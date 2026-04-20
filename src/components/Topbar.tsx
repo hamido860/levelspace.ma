@@ -90,6 +90,7 @@ export const Topbar: React.FC<{ isCollapsed?: boolean }> = ({ isCollapsed = fals
               }}
               className="p-1 hover:bg-ink/5 rounded-full text-muted/40 hover:text-accent transition-all"
               title="Refresh Connection"
+              aria-label="Refresh Connection"
             >
               <RefreshCw className={`w-2.5 h-2.5 ${dbConnected === null ? 'animate-spin' : ''}`} />
             </button>
@@ -117,6 +118,7 @@ export const Topbar: React.FC<{ isCollapsed?: boolean }> = ({ isCollapsed = fals
           <button 
             onClick={toggleTheme}
             title={theme === 'light' ? 'Dark Mode' : 'Light Mode'}
+            aria-label={theme === 'light' ? 'Dark Mode' : 'Light Mode'}
             className="text-muted hover:text-accent hover:bg-surface-mid transition-all p-2 rounded-full"
           >
             {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
@@ -128,6 +130,7 @@ export const Topbar: React.FC<{ isCollapsed?: boolean }> = ({ isCollapsed = fals
               setLanguage(nextLang as any);
             }}
             title={t('language')}
+            aria-label={t('language')}
             className="text-muted hover:text-accent hover:bg-surface-mid transition-all p-2 rounded-full"
           >
             <Globe size={18} />
@@ -135,6 +138,7 @@ export const Topbar: React.FC<{ isCollapsed?: boolean }> = ({ isCollapsed = fals
           <button 
             onClick={() => navigate('/settings')}
             title={t('settings')}
+            aria-label={t('settings')}
             className={`text-muted hover:text-accent hover:bg-surface-mid transition-all p-2 rounded-full ${location.pathname === '/settings' ? 'text-accent bg-accent/5' : ''}`}
           >
             <Settings size={18} />
@@ -144,7 +148,7 @@ export const Topbar: React.FC<{ isCollapsed?: boolean }> = ({ isCollapsed = fals
         <div className="h-8 w-px bg-ink/5 mx-1 hidden md:block" />
 
         <div className="flex items-center">
-          <button className="text-muted hover:text-accent p-2 rounded-full hover:bg-ink/5 transition-all relative">
+          <button className="text-muted hover:text-accent p-2 rounded-full hover:bg-ink/5 transition-all relative" aria-label="Notifications">
             <Bell size={18} />
             <span className="absolute top-2 right-2 w-2 h-2 bg-accent rounded-full border-2 border-surface-low"></span>
           </button>
