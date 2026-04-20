@@ -25,7 +25,9 @@ async function startServer() {
 
   // Supabase Server-Side Client
   const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+  // SECURITY: Do not use SERVICE_ROLE_KEY for the public proxy to prevent RLS bypass.
+  // Use the ANON_KEY so that requests respect Row Level Security.
+  const supabaseKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
   
   let supabase: any = null;
   if (supabaseUrl && supabaseKey && supabaseUrl !== 'YOUR_SUPABASE_URL') {
@@ -159,13 +161,14 @@ async function startServer() {
       res.json({ newsItems });
     } catch (error) {
       console.error("Scraping Agent Error:", error);
-      res.status(500).json({ error: "Failed to scrape data", details: error instanceof Error ? error.message : String(error) });
+      // SECURITY: Do not leak internal error details to the client
+      res.status(500).json({ error: "Failed to scrape data" });
     }
   });
 
   // Catch-all for API routes to ensure they always return JSON
   apiRouter.all("*", (req, res) => {
-    res.status(404).json({ error: `API route not found: ${req.method} ${req.url}` });
+    res.status(404).json({ error: "API route not found" });
   });
 
   // Mount API Router
@@ -175,7 +178,8 @@ async function startServer() {
   app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
     console.error("Global Error Handler:", err);
     if (req.path.startsWith('/api/')) {
-      return res.status(500).json({ error: "Internal Server Error", message: err.message });
+      // SECURITY: Do not leak error messages to the client
+      return res.status(500).json({ error: "Internal Server Error" });
     }
     next(err);
   });
