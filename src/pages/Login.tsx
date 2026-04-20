@@ -206,17 +206,15 @@ export const Login: React.FC = () => {
               </button>
             </p>
 
-            {process.env.NODE_ENV === 'development' && (
-              <div className="pt-4 border-t border-ink/5 flex justify-center">
-                 <button
-                   onClick={handleDemoAdmin}
-                   disabled={loading}
-                   className="text-[9px] uppercase tracking-widest font-mono font-bold text-accent/60 hover:text-accent transition-colors"
-                 >
-                   [Dev] Sign In As Demo Admin
-                 </button>
-              </div>
-            )}
+            <div className="pt-4 border-t border-ink/5 flex justify-center">
+               <button
+                 onClick={handleDemoAdmin}
+                 disabled={loading}
+                 className="text-[9px] uppercase tracking-widest font-mono font-bold text-accent/60 hover:text-accent transition-colors"
+               >
+                 Sign In As Demo Admin
+               </button>
+            </div>
           </div>
         </motion.div>
       </div>
