@@ -66,7 +66,7 @@ const Timer = () => {
   const [isRunning, setIsRunning] = useState(false);
 
   useEffect(() => {
-    let interval: any;
+    let interval: ReturnType<typeof setInterval> | undefined;
     if (isRunning) {
       interval = setInterval(() => {
         setTime((prevTime) => prevTime + 1);
