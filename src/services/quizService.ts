@@ -1,4 +1,4 @@
-import { supabase } from '../db/supabase';
+import { supabase } from '../db/supabase.ts';
 
 export interface QuizQuestion {
   id: string;
