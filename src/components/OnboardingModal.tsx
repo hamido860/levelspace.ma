@@ -111,15 +111,15 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
                 <div className="relative">
                   <div className="absolute -inset-4 bg-accent/20 blur-2xl rounded-full animate-pulse" />
                   <div className="relative w-20 h-20 bg-accent rounded-3xl flex items-center justify-center text-paper shadow-xl rotate-3">
-                    <Sparkles className="w-10 h-10" />
+                    <Sparkles className="w-8 h-8" />
                   </div>
                 </div>
                 <div className="space-y-4">
-                  <h1 className="text-xl sm:text-3xl font-display font-black text-ink leading-[1.1] tracking-tight">
+                  <h1 className="text-xl sm:text-3xl font-display font-bold text-ink leading-[1.1] tracking-tight">
                     Welcome, <span className="text-accent capitalize">{userName}</span><br />
                     Let's personalize your space
                   </h1>
-                  <p className="text-muted text-base max-w-sm mx-auto font-medium leading-relaxed">
+                  <p className="text-muted text-sm max-w-sm mx-auto font-medium leading-relaxed">
                     We'll tailor your academic curriculum to match your exact level and track.
                   </p>
                 </div>
@@ -136,11 +136,11 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
                 className="flex-1 flex flex-col"
               >
                 <div className="flex items-center gap-4 mb-8">
-                  <div className="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center text-accent">
+                  <div className="w-10 h-10 bg-gradient-to-b from-accent/10 to-transparent border border-accent/10 rounded-xl flex items-center justify-center text-accent shadow-sm">
                     <Layers className="w-5 h-5" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-display font-bold text-ink">Academic Phase</h2>
+                    <h2 className="text-lg font-display font-semibold text-ink tracking-tight">Academic Phase</h2>
                     <p className="text-muted">Select your current educational cycle.</p>
                   </div>
                 </div>
@@ -184,11 +184,11 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
                 className="flex-1 flex flex-col"
               >
                 <div className="flex items-center gap-4 mb-8">
-                  <div className="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center text-accent">
+                  <div className="w-10 h-10 bg-gradient-to-b from-accent/10 to-transparent border border-accent/10 rounded-xl flex items-center justify-center text-accent shadow-sm">
                     <GraduationCap className="w-5 h-5" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-display font-bold text-ink">Select Grade</h2>
+                    <h2 className="text-lg font-display font-semibold text-ink tracking-tight">Select Grade</h2>
                     <p className="text-muted">Which specific year are you currently in?</p>
                   </div>
                 </div>
@@ -222,11 +222,11 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
                 className="flex-1 flex flex-col"
               >
                 <div className="flex items-center gap-4 mb-8">
-                  <div className="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center text-accent">
+                  <div className="w-10 h-10 bg-gradient-to-b from-accent/10 to-transparent border border-accent/10 rounded-xl flex items-center justify-center text-accent shadow-sm">
                     <BookOpen className="w-5 h-5" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-display font-bold text-ink">Specialty / Track</h2>
+                    <h2 className="text-lg font-display font-semibold text-ink tracking-tight">Specialty / Track</h2>
                     <p className="text-muted">Choose your specific focus area.</p>
                   </div>
                 </div>
@@ -260,11 +260,11 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
                  className="flex-1 flex flex-col"
               >
                 <div className="flex items-center gap-4 mb-8">
-                  <div className="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center text-accent">
+                  <div className="w-10 h-10 bg-gradient-to-b from-accent/10 to-transparent border border-accent/10 rounded-xl flex items-center justify-center text-accent shadow-sm">
                     <Globe className="w-5 h-5" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-display font-bold text-ink">Language Option</h2>
+                    <h2 className="text-lg font-display font-semibold text-ink tracking-tight">Language Option</h2>
                     <p className="text-muted">In which language do you study scientific subjects?</p>
                   </div>
                 </div>
@@ -306,13 +306,13 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
                >
                  <div className="relative">
                    <div className="absolute -inset-6 bg-emerald-500/20 blur-3xl rounded-full" />
-                   <div className="relative w-20 h-20 bg-emerald-500 rounded-full flex items-center justify-center text-paper shadow-xl">
+                   <div className="relative w-16 h-16 bg-gradient-to-br from-emerald-500/20 to-emerald-500/5 border border-emerald-500/20 rounded-full flex items-center justify-center text-paper shadow-xl">
                      <CheckCircle2 className="w-10 h-10" />
                    </div>
                  </div>
 
                  <div className="space-y-2">
-                   <h2 className="text-xl sm:text-3xl font-display font-black text-ink tracking-tight">
+                   <h2 className="text-xl sm:text-3xl font-display font-bold text-ink tracking-tight">
                      Workspace Ready
                    </h2>
                    <p className="text-muted font-medium text-base">Your academic profile is perfectly configured.</p>
@@ -368,7 +368,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
                   (step === 3 && requiresTrack && !selectedTrack) ||
                   (step === (requiresTrack ? 4 : 3) && !selectedOption)
                 }
-                className="px-6 py-2.5 text-sm bg-ink text-paper rounded-2xl font-bold flex items-center gap-2 hover:bg-accent transition-all disabled:opacity-30 disabled:hover:bg-ink shadow-lg hover:-translate-y-1"
+                className="px-5 py-2 text-sm bg-ink text-paper rounded-xl font-semibold flex items-center gap-2 hover:bg-ink/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:-translate-y-0.5"
               >
                 Continue
                 <ArrowRight className="w-4 h-4" />
