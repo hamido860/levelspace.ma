@@ -41,9 +41,9 @@ test('submitQuizResult', async (t) => {
 
     assert.deepStrictEqual(data, { id: 'result-123' });
     assert.strictEqual(mockFrom.mock.calls.length, 1);
-    assert.strictEqual(mockFrom.mock.calls[0].arguments[0], 'quiz_results');
+    assert.strictEqual((mockFrom.mock.calls[0] as any).arguments[0], 'quiz_results');
     assert.strictEqual(mockInsert.mock.calls.length, 1);
-    assert.deepStrictEqual(mockInsert.mock.calls[0].arguments[0], [result]);
+    assert.deepStrictEqual((mockInsert.mock.calls[0] as any).arguments[0] as any, [result]);
   });
 
   await t.test('throws error when database insertion fails', async () => {

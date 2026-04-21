@@ -254,3 +254,9 @@
   margin: 1em 0;
 }
 
+
+@media (min-width: 1024px) {
+  .landing-scale {
+    zoom: 0.85;
+  }
+}

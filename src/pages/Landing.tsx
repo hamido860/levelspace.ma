@@ -27,7 +27,7 @@ export const Landing: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background text-ink font-sans selection:bg-accent/10 selection:text-accent overflow-x-hidden">
+    <div className="min-h-screen bg-background text-ink font-sans selection:bg-accent/10 selection:text-accent overflow-x-hidden lg:landing-scale">
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-ink/5">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
