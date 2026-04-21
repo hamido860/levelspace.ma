@@ -33,65 +33,68 @@ export const Topbar: React.FC<{ isCollapsed?: boolean }> = ({ isCollapsed = fals
           : 'left-0 w-full md:left-[176px] md:w-[calc(100%-176px)]'
       }`}
     >
-      {/* Session Title / Profile Section */}
-      <div 
-        onClick={() => navigate('/profile')}
-        className="flex items-center gap-3 min-w-0 cursor-pointer hover:opacity-80 transition-opacity"
-      >
-        <div className="w-7 h-7 rounded-full bg-accent/10 flex items-center justify-center shrink-0 border border-accent/20 overflow-hidden shadow-sm">
-          {profile?.avatar_url ? (
-            <img 
-              alt="User" 
-              className="w-full h-full object-cover" 
-              src={profile.avatar_url}
-              referrerPolicy="no-referrer"
-            />
-          ) : (
-            <span className="text-sm font-bold text-accent">
-              {user?.email?.[0].toUpperCase() || 'U'}
-            </span>
-          )}
-        </div>
-        <div className="flex flex-col min-w-0 leading-tight">
-          <div className="flex items-center gap-2">
-            <h2 className="text-[13px] font-black text-ink truncate tracking-tight uppercase">
-              {profile?.full_name || user?.email?.split('@')[0] || t('my_space')}
-            </h2>
-            <span className={`text-[7px] font-black uppercase tracking-tighter px-1 py-0.5 rounded ${
-              isPro ? 'bg-accent text-white' : 'bg-ink/5 text-muted'
-            }`}>
-              {isPro ? 'PRO' : 'FREE'}
-            </span>
+      {/* Session Title / Profile Section & Connection Status */}
+      <div className="flex items-center gap-4">
+        <button
+          onClick={() => navigate('/profile')}
+          className="flex items-center gap-3 min-w-0 cursor-pointer hover:opacity-80 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-lg p-1 -ml-1 text-left"
+          aria-label="View Profile"
+        >
+          <div className="w-7 h-7 rounded-full bg-accent/10 flex items-center justify-center shrink-0 border border-accent/20 overflow-hidden shadow-sm">
+            {profile?.avatar_url ? (
+              <img
+                alt="User"
+                className="w-full h-full object-cover"
+                src={profile.avatar_url}
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <span className="text-sm font-bold text-accent">
+                {user?.email?.[0].toUpperCase() || 'U'}
+              </span>
+            )}
           </div>
-          <div className="flex items-center gap-1.5 mt-0.5">
-            <span className="text-[9px] font-bold text-muted/60 uppercase tracking-widest whitespace-nowrap">
-              {currentGrade}
-            </span>
-            <div className="w-0.5 h-0.5 rounded-full bg-muted/20" />
-            <span className="text-[9px] font-bold text-accent uppercase tracking-widest whitespace-nowrap">
-              {t('active_session')}
-            </span>
+          <div className="flex flex-col min-w-0 leading-tight">
+            <div className="flex items-center gap-2">
+              <h2 className="text-[13px] font-black text-ink truncate tracking-tight uppercase">
+                {profile?.full_name || user?.email?.split('@')[0] || t('my_space')}
+              </h2>
+              <span className={`text-[7px] font-black uppercase tracking-tighter px-1 py-0.5 rounded ${
+                isPro ? 'bg-accent text-white' : 'bg-ink/5 text-muted'
+              }`}>
+                {isPro ? 'PRO' : 'FREE'}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <span className="text-[9px] font-bold text-muted/60 uppercase tracking-widest whitespace-nowrap">
+                {currentGrade}
+              </span>
+              <div className="w-0.5 h-0.5 rounded-full bg-muted/20" />
+              <span className="text-[9px] font-bold text-accent uppercase tracking-widest whitespace-nowrap">
+                {t('active_session')}
+              </span>
+            </div>
           </div>
-        </div>
+        </button>
         
         {dbConnected !== null && (
-          <div className="hidden sm:flex items-center gap-1 ml-2">
+          <div className="hidden sm:flex items-center gap-1">
             <div 
               className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full border ${dbConnected ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600' : 'bg-error/10 border-error/20 text-error'} text-[7px] font-black uppercase tracking-tighter`}
               title={dbConnected ? 'Cloud Connected' : 'Local Only'}
+              role="status"
+              aria-label={dbConnected ? 'Database cloud connected' : 'Database local only'}
             >
               <div className={`w-1 h-1 rounded-full ${dbConnected ? 'bg-emerald-500' : 'bg-error'} animate-pulse`} />
               {dbConnected ? 'Cloud' : 'Local'}
             </div>
             <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                refreshDbConnection();
-              }}
-              className="p-1 hover:bg-ink/5 rounded-full text-muted/40 hover:text-accent transition-all"
+              onClick={refreshDbConnection}
+              className="p-1 hover:bg-ink/5 rounded-full text-muted/40 hover:text-accent transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               title="Refresh Connection"
+              aria-label="Refresh Database Connection"
             >
-              <RefreshCw className={`w-2.5 h-2.5 ${dbConnected === null ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-2.5 h-2.5 ${dbConnected === null ? 'animate-spin' : ''}`} aria-hidden="true" />
             </button>
           </div>
         )}
@@ -117,9 +120,10 @@ export const Topbar: React.FC<{ isCollapsed?: boolean }> = ({ isCollapsed = fals
           <button 
             onClick={toggleTheme}
             title={theme === 'light' ? 'Dark Mode' : 'Light Mode'}
-            className="text-muted hover:text-accent hover:bg-surface-mid transition-all p-2 rounded-full"
+            aria-label={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+            className="text-muted hover:text-accent hover:bg-surface-mid transition-all p-2 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
-            {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+            {theme === 'light' ? <Moon size={18} aria-hidden="true" /> : <Sun size={18} aria-hidden="true" />}
           </button>
           <button 
             onClick={() => {
@@ -128,24 +132,29 @@ export const Topbar: React.FC<{ isCollapsed?: boolean }> = ({ isCollapsed = fals
               setLanguage(nextLang as any);
             }}
             title={t('language')}
-            className="text-muted hover:text-accent hover:bg-surface-mid transition-all p-2 rounded-full"
+            aria-label={`Change language, current is ${language}`}
+            className="text-muted hover:text-accent hover:bg-surface-mid transition-all p-2 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
-            <Globe size={18} />
+            <Globe size={18} aria-hidden="true" />
           </button>
           <button 
             onClick={() => navigate('/settings')}
             title={t('settings')}
-            className={`text-muted hover:text-accent hover:bg-surface-mid transition-all p-2 rounded-full ${location.pathname === '/settings' ? 'text-accent bg-accent/5' : ''}`}
+            aria-label="Open settings"
+            className={`text-muted hover:text-accent hover:bg-surface-mid transition-all p-2 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${location.pathname === '/settings' ? 'text-accent bg-accent/5' : ''}`}
           >
-            <Settings size={18} />
+            <Settings size={18} aria-hidden="true" />
           </button>
         </div>
 
         <div className="h-8 w-px bg-ink/5 mx-1 hidden md:block" />
 
         <div className="flex items-center">
-          <button className="text-muted hover:text-accent p-2 rounded-full hover:bg-ink/5 transition-all relative">
-            <Bell size={18} />
+          <button
+            className="text-muted hover:text-accent p-2 rounded-full hover:bg-ink/5 transition-all relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            aria-label="Notifications"
+          >
+            <Bell size={18} aria-hidden="true" />
             <span className="absolute top-2 right-2 w-2 h-2 bg-accent rounded-full border-2 border-surface-low"></span>
           </button>
         </div>
