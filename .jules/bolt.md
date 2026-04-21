@@ -1,0 +1,3 @@
+## 2024-06-25 - [Scroll Listener Bottleneck in React]
+**Learning:** Attaching a custom scroll event listener (`window.addEventListener('scroll')`) that triggers a React state update (e.g., `setScrollProgress`) on every scroll event is a massive performance anti-pattern. This causes the entire component tree to re-render synchronously with the scroll, leading to severe main-thread blocking and frame drops, especially in large components like `LessonView`.
+**Action:** Use framer-motion's `useScroll` hook to manage scroll-driven animations (like progress bars) purely through CSS variables/transforms, entirely bypassing React state updates and the render cycle during scrolling.

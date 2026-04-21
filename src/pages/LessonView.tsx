@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useScroll, useTransform } from 'motion/react';
 import { Layout } from '../components/Layout';
 import { 
   AlertCircle,
@@ -137,7 +137,7 @@ export const LessonView: React.FC = () => {
   const [auditResult, setAuditResult] = useState<AuditResult | null>(null);
 
   // Scroll Progress state
-  const [scrollProgress, setScrollProgress] = useState(0);
+  const { scrollYProgress } = useScroll();
   const [isGeneratingTags, setIsGeneratingTags] = useState(false);
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [showReminderModal, setShowReminderModal] = useState(false);
@@ -159,17 +159,6 @@ export const LessonView: React.FC = () => {
   const [activeInteractiveType, setActiveInteractiveType] = useState<'hard_questions' | 'more_examples' | 'exam_questions' | null>(null);
   const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
   const [forceDir, setForceDir] = useState<'ltr' | 'rtl' | null>(null);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      const totalHeight = document.documentElement.scrollHeight - window.innerHeight;
-      const progress = (window.scrollY / totalHeight) * 100;
-      setScrollProgress(progress);
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
 
   // AI Explanation state
   const [selectedText, setSelectedText] = useState<string | null>(null);
@@ -502,10 +491,8 @@ export const LessonView: React.FC = () => {
       {/* Fixed Progress Bar */}
       <div className="fixed top-0 left-0 right-0 h-1.5 z-40 bg-ink/5 pointer-events-none">
         <motion.div 
-          className="h-full bg-accent shadow-[0_0_12px_rgba(18,70,255,0.4)]"
-          initial={{ width: 0 }}
-          animate={{ width: `${scrollProgress}%` }}
-          transition={{ type: 'spring', damping: 25, stiffness: 120 }}
+          className="h-full bg-accent shadow-[0_0_12px_rgba(18,70,255,0.4)] origin-left"
+          style={{ scaleX: scrollYProgress }}
         />
       </div>
 
