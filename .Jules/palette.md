@@ -1,0 +1,3 @@
+## 2026-04-21 - Fixed nested interactive element and added a11y labels in Topbar
+**Learning:** Found an anti-pattern in the Topbar component: using `<div onClick={...}>` containing an interactive sub-element (`<button>` for Refresh connection). This causes a11y issues because a `div` is not focusable natively and screen readers struggle to parse it properly.
+**Action:** Always use semantic `<button>` tags instead of `onClick` on `div` elements, especially when there are no nested interactive elements. If there are nested elements, refactor them so they sit side-by-side rather than nested. Also added proper `aria-label`s and `aria-hidden` attributes to Lucide icons.
