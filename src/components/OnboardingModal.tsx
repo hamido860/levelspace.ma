@@ -83,7 +83,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        className="bg-paper w-full max-w-2xl rounded-[2rem] shadow-2xl overflow-hidden border border-ink/10 relative"
+        className="bg-paper w-full max-w-xl rounded-[2rem] shadow-2xl overflow-hidden border border-ink/10 relative"
       >
         <div className="absolute inset-0 bg-gradient-to-br from-accent/5 via-transparent to-transparent pointer-events-none" />
         
@@ -96,7 +96,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
           />
         </div>
 
-        <div className="p-8 md:p-12 min-h-[500px] flex flex-col">
+        <div className="p-6 md:p-10 min-h-[425px] flex flex-col">
           <AnimatePresence mode="wait">
             
             {/* STEP 0: WELCOME */}
@@ -110,16 +110,16 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
               >
                 <div className="relative">
                   <div className="absolute -inset-4 bg-accent/20 blur-2xl rounded-full animate-pulse" />
-                  <div className="relative w-24 h-24 bg-accent rounded-[2rem] flex items-center justify-center text-paper shadow-xl rotate-3">
-                    <Sparkles className="w-12 h-12" />
+                  <div className="relative w-20 h-20 bg-accent rounded-3xl flex items-center justify-center text-paper shadow-xl rotate-3">
+                    <Sparkles className="w-10 h-10" />
                   </div>
                 </div>
                 <div className="space-y-4">
-                  <h1 className="text-4xl sm:text-5xl font-display font-black text-ink leading-[1.1] tracking-tight">
+                  <h1 className="text-xl sm:text-3xl font-display font-black text-ink leading-[1.1] tracking-tight">
                     Welcome, <span className="text-accent capitalize">{userName}</span><br />
                     Let's personalize your space
                   </h1>
-                  <p className="text-muted text-lg max-w-md mx-auto font-medium leading-relaxed">
+                  <p className="text-muted text-base max-w-sm mx-auto font-medium leading-relaxed">
                     We'll tailor your academic curriculum to match your exact level and track.
                   </p>
                 </div>
@@ -136,11 +136,11 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
                 className="flex-1 flex flex-col"
               >
                 <div className="flex items-center gap-4 mb-8">
-                  <div className="w-12 h-12 bg-accent/10 rounded-2xl flex items-center justify-center text-accent">
-                    <Layers className="w-6 h-6" />
+                  <div className="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center text-accent">
+                    <Layers className="w-5 h-5" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-display font-bold text-ink">Academic Phase</h2>
+                    <h2 className="text-xl font-display font-bold text-ink">Academic Phase</h2>
                     <p className="text-muted">Select your current educational cycle.</p>
                   </div>
                 </div>
@@ -156,16 +156,16 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
                           : 'bg-surface-low border-transparent hover:border-accent/30 hover:bg-paper hover:shadow-md'
                       }`}
                     >
-                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 transition-colors ${
+                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 transition-colors ${
                         selectedCycle === cycle.id ? 'bg-accent text-paper' : 'bg-surface-mid text-ink-secondary group-hover:bg-accent/10 group-hover:text-accent'
                       }`}>
-                        <cycle.icon className="w-6 h-6" />
+                        <cycle.icon className="w-5 h-5" />
                       </div>
                       <div className="flex-1">
-                        <h3 className={`font-bold text-lg leading-tight mb-1 ${selectedCycle === cycle.id ? 'text-accent' : 'text-ink'}`}>
+                        <h3 className={`font-bold text-base leading-tight mb-1 ${selectedCycle === cycle.id ? 'text-accent' : 'text-ink'}`}>
                           {cycle.name}
                         </h3>
-                        <p className="text-sm text-muted font-medium">{cycle.desc}</p>
+                        <p className="text-xs text-muted font-medium">{cycle.desc}</p>
                       </div>
                       {selectedCycle === cycle.id && <CheckCircle2 className="w-5 h-5 text-accent shrink-0" />}
                     </button>
@@ -184,11 +184,11 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
                 className="flex-1 flex flex-col"
               >
                 <div className="flex items-center gap-4 mb-8">
-                  <div className="w-12 h-12 bg-accent/10 rounded-2xl flex items-center justify-center text-accent">
-                    <GraduationCap className="w-6 h-6" />
+                  <div className="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center text-accent">
+                    <GraduationCap className="w-5 h-5" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-display font-bold text-ink">Select Grade</h2>
+                    <h2 className="text-xl font-display font-bold text-ink">Select Grade</h2>
                     <p className="text-muted">Which specific year are you currently in?</p>
                   </div>
                 </div>
@@ -198,7 +198,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
                     <button
                       key={grade}
                       onClick={() => { setSelectedGrade(grade); setSelectedTrack(""); }}
-                      className={`p-4 rounded-2xl border-2 font-bold transition-all text-center flex items-center justify-center gap-2 ${
+                      className={`p-3 rounded-xl border-2 text-sm font-bold transition-all text-center flex items-center justify-center gap-2 ${
                         selectedGrade === grade 
                           ? 'bg-accent border-accent text-paper shadow-lg shadow-accent/20' 
                           : 'bg-surface-low border-transparent text-ink hover:border-accent/30 hover:bg-paper'
@@ -222,11 +222,11 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
                 className="flex-1 flex flex-col"
               >
                 <div className="flex items-center gap-4 mb-8">
-                  <div className="w-12 h-12 bg-accent/10 rounded-2xl flex items-center justify-center text-accent">
-                    <BookOpen className="w-6 h-6" />
+                  <div className="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center text-accent">
+                    <BookOpen className="w-5 h-5" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-display font-bold text-ink">Specialty / Track</h2>
+                    <h2 className="text-xl font-display font-bold text-ink">Specialty / Track</h2>
                     <p className="text-muted">Choose your specific focus area.</p>
                   </div>
                 </div>
@@ -236,7 +236,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
                     <button
                       key={track}
                       onClick={() => setSelectedTrack(track)}
-                      className={`p-4 rounded-2xl border-2 font-bold transition-all text-left flex items-center justify-between group ${
+                      className={`p-3 rounded-xl border-2 text-sm font-bold transition-all text-left flex items-center justify-between group ${
                         selectedTrack === track 
                           ? 'bg-accent/10 border-accent text-accent shadow-md' 
                           : 'bg-surface-low border-transparent text-ink hover:border-accent/30 hover:bg-paper'
@@ -260,11 +260,11 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
                  className="flex-1 flex flex-col"
               >
                 <div className="flex items-center gap-4 mb-8">
-                  <div className="w-12 h-12 bg-accent/10 rounded-2xl flex items-center justify-center text-accent">
-                    <Globe className="w-6 h-6" />
+                  <div className="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center text-accent">
+                    <Globe className="w-5 h-5" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-display font-bold text-ink">Language Option</h2>
+                    <h2 className="text-xl font-display font-bold text-ink">Language Option</h2>
                     <p className="text-muted">In which language do you study scientific subjects?</p>
                   </div>
                 </div>
@@ -278,17 +278,17 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
                     <button
                       key={opt.id}
                       onClick={() => setSelectedOption(opt.id)}
-                      className={`p-5 rounded-2xl border-2 transition-all text-left flex items-start justify-between group ${
+                      className={`p-4 rounded-xl border-2 text-sm transition-all text-left flex items-start justify-between group ${
                         selectedOption === opt.id 
                           ? 'bg-accent/5 border-accent shadow-md' 
                           : 'bg-surface-low border-transparent hover:border-accent/30 hover:bg-paper'
                       }`}
                     >
                       <div>
-                        <h3 className={`font-bold text-lg mb-1 ${selectedOption === opt.id ? 'text-accent' : 'text-ink'}`}>{opt.name}</h3>
-                        <p className="text-sm text-muted">{opt.desc}</p>
+                        <h3 className={`font-bold text-base mb-1 ${selectedOption === opt.id ? 'text-accent' : 'text-ink'}`}>{opt.name}</h3>
+                        <p className="text-xs text-muted">{opt.desc}</p>
                       </div>
-                      {selectedOption === opt.id && <CheckCircle2 className="w-6 h-6 text-accent mt-2" />}
+                      {selectedOption === opt.id && <CheckCircle2 className="w-5 h-5 text-accent mt-2" />}
                     </button>
                   ))}
                 </div>
@@ -306,19 +306,19 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
                >
                  <div className="relative">
                    <div className="absolute -inset-6 bg-emerald-500/20 blur-3xl rounded-full" />
-                   <div className="relative w-24 h-24 bg-emerald-500 rounded-full flex items-center justify-center text-paper shadow-xl">
-                     <CheckCircle2 className="w-12 h-12" />
+                   <div className="relative w-20 h-20 bg-emerald-500 rounded-full flex items-center justify-center text-paper shadow-xl">
+                     <CheckCircle2 className="w-10 h-10" />
                    </div>
                  </div>
 
                  <div className="space-y-2">
-                   <h2 className="text-3xl sm:text-4xl font-display font-black text-ink tracking-tight">
+                   <h2 className="text-xl sm:text-3xl font-display font-black text-ink tracking-tight">
                      Workspace Ready
                    </h2>
-                   <p className="text-muted font-medium text-lg">Your academic profile is perfectly configured.</p>
+                   <p className="text-muted font-medium text-base">Your academic profile is perfectly configured.</p>
                  </div>
 
-                 <div className="w-full bg-surface-low border border-ink/5 rounded-3xl p-6 text-left space-y-4">
+                 <div className="w-full bg-surface-low border border-ink/5 rounded-2xl p-5 text-left text-sm space-y-4">
                    <div className="flex justify-between border-b border-ink/5 pb-3">
                      <span className="text-muted font-bold uppercase text-sm tracking-wider">Cycle</span>
                      <span className="font-bold text-ink">{CYCLES.find(c => c.id === selectedCycle)?.name}</span>
@@ -350,7 +350,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
             {step > 0 ? (
               <button
                 onClick={handleBack}
-                className="px-6 py-3 rounded-2xl font-bold text-muted hover:text-ink hover:bg-ink/5 transition-all flex items-center gap-2 group"
+                className="px-5 py-2.5 text-sm rounded-2xl font-bold text-muted hover:text-ink hover:bg-ink/5 transition-all flex items-center gap-2 group"
               >
                 <ArrowRight className="w-4 h-4 rotate-180 group-hover:-translate-x-1 transition-transform" />
                 Back
@@ -368,7 +368,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
                   (step === 3 && requiresTrack && !selectedTrack) ||
                   (step === (requiresTrack ? 4 : 3) && !selectedOption)
                 }
-                className="px-8 py-3 bg-ink text-paper rounded-2xl font-bold flex items-center gap-2 hover:bg-accent transition-all disabled:opacity-30 disabled:hover:bg-ink shadow-lg hover:-translate-y-1"
+                className="px-6 py-2.5 text-sm bg-ink text-paper rounded-2xl font-bold flex items-center gap-2 hover:bg-accent transition-all disabled:opacity-30 disabled:hover:bg-ink shadow-lg hover:-translate-y-1"
               >
                 Continue
                 <ArrowRight className="w-4 h-4" />
@@ -376,7 +376,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
             ) : (
               <button
                 onClick={handleComplete}
-                className="px-8 py-3 bg-accent text-paper rounded-2xl font-bold flex items-center gap-2 hover:bg-[var(--accent-hover)] transition-all shadow-xl shadow-accent/20 hover:-translate-y-1 group"
+                className="px-6 py-2.5 text-sm bg-accent text-paper rounded-2xl font-bold flex items-center gap-2 hover:bg-[var(--accent-hover)] transition-all shadow-xl shadow-accent/20 hover:-translate-y-1 group"
               >
                 Enter Platform
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
