@@ -93,7 +93,7 @@ export const Login: React.FC = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="w-full max-w-md bg-paper rounded-[2rem] shadow-2xl shadow-ink/5 border border-ink/5 overflow-hidden lg:scale-[0.85] lg:origin-center"
+          className="w-full max-w-md bg-paper rounded-[2rem] shadow-2xl shadow-ink/5 border border-ink/5 overflow-hidden lg:scale-[0.70] lg:origin-center"
         >
           {/* Top Branding Bar */}
           <div className="bg-accent p-6 flex items-center justify-between">
