@@ -84,7 +84,7 @@ export const Login: React.FC = () => {
   return (
     <Layout hideSidebar>
       <SEO title={mode === 'login' ? "Login" : "Sign Up"} />
-      <div className="min-h-screen flex items-center justify-center bg-surface-low p-4 md:p-8 font-sans relative overflow-hidden">
+      <div className="min-h-[100dvh] w-full flex items-center justify-center bg-background p-4 md:p-8 font-sans relative overflow-hidden">
         {/* Background Accents */}
         <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_0%_0%,_var(--tw-gradient-stops))] from-accent/5 via-transparent to-transparent pointer-events-none" />
         <div className="absolute bottom-0 right-0 w-full h-full bg-[radial-gradient(circle_at_100%_100%,_var(--tw-gradient-stops))] from-accent/5 via-transparent to-transparent pointer-events-none" />
@@ -93,7 +93,7 @@ export const Login: React.FC = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="w-full max-w-md bg-paper rounded-[2rem] shadow-2xl shadow-ink/5 border border-ink/5 overflow-hidden"
+          className="w-full max-w-md bg-paper rounded-[2rem] shadow-2xl shadow-ink/5 border border-ink/5 overflow-hidden lg:scale-[0.70] lg:origin-center"
         >
           {/* Top Branding Bar */}
           <div className="bg-accent p-6 flex items-center justify-between">
