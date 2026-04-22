@@ -1356,9 +1356,9 @@ The output format should be a JSON array of lesson objects.`;
         
         await supabase.from('topics').delete().eq('grade_id', gradeId).eq('subject_id', subjectId).eq('title', name);
       } else if (type === 'bac_section') {
-        await supabase.from('bac_sections').delete().eq('id', name);
+        await supabase.from('bac_sections').delete().eq('name', name);
       } else if (type === 'bac_track') {
-        await supabase.from('bac_tracks').delete().eq('id', name);
+        await supabase.from('bac_tracks').delete().eq('name', name);
       } else if (type === 'track_subject') {
         if (!parent_name || !second_parent_name) throw new Error("Track and Subject are required");
         await supabase.from('bac_track_subjects').delete().eq('track_id', parent_name).eq('subject_id', second_parent_name);
