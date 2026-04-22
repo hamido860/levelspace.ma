@@ -151,8 +151,9 @@ export const Library: React.FC = () => {
 
   const addItem = (e: React.FormEvent) => {
     e.preventDefault();
+    // Security enhancement: Use crypto.randomUUID() instead of Math.random() for secure ID generation
     const item: LibraryItem = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: crypto.randomUUID(),
       title: newItem.title || newItem.url,
       author: 'Web Resource',
       format: 'link',

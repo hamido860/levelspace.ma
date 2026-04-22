@@ -93,8 +93,9 @@ export const StudyPlanner: React.FC = () => {
     e.preventDefault();
     if (!newSession.subject || !newSession.date || !newSession.startTime) return;
     
+    // Security enhancement: Use crypto.randomUUID() instead of Math.random() for secure ID generation
     const session: StudySession = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: crypto.randomUUID(),
       ...newSession,
       completed: false
     };
@@ -113,8 +114,9 @@ export const StudyPlanner: React.FC = () => {
     e.preventDefault();
     if (!newGoal.title || !newGoal.deadline) return;
     
+    // Security enhancement: Use crypto.randomUUID() instead of Math.random() for secure ID generation
     const goal: StudyGoal = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: crypto.randomUUID(),
       ...newGoal,
       progress: 0
     };
