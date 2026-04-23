@@ -1,0 +1,3 @@
+## 2025-04-23 - Interactive Icon-Only Elements Accessibility Pattern
+**Learning:** In this application, interactive icon-only elements (such as buttons without text) must have `aria-label` attributes to be accessible to screen readers. In addition, standard accessibility and keyboard navigation styling in this codebase uses Tailwind focus classes: `focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1`.
+**Action:** When adding or modifying interactive icon-only elements, always ensure an `aria-label` is present and apply the standard focus styling classes to improve accessibility and keyboard navigation.
