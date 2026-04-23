@@ -38,9 +38,17 @@ export const Profile: React.FC = () => {
   React.useEffect(() => {
     const fetchTrackName = async () => {
       if (selectedBacTrackId) {
-        const { data } = await supabase.from('bac_tracks').select('name').eq('id', selectedBacTrackId).single();
-        if (data) {
-          setBacTrackName(data.name);
+        // UUID validation check
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(selectedBacTrackId);
+
+        if (isUUID) {
+          const { data } = await supabase.from('bac_tracks').select('name').eq('id', selectedBacTrackId).single();
+          if (data) {
+            setBacTrackName(data.name);
+          }
+        } else {
+          // If not UUID, it's already the name
+          setBacTrackName(selectedBacTrackId);
         }
       }
     };
