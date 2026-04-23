@@ -1,3 +1,4 @@
+import { db } from "../db/db";
 import { supabase } from "../db/supabase";
 import { generateFullLesson, LessonTemplate, AILesson, AILessonBlock } from "./geminiService";
 import { saveLesson, searchLessons } from "./ragService";
@@ -18,6 +19,22 @@ export const lessonService = {
     const { title, grade, country, moduleId } = params;
 
     try {
+      // 0. Check local IndexedDB first
+      const localLesson = await db.lessons
+        .where('moduleId').equals(moduleId)
+        .and(l => l.title === title && l.status !== 'suggested')
+        .first();
+
+      if (localLesson) {
+        console.log("Found existing lesson in local IndexedDB");
+        return {
+          id: localLesson.id,
+          title: localLesson.title,
+          subtitle: localLesson.subtitle || '',
+          blocks: localLesson.blocks || []
+        };
+      }
+
       // 1. Search for existing lesson in Supabase using RAG/Vector search
       console.log(`Searching for existing lesson: ${title}`);
       const similarLessons = await searchLessons(title, 1);

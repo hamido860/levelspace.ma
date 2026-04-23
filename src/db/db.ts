@@ -61,6 +61,12 @@ export interface Resource {
   createdAt: number;
 }
 
+export interface AICache {
+  key: string;
+  response: any;
+  createdAt: number;
+}
+
 export class AppDatabase extends Dexie {
   modules!: Table<Module>;
   tasks!: Table<Task>;
@@ -69,17 +75,19 @@ export class AppDatabase extends Dexie {
   notes!: Table<Note>;
   resources!: Table<Resource>;
   settings!: Table<{ key: string, value: any }>;
+  aiCache!: Table<AICache>;
 
   constructor() {
     super('LevelSpaceDB');
-    this.version(5).stores({
+    this.version(6).stores({
       modules: 'id, category, selected, createdAt',
       tasks: 'id, completed, createdAt, dueDate',
       schedule: 'id, date, month',
       lessons: 'id, moduleId, status, createdAt',
       notes: 'id, lessonId, createdAt',
       resources: 'id, type, category, createdAt',
-      settings: 'key'
+      settings: 'key',
+      aiCache: 'key, createdAt'
     });
   }
 }
