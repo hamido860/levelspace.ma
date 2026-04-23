@@ -8,7 +8,11 @@
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "fn:secrets": "supabase secrets set GEMINI_KEY_0=$GEMINI_KEY_0 SR_KEY=$SR_KEY --project-ref pimojkivimygenhygsto",
+    "fn:deploy": "supabase functions deploy generate-lessons --project-ref pimojkivimygenhygsto --no-verify-jwt",
+    "fn:invoke": "supabase functions invoke generate-lessons --project-ref pimojkivimygenhygsto",
+    "fn:logs": "supabase functions logs generate-lessons --project-ref pimojkivimygenhygsto"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
@@ -45,6 +49,7 @@
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
     "autoprefixer": "^10.4.21",
+    "supabase": "^2.95.0",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
