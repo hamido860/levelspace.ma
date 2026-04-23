@@ -1,0 +1,3 @@
+## 2024-04-23 - Memoize Module lists filtering and object mapping
+**Learning:** In `Modules.tsx`, `modules` is computed by `.map` on `dbModules`, and `filteredModules` is re-computed on every render. Because `dbModules` is fetched via `useLiveQuery`, React triggers a re-render even if the query result hasn't changed. Creating new objects on every render without memoization is an unnecessary bottleneck when typing into search inputs, causing noticeable lag if the list is long.
+**Action:** Use `useMemo` for computationally intensive maps and filters (e.g. mapping `dbModules` to add icons and filtering them based on `searchQuery`).
