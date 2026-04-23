@@ -10,6 +10,29 @@ export default defineConfig(({mode}) => {
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY || process.env.GEMINI_API_KEY || ''),
     },
+    build: {
+      chunkSizeWarningLimit: 600,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            // Core React — always needed
+            'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+
+            // Supabase client
+            'vendor-supabase': ['@supabase/supabase-js'],
+
+            // UI / animation — load after paint
+            'vendor-ui': ['motion', 'framer-motion', 'lucide-react'],
+
+            // Math rendering — lazy load only on lesson pages
+            'vendor-katex': ['katex'],
+
+            // Heavy ML runtime — isolated chunk, loaded only if needed
+            'vendor-onnx': ['onnxruntime-web'],
+          },
+        },
+      },
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
