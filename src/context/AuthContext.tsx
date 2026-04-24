@@ -56,6 +56,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!dbConnected || !user || user.id === 'demo-admin-id') {
       return { errors: ['Not connected to cloud or user acting as demo admin'] };
     }
+    // Pull cloud → local first (restores lessons on new devices / fresh sessions),
+    // then push local → cloud so any offline changes are not lost.
+    await syncService.pullAll(user.id);
     return await syncService.syncAll(user.id);
   };
 
