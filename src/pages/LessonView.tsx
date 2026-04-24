@@ -236,6 +236,11 @@ export const LessonView: React.FC = () => {
     } else if (lesson && !lesson.blocks && openBlocks.length === 0) {
       setOpenBlocks(['content']);
     }
+
+    if (lesson) {
+      // Save last viewed lesson
+      db.settings.put({ key: 'last_viewed_lesson_id', value: lesson.id });
+    }
   }, [lesson]);
 
   useEffect(() => {

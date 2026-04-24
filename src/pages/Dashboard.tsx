@@ -87,6 +87,12 @@ export const Dashboard: React.FC = () => {
   }, []);
 
   const allModules = useLiveQuery(() => db.modules.toArray()) || [];
+  const lastViewedLessonId = useLiveQuery(async () => {
+    const setting = await db.settings.get('last_viewed_lesson_id');
+    return setting?.value;
+  });
+  const lastLesson = useLiveQuery(() => lastViewedLessonId ? db.lessons.get(lastViewedLessonId) : undefined, [lastViewedLessonId]);
+
   const activeModules = allModules.filter(m => m.selected);
   const reminders = useLiveQuery(() => db.tasks.toArray()) || [];
   const schedule = useLiveQuery(() => db.schedule.toArray()) || [];
@@ -366,6 +372,30 @@ export const Dashboard: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 px-4">
           {/* Main Content - Classrooms */}
           <div className="lg:col-span-8 space-y-8">
+            {/* Last Lesson Quick Action */}
+            {lastLesson && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                onClick={() => navigate(`/lesson/${lastLesson.id}`)}
+                className="bg-accent/5 border border-accent/20 rounded-2xl p-4 flex items-center justify-between group cursor-pointer hover:bg-accent/10 transition-all"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-accent text-white rounded-xl flex items-center justify-center">
+                    <BookOpen size={20} />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-accent uppercase tracking-widest">Continue Learning</p>
+                    <h3 className="text-sm font-bold text-ink">{lastLesson.title}</h3>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 text-accent">
+                  <span className="text-[10px] font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">Resume</span>
+                  <ChevronRight size={18} />
+                </div>
+              </motion.div>
+            )}
+
             <div className="flex items-center justify-between">
               <div className="space-y-1">
                 <h2 className="text-2xl font-bold text-ink">{t('active_classrooms')}</h2>

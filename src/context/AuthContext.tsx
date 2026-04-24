@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase, getProfile, checkSupabaseConnection } from '../db/supabase';
 import { syncService } from '../services/syncService';
+import { db } from '../db/db';
 
 interface AuthContextType {
   user: User | null;
@@ -73,8 +74,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (session?.user) {
         setUser(session.user);
+
+        // Try to load from cache first
+        const cachedProfile = await db.settings.get(`profile_${session.user.id}`);
+        if (cachedProfile) {
+          setProfile(cachedProfile.value);
+        }
+
         const userProfile = await getProfile(session.user.id);
-        setProfile(userProfile);
+        if (userProfile) {
+          setProfile(userProfile);
+          await db.settings.put({ key: `profile_${session.user.id}`, value: userProfile });
+        }
       } else {
         if (localStorage.getItem('demo_admin_logged_in') === 'true') {
           setUser(dummyAdminUser);
@@ -94,8 +105,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (session?.user) {
         setUser(session.user);
+
+        // Try to load from cache first
+        const cachedProfile = await db.settings.get(`profile_${session.user.id}`);
+        if (cachedProfile) {
+          setProfile(cachedProfile.value);
+        }
+
         const userProfile = await getProfile(session.user.id);
-        setProfile(userProfile);
+        if (userProfile) {
+          setProfile(userProfile);
+          await db.settings.put({ key: `profile_${session.user.id}`, value: userProfile });
+        }
       } else {
         if (localStorage.getItem('demo_admin_logged_in') === 'true') {
           setUser(dummyAdminUser);

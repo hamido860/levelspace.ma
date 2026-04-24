@@ -2,6 +2,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { jsonrepair } from "jsonrepair";
 import { moroccanAcademicDb } from "../data/moroccan_academic_db";
 import { toast } from "sonner";
+import { db } from "../db/db";
 import { searchContextForGeneration } from "./ragService";
 import { transformersService } from "./transformersService";
 
@@ -155,8 +156,36 @@ export const handleApiError = (error: any, context: string) => {
 
 // --- AI Response Pipeline ---
 
-// 1. Cache (Free)
-const responseCache = new Map<string, string>();
+// 1. Cache (Free & Persistent)
+const responseCache = {
+  get: async (key: string): Promise<string | null> => {
+    try {
+      const cached = await db.aiCache.get(key);
+      if (cached) {
+        // Optional: Implement TTL (Time-To-Live) here if needed
+        return cached.response;
+      }
+    } catch (err) {
+      console.warn("Failed to read from AI cache:", err);
+    }
+    return null;
+  },
+  set: async (key: string, response: string): Promise<void> => {
+    try {
+      await db.aiCache.put({
+        key,
+        response,
+        createdAt: Date.now()
+      });
+    } catch (err) {
+      console.warn("Failed to write to AI cache:", err);
+    }
+  },
+  has: async (key: string): Promise<boolean> => {
+    const cached = await db.aiCache.get(key);
+    return !!cached;
+  }
+};
 
 export function getCacheKey(operation: string, ...args: any[]): string {
   return `${operation}:${JSON.stringify(args)}`;
@@ -929,9 +958,10 @@ export const generateCurriculum = async (
   try {
     // 1. Check Cache
     const cacheKey = getCacheKey("generateCurriculum", country, grade, isAdmin);
-    if (responseCache.has(cacheKey)) {
+    const cachedResponse = await responseCache.get(cacheKey);
+    if (cachedResponse) {
       console.log("Pipeline: Cache hit for generateCurriculum");
-      return safeJsonParse(responseCache.get(cacheKey)!);
+      return safeJsonParse(cachedResponse);
     }
 
     let extraContext = "";
@@ -993,7 +1023,7 @@ export const generateCurriculum = async (
     try {
       const parsed = safeJsonParse(text);
       // Save to cache
-      responseCache.set(cacheKey, text);
+      await responseCache.set(cacheKey, text);
       return parsed;
     } catch (parseError) {
       console.error("JSON Parse Error in generateCurriculum:", parseError);
@@ -1029,9 +1059,10 @@ export const generateSeedLesson = async (
       strictRAG,
       existingContext
     );
-    if (responseCache.has(cacheKey)) {
+    const cachedResponse = await responseCache.get(cacheKey);
+    if (cachedResponse) {
       console.log("Pipeline: Cache hit for generateSeedLesson");
-      return safeJsonParse(responseCache.get(cacheKey)!);
+      return safeJsonParse(cachedResponse);
     }
 
     const ragInstruction = strictRAG ? `\nSTRICT RAG MODE IS ENABLED: You MUST firmly base the entire generated lesson strictly on this provided existing context. Do NOT hallucinate concepts outside of this context:\n<EXISTING_CONTEXT>\n${existingContext}\n</EXISTING_CONTEXT>\n\nIf the existing context is empty, simply summarize the topic briefly without generating deep educational material.` : "";
@@ -1160,7 +1191,7 @@ export const generateSeedLesson = async (
     try {
       const parsed = safeJsonParse(text);
       // Save to cache
-      responseCache.set(cacheKey, text);
+      await responseCache.set(cacheKey, text);
       return parsed;
     } catch (parseError) {
       console.error("JSON Parse Error in generateSeedLesson:", parseError);
@@ -1256,9 +1287,10 @@ export const generateLessonSuggestions = async (
       country,
       existingTopics
     );
-    if (responseCache.has(cacheKey)) {
+    const cachedResponse = await responseCache.get(cacheKey);
+    if (cachedResponse) {
       console.log("Pipeline: Cache hit for generateLessonSuggestions");
-      return safeJsonParse(responseCache.get(cacheKey)!);
+      return safeJsonParse(cachedResponse);
     }
 
     const topicsContext = existingTopics && existingTopics.length > 0
@@ -1300,7 +1332,7 @@ export const generateLessonSuggestions = async (
     try {
       const parsed = safeJsonParse(text);
       // Save to cache
-      responseCache.set(cacheKey, text);
+      await responseCache.set(cacheKey, text);
       return parsed;
     } catch (parseError) {
       console.error(
@@ -1346,9 +1378,10 @@ export const explainText = async (
       userLanguage,
       strictRAG
     );
-    if (responseCache.has(cacheKey)) {
+    const cachedResponse = await responseCache.get(cacheKey);
+    if (cachedResponse) {
       console.log("Pipeline: Cache hit for explainText");
-      return responseCache.get(cacheKey)!;
+      return cachedResponse;
     }
 
     // 2. Determine Model (Simple task doesn't apply to explanations)
@@ -1381,7 +1414,7 @@ export const explainText = async (
       response.text || "I couldn't generate an explanation for that text.";
 
     // Save to cache
-    responseCache.set(cacheKey, responseText);
+    await responseCache.set(cacheKey, responseText);
 
     return responseText;
   } catch (error) {
@@ -1412,9 +1445,10 @@ export const auditLessonLanguage = async (
       grade,
       country,
     );
-    if (responseCache.has(cacheKey)) {
+    const cachedResponse = await responseCache.get(cacheKey);
+    if (cachedResponse) {
       console.log("Pipeline: Cache hit for auditLessonLanguage");
-      return safeJsonParse(responseCache.get(cacheKey)!);
+      return safeJsonParse(cachedResponse);
     }
 
     const response = await generateContentWithFallback(
@@ -1470,7 +1504,7 @@ export const auditLessonLanguage = async (
 
     try {
       const parsed = safeJsonParse(text);
-      responseCache.set(cacheKey, text);
+      await responseCache.set(cacheKey, text);
       return parsed;
     } catch (parseError) {
       console.error("JSON Parse Error in auditLessonLanguage:", parseError);
@@ -1517,9 +1551,10 @@ export const generateLessonTags = async (
       grade,
       country,
     );
-    if (responseCache.has(cacheKey)) {
+    const cachedResponse = await responseCache.get(cacheKey);
+    if (cachedResponse) {
       console.log("Pipeline: Cache hit for generateLessonTags");
-      return safeJsonParse(responseCache.get(cacheKey)!);
+      return safeJsonParse(cachedResponse);
     }
 
     const response = await generateContentWithFallback(
@@ -1549,7 +1584,7 @@ export const generateLessonTags = async (
     if (!text) return [];
 
     const parsed = safeJsonParse(text);
-    responseCache.set(cacheKey, text);
+    await responseCache.set(cacheKey, text);
     return parsed;
   } catch (error) {
     handleApiError(error, "generateLessonTags");
@@ -1568,9 +1603,10 @@ export const generateProactiveGreeting = async (
       lessonContent,
       userLanguage,
     );
-    if (responseCache.has(cacheKey)) {
+    const cachedResponse = await responseCache.get(cacheKey);
+    if (cachedResponse) {
       console.log("Pipeline: Cache hit for generateProactiveGreeting");
-      return responseCache.get(cacheKey)!;
+      return cachedResponse;
     }
 
     // 2. Determine Model (Use fast model for greetings)
@@ -1597,7 +1633,7 @@ export const generateProactiveGreeting = async (
       "How can I help you with this lesson? I can answer questions, explain concepts, or test your knowledge.";
 
     // Save to cache
-    responseCache.set(cacheKey, responseText);
+    await responseCache.set(cacheKey, responseText);
 
     return responseText;
   } catch (error) {
@@ -1630,9 +1666,10 @@ export const chatWithTutor = async (
       userId,
       strictRAG
     );
-    if (responseCache.has(cacheKey)) {
+    const cachedResponse = await responseCache.get(cacheKey);
+    if (cachedResponse) {
       console.log("Pipeline: Cache hit for chatWithTutor");
-      return responseCache.get(cacheKey)!;
+      return cachedResponse;
     }
 
     // 2. Check Simple Task
@@ -1714,7 +1751,7 @@ ${augmentedContext}`,
       response.text || "I'm sorry, I couldn't generate a response.";
 
     // Save to cache
-    responseCache.set(cacheKey, responseText);
+    await responseCache.set(cacheKey, responseText);
 
     return responseText;
   } catch (error) {
@@ -1729,9 +1766,10 @@ export const generateFlashcards = async (
   try {
     // 1. Check Cache
     const cacheKey = getCacheKey("generateFlashcards", lessonContent);
-    if (responseCache.has(cacheKey)) {
+    const cachedResponse = await responseCache.get(cacheKey);
+    if (cachedResponse) {
       console.log("Pipeline: Cache hit for generateFlashcards");
-      return safeJsonParse(responseCache.get(cacheKey)!);
+      return safeJsonParse(cachedResponse);
     }
 
     const response = await generateContentWithFallback(
@@ -1770,7 +1808,7 @@ export const generateFlashcards = async (
     if (!text) return [];
 
     const parsed = safeJsonParse(text);
-    responseCache.set(cacheKey, text);
+    await responseCache.set(cacheKey, text);
     return parsed;
   } catch (error) {
     handleApiError(error, "generateFlashcards");
@@ -1795,9 +1833,10 @@ export const generateInteractiveContent = async (
       country,
       strictRAG
     );
-    if (responseCache.has(cacheKey)) {
+    const cachedResponse = await responseCache.get(cacheKey);
+    if (cachedResponse) {
       console.log("Pipeline: Cache hit for generateInteractiveContent");
-      return responseCache.get(cacheKey)!;
+      return cachedResponse;
     }
 
     let prompt = "";
@@ -1832,7 +1871,7 @@ export const generateInteractiveContent = async (
 
     const responseText =
       response.text || "I couldn't generate the content. Please try again.";
-    responseCache.set(cacheKey, responseText);
+    await responseCache.set(cacheKey, responseText);
     return responseText;
   } catch (error) {
     handleApiError(error, "generateInteractiveContent");
@@ -1846,9 +1885,10 @@ export const generateCauseEffect = async (
   try {
     // 1. Check Cache
     const cacheKey = getCacheKey("generateCauseEffect", lessonContent);
-    if (responseCache.has(cacheKey)) {
+    const cachedResponse = await responseCache.get(cacheKey);
+    if (cachedResponse) {
       console.log("Pipeline: Cache hit for generateCauseEffect");
-      return safeJsonParse(responseCache.get(cacheKey)!);
+      return safeJsonParse(cachedResponse);
     }
 
     const response = await generateContentWithFallback(
@@ -1887,7 +1927,7 @@ export const generateCauseEffect = async (
     if (!text) return [];
 
     const parsed = safeJsonParse(text);
-    responseCache.set(cacheKey, text);
+    await responseCache.set(cacheKey, text);
     return parsed;
   } catch (error) {
     handleApiError(error, "generateCauseEffect");
