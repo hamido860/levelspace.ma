@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Layout } from '../components/Layout';
@@ -30,10 +30,20 @@ export const ClassroomView: React.FC = () => {
 
   const module = useLiveQuery(() => id ? db.modules.get(id) : undefined, [id]);
   const allLessons = useLiveQuery(() => id ? db.lessons.where('moduleId').equals(id).sortBy('createdAt') : [], [id]);
-  const lessons = allLessons?.filter(l => l.status !== 'suggested') || [];
 
-  const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
-  const settingsMap = Object.fromEntries(dbSettings.map(s => [s.key, s.value]));
+  // ⚡ Bolt: Memoize derived data from useLiveQuery to prevent unnecessary re-renders
+  const lessons = useMemo(() => {
+    if (!Array.isArray(allLessons)) return [];
+    return allLessons.filter(l => l.status !== 'suggested');
+  }, [allLessons]);
+
+  const dbSettings = useLiveQuery(() => db.settings.toArray());
+
+  // ⚡ Bolt: Memoize derived data from useLiveQuery to prevent unnecessary re-renders
+  const settingsMap = useMemo(() => {
+    if (!Array.isArray(dbSettings)) return {};
+    return Object.fromEntries(dbSettings.map(s => [s.key, s.value]));
+  }, [dbSettings]);
 
   const selectedGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
   const country = settingsMap['selected_country'] || localStorage.getItem('selected_country') || '';

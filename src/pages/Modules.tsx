@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Layout } from '../components/Layout';
@@ -57,14 +57,23 @@ export const Modules: React.FC = () => {
   });
 
   const dbModules = useLiveQuery(() => db.modules.toArray());
-  const modules = (dbModules || []).map(m => ({
+
+  // ⚡ Bolt: Memoize derived data from useLiveQuery to prevent unnecessary re-renders
+  const modules = useMemo(() => (dbModules || []).map(m => ({
     ...m,
     icon: getIconForCategory(m.category)
-  }));
-  const selectedCount = modules.filter(m => m.selected).length;
+  })), [dbModules]);
 
-  const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
-  const settingsMap = Object.fromEntries(dbSettings.map(s => [s.key, s.value]));
+  // ⚡ Bolt: Memoize derived data from useLiveQuery to prevent unnecessary re-renders
+  const selectedCount = useMemo(() => modules.filter(m => m.selected).length, [modules]);
+
+  const dbSettings = useLiveQuery(() => db.settings.toArray());
+
+  // ⚡ Bolt: Memoize derived data from useLiveQuery to prevent unnecessary re-renders
+  const settingsMap = useMemo(() => {
+    if (!Array.isArray(dbSettings)) return {};
+    return Object.fromEntries(dbSettings.map(s => [s.key, s.value]));
+  }, [dbSettings]);
 
   const country = settingsMap['selected_country'] || localStorage.getItem('selected_country') || '';
   const grade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
@@ -148,10 +157,11 @@ export const Modules: React.FC = () => {
     await db.modules.bulkPut(updates);
   };
 
-  const filteredModules = modules.filter(m => 
+  // ⚡ Bolt: Memoize derived data from useLiveQuery to prevent unnecessary re-renders
+  const filteredModules = useMemo(() => modules.filter(m =>
     m.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
     m.code.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  ), [modules, searchQuery]);
 
   return (
     <Layout>
