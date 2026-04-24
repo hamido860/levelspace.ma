@@ -1,3 +1,4 @@
+cat << 'PATCH' > src/components/workspace/tools/DictionaryTool.tsx
 import React, { useState, useEffect } from 'react';
 import { Book, Search, Loader2, Volume2, Bookmark, ExternalLink } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -157,3 +158,4 @@ export const DictionaryTool: React.FC<DictionaryToolProps> = ({ state, onChange 
     </div>
   );
 };
+PATCH
