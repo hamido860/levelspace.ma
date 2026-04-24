@@ -1,3 +1,4 @@
+cat << 'PATCH' > src/components/workspace/config.ts
 export type ToolType = 'input' | 'logic' | 'api' | 'ai' | 'visual';
 
 export interface ToolConfig {
@@ -84,3 +85,4 @@ export const WORKSPACE_CONFIG: Record<string, SubjectConfig> = {
 export const GLOBAL_TOOLS: ToolConfig[] = [
   { id: 'ai-assistant', type: 'ai', label: 'AI Assistant', icon: 'Brain' }
 ];
+PATCH

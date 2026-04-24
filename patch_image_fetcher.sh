@@ -1,3 +1,4 @@
+cat << 'PATCH' > src/components/workspace/tools/ImageFetcher.tsx
 import React, { useState, useEffect } from 'react';
 import { Image as ImageIcon, Search, Loader2, Maximize2, Download, ExternalLink, X, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -193,3 +194,4 @@ export const ImageFetcher: React.FC<ImageFetcherProps> = ({ state, onChange, les
     </div>
   );
 };
+PATCH
