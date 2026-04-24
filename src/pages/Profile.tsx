@@ -19,7 +19,7 @@ import { Layout } from '../components/Layout';
 import { SEO } from '../components/SEO';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
-import { useAppSettings } from '../hooks/useAppSettings';
+import { useAppSettings } from '../context/AppSettingsContext';
 import { supabase } from '../db/supabase';
 
 export const Profile: React.FC = () => {

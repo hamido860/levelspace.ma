@@ -2,7 +2,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import 'mathlive';
 import { Calculator, Copy, Check, Trash2, Send } from 'lucide-react';
-import { useAppSettings } from '../../../hooks/useAppSettings';
+import { useAppSettings } from '../../../context/AppSettingsContext';
 import { useAuth } from '../../../context/AuthContext';
 
 interface MathEditorProps {

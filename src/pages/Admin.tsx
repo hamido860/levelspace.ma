@@ -43,7 +43,7 @@ import {
   PlayCircle
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import { useAppSettings } from "../hooks/useAppSettings";
+import { useAppSettings } from "../context/AppSettingsContext";
 import { saveLesson, deleteLessonsByScope, deleteLessonById, updateLesson } from "../services/ragService";
 import { LessonTemplate, generateFullLesson, generateSyllabus, askAdminAI, getLessonPrompt, getAIStatus, AIStatus, auditCurriculumConfig, CurriculumAuditResult, smartExtractFromResource, evaluateExtractionWeakness, findSimilarResources, ExtractionEvaluation } from "../services/geminiService";
 import { aiCrew, AITask } from "../services/aiCrewService";

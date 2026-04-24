@@ -6,7 +6,7 @@ import ReactMarkdown from 'react-markdown';
 import { generateAIContent, determineModel, handleApiError } from '../../../services/geminiService';
 import { ToolConfig } from '../config';
 import { useAuth } from '../../../context/AuthContext';
-import { useAppSettings } from '../../../hooks/useAppSettings';
+import { useAppSettings } from '../../../context/AppSettingsContext';
 
 interface AIToolProps {
   tool: ToolConfig;

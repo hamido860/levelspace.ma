@@ -6,12 +6,15 @@ import './index.css';
 import { seedDatabase } from './db/seed.ts';
 
 import {ThemeProvider} from './context/ThemeContext.tsx';
+import { AppSettingsProvider } from './context/AppSettingsContext.tsx';
 
 seedDatabase().then(() => {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <ThemeProvider>
-        <App />
+        <AppSettingsProvider>
+          <App />
+        </AppSettingsProvider>
       </ThemeProvider>
     </StrictMode>,
   );
