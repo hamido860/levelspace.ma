@@ -10,7 +10,7 @@ import { mcpClient } from "./mcpClient";
 export const getCustomApiKey = () =>
   localStorage.getItem("CUSTOM_GEMINI_API_KEY") || "";
 
-export const getEffectiveApiKey = () => getCustomApiKey() || process.env.GEMINI_API_KEY || "";
+export const getEffectiveApiKey = () => getCustomApiKey() || import.meta.env.VITE_GEMINI_API_KEY || "";
 
 export const getNvidiaApiKey = () =>
   localStorage.getItem("CUSTOM_NVIDIA_API_KEY") || import.meta.env.VITE_NVIDIA_API_KEY || "";
