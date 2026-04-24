@@ -75,7 +75,7 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson }) => {
       {/* Content Area */}
       <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
         {activeTab === 'content' && (
-          <div className="bg-paper p-8 rounded-3xl border border-surface-mid shadow-sm prose prose-slate max-w-none">
+          <div className="bg-paper p-8 rounded-3xl border border-surface-mid shadow-sm prose prose-custom max-w-none">
             <div className="markdown-body">
               <ReactMarkdown 
                 remarkPlugins={[remarkMath]} 
@@ -146,7 +146,7 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson }) => {
                   
                   {openBlocks.includes(`ex-${idx}`) && (
                     <div className="p-6 border-t border-surface-mid space-y-6 animate-in slide-in-from-top-2 duration-300">
-                      <div className="prose prose-slate max-w-none text-sm text-ink-secondary">
+                      <div className="prose prose-custom max-w-none text-sm text-ink-secondary">
                         <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
                           {ex.question}
                         </ReactMarkdown>

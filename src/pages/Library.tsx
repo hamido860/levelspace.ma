@@ -417,7 +417,7 @@ export const Library: React.FC = () => {
                 {/* Reader Content */}
                 <div className="flex-grow overflow-y-auto p-8 md:p-12 lg:p-16">
                   <div className="max-w-2xl mx-auto">
-                    <div className="prose prose-slate prose-sm md:prose-base lg:prose-lg max-w-none">
+                    <div className="prose prose-custom prose-sm md:prose-base lg:prose-lg max-w-none">
                       <div className="markdown-body">
                         <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{selectedItem.content || '# No Content Available\n\nThis resource does not have preview content yet.'}</Markdown>
                       </div>

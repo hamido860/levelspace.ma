@@ -3098,7 +3098,7 @@ The output format should be a JSON array of lesson objects.`;
                       <div className="w-7 h-7 rounded-lg bg-accent/10 flex items-center justify-center text-accent shrink-0">
                         <Sparkles size={14} />
                       </div>
-                      <div className="bg-paper p-4 rounded-xl rounded-tl-sm border border-ink/5 shadow-sm prose prose-sm dark:prose-invert max-w-none text-[11px]">
+                      <div className="bg-paper p-4 rounded-xl rounded-tl-sm border border-ink/5 shadow-sm prose prose-sm prose-custom max-w-none text-[11px]">
                         <ReactMarkdown>{askAiResponse}</ReactMarkdown>
                       </div>
                     </div>
@@ -3897,7 +3897,7 @@ The output format should be a JSON array of lesson objects.`;
                     <Globe className="text-accent w-5 h-5" />
                     <h4 className="text-xs font-bold text-accent uppercase tracking-widest">AI Crew: Suggested Resources</h4>
                   </div>
-                  <div className="prose prose-sm dark:prose-invert max-w-none text-xs text-ink-secondary">
+                  <div className="prose prose-sm prose-custom max-w-none text-xs text-ink-secondary">
                     <ReactMarkdown>{smartSimilarResources}</ReactMarkdown>
                   </div>
                 </div>

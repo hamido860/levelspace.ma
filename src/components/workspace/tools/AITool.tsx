@@ -157,7 +157,7 @@ export const AITool: React.FC<AIToolProps> = ({ tool, state, onChange, lessonCon
               <p className="text-xs font-bold uppercase tracking-widest animate-pulse">AI is thinking...</p>
             </div>
           ) : response ? (
-            <div className="prose prose-sm dark:prose-invert max-w-none text-ink prose-headings:text-ink prose-strong:text-accent prose-code:text-accent prose-code:bg-accent/5 dark:prose-code:bg-accent/15 prose-code:px-1 prose-code:rounded">
+            <div className="prose prose-sm prose-custom max-w-none text-ink prose-headings:text-ink prose-strong:text-accent prose-code:text-accent prose-code:bg-accent/5 dark:prose-code:bg-accent/15 prose-code:px-1 prose-code:rounded">
               <ReactMarkdown>{response}</ReactMarkdown>
             </div>
           ) : (

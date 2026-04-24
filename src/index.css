@@ -283,3 +283,24 @@
 .katex .mopen,
 .katex .mclose             { color: var(--math-bracket);  } /* delimiters: ( ) [ ] */
 
+
+@layer components {
+  .prose-custom {
+    --tw-prose-body: var(--ink);
+    --tw-prose-headings: var(--ink);
+    --tw-prose-lead: var(--ink-secondary);
+    --tw-prose-links: var(--accent);
+    --tw-prose-bold: var(--ink);
+    --tw-prose-counters: var(--ink-muted);
+    --tw-prose-bullets: var(--ink-muted);
+    --tw-prose-hr: var(--surface-mid);
+    --tw-prose-quotes: var(--ink-secondary);
+    --tw-prose-quote-borders: var(--accent);
+    --tw-prose-captions: var(--ink-muted);
+    --tw-prose-code: var(--ink);
+    --tw-prose-pre-code: var(--ink);
+    --tw-prose-pre-bg: var(--surface-low);
+    --tw-prose-th-borders: var(--surface-mid);
+    --tw-prose-td-borders: var(--surface-mid);
+  }
+}
