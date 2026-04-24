@@ -161,19 +161,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const initSettings = async () => {
       try {
-        const { data } = await supabase
+        // Only run this when authenticated, and suppress errors silently if user doesn't have privileges
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (!sessionData.session) return;
+
+        const { data, error } = await supabase
           .from('app_settings')
           .select('key')
           .eq('key', 'ask_ai_access')
           .maybeSingle();
         
+        if (error && error.code !== 'PGRST116') {
+          // Ignore not found or RLS errors
+          return;
+        }
+
         if (!data) {
-          await supabase
+          // The insert will fail gracefully if the RLS policy "Admins can manage app settings" is not met
+          // we don't need to await or check the error to prevent uncaught exceptions crashing the app
+          supabase
             .from('app_settings')
-            .insert({ key: 'ask_ai_access', value: 'admin', updated_at: new Date().toISOString() });
+            .insert({ key: 'ask_ai_access', value: 'admin', updated_at: new Date().toISOString() })
+            .then(({error: insertErr}) => {
+                if (insertErr) {
+                    // Fail silently, expected if not admin
+                }
+            })
+            .catch(() => {});
         }
       } catch (err) {
-        console.error("Error initializing app settings:", err);
+        // Silent catch to prevent UI disruption
       }
     };
     initSettings();

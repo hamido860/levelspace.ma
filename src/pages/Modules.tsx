@@ -77,12 +77,22 @@ export const Modules: React.FC = () => {
   useEffect(() => {
     const fetchBacDetails = async () => {
       if (selectedBacTrackId) {
-        const { data } = await supabase.from('bac_tracks').select('name').eq('id', selectedBacTrackId).single();
-        if (data) setBacTrackName(data.name);
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(selectedBacTrackId);
+        if (isUUID) {
+          const { data } = await supabase.from('bac_tracks').select('name').eq('id', selectedBacTrackId).single();
+          if (data) setBacTrackName(data.name);
+        } else {
+          setBacTrackName(selectedBacTrackId);
+        }
       }
       if (selectedBacIntOptionId) {
-        const { data } = await supabase.from('bac_international_options').select('name').eq('id', selectedBacIntOptionId).single();
-        if (data) setBacIntOptionName(data.name);
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(selectedBacIntOptionId);
+        if (isUUID) {
+          const { data } = await supabase.from('bac_international_options').select('name').eq('id', selectedBacIntOptionId).single();
+          if (data) setBacIntOptionName(data.name);
+        } else {
+          setBacIntOptionName(selectedBacIntOptionId);
+        }
       }
     };
     fetchBacDetails();
