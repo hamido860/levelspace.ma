@@ -158,7 +158,7 @@ export const Dashboard: React.FC = () => {
       if (lesson) {
         // Add to local DB for offline access
         const newLessonId = lesson.id || crypto.randomUUID();
-        await db.lessons.add({
+        await db.lessons.put({
           id: newLessonId,
           moduleId: selectedModule.id,
           title: lesson.title,

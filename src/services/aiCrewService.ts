@@ -1,4 +1,5 @@
-import { generateFullLesson, auditCurriculumConfig, generateSyllabus, auditClassroomContent } from "./geminiService";
+import { generateFullLesson, auditCurriculumConfig, generateSyllabus, auditClassroomContent, generateQuizzesForLesson, generateExercisesForLesson } from "./geminiService";
+import { supabase } from "../db/supabase";
 import { db } from "../db/db";
 import { toast } from "sonner";
 
@@ -6,7 +7,7 @@ export type TaskStatus = "pending" | "running" | "completed" | "failed";
 
 export interface AITask {
   id: string;
-  type: "lesson_generation" | "curriculum_audit" | "syllabus_generation" | "classroom_audit";
+  type: "lesson_generation" | "curriculum_audit" | "syllabus_generation" | "classroom_audit" | "quiz_generation" | "exercise_generation";
   status: TaskStatus;
   payload: any;
   result?: any;
@@ -62,6 +63,8 @@ class AICrewService {
       if (!task) break;
 
       await this.runTask(task);
+      // Rate limit between tasks to avoid quota exhaustion
+      await new Promise((r) => setTimeout(r, 1500));
     }
 
     this.isProcessing = false;
@@ -115,6 +118,59 @@ class AICrewService {
             task.payload.existingLessons
           );
           break;
+        case "quiz_generation": {
+          const quizzes = await generateQuizzesForLesson(
+            task.payload.lessonTitle,
+            task.payload.lessonContent,
+            task.payload.existingCount ?? 0,
+            task.payload.targetCount ?? 5,
+            task.payload.country,
+            task.payload.grade
+          );
+          if (quizzes.length > 0 && task.payload.lessonId) {
+            await supabase.from("quizzes").insert({
+              lesson_id: task.payload.lessonId,
+              user_id: null,
+              title: `Quiz: ${task.payload.lessonTitle}`,
+              description: `Test your knowledge on ${task.payload.lessonTitle}`,
+              difficulty: "medium",
+              questions: quizzes.map((q: any, i: number) => ({
+                id: `q-${Date.now()}-${i}`,
+                type: "multiple-choice",
+                question: q.question,
+                options: q.options,
+                correctAnswer: q.correctAnswer,
+                explanation: q.explanation || "",
+              })),
+            });
+          }
+          result = { quizzesAdded: quizzes.length };
+          break;
+        }
+        case "exercise_generation": {
+          const exercises = await generateExercisesForLesson(
+            task.payload.lessonTitle,
+            task.payload.lessonContent,
+            task.payload.existingCount ?? 0,
+            task.payload.targetCount ?? 5,
+            task.payload.country,
+            task.payload.grade
+          );
+          if (exercises.length > 0 && task.payload.lessonId) {
+            const rows = exercises.map((ex: any, i: number) => ({
+              lesson_id: task.payload.lessonId,
+              title: `Exercise ${(task.payload.existingCount ?? 0) + i + 1}: ${task.payload.lessonTitle}`,
+              prompt: ex.question,
+              solution: ex.solution,
+              hints: ex.hint ? [ex.hint] : [],
+              difficulty: "medium",
+              type: "practice",
+            }));
+            await supabase.from("exercises").insert(rows);
+          }
+          result = { exercisesAdded: exercises.length };
+          break;
+        }
       }
 
       task.status = "completed";

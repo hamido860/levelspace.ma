@@ -5,11 +5,68 @@ import { toast } from "sonner";
 import { db } from "../db/db";
 import { searchContextForGeneration } from "./ragService";
 import { transformersService } from "./transformersService";
+import { mcpClient } from "./mcpClient";
 
 export const getCustomApiKey = () =>
   localStorage.getItem("CUSTOM_GEMINI_API_KEY") || "";
 
 export const getEffectiveApiKey = () => getCustomApiKey() || process.env.GEMINI_API_KEY || "";
+
+export const getNvidiaApiKey = () =>
+  localStorage.getItem("CUSTOM_NVIDIA_API_KEY") || (import.meta as any).env?.NVIDIA_API_KEY || "";
+
+export const setNvidiaApiKey = (key: string) => {
+  if (key) {
+    localStorage.setItem("CUSTOM_NVIDIA_API_KEY", key);
+  } else {
+    localStorage.removeItem("CUSTOM_NVIDIA_API_KEY");
+  }
+};
+
+export const NVIDIA_MODEL = "google/gemma-3-27b-it";
+
+export async function callNvidiaAPI(params: {
+  prompt: string;
+  isJson?: boolean;
+  temperature?: number;
+  maxTokens?: number;
+}): Promise<string | null> {
+  const apiKey = getNvidiaApiKey();
+  if (!apiKey) return null;
+
+  const { prompt, isJson = false, temperature = 0.7, maxTokens = 4096 } = params;
+
+  const body: any = {
+    model: NVIDIA_MODEL,
+    messages: [{ role: "user", content: prompt }],
+    temperature,
+    max_tokens: maxTokens,
+    stream: false,
+  };
+
+  if (isJson) {
+    body.response_format = { type: "json_object" };
+    // Reinforce JSON output in prompt for Gemma
+    body.messages[0].content = prompt + "\n\nRespond with valid JSON only.";
+  }
+
+  const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`NVIDIA API error ${response.status}: ${errText}`);
+  }
+
+  const data = await response.json();
+  return data.choices?.[0]?.message?.content || null;
+}
 
 let currentApiKey = getEffectiveApiKey();
 // Provide a fallback string so the SDK doesn't throw an error immediately on boot if hosted outside AI Studio without a key
@@ -557,20 +614,38 @@ export async function generateAIContent(
         duration: 3000,
       });
 
+      let promptText = "";
+      if (typeof params.contents === 'string') {
+        promptText = params.contents;
+      } else if (Array.isArray(params.contents)) {
+        promptText = params.contents.map((p: any) => p.text || JSON.stringify(p)).join('\n');
+      } else if (params.contents?.parts) {
+        promptText = params.contents.parts.map((p: any) => p.text || JSON.stringify(p)).join('\n');
+      } else {
+        promptText = JSON.stringify(params.contents);
+      }
+
+      const isJson = params.config?.responseMimeType === "application/json";
+
+      // Fallback 1: NVIDIA NIM (Gemma 3 27B) — cloud, no local setup needed
       try {
-        let promptText = "";
-        if (typeof params.contents === 'string') {
-          promptText = params.contents;
-        } else if (Array.isArray(params.contents)) {
-          promptText = params.contents.map((p: any) => p.text || JSON.stringify(p)).join('\n');
-        } else if (params.contents?.parts) {
-          promptText = params.contents.parts.map((p: any) => p.text || JSON.stringify(p)).join('\n');
-        } else {
-          promptText = JSON.stringify(params.contents);
+        const nvidiaText = await callNvidiaAPI({
+          prompt: promptText,
+          isJson,
+          temperature: params.config?.temperature || 0.7,
+          maxTokens: Math.min(params.config?.maxOutputTokens || 4096, 4096),
+        });
+        if (nvidiaText) {
+          updateAIStatus({ lastModel: `Gemma 3 (NVIDIA NIM)`, isLocal: false, lastError: null });
+          toast.info("Using Gemma via NVIDIA", { description: "Switched to NVIDIA NIM for this request.", duration: 2000 });
+          return { text: nvidiaText, candidates: [{ content: { parts: [{ text: nvidiaText }] } }] };
         }
+      } catch (nvidiaError) {
+        console.warn("NVIDIA fallback failed:", nvidiaError);
+      }
 
-        const isJson = params.config?.responseMimeType === "application/json";
-
+      // Fallback 2: Ollama (local Gemma)
+      try {
         const ollamaResponse = await fetch('http://localhost:11434/api/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -579,42 +654,30 @@ export async function generateAIContent(
             prompt: promptText,
             stream: false,
             format: isJson ? 'json' : undefined,
-            options: {
-              temperature: params.config?.temperature || 0.7,
-            }
+            options: { temperature: params.config?.temperature || 0.7 }
           })
         });
 
-        if (!ollamaResponse.ok) {
-          throw new Error(`Ollama failed with status ${ollamaResponse.status}`);
-        }
+        if (!ollamaResponse.ok) throw new Error(`Ollama failed with status ${ollamaResponse.status}`);
 
         const ollamaData = await ollamaResponse.json();
-        updateAIStatus({ lastModel: "Gemma 4 (local)", isLocal: true, lastError: null });
-        
-        return {
-          text: ollamaData.response,
-          candidates: [
-            {
-              content: {
-                parts: [{ text: ollamaData.response }]
-              }
-            }
-          ]
-        };
+        updateAIStatus({ lastModel: "Gemma (local Ollama)", isLocal: true, lastError: null });
+        return { text: ollamaData.response, candidates: [{ content: { parts: [{ text: ollamaData.response }] } }] };
       } catch (localError) {
-        console.error("Local Ollama fallback failed:", localError);
+        console.warn("Local Ollama fallback failed:", localError);
         updateAIStatus({ lastError: "Local Fallback Failed", isLocal: false });
-        // If local fails, try the flash-lite fallback as a last resort
+      }
+
+      // Fallback 3: gemini-2.5-flash-lite (last resort)
+      try {
         if (primaryModel !== "gemini-2.5-flash-lite") {
           console.warn("Falling back to gemini-2.5-flash-lite.");
-          const result = await ai.models.generateContent({
-            ...params,
-            model: "gemini-2.5-flash-lite",
-          });
+          const result = await ai.models.generateContent({ ...params, model: "gemini-2.5-flash-lite" });
           updateAIStatus({ lastModel: "gemini-2.5-flash-lite", isLocal: false, lastError: null });
           return result;
         }
+      } catch (liteError) {
+        console.error("gemini-2.5-flash-lite fallback failed:", liteError);
       }
     }
 
@@ -811,6 +874,7 @@ export const generateFullLesson = async (
   referenceUrls?: string[],
   existingContext?: string,
   isAdmin: boolean = false,
+  _correctionPrompt: string = "", // internal — injected on MCP validation retry
 ): Promise<LessonTemplate | null> => {
   try {
     let urlContexts = "";
@@ -818,7 +882,12 @@ export const generateFullLesson = async (
       urlContexts = await fetchAllUrlContexts(referenceUrls);
     }
 
-    const prompt = getLessonPrompt(topic, country, grade, subject, moduleName, referenceUrls, existingContext, isAdmin, urlContexts);
+    // MCP: build curriculum + pedagogy context before generation
+    const mcpContext = mcpClient.buildPromptContext(country, grade, subject);
+
+    const basePrompt = getLessonPrompt(topic, country, grade, subject, moduleName, referenceUrls, existingContext, isAdmin, urlContexts);
+    // Prepend MCP authority block + any correction from previous failed validation
+    const prompt = mcpContext + "\n\n" + (_correctionPrompt || "") + "\n\n" + basePrompt;
 
     const config: any = {
       responseMimeType: "application/json",
@@ -903,29 +972,50 @@ export const generateFullLesson = async (
 
     try {
       const parsed = safeJsonParse(text);
-      
-      // Post-processing step: Refine the main lesson content
+
+      // Post-processing: refine content prose
       if (parsed && parsed.content) {
         parsed.content = await refineLessonContent(parsed.content);
       }
-      
+
+      // MCP: validate lesson — language, structure, pedagogy
+      if (parsed) {
+        const correction = mcpClient.validateAndGetCorrection(
+          {
+            title:     parsed.lesson_title || topic,
+            content:   parsed.content || "",
+            exercises: parsed.exercises,
+            quizzes:   parsed.quizzes,
+          },
+          country,
+          grade,
+          subject,
+        );
+
+        if (correction && retries > 0) {
+          console.warn(`[MCP] Lesson failed validation. Retrying with correction (${retries} left).`);
+          toast.info("MCP: lesson quality check failed — regenerating with corrections.", { duration: 3000 });
+          return generateFullLesson(
+            topic, country, grade, subject, moduleName,
+            retries - 1, referenceUrls, existingContext, isAdmin,
+            correction,
+          );
+        }
+
+        if (correction) {
+          // Max retries exhausted — flag the lesson but still return it
+          console.warn("[MCP] Lesson still has violations after max retries. Returning with flag.");
+          parsed._mcpViolations = correction;
+        }
+      }
+
       return parsed;
     } catch (parseError) {
       console.error("JSON Parse Error in generateFullLesson:", parseError);
       if (retries > 0) {
-        console.log(
-          `Retrying generateFullLesson... (${retries} attempts left)`,
-        );
         return generateFullLesson(
-          topic,
-          country,
-          grade,
-          subject,
-          moduleName,
-          retries - 1,
-          referenceUrls,
-          existingContext,
-          isAdmin
+          topic, country, grade, subject, moduleName,
+          retries - 1, referenceUrls, existingContext, isAdmin, _correctionPrompt,
         );
       }
       throw parseError;
@@ -934,15 +1024,8 @@ export const generateFullLesson = async (
     handleApiError(error, "generateFullLesson");
     if (retries > 0 && !(error instanceof SyntaxError)) {
       return generateFullLesson(
-        topic,
-        country,
-        grade,
-        subject,
-        moduleName,
-        retries - 1,
-        referenceUrls,
-        existingContext,
-        isAdmin
+        topic, country, grade, subject, moduleName,
+        retries - 1, referenceUrls, existingContext, isAdmin, _correctionPrompt,
       );
     }
     return null;
@@ -2279,6 +2362,71 @@ export async function evaluateExtractionWeakness(
     return null;
   }
 }
+
+export const MAX_QUIZZES_PER_LESSON = 5;
+export const MAX_EXERCISES_PER_LESSON = 5;
+
+export const generateQuizzesForLesson = async (
+  lessonTitle: string,
+  lessonContent: string,
+  existingCount: number,
+  targetCount: number = MAX_QUIZZES_PER_LESSON,
+  country: string = "",
+  grade: string = "",
+): Promise<any[]> => {
+  const needed = Math.max(0, targetCount - existingCount);
+  if (needed === 0) return [];
+
+  const prompt = `Generate ${needed} multiple-choice quiz questions for this lesson.
+Lesson: "${lessonTitle}"
+Content: ${lessonContent.substring(0, 3000)}
+${country ? `Country: ${country}, Grade: ${grade}` : ""}
+
+Return ONLY a JSON array (no markdown):
+[{"question":"...","options":["A","B","C","D"],"correctAnswer":"exact option text","explanation":"..."}]`;
+
+  try {
+    const response = await generateContentWithFallback(
+      { model: "gemini-3-flash-preview", contents: prompt, config: { responseMimeType: "application/json", maxOutputTokens: 2048 } },
+      "generateQuizzesForLesson"
+    );
+    const parsed = safeJsonParse(response.text || "");
+    return Array.isArray(parsed) ? parsed.slice(0, needed) : [];
+  } catch {
+    return [];
+  }
+};
+
+export const generateExercisesForLesson = async (
+  lessonTitle: string,
+  lessonContent: string,
+  existingCount: number,
+  targetCount: number = MAX_EXERCISES_PER_LESSON,
+  country: string = "",
+  grade: string = "",
+): Promise<any[]> => {
+  const needed = Math.max(0, targetCount - existingCount);
+  if (needed === 0) return [];
+
+  const prompt = `Generate ${needed} practice exercises for this lesson.
+Lesson: "${lessonTitle}"
+Content: ${lessonContent.substring(0, 3000)}
+${country ? `Country: ${country}, Grade: ${grade}` : ""}
+
+Return ONLY a JSON array (no markdown):
+[{"question":"problem statement (use LaTeX for math)","hint":"optional hint","solution":"step-by-step solution"}]`;
+
+  try {
+    const response = await generateContentWithFallback(
+      { model: "gemini-3-flash-preview", contents: prompt, config: { responseMimeType: "application/json", maxOutputTokens: 2048 } },
+      "generateExercisesForLesson"
+    );
+    const parsed = safeJsonParse(response.text || "");
+    return Array.isArray(parsed) ? parsed.slice(0, needed) : [];
+  } catch {
+    return [];
+  }
+};
 
 export async function findSimilarResources(
   topic: string, 
