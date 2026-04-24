@@ -175,7 +175,7 @@ async function startServer() {
   app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
     console.error("Global Error Handler:", err);
     if (req.path.startsWith('/api/')) {
-      return res.status(500).json({ error: "Internal Server Error", message: err.message });
+      return res.status(500).json({ error: "Internal Server Error" }); // Don't expose internal error messages to client
     }
     next(err);
   });
