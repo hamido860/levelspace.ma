@@ -13,7 +13,7 @@ export const getCustomApiKey = () =>
 export const getEffectiveApiKey = () => getCustomApiKey() || process.env.GEMINI_API_KEY || "";
 
 export const getNvidiaApiKey = () =>
-  localStorage.getItem("CUSTOM_NVIDIA_API_KEY") || (import.meta as any).env?.NVIDIA_API_KEY || "";
+  localStorage.getItem("CUSTOM_NVIDIA_API_KEY") || import.meta.env.VITE_NVIDIA_API_KEY || "";
 
 export const setNvidiaApiKey = (key: string) => {
   if (key) {
