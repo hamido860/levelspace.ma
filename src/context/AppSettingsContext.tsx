@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '../db/supabase';
 
 interface AppSettingsContextValue {
@@ -11,15 +11,14 @@ const AppSettingsContext = createContext<AppSettingsContextValue>({ settings: {}
 export function AppSettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   useEffect(() => {
-    if (channelRef.current) return; // already subscribed
+    let active = true;
 
     const fetchSettings = async () => {
       try {
         const { data } = await supabase.from('app_settings').select('*');
-        if (data) {
+        if (active && data) {
           setSettings(data.reduce((acc: any, curr: any) => {
             acc[curr.key] = curr.value;
             return acc;
@@ -28,16 +27,17 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       } catch (err) {
         console.error('Error fetching app settings:', err);
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
 
     fetchSettings();
 
-    channelRef.current = supabase
-      .channel('app_settings_global')
+    // Unique name per effect run — survives React StrictMode's double-invoke
+    const channel = supabase
+      .channel(`app_settings_${Math.random().toString(36).slice(2)}`)
       .on('postgres_changes', { event: '*', table: 'app_settings', schema: 'public' }, (payload) => {
-        if (payload.new) {
+        if (active && payload.new) {
           const s = payload.new as any;
           setSettings(prev => ({ ...prev, [s.key]: s.value }));
         }
@@ -45,10 +45,8 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       .subscribe();
 
     return () => {
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
-        channelRef.current = null;
-      }
+      active = false;
+      supabase.removeChannel(channel);
     };
   }, []);
 
