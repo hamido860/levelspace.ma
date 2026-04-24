@@ -28,8 +28,13 @@ import {
   Target,
   Dumbbell,
   Type,
-  Globe
-, ListMusic } from 'lucide-react';
+  Globe,
+  ListMusic,
+  List,
+  FileText,
+  FlaskConical,
+  GraduationCap,
+} from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 import Markdown from 'react-markdown';
@@ -55,6 +60,19 @@ import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { useAppSettings } from '../hooks/useAppSettings';
 import { indexLessonContent } from '../services/ragService';
+
+const BLOCK_TYPE_CONFIG: Record<string, { icon: React.ElementType; colorClass: string; label: string }> = {
+  definition: { icon: BookOpen,     colorClass: 'text-accent',   label: 'Definition'  },
+  content:    { icon: FileText,     colorClass: 'text-accent',   label: 'Content'     },
+  rules:      { icon: List,         colorClass: 'text-success',  label: 'Key Rules'   },
+  examples:   { icon: FlaskConical, colorClass: 'text-warning',  label: 'Examples'    },
+  quiz:       { icon: HelpCircle,   colorClass: 'text-accent',   label: 'Quiz'        },
+  exercise:   { icon: Dumbbell,     colorClass: 'text-success',  label: 'Exercise'    },
+  exam:       { icon: GraduationCap,colorClass: 'text-warning',  label: 'Exam'        },
+};
+
+const getBlockTypeConfig = (type: string) =>
+  BLOCK_TYPE_CONFIG[type] ?? { icon: FileText, colorClass: 'text-muted', label: 'Content' };
 
 const isRTL = (text: string) => {
   const rtlChars = /[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
@@ -1017,7 +1035,8 @@ export const LessonView: React.FC = () => {
                 blocks.map((block, index) => {
                   const blockId = `block-${index}`;
                   const isOpen = openBlocks.includes(blockId);
-              
+                  const { icon: BlockIcon, colorClass: blockColorClass } = getBlockTypeConfig(block.type || '');
+
               // Determine status
               let status = 'pending';
               if (isOpen) status = 'active';
@@ -1030,13 +1049,14 @@ export const LessonView: React.FC = () => {
 
               return (
                 <article key={index} className="block group">
-                  <div 
-                    className={`block__header sticky top-16 z-20 backdrop-blur-xl bg-paper/90 border-b border-surface-mid transition-all duration-200 ${isOpen ? 'shadow-md' : 'shadow-sm'}`} 
+                  <div
+                    className={`block__header sticky top-16 z-20 backdrop-blur-xl bg-paper/90 border-b border-surface-mid transition-all duration-200 ${isOpen ? 'shadow-md' : 'shadow-sm'}`}
                     onClick={() => toggleBlock(blockId)}
                   >
                     <div className={`block__num block__num--${status}`}>
                       {status === 'done' ? '✓' : status === 'error' ? '!' : index + 1}
                     </div>
+                    <BlockIcon size={14} className={`shrink-0 ${blockColorClass} opacity-70`} />
                     <span className="block__label">{block.title}</span>
                     <div className="flex items-center gap-2 ml-auto mr-2">
                       {block.type === 'quiz' && <span className="pill pill--warn text-[10px]">interactive</span>}
@@ -1105,6 +1125,12 @@ export const LessonView: React.FC = () => {
                       {/* Definition / Content */}
                           {(block.type === 'definition' || block.type === 'content') && block.content && (
                             <div className="def-box">
+                              <div className="flex items-center gap-1.5 mb-2.5 pb-2 border-b border-accent/15">
+                                <BookOpen size={11} className="text-accent" />
+                                <span className="text-[9px] font-bold text-accent uppercase tracking-widest">
+                                  {block.type === 'definition' ? 'Definition' : 'Content'}
+                                </span>
+                              </div>
                               <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{block.content}</Markdown>
                               {block.source && <span className="def-box__source">Source: {block.source}</span>}
                             </div>
@@ -1112,19 +1138,29 @@ export const LessonView: React.FC = () => {
 
                           {/* Rules */}
                           {block.type === 'rules' && block.rules && Array.isArray(block.rules) && (
-                            <ul className="rules-list">
-                              {block.rules.map((rule, i) => (
-                                <li key={i} className="rules-list__item">
-                                  <div className="rules-list__dot"></div>
-                                  <span><Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{rule}</Markdown></span>
-                                </li>
-                              ))}
-                            </ul>
+                            <>
+                              <div className="flex items-center gap-1.5 mt-3.5 mb-1">
+                                <List size={12} className="text-success" />
+                                <span className="text-[9px] font-bold text-success uppercase tracking-widest">Key Rules</span>
+                              </div>
+                              <ul className="rules-list">
+                                {block.rules.map((rule, i) => (
+                                  <li key={i} className="rules-list__item">
+                                    <div className="rules-list__dot"></div>
+                                    <span><Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{rule}</Markdown></span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </>
                           )}
 
                           {/* Examples */}
                           {block.type === 'examples' && block.examples && Array.isArray(block.examples) && (
                             <>
+                              <div className="flex items-center gap-1.5 mt-3.5 mb-1">
+                                <FlaskConical size={12} className="text-warning" />
+                                <span className="text-[9px] font-bold text-warning uppercase tracking-widest">Worked Examples</span>
+                              </div>
                               {block.examples.map((ex, i) => (
                                 <div key={i} className="example-card">
                                   <div className="example-card__question"><Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{ex.question}</Markdown></div>
