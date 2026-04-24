@@ -254,3 +254,32 @@
   margin: 1em 0;
 }
 
+/* ═══════════════════════════════════════════════
+   MATH EXPRESSION COLOR CODING
+   Light mode: saturated, high-contrast palette
+   Dark mode: lighter, accessible equivalents
+═══════════════════════════════════════════════ */
+:root {
+  --math-variable: #2563EB;   /* blue  — x, y, n, α, β */
+  --math-operator: #C2410C;   /* orange — +, −, ×, ÷   */
+  --math-relation: #B91C1C;   /* red   — =, <, >, ≤, ≥ */
+  --math-function: #7C3AED;   /* purple — sin, cos, log */
+  --math-bracket:  #B45309;   /* amber — ( ) [ ] { }   */
+}
+
+.dark {
+  --math-variable: #60A5FA;
+  --math-operator: #FB923C;
+  --math-relation: #F87171;
+  --math-function: #C084FC;
+  --math-bracket:  #FCD34D;
+}
+
+/* KaTeX semantic token coloring */
+.katex .mathit              { color: var(--math-variable); } /* italic variables */
+.katex .mbin               { color: var(--math-operator); } /* binary ops: + − × */
+.katex .mrel               { color: var(--math-relation); } /* relations: = < > ≤ */
+.katex .mop                { color: var(--math-function); } /* functions: sin cos log */
+.katex .mopen,
+.katex .mclose             { color: var(--math-bracket);  } /* delimiters: ( ) [ ] */
+
