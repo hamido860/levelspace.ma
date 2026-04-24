@@ -815,8 +815,8 @@ export const Settings: React.FC = () => {
               </div>
             </section>
 
-            {/* NVIDIA API Key — admin only */}
-            {isAdmin && <section className="p-5 bg-paper border border-ink/5 rounded-3xl space-y-5 shadow-sm flex flex-col">
+            {/* NVIDIA API Key */}
+            <section className="p-5 bg-paper border border-ink/5 rounded-3xl space-y-5 shadow-sm flex flex-col">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 bg-success/10 rounded-lg flex items-center justify-center text-success">
                   <Key className="w-4 h-4" />
@@ -854,7 +854,7 @@ export const Settings: React.FC = () => {
                   {isNvidiaKeySaved ? 'Saved' : 'Save Key'}
                 </button>
               </div>
-            </section>}
+            </section>
 
             {/* Supabase Connection Status */}
             <section className="p-5 bg-paper border border-ink/5 rounded-3xl space-y-5 shadow-sm flex flex-col md:col-span-2">
