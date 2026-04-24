@@ -70,7 +70,7 @@ export const Login: React.FC = () => {
 
   const handleSocialLogin = async (provider: 'google' | 'facebook') => {
     try {
-      const { error } = await supabase.auth.signInWithOAuth({ provider });
+      const { error } = await supabase.auth.signInWithOAuth({ provider, options: { redirectTo: window.location.origin } });
       if (error) throw error;
     } catch (err: any) {
       if (err.message.includes('not enabled')) {
