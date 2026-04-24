@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Layout } from '../components/Layout';
-import { 
+import {
   AlertCircle,
   ArrowLeft,
   CheckCircle2,
@@ -29,7 +29,7 @@ import {
   Dumbbell,
   Type,
   Globe
-} from 'lucide-react';
+, ListMusic } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 import Markdown from 'react-markdown';
@@ -157,6 +157,8 @@ export const LessonView: React.FC = () => {
   const [interactiveContent, setInteractiveContent] = useState<string | null>(null);
   const [isGeneratingInteractive, setIsGeneratingInteractive] = useState(false);
   const [activeInteractiveType, setActiveInteractiveType] = useState<'hard_questions' | 'more_examples' | 'exam_questions' | null>(null);
+  const [showOutlineModal, setShowOutlineModal] = useState(false);
+  const [readingBlockIndex, setReadingBlockIndex] = useState<number | null>(null);
   const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
   const [forceDir, setForceDir] = useState<'ltr' | 'rtl' | null>(null);
 
@@ -175,6 +177,57 @@ export const LessonView: React.FC = () => {
   const [selectedText, setSelectedText] = useState<string | null>(null);
   const [explanation, setExplanation] = useState<string | null>(null);
   const [isExplaining, setIsExplaining] = useState(false);
+
+
+  // --- Audio Reading Logic ---
+  useEffect(() => {
+    return () => {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  const toggleReadAloud = (index: number, text: string) => {
+    if (!('speechSynthesis' in window)) {
+      toast.error('Text-to-speech is not supported in this browser.');
+      return;
+    }
+
+    if (readingBlockIndex === index) {
+      // Stop reading
+      window.speechSynthesis.cancel();
+      setReadingBlockIndex(null);
+    } else {
+      // Start reading new block
+      window.speechSynthesis.cancel();
+
+      // Strip markdown syntax for better reading
+      const cleanText = text
+        .replace(/[#*_\`]/g, '')
+        .replace(/\n/g, ' ')
+        .trim();
+
+      if (!cleanText) return;
+
+      const utterance = new SpeechSynthesisUtterance(cleanText);
+      utterance.rate = 0.9; // Slightly slower for better comprehension
+
+      utterance.onend = () => {
+        setReadingBlockIndex(null);
+      };
+
+      utterance.onerror = () => {
+        setReadingBlockIndex(null);
+        toast.error('Error playing audio.');
+      };
+
+      setReadingBlockIndex(index);
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+  // -------------------------
+
 
   const handleMouseUp = (e: React.MouseEvent) => {
     // If we're clicking inside the explain button, don't do anything
@@ -1480,6 +1533,74 @@ export const LessonView: React.FC = () => {
       </div>
     </div>
 
+
+
+      {/* Lesson Outline Modal */}
+      <Modal
+        isOpen={showOutlineModal}
+        onClose={() => {
+          setShowOutlineModal(false);
+          // Stop audio when modal closes
+          if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            setReadingBlockIndex(null);
+          }
+        }}
+        title="Lesson Outline"
+      >
+        <div className="space-y-4">
+          <div className="p-4 bg-accent/5 rounded-xl border border-accent/10 space-y-2">
+            <h3 className="font-bold text-accent">Audio Reading</h3>
+            <p className="text-sm text-muted">Click any section title to hear it read aloud. Click again to stop.</p>
+          </div>
+
+          <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-2">
+            {lesson?.blocks?.map((block, index) => {
+              const isReading = readingBlockIndex === index;
+              return (
+                <button
+                  key={block.id || index}
+                  onClick={() => toggleReadAloud(index, block.content || '')}
+                  className={`w-full text-left p-4 rounded-xl border transition-all flex items-center justify-between gap-4 ${
+                    isReading
+                      ? 'bg-accent/10 border-accent/30 shadow-sm'
+                      : 'bg-surface-low border-ink/5 hover:border-accent/30 hover:bg-surface-mid'
+                  }`}
+                >
+                  <div className="flex-1">
+                    <span className="text-xs font-bold text-muted uppercase tracking-wider mb-1 block">
+                      Section {index + 1}
+                    </span>
+                    <h4 className={`font-bold ${isReading ? 'text-accent' : 'text-ink'}`}>
+                      {block.title || 'Untitled Section'}
+                    </h4>
+                  </div>
+
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+                    isReading ? 'bg-accent text-paper' : 'bg-surface-mid text-ink-secondary'
+                  }`}>
+                    {isReading ? (
+                      <div className="w-4 h-4 flex items-center justify-center gap-1">
+                        <span className="w-1 h-3 bg-paper rounded-full animate-pulse" style={{ animationDelay: '0ms' }} />
+                        <span className="w-1 h-4 bg-paper rounded-full animate-pulse" style={{ animationDelay: '150ms' }} />
+                        <span className="w-1 h-3 bg-paper rounded-full animate-pulse" style={{ animationDelay: '300ms' }} />
+                      </div>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+
+            {(!lesson?.blocks || lesson.blocks.length === 0) && (
+              <div className="text-center p-8 text-muted">
+                No sections found in this lesson.
+              </div>
+            )}
+          </div>
+        </div>
+      </Modal>
 
       {/* Reminder Modal */}
       <Modal
