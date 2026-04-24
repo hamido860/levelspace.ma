@@ -697,7 +697,7 @@ export const LessonView: React.FC = () => {
                 )}
               </div>
               <div className="bg-paper p-6 rounded-2xl border border-ink/5 shadow-sm min-h-[200px]">
-                <div className="text-sm text-ink leading-relaxed prose prose-sm max-w-none">
+                <div className="text-sm text-ink leading-relaxed prose prose-custom prose-sm max-w-none">
                   {isExplaining ? (
                     <div className="flex flex-col items-center justify-center py-12 space-y-4">
                       <Loader2 size={32} className="animate-spin text-accent" />
@@ -836,7 +836,7 @@ export const LessonView: React.FC = () => {
                       </div>
                     </div>
                   ) : (
-                    <div className="markdown-body prose prose-sm max-w-none">
+                    <div className="markdown-body prose prose-custom prose-sm max-w-none">
                       <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>
                         {interactiveContent || ''}
                       </Markdown>

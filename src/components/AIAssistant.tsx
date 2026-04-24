@@ -258,7 +258,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
                         {msg.role === 'user' ? (
                           msg.parts[0].text
                         ) : (
-                          <div className="prose prose-sm dark:prose-invert prose-p:leading-relaxed prose-pre:bg-surface-mid dark:prose-pre:bg-surface-low prose-pre:text-ink dark:prose-pre:text-ink-secondary max-w-none">
+                          <div className="prose prose-sm prose-custom prose-p:leading-relaxed prose-pre:bg-surface-mid dark:prose-pre:bg-surface-low prose-pre:text-ink dark:prose-pre:text-ink-secondary max-w-none">
                             <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{msg.parts[0].text}</Markdown>
                           </div>
                         )}
