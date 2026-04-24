@@ -28,9 +28,10 @@ export const useAppSettings = () => {
 
     fetchSettings();
 
-    // Subscribe to changes
-    const subscription = supabase
-      .channel('app_settings_changes')
+    // Unique channel name per hook instance — prevents "cannot add callbacks after subscribe()"
+    // when the hook is mounted in multiple components at the same time.
+    const channel = supabase
+      .channel(`app_settings_changes_${Math.random().toString(36).slice(2)}`)
       .on('postgres_changes', { event: '*', table: 'app_settings', schema: 'public' }, (payload) => {
         if (payload.new) {
           const newSetting = payload.new as any;
@@ -40,7 +41,7 @@ export const useAppSettings = () => {
       .subscribe();
 
     return () => {
-      subscription.unsubscribe();
+      supabase.removeChannel(channel);
     };
   }, []);
 
