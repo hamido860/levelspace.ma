@@ -1,6 +1,6 @@
 import { db } from "../db/db";
 import { supabase } from "../db/supabase";
-import { generateFullLesson, LessonTemplate, AILesson, AILessonBlock } from "./geminiService";
+import { generateFullLesson, LessonTemplate, AILesson, AILessonBlock, flatLessonToBlocks } from "./geminiService";
 import { saveLesson, searchLessons } from "./ragService";
 import { aiCrew } from "./aiCrewService";
 
@@ -79,42 +79,23 @@ export const lessonService = {
 };
 
 function buildAILesson(lessonData: LessonTemplate): AILesson & { id?: string } {
-  const blocks: AILessonBlock[] = [
-    { type: "content", title: "Lesson Content", content: lessonData.content },
-  ];
-
-  if (lessonData.exercises?.length > 0) {
-    blocks.push({
-      type: "examples",
-      title: "Exercises",
-      examples: lessonData.exercises.map((ex: any) => ({
-        question: ex.question,
-        steps: [],
-        answer: ex.solution,
-      })),
-    });
+  // If the lesson already has structured blocks, use them directly
+  if (lessonData.blocks && lessonData.blocks.length > 0) {
+    return {
+      id: lessonData.id,
+      title: lessonData.lesson_title,
+      subtitle: `${lessonData.blocks.length} blocks · ~${Math.ceil(lessonData.blocks.length * 1.5)} min`,
+      blocks: lessonData.blocks,
+    };
   }
 
-  lessonData.quizzes?.forEach((q: any) => {
-    blocks.push({
-      type: "quiz",
-      title: "Quiz",
-      quiz: { question: q.question, options: q.options, correctAnswer: q.correctAnswer, explanation: q.explanation },
-    });
-  });
-
-  if (lessonData.exam) {
-    blocks.push({
-      type: "exam",
-      title: "Exam Question",
-      exam: { source: "National Exam Style", question: lessonData.exam.question, hint: lessonData.exam.hint || "", solution: lessonData.exam.solution },
-    });
-  }
+  // Legacy fallback: convert flat structure to blocks
+  const blocks = flatLessonToBlocks(lessonData);
 
   return {
     id: lessonData.id,
     title: lessonData.lesson_title,
-    subtitle: `${blocks.length} sections · ~15 min`,
+    subtitle: `${blocks.length} blocks · ~${Math.ceil(blocks.length * 1.5)} min`,
     blocks,
   };
 }
