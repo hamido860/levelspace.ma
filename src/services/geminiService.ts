@@ -3,6 +3,7 @@ import { jsonrepair } from "jsonrepair";
 import { moroccanAcademicDb } from "../data/moroccan_academic_db";
 import { toast } from "sonner";
 import { db } from "../db/db";
+import { supabase } from "../db/supabase";
 import { searchContextForGeneration } from "./ragService";
 import { transformersService } from "./transformersService";
 
@@ -156,14 +157,37 @@ export const handleApiError = (error: any, context: string) => {
 
 // --- AI Response Pipeline ---
 
-// 1. Cache (Free & Persistent)
+// 1. Cache (Free & Persistent & Cloud-Optimized)
 const responseCache = {
   get: async (key: string): Promise<string | null> => {
     try {
-      const cached = await db.aiCache.get(key);
-      if (cached) {
-        // Optional: Implement TTL (Time-To-Live) here if needed
-        return cached.response;
+      // Level 1: Local IndexedDB (Instant, Offline)
+      const localCached = await db.aiCache.get(key);
+      if (localCached) {
+        console.log("AI Cache: Local Hit");
+        return localCached.response;
+      }
+
+      // Level 2: Supabase Global Cache (Shared across users)
+      const { data: cloudCached, error } = await supabase
+        .from('ai_cache')
+        .select('response')
+        .eq('key', key)
+        .maybeSingle();
+
+      if (!error && cloudCached) {
+        console.log("AI Cache: Cloud Hit");
+        // Backfill local cache for faster next access
+        await db.aiCache.put({
+          key,
+          response: cloudCached.response,
+          createdAt: Date.now()
+        });
+
+        // Update hit count in background
+        supabase.rpc('increment_ai_cache_hit', { p_key: key }).catch(() => {});
+
+        return cloudCached.response;
       }
     } catch (err) {
       console.warn("Failed to read from AI cache:", err);
@@ -172,18 +196,23 @@ const responseCache = {
   },
   set: async (key: string, response: string): Promise<void> => {
     try {
+      // Level 1: Save Locally
       await db.aiCache.put({
         key,
         response,
         createdAt: Date.now()
       });
+
+      // Level 2: Save to Supabase (if connected)
+      await supabase.from('ai_cache').upsert({
+        key,
+        response,
+        created_at: new Date().toISOString()
+      }, { onConflict: 'key' });
+
     } catch (err) {
       console.warn("Failed to write to AI cache:", err);
     }
-  },
-  has: async (key: string): Promise<boolean> => {
-    const cached = await db.aiCache.get(key);
-    return !!cached;
   }
 };
 

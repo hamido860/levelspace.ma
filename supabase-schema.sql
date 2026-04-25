@@ -348,6 +348,30 @@ CREATE TABLE IF NOT EXISTS bac_track_subjects (
   PRIMARY KEY (track_id, subject_id)
 );
 
+-- 21. Global AI Cache Table
+CREATE TABLE IF NOT EXISTS ai_cache (
+  key TEXT PRIMARY KEY,
+  response TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  hit_count INTEGER DEFAULT 1
+);
+
+-- Enable RLS for ai_cache
+ALTER TABLE ai_cache ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Anyone can view ai_cache" ON ai_cache FOR SELECT USING (true);
+CREATE POLICY "Anyone can insert into ai_cache" ON ai_cache FOR INSERT WITH CHECK (true);
+CREATE POLICY "Anyone can update hit_count" ON ai_cache FOR UPDATE USING (true);
+
+-- Function to increment hit_count
+CREATE OR REPLACE FUNCTION increment_ai_cache_hit(p_key TEXT)
+RETURNS VOID AS $$
+BEGIN
+  UPDATE ai_cache
+  SET hit_count = hit_count + 1
+  WHERE key = p_key;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- 20. Quiz Results Table
 CREATE TABLE IF NOT EXISTS quiz_results (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
