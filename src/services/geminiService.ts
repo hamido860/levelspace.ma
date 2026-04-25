@@ -1304,8 +1304,12 @@ export const generateCurriculum = async (
 
       If the grade is "Tronc Commun", "1ère année Bac", or "2ème année Bac", you MUST generate high-school level subjects.
       DO NOT generate primary school topics like "Reading and Writing" (القراءة والكتابة) for high school students.
-      For "Tronc Commun Scientifique", focus on Mathematics, Physics-Chemistry, Life and Earth Sciences (SVT) at an advanced level.
-      Ensure the modules match the specific grade level and track provided.`;
+
+      STRICT TRACK FILTERING:
+      If a specific track is provided (e.g., "Scientifique", "Littéraire", "Technique"), you MUST ONLY generate subjects that belong to that track.
+      For example, "Tronc Commun Scientifique" should NOT have "Art Education" or "Arabic Reading and Writing" as primary modules. It should have "Mathematics", "Physics-Chemistry", "SVT", "French", "Arabic (advanced)", etc.
+
+      Ensure the modules match the specific grade level and track provided strictly.`;
     }
 
     const adminContext = isAdmin ? `
