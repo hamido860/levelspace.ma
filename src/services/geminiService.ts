@@ -745,10 +745,26 @@ export interface AICuratedModule {
 }
 
 export interface AILessonBlock {
-  type: "definition" | "rules" | "examples" | "quiz" | "exam" | "content";
-  title: string;
+  type: "intro" | "theory" | "formula" | "example" | "exercise" | "quiz" | "exam" | "summary" | "definition" | "rules" | "examples" | "content";
+  // intro & common
   content?: string;
+  title?: string;
+  // formula
+  label?: string;
+  // exercise
+  solution?: string;
+  hint?: string;
+  // quiz
+  question?: string;
+  options?: string[];
+  correctAnswer?: string;
+  explanation?: string;
+  // exam
   source?: string;
+  // summary
+  points?: string[];
+
+  // Legacy fields for backward compatibility
   rules?: string[];
   examples?: { question: string; steps: string[]; answer: string }[];
   quiz?: {
@@ -758,6 +774,7 @@ export interface AILessonBlock {
     explanation: string;
   };
   exam?: { source: string; question: string; hint: string; solution: string };
+  exercise?: { question: string; solution: string };
 }
 
 export interface AILesson {
@@ -792,6 +809,7 @@ export interface LessonTemplate {
   mod: string;
   exam: any;
   similarity?: number;
+  blocks?: AILessonBlock[];
 }
 
 // ─── Orchestration: Pro plans, Gemma 4 executes ──────────────────────────────
@@ -932,6 +950,16 @@ Generate a complete lesson as JSON with this structure:
   "lesson_title": "${plan.lesson_title}",
   "mod": "${plan.subject}",
   "content": "full markdown lesson content",
+  "blocks": [
+    { "type": "intro", "content": "string" },
+    { "type": "theory", "title": "string", "content": "string" },
+    { "type": "formula", "label": "string", "content": "string" },
+    { "type": "example", "title": "string", "content": "string" },
+    { "type": "exercise", "title": "string", "content": "string", "solution": "string", "hint": "string" },
+    { "type": "quiz", "question": "string", "options": ["A","B","C","D"], "correctAnswer": "A", "explanation": "string" },
+    { "type": "exam", "question": "string", "hint": "string", "solution": "string", "source": "string" },
+    { "type": "summary", "points": ["string"] }
+  ],
   "exercises": [{"question": "...", "solution": "...", "hint": "..."}],
   "quizzes": [{"question": "...", "options": ["A","B","C","D"], "correctAnswer": "A", "explanation": "..."}],
   "exam": {"question": "...", "hint": "...", "solution": "..."}
@@ -1059,12 +1087,35 @@ export const getLessonPrompt = (
     "grade": "string",
     "subject": "string",
     "lesson_title": "string",
-    "content": "string (Markdown)",
-    "mod": "string (Module name)",
-    "exercises": [{"question": "string", "solution": "string"}],
-    "quizzes": [{"question": "string", "options": ["string"], "correctAnswer": "string", "explanation": "string"}],
-    "exam": {"question": "string", "hint": "string", "solution": "string"}
-  }`;
+    "mod": "string",
+    "content": "string (full lesson in Markdown — kept for RAG/embedding use)",
+    "blocks": [
+      { "type": "intro", "content": "string" },
+      { "type": "theory", "title": "string", "content": "string" },
+      { "type": "formula", "label": "string", "content": "string" },
+      { "type": "example", "title": "string", "content": "string" },
+      { "type": "exercise", "title": "string", "content": "string", "solution": "string", "hint": "string (optional)" },
+      { "type": "quiz", "question": "string", "options": ["A","B","C","D"], "correctAnswer": "string", "explanation": "string" },
+      { "type": "exam", "question": "string", "hint": "string", "solution": "string", "source": "string (optional)" },
+      { "type": "summary", "points": ["string"] }
+    ],
+    "exercises": [{ "question": "string", "solution": "string" }],
+    "quizzes": [{ "question": "string", "options": ["string"], "correctAnswer": "string", "explanation": "string" }],
+    "exam": { "question": "string", "hint": "string", "solution": "string" }
+  }
+
+BLOCK GENERATION RULES:
+- Generate 8–12 blocks total
+- Always start with exactly one "intro" block
+- Always end with exactly one "summary" block with 5–8 bullet points
+- Include 1–3 "theory" blocks for core concepts
+- Include 1–3 "formula" blocks for any equations or rules
+- Include 2–3 "example" blocks showing solved problems
+- Include 1–2 "exercise" blocks for student practice
+- Include 2–3 "quiz" blocks (multiple choice)
+- Include 1 "exam" block for national-exam-style question
+- The "content" field must be the full lesson as Markdown (concatenate all blocks)
+- The "exercises", "quizzes", "exam" top-level fields must mirror the blocks (kept for backward compat)`;
 
   return prompt;
 };
@@ -2695,4 +2746,66 @@ export async function findSimilarResources(
     handleApiError(error, "findSimilarResources");
     return null;
   }
+}
+
+/**
+ * Converts a legacy flat LessonTemplate (no blocks) into the canonical blocks format.
+ * Used for backward compat when loading old Supabase lessons that predate blocks.
+ */
+export function flatLessonToBlocks(lesson: LessonTemplate): AILessonBlock[] {
+  const blocks: AILessonBlock[] = [];
+
+  // Intro from the start of content
+  const lines = (lesson.content || "").split("\n").filter(l => l.trim());
+  const introParagraph = lines.slice(0, 3).join("\n");
+  if (introParagraph) {
+    blocks.push({ type: "intro", content: introParagraph });
+  }
+
+  // Main content as a theory block
+  const rest = lines.slice(3).join("\n");
+  if (rest) {
+    blocks.push({ type: "theory", title: lesson.lesson_title, content: rest });
+  }
+
+  // Exercises
+  (lesson.exercises || []).forEach((ex: any, i: number) => {
+    blocks.push({
+      type: "exercise",
+      title: `Exercise ${i + 1}`,
+      content: ex.question || ex.prompt || "",
+      solution: ex.solution || "",
+      hint: ex.hint || undefined,
+    });
+  });
+
+  // Quizzes
+  (lesson.quizzes || []).forEach((q: any) => {
+    blocks.push({
+      type: "quiz",
+      question: q.question || "",
+      options: q.options || [],
+      correctAnswer: q.correctAnswer || "",
+      explanation: q.explanation || "",
+    });
+  });
+
+  // Exam
+  if (lesson.exam) {
+    blocks.push({
+      type: "exam",
+      question: lesson.exam.question || "",
+      hint: lesson.exam.hint || undefined,
+      solution: lesson.exam.solution || "",
+      source: lesson.exam.source || "National Exam Style",
+    });
+  }
+
+  // Summary
+  blocks.push({
+    type: "summary",
+    points: [`Leçon : ${lesson.lesson_title}`, `Matière : ${lesson.subject}`, `Niveau : ${lesson.grade}`],
+  });
+
+  return blocks;
 }
