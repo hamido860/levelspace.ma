@@ -401,6 +401,10 @@ CREATE TABLE IF NOT EXISTS rag_chunks (
 ALTER TABLE rag_chunks ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Anyone can view rag_chunks" ON rag_chunks FOR SELECT USING (true);
 CREATE POLICY "Admins can manage rag_chunks" ON rag_chunks FOR ALL USING (EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.plan = 'pro'));
+-- Authenticated users can manage their own chunks (keyed by metadata->>'user_id')
+CREATE POLICY "Users can manage their own rag_chunks" ON rag_chunks FOR ALL
+  USING ((metadata->>'user_id')::uuid = auth.uid())
+  WITH CHECK ((metadata->>'user_id')::uuid = auth.uid());
 
 -- Create match_rag_chunks function
 CREATE OR REPLACE FUNCTION match_rag_chunks (

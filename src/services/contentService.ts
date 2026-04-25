@@ -47,7 +47,7 @@ export const contentService = {
 
   // Subjects
   async getSubjects(levelId?: string) {
-    let query = supabase.from('subjects').select('*, levels(*)');
+    let query = supabase.from('subjects').select('*, levels!level_id(*)');
     if (levelId) {
       query = query.eq('level_id', levelId);
     }
@@ -78,7 +78,7 @@ export const contentService = {
   async getContent(subjectId: string, activeOnly = true) {
     let query = supabase
       .from('content')
-      .select('*, subjects(*)')
+      .select('*, subjects!subject_id(*)')
       .eq('subject_id', subjectId);
     
     if (activeOnly) {
