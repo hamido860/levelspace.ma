@@ -618,13 +618,25 @@ export async function generateAIContent(
   context: string,
 ): Promise<any> {
   if (!currentApiKey) {
-    const errorMsg = "Gemini API key is missing. Please configure it in the Secrets panel.";
+    // No Gemini key — skip straight to NVIDIA if available
+    if (getNvidiaApiKey()) {
+      let promptText = "";
+      if (typeof params.contents === "string") promptText = params.contents;
+      else if (Array.isArray(params.contents)) promptText = params.contents.map((p: any) => p.text || JSON.stringify(p)).join("\n");
+      else promptText = JSON.stringify(params.contents);
+      const isJson = params.config?.responseMimeType === "application/json";
+      try {
+        const nvidiaText = await callNvidiaAPI({ prompt: promptText, isJson, maxTokens: Math.min(params.config?.maxOutputTokens || 4096, 4096) });
+        if (nvidiaText) {
+          updateAIStatus({ lastModel: "Gemma 3 (NVIDIA NIM)", isLocal: false, lastError: null });
+          return { text: nvidiaText, candidates: [{ content: { parts: [{ text: nvidiaText }] } }] };
+        }
+      } catch (e) { console.warn("[generateAIContent] NVIDIA-only path failed:", e); }
+    }
+    const errorMsg = "No AI API key configured. Add a Gemini or NVIDIA key in Settings.";
     console.error(errorMsg);
     updateAIStatus({ lastError: errorMsg });
-    toast.error("AI Configuration Error", {
-      description: errorMsg,
-      duration: 5000,
-    });
+    toast.error("AI Configuration Error", { description: errorMsg, duration: 5000 });
     throw new Error(errorMsg);
   }
   const primaryModel = params.model || "gemini-3-flash-preview";
@@ -1392,7 +1404,52 @@ export const generateSeedLesson = async (
       return safeJsonParse(cachedResponse);
     }
 
-    const ragInstruction = strictRAG ? `\nSTRICT RAG MODE IS ENABLED: You MUST firmly base the entire generated lesson strictly on this provided existing context. Do NOT hallucinate concepts outside of this context:\n<EXISTING_CONTEXT>\n${existingContext}\n</EXISTING_CONTEXT>\n\nIf the existing context is empty, simply summarize the topic briefly without generating deep educational material.` : "";
+    const ragInstruction = strictRAG && existingContext
+      ? `\nSTRICT RAG MODE: Base the entire lesson on this context only:\n<EXISTING_CONTEXT>\n${existingContext}\n</EXISTING_CONTEXT>`
+      : existingContext
+        ? `\nUse this existing curriculum as chaining context to stay consistent:\n<CONTEXT>\n${existingContext}\n</CONTEXT>`
+        : "";
+
+    const basePrompt = `Generate a concise introductory seed lesson for the classroom "${moduleName}" for a student in ${country} at the ${grade} level.
+The lesson must be engaging and structured into blocks: definition, rules, worked examples, a multiple-choice quiz, a practice exercise, and a national exam style question.
+${ragInstruction}
+
+CONSTRAINTS:
+- Keep total content under 3000 characters.
+- Use Markdown inside "content" and "question" fields.
+- No walls of text: use bullet points, bold key terms, short paragraphs.
+- Write entirely in the official language of instruction for "${moduleName}" in ${country} for ${grade} (e.g. Arabic for Philosophy/History in Morocco, French for Sciences/Math).
+
+Return ONLY valid JSON (no markdown fences) matching this exact structure:
+{
+  "title": "string",
+  "subtitle": "string (e.g. '6 blocks · ~20 min')",
+  "blocks": [
+    {"type": "definition", "title": "string", "content": "markdown string"},
+    {"type": "rules", "title": "string", "rules": ["rule 1", "rule 2"]},
+    {"type": "examples", "title": "string", "examples": [{"question": "string", "steps": ["string"], "answer": "string"}]},
+    {"type": "quiz", "title": "string", "quiz": {"question": "string", "options": ["A","B","C","D"], "correctAnswer": "string", "explanation": "string"}},
+    {"type": "exercise", "title": "string", "exercise": {"question": "string", "hint": "string", "solution": "string"}},
+    {"type": "exam", "title": "string", "exam": {"source": "string", "question": "string", "hint": "string", "solution": "string"}}
+  ]
+}`;
+
+    // ── Primary: NVIDIA (free tier, no Gemini quota consumed) ─────────────────
+    if (getNvidiaApiKey()) {
+      try {
+        const nvidiaText = await callNvidiaAPI({ prompt: basePrompt, isJson: true, maxTokens: 4096 });
+        if (nvidiaText) {
+          const parsed = safeJsonParse(nvidiaText) as AILesson;
+          if (parsed?.title && Array.isArray(parsed.blocks)) {
+            await responseCache.set(cacheKey, nvidiaText);
+            updateAIStatus({ lastModel: "Gemma 3 (NVIDIA NIM)", isLocal: false, lastError: null });
+            return parsed;
+          }
+        }
+      } catch (nvidiaErr) {
+        console.warn("[generateSeedLesson] NVIDIA failed, falling back to Gemini:", nvidiaErr);
+      }
+    }
 
     const response = await generateContentWithFallback(
       {
@@ -1621,19 +1678,38 @@ export const generateLessonSuggestions = async (
     }
 
     const topicsContext = existingTopics && existingTopics.length > 0
-      ? `\n\nCRITICAL: The admin has already defined the following topics for this subject. You MUST use these topics as the basis for your suggestions:\n${existingTopics.join('\n')}`
+      ? `\n\nCRITICAL: The admin has already defined the following topics. Use these as the basis:\n${existingTopics.join('\n')}`
       : "";
+
+    const suggestionsPrompt = `Provide a list of 10 specific lesson topics for a curriculum module named "${moduleName}" for ${grade} in ${country}.${topicsContext}
+Each topic should have a title and a short 1-sentence description (max 150 characters).
+Write titles and descriptions ENTIRELY in the official language of instruction for "${moduleName}" in ${country} for ${grade} (e.g. Arabic for Philosophy/History in Morocco). No English translations.
+
+Return ONLY valid JSON array (no markdown fences):
+[{"title": "string", "description": "string"}, ...]`;
+
+    // ── Primary: NVIDIA ───────────────────────────────────────────────────────
+    if (getNvidiaApiKey()) {
+      try {
+        const nvidiaText = await callNvidiaAPI({ prompt: suggestionsPrompt, isJson: true, maxTokens: 2048 });
+        if (nvidiaText) {
+          const parsed = safeJsonParse(nvidiaText);
+          const list = Array.isArray(parsed) ? parsed : parsed?.suggestions ?? parsed?.topics ?? null;
+          if (Array.isArray(list) && list.length > 0 && list[0]?.title) {
+            await responseCache.set(cacheKey, JSON.stringify(list));
+            updateAIStatus({ lastModel: "Gemma 3 (NVIDIA NIM)", isLocal: false, lastError: null });
+            return list as LessonSuggestion[];
+          }
+        }
+      } catch (nvidiaErr) {
+        console.warn("[generateLessonSuggestions] NVIDIA failed, falling back to Gemini:", nvidiaErr);
+      }
+    }
 
     const response = await generateContentWithFallback(
       {
         model: "gemini-3-flash-preview",
-        contents: `Provide a list of 10 specific lesson topics for a curriculum module named "${moduleName}" for ${grade} in ${country}.${topicsContext}
-      Each topic should have a title and a short 1-sentence description of what it covers.
-      Keep descriptions concise (max 150 characters).
-      CRITICAL INSTRUCTION REGARDING LANGUAGE: 
-      1. First, identify the official national language of instruction for the specific subject "${moduleName}" in ${country} for ${grade}. For example, in the Moroccan educational system, Philosophy, History, Geography, and Islamic Education are taught EXCLUSIVELY in Arabic.
-      2. Generate the titles and descriptions STRICTLY in that SINGLE official native language of instruction. 
-      3. DO NOT mix languages. DO NOT provide English translations.`,
+        contents: suggestionsPrompt,
         config: {
           responseMimeType: "application/json",
           maxOutputTokens: 4096,

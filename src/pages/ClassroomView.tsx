@@ -132,19 +132,43 @@ export const ClassroomView: React.FC = () => {
     }
   }, [module, allLessons]);
 
+  const buildChainContext = async (maxChars = 8000): Promise<string> => {
+    if (!module) return '';
+    const parts: string[] = [];
+
+    // 1. Local lessons (IndexedDB)
+    const localLessons = allLessons?.filter(l => l.status !== 'suggested') || [];
+    for (const l of localLessons) {
+      parts.push(`Title: ${l.title}\nContent: ${l.content || (l.blocks ? l.blocks.map((b: any) => b.content).join('\n') : '')}`);
+    }
+
+    // 2. Supabase lessons for this subject/grade/country (seed chaining)
+    try {
+      const { data: dbLessons } = await supabase
+        .from('lessons')
+        .select('lesson_title, content')
+        .eq('subject', module.category || module.name)
+        .eq('grade', selectedGrade)
+        .eq('country', country)
+        .limit(5);
+      if (dbLessons) {
+        for (const l of dbLessons) {
+          const entry = `Title: ${l.lesson_title}\nContent: ${l.content?.substring(0, 600) ?? ''}`;
+          if (!parts.some(p => p.includes(l.lesson_title))) parts.push(entry);
+        }
+      }
+    } catch { /* non-critical */ }
+
+    const combined = parts.join('\n\n');
+    return combined.length > maxChars ? combined.substring(0, maxChars) + '...' : combined;
+  };
+
   const handleGenerateLesson = async (title?: string, autoNavigate = false) => {
     if (!module) return;
     const lessonTitle = title || module.name;
     setGeneratingTitle(lessonTitle);
     try {
-      let existingContext = '';
-      if (module.strictRAG) {
-         let localLessons = allLessons?.filter(l => l.status !== 'suggested') || [];
-         existingContext = localLessons.map(l => `Title: ${l.title}\nContent: ${l.content || (l.blocks ? l.blocks.map((b:any) => b.content).join('\n') : '')}`).join('\n\n');
-         if (existingContext.length > 10000) {
-            existingContext = existingContext.substring(0, 10000) + '...'; // truncate to prevent token overflow
-         }
-      }
+      const existingContext = await buildChainContext();
 
       const seedLesson = await generateSeedLesson(lessonTitle, selectedGrade, country, 2, module.strictRAG, existingContext);
       if (seedLesson) {
@@ -190,17 +214,9 @@ export const ClassroomView: React.FC = () => {
     if (!module || selectedSuggestions.length === 0) return;
     setGeneratingTitle('selected');
     try {
-      let existingContext = '';
-      if (module.strictRAG) {
-         let localLessons = allLessons?.filter(l => l.status !== 'suggested') || [];
-         existingContext = localLessons.map(l => `Title: ${l.title}\nContent: ${l.content || (l.blocks ? l.blocks.map((b:any) => b.content).join('\n') : '')}`).join('\n\n');
-         if (existingContext.length > 10000) {
-            existingContext = existingContext.substring(0, 10000) + '...'; 
-         }
-      }
+      const existingContext = await buildChainContext();
 
       for (const title of selectedSuggestions) {
-        // We use a simplified version here to avoid multiple AI calls in parallel or sequential state updates that might conflict
         const seedLesson = await generateSeedLesson(title, selectedGrade, country, 2, module.strictRAG, existingContext);
         if (seedLesson) {
           await db.lessons.add({
@@ -237,14 +253,7 @@ export const ClassroomView: React.FC = () => {
     if (!module || suggestions.length === 0) return;
     setGeneratingTitle('all');
     try {
-      let existingContext = '';
-      if (module.strictRAG) {
-         let localLessons = allLessons?.filter(l => l.status !== 'suggested') || [];
-         existingContext = localLessons.map(l => `Title: ${l.title}\nContent: ${l.content || (l.blocks ? l.blocks.map((b:any) => b.content).join('\n') : '')}`).join('\n\n');
-         if (existingContext.length > 10000) {
-            existingContext = existingContext.substring(0, 10000) + '...'; 
-         }
-      }
+      const existingContext = await buildChainContext();
 
       const titles = suggestions.map(s => s.title);
       for (const title of titles) {
