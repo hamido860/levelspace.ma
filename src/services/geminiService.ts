@@ -24,7 +24,7 @@ export const setNvidiaApiKey = (key: string) => {
 };
 
 export const NVIDIA_MODEL = "google/gemma-3-27b-it";
-export const NVIDIA_WORKER_MODEL = "google/gemma-4-27b-it"; // Gemma 4 — primary bulk lesson worker
+export const NVIDIA_WORKER_MODEL = "google/gemma-3-27b-it"; // Gemma 3 27B — primary bulk lesson worker
 
 export async function callNvidiaAPI(params: {
   prompt: string;
@@ -103,7 +103,7 @@ export class ServiceUnavailableError extends Error {
 const QUOTA_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
 const QUOTA_STORAGE_KEY = "ai_model_quota_hits";
 
-const GEMINI_FALLBACKS = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-3-flash-preview"] as const;
+const GEMINI_FALLBACKS = ["gemini-2.5-flash", "gemini-2.5-flash-lite"] as const;
 
 export const modelQuotaTracker = {
   _load(): Record<string, number> {
@@ -202,7 +202,7 @@ Respond strictly in JSON format with the following schema:
     };
 
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]),
       contents: prompt,
       config: config
     });
@@ -571,7 +571,7 @@ export type AIStatus = {
 };
 
 let aiStatus: AIStatus = {
-  lastModel: "gemini-3-flash-preview",
+  lastModel: "gemini-2.5-flash",
   isLocal: false,
   lastError: null,
   timestamp: new Date().toISOString(),
@@ -639,12 +639,11 @@ export async function generateAIContent(
     toast.error("AI Configuration Error", { description: errorMsg, duration: 5000 });
     throw new Error(errorMsg);
   }
-  const primaryModel = params.model || "gemini-3-flash-preview";
+  const primaryModel = params.model || "gemini-2.5-flash";
   try {
     const config = params.config || {};
-    
-    // Always enable Google Search grounding for better factual accuracy
-    const tools = params.tools || [{ googleSearch: {} }];
+    const isJsonMode = config.responseMimeType === "application/json";
+    const tools = params.tools !== undefined ? params.tools : (isJsonMode ? [] : [{ googleSearch: {} }]);
 
     const result = await ai.models.generateContent({
       ...params,
@@ -1148,7 +1147,6 @@ export const generateFullLesson = async (
     const config: any = {
       responseMimeType: "application/json",
       maxOutputTokens: 5000,
-      tools: [{ googleSearch: {} }],
       responseSchema: {
         type: Type.OBJECT,
         properties: {
@@ -1315,7 +1313,7 @@ export const generateCurriculum = async (
 
     let response = await generateContentWithFallback(
       {
-        model: "gemini-3-flash-preview",
+        model: modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]),
         contents: `Generate a list of 10 academic classrooms (modules) for a student in ${country} at the ${grade} level. 
       The classrooms should be from trusted academic resources and follow the standard curriculum of that region.
       ${adminContext}
@@ -1453,7 +1451,7 @@ Return ONLY valid JSON (no markdown fences) matching this exact structure:
 
     const response = await generateContentWithFallback(
       {
-        model: "gemini-3-flash-preview",
+        model: modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]),
         contents: `Generate a concise introductory seed lesson for the classroom "${moduleName}" for a student in ${country} at the ${grade} level.
       The lesson should be engaging and structured into specific blocks: definition, rules, worked examples, a multiple-choice quiz, a practice exercise, and a national exam style question.
       ${ragInstruction}
@@ -1708,7 +1706,7 @@ Return ONLY valid JSON array (no markdown fences):
 
     const response = await generateContentWithFallback(
       {
-        model: "gemini-3-flash-preview",
+        model: modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]),
         contents: suggestionsPrompt,
         config: {
           responseMimeType: "application/json",
@@ -1856,7 +1854,7 @@ export const auditLessonLanguage = async (
 
     const response = await generateContentWithFallback(
       {
-        model: "gemini-3-flash-preview",
+        model: modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]),
         contents: `You are an educational content auditor.
       Review the following lesson content for a student in ${country} at the ${grade} level, studying "${moduleName}".
       1. Determine the SINGLE primary native language of instruction expected for this specific subject in this country. For example, in Morocco, Philosophy, History, Geography, and Islamic Education are taught EXCLUSIVELY in Arabic.
@@ -1962,7 +1960,7 @@ export const generateLessonTags = async (
 
     const response = await generateContentWithFallback(
       {
-        model: "gemini-3-flash-preview",
+        model: modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]),
         contents: `Generate a list of 5-7 relevant academic tags for the following lesson.
       
       Lesson Title: "${lessonTitle}"
@@ -2177,7 +2175,7 @@ export const generateFlashcards = async (
 
     const response = await generateContentWithFallback(
       {
-        model: "gemini-3-flash-preview",
+        model: modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]),
         contents: `Generate 5 to 10 study flashcards based on the following lesson content. 
       Extract the most important key terms, concepts, or questions for the front of the card, and provide clear, concise definitions or answers for the back.
       
@@ -2257,7 +2255,7 @@ export const generateInteractiveContent = async (
 
     const response = await generateContentWithFallback(
       {
-        model: "gemini-3-flash-preview",
+        model: modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]),
         contents: `${prompt}
       
       LESSON CONTENT:
@@ -2296,7 +2294,7 @@ export const generateCauseEffect = async (
 
     const response = await generateContentWithFallback(
       {
-        model: "gemini-3-flash-preview",
+        model: modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]),
         contents: `Analyze the following lesson content and identify 3 to 6 cause-and-effect relationships.
       For each relationship, provide a clear 'cause' (the trigger or event) and its corresponding 'effect' (the result or consequence).
       
@@ -2346,7 +2344,7 @@ export const summarizeWithFallback = async (text: string): Promise<string> => {
     // Try the "Smart" AI (Gemini)
     const response = await generateContentWithFallback(
       {
-        model: "gemini-3-flash-preview",
+        model: modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]),
         contents: `Summarize the following text in a concise manner:\n\n${text}`,
         config: {
         },
@@ -2411,7 +2409,7 @@ export const generateSyllabus = async (
 
     const response = await generateContentWithFallback(
       {
-        model: "gemini-3-flash-preview",
+        model: modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]),
         contents: prompt,
         config: {
           temperature: 0.2,
@@ -2707,7 +2705,7 @@ Return ONLY a JSON array (no markdown):
 
   try {
     const response = await generateContentWithFallback(
-      { model: "gemini-3-flash-preview", contents: prompt, config: { responseMimeType: "application/json", maxOutputTokens: 2048 } },
+      { model: modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]), contents: prompt, config: { responseMimeType: "application/json", maxOutputTokens: 2048 } },
       "generateQuizzesForLesson"
     );
     const parsed = safeJsonParse(response.text || "");
@@ -2738,7 +2736,7 @@ Return ONLY a JSON array (no markdown):
 
   try {
     const response = await generateContentWithFallback(
-      { model: "gemini-3-flash-preview", contents: prompt, config: { responseMimeType: "application/json", maxOutputTokens: 2048 } },
+      { model: modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]), contents: prompt, config: { responseMimeType: "application/json", maxOutputTokens: 2048 } },
       "generateExercisesForLesson"
     );
     const parsed = safeJsonParse(response.text || "");
