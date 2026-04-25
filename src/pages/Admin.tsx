@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Layout } from "../components/Layout";
 import { SEO } from "../components/SEO";
 import { supabase } from "../db/supabase";
@@ -28,9 +28,6 @@ interface TableHealth {
   row_count: number;
 }
 
-interface QueueByGrade extends GradeRow {
-  total_queue: number;
-}
 
 interface RagByGrade {
   grade: string;
@@ -118,7 +115,7 @@ const KPI: React.FC<{ label: string; value: number | string; sub?: string; varia
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export const Admin: React.FC = () => {
-  const { user } = useAuth();
+  useAuth();
   const [tab, setTab] = useState<Tab>("overview");
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<string>("");
@@ -132,7 +129,6 @@ export const Admin: React.FC = () => {
 
   // Queue
   const [queueStats, setQueueStats] = useState<any>({});
-  const [queueByGrade, setQueueByGrade] = useState<QueueByGrade[]>([]);
   const [failedJobs, setFailedJobs] = useState<any[]>([]);
 
   // RAG
@@ -149,7 +145,6 @@ export const Admin: React.FC = () => {
   const [activeAITab, setActiveAITab] = useState<AIAction>("insights");
 
   // Browser
-  const [tables, setTables] = useState<TableHealth[]>([]);
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
   const [browseLimit, setBrowseLimit] = useState(20);
   const [browseFilter, setBrowseFilter] = useState("");
@@ -158,12 +153,6 @@ export const Admin: React.FC = () => {
   const [browseLoading, setBrowseLoading] = useState(false);
   const [browseError, setBrowseError] = useState("");
 
-  // ── SQL runner ──
-  const rpc = useCallback(async (query: string) => {
-    const { data, error } = await supabase.rpc("execute_admin_sql" as any, { query });
-    if (error) throw new Error(error.message);
-    return data as any[];
-  }, []);
 
   // Fallback: use regular Supabase queries instead of raw SQL RPC
   const loadOverview = useCallback(async () => {
@@ -300,10 +289,6 @@ export const Admin: React.FC = () => {
     setRagByGrade(ragRows);
   }, []);
 
-  const loadTables = useCallback(async () => {
-    setTables(tableHealth.length ? tableHealth : []);
-  }, [tableHealth]);
-
   // ── AI Agent caller ──────────────────────────────────────────────────────
   const callAgent = useCallback(async (action: AIAction) => {
     setAiLoading(true);
@@ -343,7 +328,11 @@ export const Admin: React.FC = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ metrics: metricsSnapshot, action }),
       });
-      const json = await res.json();
+      const text = await res.text();
+      if (!text) throw new Error(`Empty response from server (HTTP ${res.status}). Is the dev server running with \`npm run dev\`?`);
+      let json: any;
+      try { json = JSON.parse(text); }
+      catch { throw new Error(`Server returned non-JSON (HTTP ${res.status}): ${text.slice(0, 120)}`); }
       if (!res.ok) throw new Error(json.error || "Agent call failed");
 
       if (action === "insights")      setAiInsights(json.result as AIInsights);
@@ -368,7 +357,6 @@ export const Admin: React.FC = () => {
   }, [loadOverview, loadTableHealth, loadGrades, loadQueue, loadRag]);
 
   useEffect(() => { refreshAll(); }, []);
-  useEffect(() => { if (tab === "browser") loadTables(); }, [tab, tableHealth]);
 
   const browseTable = async (tableName?: string) => {
     const t = tableName ?? selectedTable;

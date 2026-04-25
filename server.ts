@@ -156,12 +156,16 @@ async function startServer() {
     // ── Auto-retry failed queue jobs ──────────────────────────────────────
     if (action === "retry_failed") {
       if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
-      const { data, error } = await supabase
-        .from("lesson_gen_queue")
-        .update({ status: "pending", attempts: 0, last_error: null, claimed_at: null })
-        .eq("status", "failed");
-      if (error) return res.status(500).json({ error: error.message });
-      return res.json({ success: true, message: `Reset ${metrics.failedJobs} failed jobs back to pending.` });
+      try {
+        const { error } = await supabase
+          .from("lesson_gen_queue")
+          .update({ status: "pending", attempts: 0, last_error: null, claimed_at: null })
+          .eq("status", "failed");
+        if (error) return res.status(500).json({ error: error.message });
+        return res.json({ success: true, message: `Reset ${metrics.failedJobs} failed jobs back to pending.` });
+      } catch (err: any) {
+        return res.status(500).json({ error: err.message ?? "Unknown error during retry" });
+      }
     }
 
     // ── Build prompt from live metrics ────────────────────────────────────
