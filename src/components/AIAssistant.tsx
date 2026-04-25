@@ -9,7 +9,7 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
-import { useAppSettings } from '../hooks/useAppSettings';
+import { useAppSettings } from '../context/AppSettingsContext';
 import { toast } from 'sonner';
 import 'mathlive';
 

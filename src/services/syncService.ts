@@ -2,6 +2,96 @@ import { db } from "../db/db";
 import { supabase } from "../db/supabase";
 
 export const syncService = {
+  /**
+   * Pull data from Supabase into local IndexedDB.
+   * Must be called on login so the user sees their lessons on any device.
+   */
+  pullAll: async (userId: string) => {
+    const results = { modules: 0, lessons: 0, tasks: 0, errors: [] as string[] };
+    try {
+      // 1. Pull modules
+      const { data: cloudModules, error: modErr } = await supabase
+        .from('modules')
+        .select('*')
+        .eq('user_id', userId);
+
+      if (modErr) {
+        results.errors.push(`Modules pull error: ${modErr.message}`);
+      } else if (cloudModules && cloudModules.length > 0) {
+        await db.modules.bulkPut(
+          cloudModules.map((m: any) => ({
+            id: m.id,
+            name: m.name,
+            code: m.code ?? '',
+            description: m.description ?? '',
+            category: m.category ?? '',
+            progress: m.progress ?? 0,
+            selected: m.selected ?? false,
+            tags: m.tags ?? [],
+            strictRAG: m.strict_rag ?? false,
+            createdAt: m.created_at ? new Date(m.created_at).getTime() : Date.now(),
+          }))
+        );
+        results.modules = cloudModules.length;
+      }
+
+      // 2. Pull lessons
+      const { data: cloudLessons, error: lesErr } = await supabase
+        .from('user_lessons')
+        .select('*')
+        .eq('user_id', userId);
+
+      if (lesErr) {
+        results.errors.push(`Lessons pull error: ${lesErr.message}`);
+      } else if (cloudLessons && cloudLessons.length > 0) {
+        await db.lessons.bulkPut(
+          cloudLessons.map((l: any) => ({
+            id: l.id,
+            moduleId: l.module_id,
+            title: l.title,
+            content: l.content ?? '',
+            blocks: l.blocks ?? [],
+            subtitle: l.subtitle ?? '',
+            status: l.status ?? 'done',
+            tags: l.tags ?? [],
+            createdAt: l.created_at ? new Date(l.created_at).getTime() : Date.now(),
+          }))
+        );
+        results.lessons = cloudLessons.length;
+      }
+
+      // 3. Pull tasks
+      const { data: cloudTasks, error: taskErr } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('user_id', userId);
+
+      if (taskErr) {
+        results.errors.push(`Tasks pull error: ${taskErr.message}`);
+      } else if (cloudTasks && cloudTasks.length > 0) {
+        await db.tasks.bulkPut(
+          cloudTasks.map((t: any) => ({
+            id: t.id,
+            title: t.title,
+            completed: t.completed ?? false,
+            dueDate: t.due_date ?? undefined,
+            type: t.type ?? 'general',
+            tags: t.tags ?? [],
+            createdAt: t.created_at ? new Date(t.created_at).getTime() : Date.now(),
+          }))
+        );
+        results.tasks = cloudTasks.length;
+      }
+
+      console.log('Pull completed:', results);
+      return results;
+    } catch (err: any) {
+      console.error('Pull failed:', err);
+      results.errors.push(err.message);
+      return results;
+    }
+  },
+
   syncAll: async (userId: string) => {
     console.log("Starting full cloud sync...");
     const results = {

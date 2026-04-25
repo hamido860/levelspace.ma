@@ -19,7 +19,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { useAppSettings } from '../hooks/useAppSettings';
+import { useAppSettings } from '../context/AppSettingsContext';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 import { generateFlashcards, generateCauseEffect } from '../services/geminiService';

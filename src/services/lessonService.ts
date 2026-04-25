@@ -1,11 +1,10 @@
+import { db } from "../db/db";
 import { supabase } from "../db/supabase";
 import { generateFullLesson, LessonTemplate, AILesson, AILessonBlock } from "./geminiService";
 import { saveLesson, searchLessons } from "./ragService";
+import { aiCrew } from "./aiCrewService";
 
 export const lessonService = {
-  /**
-   * Fetches a lesson from the database or generates it using AI if not found.
-   */
   fetchOrGenerate: async (
     params: {
       title: string;
@@ -18,104 +17,104 @@ export const lessonService = {
     const { title, grade, country, moduleId } = params;
 
     try {
-      // 1. Search for existing lesson in Supabase using RAG/Vector search
-      console.log(`Searching for existing lesson: ${title}`);
-      const similarLessons = await searchLessons(title, 1);
-      
-      let lessonData: LessonTemplate | null = null;
+      // 0. Check local IndexedDB first
+      const localLesson = await db.lessons
+        .where("moduleId").equals(moduleId)
+        .and(l => l.title === title && l.status !== "suggested")
+        .first();
 
-      // If we found a very similar lesson (similarity > 0.9), use it
-      if (similarLessons.length > 0 && (similarLessons[0].similarity || 0) > 0.9) {
-        console.log("Found existing lesson in Supabase via RAG");
-        lessonData = similarLessons[0];
-      } else {
-        // 2. If not found, generate using AI
-        console.log("Lesson not found in Supabase. Generating with AI...");
-        
-        const { data: moduleData } = await supabase
-          .from('modules')
-          .select('name')
-          .eq('id', moduleId)
-          .maybeSingle();
-        
-        const subject = moduleData?.name || "General";
-
-        lessonData = await generateFullLesson(
-          title,
-          country,
-          grade,
-          subject,
-          subject
-        );
-
-        if (lessonData) {
-          // 3. Save to Supabase for future RAG use
-          await saveLesson(lessonData, userId, true);
-        }
-      }
-
-      if (lessonData) {
-        // Transform LessonTemplate to AILesson format for the UI
-        const blocks: AILessonBlock[] = [
-          {
-            type: 'content',
-            title: 'Lesson Content',
-            content: lessonData.content
-          }
-        ];
-
-        if (lessonData.exercises && lessonData.exercises.length > 0) {
-          blocks.push({
-            type: 'examples',
-            title: 'Exercises',
-            examples: lessonData.exercises.map((ex: any) => ({
-              question: ex.question,
-              steps: [],
-              answer: ex.solution
-            }))
-          });
-        }
-
-        if (lessonData.quizzes && lessonData.quizzes.length > 0) {
-          lessonData.quizzes.forEach((q: any) => {
-            blocks.push({
-              type: 'quiz',
-              title: 'Quiz',
-              quiz: {
-                question: q.question,
-                options: q.options,
-                correctAnswer: q.correctAnswer,
-                explanation: q.explanation
-              }
-            });
-          });
-        }
-
-        if (lessonData.exam) {
-          blocks.push({
-            type: 'exam',
-            title: 'Exam Question',
-            exam: {
-              source: 'National Exam Style',
-              question: lessonData.exam.question,
-              hint: lessonData.exam.hint || '',
-              solution: lessonData.exam.solution
-            }
-          });
-        }
-
+      if (localLesson) {
         return {
-          id: lessonData.id,
-          title: lessonData.lesson_title,
-          subtitle: `${blocks.length} sections · ~15 min`,
-          blocks
+          id: localLesson.id,
+          title: localLesson.title,
+          subtitle: localLesson.subtitle || "",
+          blocks: localLesson.blocks || [],
         };
       }
 
-      return null;
+      // 1. Search RAG/Supabase
+      const similarLessons = await searchLessons(title, 1);
+      let lessonData: LessonTemplate | null = null;
+
+      if (similarLessons.length > 0 && (similarLessons[0].similarity || 0) > 0.9) {
+        lessonData = similarLessons[0];
+      } else {
+        // 2. Try immediate generation (fast path — still uses best available model)
+        const { data: moduleData } = await supabase
+          .from("modules")
+          .select("name")
+          .eq("id", moduleId)
+          .maybeSingle();
+
+        const subject = moduleData?.name || "General";
+
+        lessonData = await generateFullLesson(title, country, grade, subject, subject);
+
+        if (lessonData) {
+          await saveLesson(lessonData, userId, true);
+        } else {
+          // 3. Immediate generation failed → hand off to AI Crew (Pro plans, Gemma 4 generates)
+          const taskId = aiCrew.logLessonMiss({ title, grade, subject, country, moduleId, userId });
+
+          // Return a pending stub so the UI shows a generating state instead of an error
+          return {
+            id: undefined,
+            title,
+            subtitle: "Being generated by AI Crew...",
+            blocks: [],
+            _pending: true,
+            _taskId: taskId,
+          };
+        }
+      }
+
+      if (!lessonData) return null;
+
+      return buildAILesson(lessonData);
     } catch (error) {
       console.error("Error in lessonService.fetchOrGenerate:", error);
       return null;
     }
-  }
+  },
 };
+
+function buildAILesson(lessonData: LessonTemplate): AILesson & { id?: string } {
+  const blocks: AILessonBlock[] = [
+    { type: "content", title: "Lesson Content", content: lessonData.content },
+  ];
+
+  if (lessonData.exercises?.length > 0) {
+    blocks.push({
+      type: "examples",
+      title: "Exercises",
+      examples: lessonData.exercises.map((ex: any) => ({
+        question: ex.question,
+        steps: [],
+        answer: ex.solution,
+      })),
+    });
+  }
+
+  lessonData.quizzes?.forEach((q: any) => {
+    blocks.push({
+      type: "quiz",
+      title: "Quiz",
+      quiz: { question: q.question, options: q.options, correctAnswer: q.correctAnswer, explanation: q.explanation },
+    });
+  });
+
+  if (lessonData.exam) {
+    blocks.push({
+      type: "exam",
+      title: "Exam Question",
+      exam: { source: "National Exam Style", question: lessonData.exam.question, hint: lessonData.exam.hint || "", solution: lessonData.exam.solution },
+    });
+  }
+
+  return {
+    id: lessonData.id,
+    title: lessonData.lesson_title,
+    subtitle: `${blocks.length} sections · ~15 min`,
+    blocks,
+  };
+}

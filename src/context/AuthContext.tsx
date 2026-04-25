@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase, getProfile, checkSupabaseConnection } from '../db/supabase';
 import { syncService } from '../services/syncService';
+import { db } from '../db/db';
 
 interface AuthContextType {
   user: User | null;
@@ -55,6 +56,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!dbConnected || !user || user.id === 'demo-admin-id') {
       return { errors: ['Not connected to cloud or user acting as demo admin'] };
     }
+    // Pull cloud → local first (restores lessons on new devices / fresh sessions),
+    // then push local → cloud so any offline changes are not lost.
+    await syncService.pullAll(user.id);
     return await syncService.syncAll(user.id);
   };
 
@@ -73,8 +77,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (session?.user) {
         setUser(session.user);
+
+        // Try to load from cache first
+        const cachedProfile = await db.settings.get(`profile_${session.user.id}`);
+        if (cachedProfile) {
+          setProfile(cachedProfile.value);
+        }
+
         const userProfile = await getProfile(session.user.id);
-        setProfile(userProfile);
+        if (userProfile) {
+          setProfile(userProfile);
+          await db.settings.put({ key: `profile_${session.user.id}`, value: userProfile });
+        }
       } else {
         if (localStorage.getItem('demo_admin_logged_in') === 'true') {
           setUser(dummyAdminUser);
@@ -94,8 +108,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (session?.user) {
         setUser(session.user);
+
+        // Try to load from cache first
+        const cachedProfile = await db.settings.get(`profile_${session.user.id}`);
+        if (cachedProfile) {
+          setProfile(cachedProfile.value);
+        }
+
         const userProfile = await getProfile(session.user.id);
-        setProfile(userProfile);
+        if (userProfile) {
+          setProfile(userProfile);
+          await db.settings.put({ key: `profile_${session.user.id}`, value: userProfile });
+        }
       } else {
         if (localStorage.getItem('demo_admin_logged_in') === 'true') {
           setUser(dummyAdminUser);
@@ -140,19 +164,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const initSettings = async () => {
       try {
-        const { data } = await supabase
+        // Only run this when authenticated, and suppress errors silently if user doesn't have privileges
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (!sessionData.session) return;
+
+        const { data, error } = await supabase
           .from('app_settings')
           .select('key')
           .eq('key', 'ask_ai_access')
           .maybeSingle();
         
+        if (error && error.code !== 'PGRST116') {
+          // Ignore not found or RLS errors
+          return;
+        }
+
         if (!data) {
-          await supabase
+          // The insert will fail gracefully if the RLS policy "Admins can manage app settings" is not met
+          // we don't need to await or check the error to prevent uncaught exceptions crashing the app
+          supabase
             .from('app_settings')
-            .insert({ key: 'ask_ai_access', value: 'admin', updated_at: new Date().toISOString() });
+            .insert({ key: 'ask_ai_access', value: 'admin', updated_at: new Date().toISOString() })
+            .then(({error: insertErr}) => {
+                if (insertErr) {
+                    // Fail silently, expected if not admin
+                }
+            })
+            .catch(() => {});
         }
       } catch (err) {
-        console.error("Error initializing app settings:", err);
+        // Silent catch to prevent UI disruption
       }
     };
     initSettings();

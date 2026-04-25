@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Layout } from '../components/Layout';
-import { 
+import {
   AlertCircle,
   ArrowLeft,
   CheckCircle2,
@@ -29,7 +29,7 @@ import {
   Dumbbell,
   Type,
   Globe,
-  Volume2
+
 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
@@ -55,8 +55,21 @@ import { AIAssistant } from '../components/AIAssistant';
 import { EduWorkspace } from '../components/workspace/EduWorkspace';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
-import { useAppSettings } from '../hooks/useAppSettings';
+import { useAppSettings } from '../context/AppSettingsContext';
 import { indexLessonContent } from '../services/ragService';
+
+const BLOCK_TYPE_CONFIG: Record<string, { icon: React.ElementType; colorClass: string; label: string }> = {
+  definition: { icon: BookOpen,     colorClass: 'text-accent',   label: 'Definition'  },
+  content:    { icon: FileText,     colorClass: 'text-accent',   label: 'Content'     },
+  rules:      { icon: List,         colorClass: 'text-success',  label: 'Key Rules'   },
+  examples:   { icon: FlaskConical, colorClass: 'text-warning',  label: 'Examples'    },
+  quiz:       { icon: HelpCircle,   colorClass: 'text-accent',   label: 'Quiz'        },
+  exercise:   { icon: Dumbbell,     colorClass: 'text-success',  label: 'Exercise'    },
+  exam:       { icon: GraduationCap,colorClass: 'text-warning',  label: 'Exam'        },
+};
+
+const getBlockTypeConfig = (type: string) =>
+  BLOCK_TYPE_CONFIG[type] ?? { icon: FileText, colorClass: 'text-muted', label: 'Content' };
 
 const isRTL = (text: string) => {
   const rtlChars = /[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
@@ -101,6 +114,62 @@ const Timer = () => {
         Reset
       </button>
     </div>
+  );
+};
+
+const PENDING_STAGES = [
+  'Gemini Pro: investigating curriculum + RAG...',
+  'Building generation plan...',
+  'Gemma 4: generating lesson...',
+  'Validating + saving...',
+];
+
+// Shown when AI Crew is generating a lesson on-demand (status === 'pending')
+const PendingLessonView: React.FC<{ title: string; lessonId: string; onReady: () => void }> = ({ title, lessonId, onReady }) => {
+  const navigate = useNavigate();
+  const [dots, setDots] = useState('.');
+  const [stageIdx, setStageIdx] = useState(0);
+
+  useEffect(() => {
+    const dotInterval  = setInterval(() => setDots(d => d.length >= 3 ? '.' : d + '.'), 600);
+    const stageInterval = setInterval(() => setStageIdx(i => Math.min(i + 1, PENDING_STAGES.length - 1)), 8000);
+
+    const handleReady = () => {
+      clearInterval(dotInterval);
+      clearInterval(stageInterval);
+      db.lessons.update(lessonId, { status: 'done' }).then(onReady);
+    };
+
+    window.addEventListener('lesson-ready', handleReady);
+    return () => {
+      clearInterval(dotInterval);
+      clearInterval(stageInterval);
+      window.removeEventListener('lesson-ready', handleReady);
+    };
+  }, [lessonId, onReady]);
+
+  return (
+    <Layout fullWidth>
+      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6 px-4">
+        <div className="relative">
+          <Loader2 className="w-12 h-12 text-accent animate-spin" />
+          <Sparkles className="w-5 h-5 text-warning absolute -top-1 -right-1 animate-pulse" />
+        </div>
+        <div className="text-center space-y-2 max-w-md">
+          <p className="text-ink font-semibold text-lg">"{title}"</p>
+          <p className="text-accent font-medium text-sm">{PENDING_STAGES[stageIdx]}{dots}</p>
+          <p className="text-muted text-xs">AI Crew is building this lesson. This usually takes 30–90 seconds.</p>
+        </div>
+        <div className="flex gap-1.5">
+          {PENDING_STAGES.map((_, i) => (
+            <div key={i} className={`h-1.5 rounded-full transition-all duration-500 ${i <= stageIdx ? 'w-8 bg-accent' : 'w-3 bg-ink/10'}`} />
+          ))}
+        </div>
+        <button onClick={() => navigate('/dashboard')} className="text-muted text-xs hover:text-accent transition-colors">
+          Go back — lesson will be ready when you return
+        </button>
+      </div>
+    </Layout>
   );
 };
 
@@ -159,6 +228,8 @@ export const LessonView: React.FC = () => {
   const [interactiveContent, setInteractiveContent] = useState<string | null>(null);
   const [isGeneratingInteractive, setIsGeneratingInteractive] = useState(false);
   const [activeInteractiveType, setActiveInteractiveType] = useState<'hard_questions' | 'more_examples' | 'exam_questions' | null>(null);
+  const [showOutlineModal, setShowOutlineModal] = useState(false);
+  const [readingBlockIndex, setReadingBlockIndex] = useState<number | null>(null);
   const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
   const [forceDir, setForceDir] = useState<'ltr' | 'rtl' | null>(null);
 
@@ -183,6 +254,57 @@ export const LessonView: React.FC = () => {
     const audio = new Audio(url);
     audio.play().catch(e => console.error("Audio playback failed", e));
   };
+
+
+  // --- Audio Reading Logic ---
+  useEffect(() => {
+    return () => {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  const toggleReadAloud = (index: number, text: string) => {
+    if (!('speechSynthesis' in window)) {
+      toast.error('Text-to-speech is not supported in this browser.');
+      return;
+    }
+
+    if (readingBlockIndex === index) {
+      // Stop reading
+      window.speechSynthesis.cancel();
+      setReadingBlockIndex(null);
+    } else {
+      // Start reading new block
+      window.speechSynthesis.cancel();
+
+      // Strip markdown syntax for better reading
+      const cleanText = text
+        .replace(/[#*_\`]/g, '')
+        .replace(/\n/g, ' ')
+        .trim();
+
+      if (!cleanText) return;
+
+      const utterance = new SpeechSynthesisUtterance(cleanText);
+      utterance.rate = 0.9; // Slightly slower for better comprehension
+
+      utterance.onend = () => {
+        setReadingBlockIndex(null);
+      };
+
+      utterance.onerror = () => {
+        setReadingBlockIndex(null);
+        toast.error('Error playing audio.');
+      };
+
+      setReadingBlockIndex(index);
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+  // -------------------------
+
 
   const handleMouseUp = (e: React.MouseEvent) => {
     // If we're clicking inside the explain button, don't do anything
@@ -251,6 +373,11 @@ export const LessonView: React.FC = () => {
       setOpenBlocks(['block-0']);
     } else if (lesson && !lesson.blocks && openBlocks.length === 0) {
       setOpenBlocks(['content']);
+    }
+
+    if (lesson) {
+      // Save last viewed lesson
+      db.settings.put({ key: 'last_viewed_lesson_id', value: lesson.id });
     }
   }, [lesson]);
 
@@ -505,6 +632,17 @@ export const LessonView: React.FC = () => {
           <button onClick={() => navigate('/dashboard')} className="text-accent hover:underline">Return to Dashboard</button>
         </div>
       </Layout>
+    );
+  }
+
+  // AI Crew is generating this lesson on-demand (Pro planned, Gemma 4 is executing)
+  if (lesson.status === 'pending') {
+    return (
+      <PendingLessonView
+        title={lesson.title}
+        lessonId={id!}
+        onReady={() => window.location.reload()}
+      />
     );
   }
 
@@ -1037,7 +1175,8 @@ export const LessonView: React.FC = () => {
                 blocks.map((block, index) => {
                   const blockId = `block-${index}`;
                   const isOpen = openBlocks.includes(blockId);
-              
+                  const { icon: BlockIcon, colorClass: blockColorClass } = getBlockTypeConfig(block.type || '');
+
               // Determine status
               let status = 'pending';
               if (isOpen) status = 'active';
@@ -1050,13 +1189,14 @@ export const LessonView: React.FC = () => {
 
               return (
                 <article key={index} className="block group">
-                  <div 
-                    className={`block__header sticky top-16 z-20 backdrop-blur-xl bg-paper/90 border-b border-surface-mid transition-all duration-200 ${isOpen ? 'shadow-md' : 'shadow-sm'}`} 
+                  <div
+                    className={`block__header sticky top-16 z-20 backdrop-blur-xl bg-paper/90 border-b border-surface-mid transition-all duration-200 ${isOpen ? 'shadow-md' : 'shadow-sm'}`}
                     onClick={() => toggleBlock(blockId)}
                   >
                     <div className={`block__num block__num--${status}`}>
                       {status === 'done' ? '✓' : status === 'error' ? '!' : index + 1}
                     </div>
+                    <BlockIcon size={14} className={`shrink-0 ${blockColorClass} opacity-70`} />
                     <span className="block__label">{block.title}</span>
                     <div className="flex items-center gap-2 ml-auto mr-2">
                       {block.type === 'quiz' && <span className="pill pill--warn text-[10px]">interactive</span>}
@@ -1125,6 +1265,12 @@ export const LessonView: React.FC = () => {
                       {/* Definition / Content */}
                           {(block.type === 'definition' || block.type === 'content') && block.content && (
                             <div className="def-box">
+                              <div className="flex items-center gap-1.5 mb-2.5 pb-2 border-b border-accent/15">
+                                <BookOpen size={11} className="text-accent" />
+                                <span className="text-[9px] font-bold text-accent uppercase tracking-widest">
+                                  {block.type === 'definition' ? 'Definition' : 'Content'}
+                                </span>
+                              </div>
                               <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{block.content}</Markdown>
                               {block.source && <span className="def-box__source">Source: {block.source}</span>}
                             </div>
@@ -1132,19 +1278,29 @@ export const LessonView: React.FC = () => {
 
                           {/* Rules */}
                           {block.type === 'rules' && block.rules && Array.isArray(block.rules) && (
-                            <ul className="rules-list">
-                              {block.rules.map((rule, i) => (
-                                <li key={i} className="rules-list__item">
-                                  <div className="rules-list__dot"></div>
-                                  <span><Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{rule}</Markdown></span>
-                                </li>
-                              ))}
-                            </ul>
+                            <>
+                              <div className="flex items-center gap-1.5 mt-3.5 mb-1">
+                                <List size={12} className="text-success" />
+                                <span className="text-[9px] font-bold text-success uppercase tracking-widest">Key Rules</span>
+                              </div>
+                              <ul className="rules-list">
+                                {block.rules.map((rule, i) => (
+                                  <li key={i} className="rules-list__item">
+                                    <div className="rules-list__dot"></div>
+                                    <span><Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{rule}</Markdown></span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </>
                           )}
 
                           {/* Examples */}
                           {block.type === 'examples' && block.examples && Array.isArray(block.examples) && (
                             <>
+                              <div className="flex items-center gap-1.5 mt-3.5 mb-1">
+                                <FlaskConical size={12} className="text-warning" />
+                                <span className="text-[9px] font-bold text-warning uppercase tracking-widest">Worked Examples</span>
+                              </div>
                               {block.examples.map((ex, i) => (
                                 <div key={i} className="example-card">
                                   <div className="example-card__question"><Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{ex.question}</Markdown></div>
@@ -1558,6 +1714,74 @@ export const LessonView: React.FC = () => {
       </div>
     </div>
 
+
+
+      {/* Lesson Outline Modal */}
+      <Modal
+        isOpen={showOutlineModal}
+        onClose={() => {
+          setShowOutlineModal(false);
+          // Stop audio when modal closes
+          if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            setReadingBlockIndex(null);
+          }
+        }}
+        title="Lesson Outline"
+      >
+        <div className="space-y-4">
+          <div className="p-4 bg-accent/5 rounded-xl border border-accent/10 space-y-2">
+            <h3 className="font-bold text-accent">Audio Reading</h3>
+            <p className="text-sm text-muted">Click any section title to hear it read aloud. Click again to stop.</p>
+          </div>
+
+          <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-2">
+            {lesson?.blocks?.map((block, index) => {
+              const isReading = readingBlockIndex === index;
+              return (
+                <button
+                  key={block.id || index}
+                  onClick={() => toggleReadAloud(index, block.content || '')}
+                  className={`w-full text-left p-4 rounded-xl border transition-all flex items-center justify-between gap-4 ${
+                    isReading
+                      ? 'bg-accent/10 border-accent/30 shadow-sm'
+                      : 'bg-surface-low border-ink/5 hover:border-accent/30 hover:bg-surface-mid'
+                  }`}
+                >
+                  <div className="flex-1">
+                    <span className="text-xs font-bold text-muted uppercase tracking-wider mb-1 block">
+                      Section {index + 1}
+                    </span>
+                    <h4 className={`font-bold ${isReading ? 'text-accent' : 'text-ink'}`}>
+                      {block.title || 'Untitled Section'}
+                    </h4>
+                  </div>
+
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+                    isReading ? 'bg-accent text-paper' : 'bg-surface-mid text-ink-secondary'
+                  }`}>
+                    {isReading ? (
+                      <div className="w-4 h-4 flex items-center justify-center gap-1">
+                        <span className="w-1 h-3 bg-paper rounded-full animate-pulse" style={{ animationDelay: '0ms' }} />
+                        <span className="w-1 h-4 bg-paper rounded-full animate-pulse" style={{ animationDelay: '150ms' }} />
+                        <span className="w-1 h-3 bg-paper rounded-full animate-pulse" style={{ animationDelay: '300ms' }} />
+                      </div>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+
+            {(!lesson?.blocks || lesson.blocks.length === 0) && (
+              <div className="text-center p-8 text-muted">
+                No sections found in this lesson.
+              </div>
+            )}
+          </div>
+        </div>
+      </Modal>
 
       {/* Reminder Modal */}
       <Modal

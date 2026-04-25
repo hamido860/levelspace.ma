@@ -2,13 +2,73 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { jsonrepair } from "jsonrepair";
 import { moroccanAcademicDb } from "../data/moroccan_academic_db";
 import { toast } from "sonner";
+import { db } from "../db/db";
 import { searchContextForGeneration } from "./ragService";
 import { transformersService } from "./transformersService";
+import { mcpClient } from "./mcpClient";
 
 export const getCustomApiKey = () =>
   localStorage.getItem("CUSTOM_GEMINI_API_KEY") || "";
 
-export const getEffectiveApiKey = () => getCustomApiKey() || process.env.GEMINI_API_KEY || "";
+export const getEffectiveApiKey = () => getCustomApiKey() || import.meta.env.VITE_GEMINI_API_KEY || "";
+
+export const getNvidiaApiKey = () =>
+  localStorage.getItem("CUSTOM_NVIDIA_API_KEY") || import.meta.env.VITE_NVIDIA_API_KEY || "";
+
+export const setNvidiaApiKey = (key: string) => {
+  if (key) {
+    localStorage.setItem("CUSTOM_NVIDIA_API_KEY", key);
+  } else {
+    localStorage.removeItem("CUSTOM_NVIDIA_API_KEY");
+  }
+};
+
+export const NVIDIA_MODEL = "google/gemma-3-27b-it";
+export const NVIDIA_WORKER_MODEL = "google/gemma-4-31b-it"; // Gemma 4 — primary bulk lesson worker
+
+export async function callNvidiaAPI(params: {
+  prompt: string;
+  isJson?: boolean;
+  temperature?: number;
+  maxTokens?: number;
+  model?: string;
+}): Promise<string | null> {
+  const apiKey = getNvidiaApiKey();
+  if (!apiKey) return null;
+
+  const { prompt, isJson = false, temperature = 0.7, maxTokens = 4096, model = NVIDIA_MODEL } = params;
+
+  const body: any = {
+    model,
+    messages: [{ role: "user", content: prompt }],
+    temperature,
+    max_tokens: maxTokens,
+    stream: false,
+  };
+
+  if (isJson) {
+    body.response_format = { type: "json_object" };
+    // Reinforce JSON output in prompt for Gemma
+    body.messages[0].content = prompt + "\n\nRespond with valid JSON only.";
+  }
+
+  const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`NVIDIA API error ${response.status}: ${errText}`);
+  }
+
+  const data = await response.json();
+  return data.choices?.[0]?.message?.content || null;
+}
 
 let currentApiKey = getEffectiveApiKey();
 // Provide a fallback string so the SDK doesn't throw an error immediately on boot if hosted outside AI Studio without a key
@@ -37,6 +97,46 @@ export class ServiceUnavailableError extends Error {
     this.name = "ServiceUnavailableError";
   }
 }
+
+// --- Model Quota Tracker ---
+// Tracks which models have hit quota and skips them for QUOTA_COOLDOWN_MS
+const QUOTA_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
+const QUOTA_STORAGE_KEY = "ai_model_quota_hits";
+
+const GEMINI_FALLBACKS = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-3-flash-preview"] as const;
+
+export const modelQuotaTracker = {
+  _load(): Record<string, number> {
+    try { return JSON.parse(localStorage.getItem(QUOTA_STORAGE_KEY) || "{}"); }
+    catch { return {}; }
+  },
+  markExhausted(model: string) {
+    const hits = this._load();
+    hits[model] = Date.now();
+    localStorage.setItem(QUOTA_STORAGE_KEY, JSON.stringify(hits));
+    console.warn(`[QuotaTracker] ${model} marked exhausted for ${QUOTA_COOLDOWN_MS / 60000}min`);
+  },
+  getBestModel(preferred: string, fallbacks: string[] = []): string {
+    const hits = this._load(); // single read for the entire selection
+    const now = Date.now();
+    const isExhausted = (m: string) => !!hits[m] && now - hits[m] < QUOTA_COOLDOWN_MS;
+    for (const m of [preferred, ...fallbacks]) {
+      if (!isExhausted(m)) return m;
+    }
+    // All exhausted — reset preferred and return it
+    console.warn("[QuotaTracker] All models exhausted, resetting preferred:", preferred);
+    delete hits[preferred];
+    localStorage.setItem(QUOTA_STORAGE_KEY, JSON.stringify(hits));
+    return preferred;
+  },
+  isExhausted(model: string): boolean {
+    const hits = this._load();
+    return !!hits[model] && Date.now() - hits[model] < QUOTA_COOLDOWN_MS;
+  },
+};
+
+const extractResponseText = (response: any): string =>
+  response?.text ?? response?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 
 export interface CurriculumAuditResult {
   isValid: boolean;
@@ -155,8 +255,36 @@ export const handleApiError = (error: any, context: string) => {
 
 // --- AI Response Pipeline ---
 
-// 1. Cache (Free)
-const responseCache = new Map<string, string>();
+// 1. Cache (Free & Persistent)
+const responseCache = {
+  get: async (key: string): Promise<string | null> => {
+    try {
+      const cached = await db.aiCache.get(key);
+      if (cached) {
+        // Optional: Implement TTL (Time-To-Live) here if needed
+        return cached.response;
+      }
+    } catch (err) {
+      console.warn("Failed to read from AI cache:", err);
+    }
+    return null;
+  },
+  set: async (key: string, response: string): Promise<void> => {
+    try {
+      await db.aiCache.put({
+        key,
+        response,
+        createdAt: Date.now()
+      });
+    } catch (err) {
+      console.warn("Failed to write to AI cache:", err);
+    }
+  },
+  has: async (key: string): Promise<boolean> => {
+    const cached = await db.aiCache.get(key);
+    return !!cached;
+  }
+};
 
 export function getCacheKey(operation: string, ...args: any[]): string {
   return `${operation}:${JSON.stringify(args)}`;
@@ -240,13 +368,12 @@ export function determineModel(
   const isLongMessage = message.length > 150;
   const isLongContext = contextLength > 2000;
 
-  // Use big model for complex reasoning
+  // Use Flash for complex reasoning (Pro exhausts quota too fast)
   if (hasComplexKeyword || isLongMessage || isLongContext) {
-    return "gemini-3.1-pro-preview";
+    return modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]);
   }
 
-  // Use standard flash model for simple queries
-  return "gemini-3-flash-preview";
+  return modelQuotaTracker.getBestModel("gemini-2.5-flash-lite", ["gemini-2.5-flash"]);
 }
 
 /**
@@ -521,27 +648,58 @@ export async function generateAIContent(
       errorMessage.includes("quota");
 
     if (isQuotaError) {
-      console.warn(`Pipeline: Quota exceeded for ${primaryModel}. Attempting local fallback to Ollama (gemma).`);
-      updateAIStatus({ lastError: "Quota Exceeded", isLocal: true });
-      toast.info("Switching to Local AI", {
-        description: "Online quota reached. Falling back to local Gemma model.",
-        duration: 3000,
-      });
+      // Mark this model as exhausted so future calls skip it
+      modelQuotaTracker.markExhausted(primaryModel);
+      updateAIStatus({ lastError: "Quota Exceeded", isLocal: false });
 
-      try {
-        let promptText = "";
-        if (typeof params.contents === 'string') {
-          promptText = params.contents;
-        } else if (Array.isArray(params.contents)) {
-          promptText = params.contents.map((p: any) => p.text || JSON.stringify(p)).join('\n');
-        } else if (params.contents?.parts) {
-          promptText = params.contents.parts.map((p: any) => p.text || JSON.stringify(p)).join('\n');
-        } else {
-          promptText = JSON.stringify(params.contents);
+      let promptText = "";
+      if (typeof params.contents === 'string') {
+        promptText = params.contents;
+      } else if (Array.isArray(params.contents)) {
+        promptText = params.contents.map((p: any) => p.text || JSON.stringify(p)).join('\n');
+      } else if (params.contents?.parts) {
+        promptText = params.contents.parts.map((p: any) => p.text || JSON.stringify(p)).join('\n');
+      } else {
+        promptText = JSON.stringify(params.contents);
+      }
+
+      const isJson = params.config?.responseMimeType === "application/json";
+
+      // Fallback 1: next best Gemini Flash model
+      for (const fallbackModel of GEMINI_FALLBACKS) {
+        if (fallbackModel === primaryModel || modelQuotaTracker.isExhausted(fallbackModel)) continue;
+        try {
+          console.warn(`[Quota] Falling back to ${fallbackModel}`);
+          const result = await ai.models.generateContent({ ...params, model: fallbackModel });
+          updateAIStatus({ lastModel: fallbackModel, isLocal: false, lastError: null });
+          toast.info(`Using ${fallbackModel}`, { description: "Switched model due to quota.", duration: 2000 });
+          return result;
+        } catch (fbErr: any) {
+          const isFbQuota = String(fbErr?.message).includes("429") || String(fbErr?.message).includes("RESOURCE_EXHAUSTED");
+          if (isFbQuota) modelQuotaTracker.markExhausted(fallbackModel);
+          console.warn(`[Quota] ${fallbackModel} also failed:`, fbErr);
         }
+      }
 
-        const isJson = params.config?.responseMimeType === "application/json";
+      // Fallback 2: NVIDIA NIM (Gemma 3 27B) — cloud, no local setup needed
+      try {
+        const nvidiaText = await callNvidiaAPI({
+          prompt: promptText,
+          isJson,
+          temperature: params.config?.temperature || 0.7,
+          maxTokens: Math.min(params.config?.maxOutputTokens || 4096, 4096),
+        });
+        if (nvidiaText) {
+          updateAIStatus({ lastModel: `Gemma 3 (NVIDIA NIM)`, isLocal: false, lastError: null });
+          toast.info("Using Gemma via NVIDIA", { description: "Switched to NVIDIA NIM for this request.", duration: 2000 });
+          return { text: nvidiaText, candidates: [{ content: { parts: [{ text: nvidiaText }] } }] };
+        }
+      } catch (nvidiaError) {
+        console.warn("NVIDIA fallback failed:", nvidiaError);
+      }
 
+      // Fallback 3: Ollama (local Gemma)
+      try {
         const ollamaResponse = await fetch('http://localhost:11434/api/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -550,42 +708,19 @@ export async function generateAIContent(
             prompt: promptText,
             stream: false,
             format: isJson ? 'json' : undefined,
-            options: {
-              temperature: params.config?.temperature || 0.7,
-            }
+            options: { temperature: params.config?.temperature || 0.7 }
           })
         });
 
-        if (!ollamaResponse.ok) {
-          throw new Error(`Ollama failed with status ${ollamaResponse.status}`);
-        }
+        if (!ollamaResponse.ok) throw new Error(`Ollama failed with status ${ollamaResponse.status}`);
 
         const ollamaData = await ollamaResponse.json();
-        updateAIStatus({ lastModel: "Gemma 4 (local)", isLocal: true, lastError: null });
-        
-        return {
-          text: ollamaData.response,
-          candidates: [
-            {
-              content: {
-                parts: [{ text: ollamaData.response }]
-              }
-            }
-          ]
-        };
+        updateAIStatus({ lastModel: "Gemma (local Ollama)", isLocal: true, lastError: null });
+        toast.info("Using local Gemma", { description: "All cloud models quota-exceeded. Using local Ollama.", duration: 3000 });
+        return { text: ollamaData.response, candidates: [{ content: { parts: [{ text: ollamaData.response }] } }] };
       } catch (localError) {
-        console.error("Local Ollama fallback failed:", localError);
-        updateAIStatus({ lastError: "Local Fallback Failed", isLocal: false });
-        // If local fails, try the flash-lite fallback as a last resort
-        if (primaryModel !== "gemini-2.5-flash-lite") {
-          console.warn("Falling back to gemini-2.5-flash-lite.");
-          const result = await ai.models.generateContent({
-            ...params,
-            model: "gemini-2.5-flash-lite",
-          });
-          updateAIStatus({ lastModel: "gemini-2.5-flash-lite", isLocal: false, lastError: null });
-          return result;
-        }
+        console.warn("Local Ollama fallback failed:", localError);
+        updateAIStatus({ lastError: "All models quota-exceeded", isLocal: false });
       }
     }
 
@@ -629,6 +764,8 @@ export interface AILesson {
   title: string;
   subtitle: string;
   blocks: AILessonBlock[];
+  _pending?: boolean;   // true while AI Crew is generating this lesson on-demand
+  _taskId?: string;     // AI Crew task ID to track progress
 }
 
 export interface AuditResult {
@@ -656,6 +793,196 @@ export interface LessonTemplate {
   exam: any;
   similarity?: number;
 }
+
+// ─── Orchestration: Pro plans, Gemma 4 executes ──────────────────────────────
+
+export interface GenerationPlan {
+  lesson_title: string;
+  grade: string;
+  subject: string;
+  country: string;
+  language: string;
+  bloom_level: number;
+  depth: "introductory" | "standard" | "advanced";
+  required_sections: string[];
+  prerequisite_concepts: string[];
+  key_concepts: string[];
+  exercise_types: string[];
+  quiz_count: number;
+  exercise_count: number;
+  existing_context: string;
+  curriculum_injection: string;
+  pedagogy_injection: string;
+  timeline: {
+    estimated_tokens: number;
+    complexity: "low" | "medium" | "high";
+    priority: number;
+  };
+  worker_instruction: string;
+  validation_checklist: string[];
+}
+
+/**
+ * STAGE 1 — Gemini Pro investigates RAG + curriculum + pedagogy and produces
+ * a structured GenerationPlan that tells the worker exactly what to build.
+ * This is a short focused call (~800 output tokens) — Pro is only planning.
+ */
+export async function investigateAndPlan(params: {
+  title: string;
+  grade: string;
+  subject: string;
+  country: string;
+  ragContext?: string;
+  similarLessons?: LessonTemplate[];
+}): Promise<GenerationPlan | null> {
+  const { title, grade, subject, country, ragContext = "", similarLessons = [] } = params;
+
+  const curriculumCtx = mcpClient.getCurriculum({ country, grade, subject });
+  const pedagogyCtx   = mcpClient.getPedagogyRules({ grade, subject });
+
+  const existingContext = similarLessons.length > 0
+    ? similarLessons.map(l => `- "${l.lesson_title}" (similarity ${((l.similarity || 0) * 100).toFixed(0)}%): ${(l.content || "").slice(0, 200)}...`).join("\n")
+    : "No similar lessons found in RAG.";
+
+  const prompt = `You are an educational curriculum planner. Your job is to produce a JSON GenerationPlan that a separate AI worker will use to generate a complete lesson.
+
+TASK: Plan the lesson titled "${title}" for grade "${grade}", subject "${subject}", country "${country}".
+
+RAG DATABASE CONTEXT (existing similar lessons):
+${existingContext}
+
+ADDITIONAL RAG CHUNKS:
+${ragContext || "None."}
+
+CURRICULUM AUTHORITY:
+${curriculumCtx.promptInjection}
+
+PEDAGOGY AUTHORITY:
+${pedagogyCtx.promptInjection}
+
+Produce ONLY valid JSON matching this exact schema — no markdown, no explanation:
+{
+  "lesson_title": string,
+  "grade": string,
+  "subject": string,
+  "country": string,
+  "language": "ar" | "fr" | "en",
+  "bloom_level": number (1-6),
+  "depth": "introductory" | "standard" | "advanced",
+  "required_sections": string[],
+  "prerequisite_concepts": string[],
+  "key_concepts": string[],
+  "exercise_types": string[],
+  "quiz_count": number,
+  "exercise_count": number,
+  "existing_context": string (short summary of what exists in RAG),
+  "curriculum_injection": string (paste the full curriculum authority text),
+  "pedagogy_injection": string (paste the full pedagogy authority text),
+  "timeline": { "estimated_tokens": number, "complexity": "low"|"medium"|"high", "priority": number },
+  "worker_instruction": string (detailed 200-400 word instruction for the generation worker — include language, structure, depth, all requirements),
+  "validation_checklist": string[] (list of specific things to verify after generation)
+}`;
+
+  try {
+    const response = await generateAIContent(
+      {
+        model: modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]),
+        contents: prompt,
+        config: { responseMimeType: "application/json", temperature: 0.3, maxOutputTokens: 1000 },
+        tools: [],
+      },
+      "investigateAndPlan"
+    );
+    const plan = safeJsonParse(extractResponseText(response)) as GenerationPlan;
+    if (!plan?.worker_instruction) return null;
+    plan.existing_context = existingContext;
+    plan.curriculum_injection = curriculumCtx.promptInjection;
+    plan.pedagogy_injection = pedagogyCtx.promptInjection;
+    return plan;
+  } catch (err) {
+    console.error("[investigateAndPlan] failed:", err);
+    return null;
+  }
+}
+
+/**
+ * STAGE 2 — NVIDIA Gemma 4 receives the GenerationPlan and produces the full
+ * LessonTemplate JSON. Falls back to Gemini Flash if NVIDIA is unavailable.
+ */
+export async function generateLessonFromPlan(plan: GenerationPlan): Promise<LessonTemplate | null> {
+  const workerPrompt = `${plan.worker_instruction}
+
+CURRICULUM REQUIREMENTS:
+${plan.curriculum_injection}
+
+PEDAGOGY REQUIREMENTS:
+${plan.pedagogy_injection}
+
+EXISTING CONTEXT (do NOT duplicate — complement and deepen):
+${plan.existing_context}
+
+VALIDATION CHECKLIST — your output MUST satisfy ALL of these:
+${plan.validation_checklist.map((c, i) => `${i + 1}. ${c}`).join("\n")}
+
+Generate a complete lesson as JSON with this structure:
+{
+  "country": "${plan.country}",
+  "grade": "${plan.grade}",
+  "subject": "${plan.subject}",
+  "lesson_title": "${plan.lesson_title}",
+  "mod": "${plan.subject}",
+  "content": "full markdown lesson content",
+  "exercises": [{"question": "...", "solution": "...", "hint": "..."}],
+  "quizzes": [{"question": "...", "options": ["A","B","C","D"], "correctAnswer": "A", "explanation": "..."}],
+  "exam": {"question": "...", "hint": "...", "solution": "..."}
+}
+
+Respond with VALID JSON only. No markdown fences. No explanation.`;
+
+  // Primary: NVIDIA Gemma 4
+  try {
+    const nvidiaText = await callNvidiaAPI({
+      prompt: workerPrompt,
+      isJson: true,
+      temperature: 0.6,
+      maxTokens: 4000,
+      model: NVIDIA_WORKER_MODEL,
+    });
+    if (nvidiaText) {
+      const parsed = safeJsonParse(nvidiaText) as LessonTemplate;
+      if (parsed?.lesson_title) {
+        console.log("[generateLessonFromPlan] Gemma 4 (NVIDIA) succeeded");
+        return parsed;
+      }
+    }
+  } catch (nvErr) {
+    console.warn("[generateLessonFromPlan] Gemma 4 NVIDIA failed, falling back:", nvErr);
+  }
+
+  // Fallback: Gemini Flash
+  try {
+    const flashModel = modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]);
+    const response = await generateAIContent(
+      {
+        model: flashModel,
+        contents: workerPrompt,
+        config: { responseMimeType: "application/json", temperature: 0.6, maxOutputTokens: 4000 },
+        tools: [],
+      },
+      "generateLessonFromPlan_fallback"
+    );
+    const parsed = safeJsonParse(extractResponseText(response)) as LessonTemplate;
+    if (parsed?.lesson_title) {
+      console.log(`[generateLessonFromPlan] Flash fallback (${flashModel}) succeeded`);
+      return parsed;
+    }
+  } catch (flashErr) {
+    console.error("[generateLessonFromPlan] Flash fallback also failed:", flashErr);
+  }
+
+  return null;
+}
+
 
 export const getLessonPrompt = (
   topic: string,
@@ -742,6 +1069,13 @@ export const getLessonPrompt = (
   return prompt;
 };
 
+function needsRefinement(content: string): boolean {
+  const latexCount = (content.match(/\$/g) || []).length;
+  if (latexCount >= 4) return false; // already has LaTeX — skip
+  const rawMathPatterns = [/lim\s+x\s*->/i, /\bD\s+f\b/, /dx\s*\/\s*dt(?!\$)/, /\bx\s+0\b/, /lim_{/];
+  return rawMathPatterns.some(p => p.test(content));
+}
+
 export async function refineLessonContent(rawContent: string): Promise<string> {
   const prompt = `You are an expert pedagogical editor and math formatter. Your task is to take the following raw lesson content and refine it to be production-ready.
 
@@ -782,6 +1116,7 @@ export const generateFullLesson = async (
   referenceUrls?: string[],
   existingContext?: string,
   isAdmin: boolean = false,
+  _correctionPrompt: string = "", // internal — injected on MCP validation retry
 ): Promise<LessonTemplate | null> => {
   try {
     let urlContexts = "";
@@ -789,11 +1124,16 @@ export const generateFullLesson = async (
       urlContexts = await fetchAllUrlContexts(referenceUrls);
     }
 
-    const prompt = getLessonPrompt(topic, country, grade, subject, moduleName, referenceUrls, existingContext, isAdmin, urlContexts);
+    // MCP: build curriculum + pedagogy context before generation
+    const mcpContext = mcpClient.buildPromptContext(country, grade, subject);
+
+    const basePrompt = getLessonPrompt(topic, country, grade, subject, moduleName, referenceUrls, existingContext, isAdmin, urlContexts);
+    // Prepend MCP authority block + any correction from previous failed validation
+    const prompt = mcpContext + "\n\n" + (_correctionPrompt || "") + "\n\n" + basePrompt;
 
     const config: any = {
       responseMimeType: "application/json",
-      maxOutputTokens: 8192,
+      maxOutputTokens: 5000,
       tools: [{ googleSearch: {} }],
       responseSchema: {
         type: Type.OBJECT,
@@ -862,7 +1202,7 @@ export const generateFullLesson = async (
 
     const response = await generateContentWithFallback(
       {
-        model: "gemini-3.1-pro-preview", // Use Pro model for generation (more accurate, better for complex lessons)
+        model: modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]),
         contents: prompt,
         config: config,
       },
@@ -874,29 +1214,50 @@ export const generateFullLesson = async (
 
     try {
       const parsed = safeJsonParse(text);
-      
-      // Post-processing step: Refine the main lesson content
-      if (parsed && parsed.content) {
+
+      // Post-processing: refine content prose only when raw math text is detected
+      if (parsed && parsed.content && needsRefinement(parsed.content)) {
         parsed.content = await refineLessonContent(parsed.content);
       }
-      
+
+      // MCP: validate lesson — language, structure, pedagogy
+      if (parsed) {
+        const correction = mcpClient.validateAndGetCorrection(
+          {
+            title:     parsed.lesson_title || topic,
+            content:   parsed.content || "",
+            exercises: parsed.exercises,
+            quizzes:   parsed.quizzes,
+          },
+          country,
+          grade,
+          subject,
+        );
+
+        if (correction && retries > 0) {
+          console.warn(`[MCP] Lesson failed validation. Retrying with correction (${retries} left).`);
+          toast.info("MCP: lesson quality check failed — regenerating with corrections.", { duration: 3000 });
+          return generateFullLesson(
+            topic, country, grade, subject, moduleName,
+            retries - 1, referenceUrls, existingContext, isAdmin,
+            correction,
+          );
+        }
+
+        if (correction) {
+          // Max retries exhausted — flag the lesson but still return it
+          console.warn("[MCP] Lesson still has violations after max retries. Returning with flag.");
+          parsed._mcpViolations = correction;
+        }
+      }
+
       return parsed;
     } catch (parseError) {
       console.error("JSON Parse Error in generateFullLesson:", parseError);
       if (retries > 0) {
-        console.log(
-          `Retrying generateFullLesson... (${retries} attempts left)`,
-        );
         return generateFullLesson(
-          topic,
-          country,
-          grade,
-          subject,
-          moduleName,
-          retries - 1,
-          referenceUrls,
-          existingContext,
-          isAdmin
+          topic, country, grade, subject, moduleName,
+          retries - 1, referenceUrls, existingContext, isAdmin, _correctionPrompt,
         );
       }
       throw parseError;
@@ -905,15 +1266,8 @@ export const generateFullLesson = async (
     handleApiError(error, "generateFullLesson");
     if (retries > 0 && !(error instanceof SyntaxError)) {
       return generateFullLesson(
-        topic,
-        country,
-        grade,
-        subject,
-        moduleName,
-        retries - 1,
-        referenceUrls,
-        existingContext,
-        isAdmin
+        topic, country, grade, subject, moduleName,
+        retries - 1, referenceUrls, existingContext, isAdmin, _correctionPrompt,
       );
     }
     return null;
@@ -929,9 +1283,10 @@ export const generateCurriculum = async (
   try {
     // 1. Check Cache
     const cacheKey = getCacheKey("generateCurriculum", country, grade, isAdmin);
-    if (responseCache.has(cacheKey)) {
+    const cachedResponse = await responseCache.get(cacheKey);
+    if (cachedResponse) {
       console.log("Pipeline: Cache hit for generateCurriculum");
-      return safeJsonParse(responseCache.get(cacheKey)!);
+      return safeJsonParse(cachedResponse);
     }
 
     let extraContext = "";
@@ -993,7 +1348,7 @@ export const generateCurriculum = async (
     try {
       const parsed = safeJsonParse(text);
       // Save to cache
-      responseCache.set(cacheKey, text);
+      await responseCache.set(cacheKey, text);
       return parsed;
     } catch (parseError) {
       console.error("JSON Parse Error in generateCurriculum:", parseError);
@@ -1029,9 +1384,10 @@ export const generateSeedLesson = async (
       strictRAG,
       existingContext
     );
-    if (responseCache.has(cacheKey)) {
+    const cachedResponse = await responseCache.get(cacheKey);
+    if (cachedResponse) {
       console.log("Pipeline: Cache hit for generateSeedLesson");
-      return safeJsonParse(responseCache.get(cacheKey)!);
+      return safeJsonParse(cachedResponse);
     }
 
     const ragInstruction = strictRAG ? `\nSTRICT RAG MODE IS ENABLED: You MUST firmly base the entire generated lesson strictly on this provided existing context. Do NOT hallucinate concepts outside of this context:\n<EXISTING_CONTEXT>\n${existingContext}\n</EXISTING_CONTEXT>\n\nIf the existing context is empty, simply summarize the topic briefly without generating deep educational material.` : "";
@@ -1160,7 +1516,7 @@ export const generateSeedLesson = async (
     try {
       const parsed = safeJsonParse(text);
       // Save to cache
-      responseCache.set(cacheKey, text);
+      await responseCache.set(cacheKey, text);
       return parsed;
     } catch (parseError) {
       console.error("JSON Parse Error in generateSeedLesson:", parseError);
@@ -1256,9 +1612,10 @@ export const generateLessonSuggestions = async (
       country,
       existingTopics
     );
-    if (responseCache.has(cacheKey)) {
+    const cachedResponse = await responseCache.get(cacheKey);
+    if (cachedResponse) {
       console.log("Pipeline: Cache hit for generateLessonSuggestions");
-      return safeJsonParse(responseCache.get(cacheKey)!);
+      return safeJsonParse(cachedResponse);
     }
 
     const topicsContext = existingTopics && existingTopics.length > 0
@@ -1300,7 +1657,7 @@ export const generateLessonSuggestions = async (
     try {
       const parsed = safeJsonParse(text);
       // Save to cache
-      responseCache.set(cacheKey, text);
+      await responseCache.set(cacheKey, text);
       return parsed;
     } catch (parseError) {
       console.error(
@@ -1346,9 +1703,10 @@ export const explainText = async (
       userLanguage,
       strictRAG
     );
-    if (responseCache.has(cacheKey)) {
+    const cachedResponse = await responseCache.get(cacheKey);
+    if (cachedResponse) {
       console.log("Pipeline: Cache hit for explainText");
-      return responseCache.get(cacheKey)!;
+      return cachedResponse;
     }
 
     // 2. Determine Model (Simple task doesn't apply to explanations)
@@ -1394,7 +1752,7 @@ export const explainText = async (
       response.text || "I couldn't generate an explanation for that text.";
 
     // Save to cache
-    responseCache.set(cacheKey, responseText);
+    await responseCache.set(cacheKey, responseText);
 
     return responseText;
   } catch (error) {
@@ -1425,9 +1783,10 @@ export const auditLessonLanguage = async (
       grade,
       country,
     );
-    if (responseCache.has(cacheKey)) {
+    const cachedResponse = await responseCache.get(cacheKey);
+    if (cachedResponse) {
       console.log("Pipeline: Cache hit for auditLessonLanguage");
-      return safeJsonParse(responseCache.get(cacheKey)!);
+      return safeJsonParse(cachedResponse);
     }
 
     const response = await generateContentWithFallback(
@@ -1483,7 +1842,7 @@ export const auditLessonLanguage = async (
 
     try {
       const parsed = safeJsonParse(text);
-      responseCache.set(cacheKey, text);
+      await responseCache.set(cacheKey, text);
       return parsed;
     } catch (parseError) {
       console.error("JSON Parse Error in auditLessonLanguage:", parseError);
@@ -1530,9 +1889,10 @@ export const generateLessonTags = async (
       grade,
       country,
     );
-    if (responseCache.has(cacheKey)) {
+    const cachedResponse = await responseCache.get(cacheKey);
+    if (cachedResponse) {
       console.log("Pipeline: Cache hit for generateLessonTags");
-      return safeJsonParse(responseCache.get(cacheKey)!);
+      return safeJsonParse(cachedResponse);
     }
 
     const response = await generateContentWithFallback(
@@ -1562,7 +1922,7 @@ export const generateLessonTags = async (
     if (!text) return [];
 
     const parsed = safeJsonParse(text);
-    responseCache.set(cacheKey, text);
+    await responseCache.set(cacheKey, text);
     return parsed;
   } catch (error) {
     handleApiError(error, "generateLessonTags");
@@ -1581,9 +1941,10 @@ export const generateProactiveGreeting = async (
       lessonContent,
       userLanguage,
     );
-    if (responseCache.has(cacheKey)) {
+    const cachedResponse = await responseCache.get(cacheKey);
+    if (cachedResponse) {
       console.log("Pipeline: Cache hit for generateProactiveGreeting");
-      return responseCache.get(cacheKey)!;
+      return cachedResponse;
     }
 
     // 2. Determine Model (Use fast model for greetings)
@@ -1610,7 +1971,7 @@ export const generateProactiveGreeting = async (
       "How can I help you with this lesson? I can answer questions, explain concepts, or test your knowledge.";
 
     // Save to cache
-    responseCache.set(cacheKey, responseText);
+    await responseCache.set(cacheKey, responseText);
 
     return responseText;
   } catch (error) {
@@ -1643,9 +2004,10 @@ export const chatWithTutor = async (
       userId,
       strictRAG
     );
-    if (responseCache.has(cacheKey)) {
+    const cachedResponse = await responseCache.get(cacheKey);
+    if (cachedResponse) {
       console.log("Pipeline: Cache hit for chatWithTutor");
-      return responseCache.get(cacheKey)!;
+      return cachedResponse;
     }
 
     // 2. Check Simple Task
@@ -1727,7 +2089,7 @@ ${augmentedContext}`,
       response.text || "I'm sorry, I couldn't generate a response.";
 
     // Save to cache
-    responseCache.set(cacheKey, responseText);
+    await responseCache.set(cacheKey, responseText);
 
     return responseText;
   } catch (error) {
@@ -1742,9 +2104,10 @@ export const generateFlashcards = async (
   try {
     // 1. Check Cache
     const cacheKey = getCacheKey("generateFlashcards", lessonContent);
-    if (responseCache.has(cacheKey)) {
+    const cachedResponse = await responseCache.get(cacheKey);
+    if (cachedResponse) {
       console.log("Pipeline: Cache hit for generateFlashcards");
-      return safeJsonParse(responseCache.get(cacheKey)!);
+      return safeJsonParse(cachedResponse);
     }
 
     const response = await generateContentWithFallback(
@@ -1783,7 +2146,7 @@ export const generateFlashcards = async (
     if (!text) return [];
 
     const parsed = safeJsonParse(text);
-    responseCache.set(cacheKey, text);
+    await responseCache.set(cacheKey, text);
     return parsed;
   } catch (error) {
     handleApiError(error, "generateFlashcards");
@@ -1808,9 +2171,10 @@ export const generateInteractiveContent = async (
       country,
       strictRAG
     );
-    if (responseCache.has(cacheKey)) {
+    const cachedResponse = await responseCache.get(cacheKey);
+    if (cachedResponse) {
       console.log("Pipeline: Cache hit for generateInteractiveContent");
-      return responseCache.get(cacheKey)!;
+      return cachedResponse;
     }
 
     let prompt = "";
@@ -1845,7 +2209,7 @@ export const generateInteractiveContent = async (
 
     const responseText =
       response.text || "I couldn't generate the content. Please try again.";
-    responseCache.set(cacheKey, responseText);
+    await responseCache.set(cacheKey, responseText);
     return responseText;
   } catch (error) {
     handleApiError(error, "generateInteractiveContent");
@@ -1859,9 +2223,10 @@ export const generateCauseEffect = async (
   try {
     // 1. Check Cache
     const cacheKey = getCacheKey("generateCauseEffect", lessonContent);
-    if (responseCache.has(cacheKey)) {
+    const cachedResponse = await responseCache.get(cacheKey);
+    if (cachedResponse) {
       console.log("Pipeline: Cache hit for generateCauseEffect");
-      return safeJsonParse(responseCache.get(cacheKey)!);
+      return safeJsonParse(cachedResponse);
     }
 
     const response = await generateContentWithFallback(
@@ -1900,7 +2265,7 @@ export const generateCauseEffect = async (
     if (!text) return [];
 
     const parsed = safeJsonParse(text);
-    responseCache.set(cacheKey, text);
+    await responseCache.set(cacheKey, text);
     return parsed;
   } catch (error) {
     handleApiError(error, "generateCauseEffect");
@@ -2252,6 +2617,71 @@ export async function evaluateExtractionWeakness(
     return null;
   }
 }
+
+export const MAX_QUIZZES_PER_LESSON = 5;
+export const MAX_EXERCISES_PER_LESSON = 5;
+
+export const generateQuizzesForLesson = async (
+  lessonTitle: string,
+  lessonContent: string,
+  existingCount: number,
+  targetCount: number = MAX_QUIZZES_PER_LESSON,
+  country: string = "",
+  grade: string = "",
+): Promise<any[]> => {
+  const needed = Math.max(0, targetCount - existingCount);
+  if (needed === 0) return [];
+
+  const prompt = `Generate ${needed} multiple-choice quiz questions for this lesson.
+Lesson: "${lessonTitle}"
+Content: ${lessonContent.substring(0, 3000)}
+${country ? `Country: ${country}, Grade: ${grade}` : ""}
+
+Return ONLY a JSON array (no markdown):
+[{"question":"...","options":["A","B","C","D"],"correctAnswer":"exact option text","explanation":"..."}]`;
+
+  try {
+    const response = await generateContentWithFallback(
+      { model: "gemini-3-flash-preview", contents: prompt, config: { responseMimeType: "application/json", maxOutputTokens: 2048 } },
+      "generateQuizzesForLesson"
+    );
+    const parsed = safeJsonParse(response.text || "");
+    return Array.isArray(parsed) ? parsed.slice(0, needed) : [];
+  } catch {
+    return [];
+  }
+};
+
+export const generateExercisesForLesson = async (
+  lessonTitle: string,
+  lessonContent: string,
+  existingCount: number,
+  targetCount: number = MAX_EXERCISES_PER_LESSON,
+  country: string = "",
+  grade: string = "",
+): Promise<any[]> => {
+  const needed = Math.max(0, targetCount - existingCount);
+  if (needed === 0) return [];
+
+  const prompt = `Generate ${needed} practice exercises for this lesson.
+Lesson: "${lessonTitle}"
+Content: ${lessonContent.substring(0, 3000)}
+${country ? `Country: ${country}, Grade: ${grade}` : ""}
+
+Return ONLY a JSON array (no markdown):
+[{"question":"problem statement (use LaTeX for math)","hint":"optional hint","solution":"step-by-step solution"}]`;
+
+  try {
+    const response = await generateContentWithFallback(
+      { model: "gemini-3-flash-preview", contents: prompt, config: { responseMimeType: "application/json", maxOutputTokens: 2048 } },
+      "generateExercisesForLesson"
+    );
+    const parsed = safeJsonParse(response.text || "");
+    return Array.isArray(parsed) ? parsed.slice(0, needed) : [];
+  } catch {
+    return [];
+  }
+};
 
 export async function findSimilarResources(
   topic: string, 

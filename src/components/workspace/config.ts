@@ -1,4 +1,3 @@
-
 export type ToolType = 'input' | 'logic' | 'api' | 'ai' | 'visual';
 
 export interface ToolConfig {
@@ -42,7 +41,7 @@ export const WORKSPACE_CONFIG: Record<string, SubjectConfig> = {
     label: 'Biology',
     tools: [
       { id: 'text-input', type: 'input', label: 'Notes', icon: 'FileText' },
-      { id: 'image-fetcher', type: 'api', label: 'Diagrams', icon: 'Image', providers: ['Unsplash'] },
+      { id: 'image-fetcher', type: 'api', label: 'Diagrams', icon: 'Image', providers: ['Wikimedia'] },
       { id: 'ai-explainer', type: 'ai', label: 'AI Explainer', icon: 'Sparkles' }
     ]
   },
@@ -51,14 +50,14 @@ export const WORKSPACE_CONFIG: Record<string, SubjectConfig> = {
     label: 'Geology',
     tools: [
       { id: 'text-input', type: 'input', label: 'Notes', icon: 'FileText' },
-      { id: 'image-fetcher', type: 'api', label: 'Maps & Rocks', icon: 'Map', providers: ['Unsplash'] }
+      { id: 'image-fetcher', type: 'api', label: 'Maps & Rocks', icon: 'Map', providers: ['Wikimedia'] }
     ]
   },
   history: {
     id: 'history',
     label: 'History',
     tools: [
-      { id: 'dictionary', type: 'api', label: 'Dictionary', icon: 'Book' },
+      { id: 'dictionary', type: 'api', label: 'Dictionary', icon: 'Book', providers: ['DictionaryAPI'] },
       { id: 'timeline', type: 'visual', label: 'Timeline', icon: 'Calendar' },
       { id: 'notes-generator', type: 'ai', label: 'AI Summary', icon: 'Zap' }
     ]
@@ -67,7 +66,7 @@ export const WORKSPACE_CONFIG: Record<string, SubjectConfig> = {
     id: 'language',
     label: 'Language',
     tools: [
-      { id: 'dictionary', type: 'api', label: 'Dictionary', icon: 'Book' },
+      { id: 'dictionary', type: 'api', label: 'Dictionary', icon: 'Book', providers: ['DictionaryAPI'] },
       { id: 'writing-assistant', type: 'ai', label: 'AI Writing', icon: 'PenTool' }
     ]
   },
@@ -75,7 +74,7 @@ export const WORKSPACE_CONFIG: Record<string, SubjectConfig> = {
     id: 'philosophy',
     label: 'Philosophy',
     tools: [
-      { id: 'dictionary', type: 'api', label: 'Dictionary', icon: 'Book' },
+      { id: 'dictionary', type: 'api', label: 'Dictionary', icon: 'Book', providers: ['DictionaryAPI'] },
       { id: 'argument-builder', type: 'ai', label: 'AI Argument', icon: 'MessageSquare' },
       { id: 'writing-assistant', type: 'ai', label: 'AI Writing', icon: 'PenTool' }
     ]

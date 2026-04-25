@@ -30,7 +30,7 @@ export const useAppSettings = () => {
 
     // Subscribe to changes
     const subscription = supabase
-      .channel('app_settings_changes')
+      .channel(`app_settings_changes_${crypto.randomUUID()}`)
       .on('postgres_changes', { event: '*', table: 'app_settings', schema: 'public' }, (payload) => {
         if (payload.new) {
           const newSetting = payload.new as any;

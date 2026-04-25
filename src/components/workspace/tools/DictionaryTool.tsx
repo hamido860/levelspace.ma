@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Book, Search, Loader2, Volume2, Bookmark, ExternalLink } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -98,6 +97,7 @@ export const DictionaryTool: React.FC<DictionaryToolProps> = ({ state, onChange 
                 <button
                   onClick={() => playAudio(definition.phonetics.find((p: any) => p.audio).audio)}
                   className="w-12 h-12 bg-accent/10 text-accent rounded-full flex items-center justify-center hover:bg-accent hover:text-white transition-all shadow-lg shadow-accent/20"
+                  aria-label="Play pronunciation audio"
                 >
                   <Volume2 size={20} />
                 </button>
