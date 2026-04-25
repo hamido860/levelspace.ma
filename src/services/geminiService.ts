@@ -24,7 +24,7 @@ export const setNvidiaApiKey = (key: string) => {
 };
 
 export const NVIDIA_MODEL = "google/gemma-3-27b-it";
-export const NVIDIA_WORKER_MODEL = "google/gemma-4-27b-it"; // Gemma 4 — primary bulk lesson worker
+export const NVIDIA_WORKER_MODEL = "google/gemma-4-31b-it"; // Gemma 4 — primary bulk lesson worker
 
 export async function callNvidiaAPI(params: {
   prompt: string;
