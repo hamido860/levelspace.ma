@@ -5,7 +5,9 @@ import { supabase } from "../db/supabase";
 import { useAuth } from "../context/AuthContext";
 import {
   RefreshCw, Database, BarChart2, BookOpen, Cpu, Table2,
-  AlertTriangle, CheckCircle, Clock, Layers
+  AlertTriangle, CheckCircle, Clock, Layers, Sparkles,
+  Lightbulb, ListChecks, Map, RotateCcw, ChevronRight,
+  TrendingUp, TrendingDown, Info, Zap
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -40,7 +42,21 @@ interface RagByGrade {
 
 interface BrowseRow { [key: string]: any; }
 
-type Tab = "overview" | "grades" | "queue" | "rag" | "browser";
+type Tab = "overview" | "grades" | "queue" | "rag" | "browser" | "ai";
+
+// ─── AI Analyst Types ────────────────────────────────────────────────────────
+type AIAction = "insights" | "tasks" | "strategy" | "retry_failed";
+interface AIHighlight { type: "warning" | "success" | "info"; title: string; detail: string; }
+interface AIBottleneck { area: string; severity: "high" | "medium" | "low"; description: string; }
+interface AIInsights { summary: string; highlights: AIHighlight[]; bottlenecks: AIBottleneck[]; }
+interface AITask {
+  id: number; priority: "critical" | "high" | "medium" | "low"; title: string;
+  description: string; metric_basis: string; estimated_impact: string;
+  action_type: "fix" | "generate" | "review" | "optimize";
+}
+interface AITaskList { tasks: AITask[]; }
+interface AIPhase { phase: number; name: string; duration: string; objectives: string[]; key_metric: string; actions: string[]; }
+interface AIStrategy { goal: string; phases: AIPhase[]; success_criteria: string[]; risks: { risk: string; mitigation: string }[]; }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 100) : 0);
@@ -122,6 +138,15 @@ export const Admin: React.FC = () => {
   // RAG
   const [ragStats, setRagStats] = useState<any>({});
   const [ragByGrade, setRagByGrade] = useState<RagByGrade[]>([]);
+
+  // AI Analyst
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError]   = useState("");
+  const [aiInsights, setAiInsights]   = useState<AIInsights | null>(null);
+  const [aiTaskList, setAiTaskList]   = useState<AITaskList | null>(null);
+  const [aiStrategy, setAiStrategy]   = useState<AIStrategy | null>(null);
+  const [aiRetryMsg, setAiRetryMsg]   = useState("");
+  const [activeAITab, setActiveAITab] = useState<AIAction>("insights");
 
   // Browser
   const [tables, setTables] = useState<TableHealth[]>([]);
@@ -279,6 +304,58 @@ export const Admin: React.FC = () => {
     setTables(tableHealth.length ? tableHealth : []);
   }, [tableHealth]);
 
+  // ── AI Agent caller ──────────────────────────────────────────────────────
+  const callAgent = useCallback(async (action: AIAction) => {
+    setAiLoading(true);
+    setAiError("");
+    setAiRetryMsg("");
+
+    // Build a compact metrics snapshot from live state
+    const metricsSnapshot = {
+      totalTopics: kpis.topics,
+      lessonsGenerated: kpis.lessons,
+      lessonCoverage: `${pct(kpis.lessons, kpis.topics)}%`,
+      queuePending: kpis.pending,
+      failedJobs: kpis.failed,
+      ragChunksTotal: kpis.ragTotal,
+      ragChunksEmbedded: kpis.ragDone,
+      ragCoverage: `${pct(kpis.ragDone, kpis.ragTotal)}%`,
+      totalUsers: kpis.users,
+      gradeBreakdown: gradeData.map(g => ({
+        grade: g.grade,
+        cycle: g.cycle,
+        topics: g.total_topics,
+        lessons: g.lessons_generated,
+        coverage: `${pct(g.lessons_generated, g.total_topics)}%`,
+        queueFailed: g.q_failed,
+        queuePending: g.q_pending,
+      })),
+      tableHealth: tableHealth.slice(0, 15).map(t => ({
+        table: t.table_name,
+        rows: t.row_count,
+        status: t.row_count > 100 ? "populated" : t.row_count > 0 ? "partial" : "empty",
+      })),
+    };
+
+    try {
+      const res = await fetch("/api/ai-analyst", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ metrics: metricsSnapshot, action }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Agent call failed");
+
+      if (action === "insights")      setAiInsights(json.result as AIInsights);
+      else if (action === "tasks")    setAiTaskList(json.result as AITaskList);
+      else if (action === "strategy") setAiStrategy(json.result as AIStrategy);
+      else if (action === "retry_failed") setAiRetryMsg(json.message ?? "Done.");
+    } catch (e: any) {
+      setAiError(e.message);
+    }
+    setAiLoading(false);
+  }, [kpis, gradeData, tableHealth]);
+
   const refreshAll = useCallback(async () => {
     setLoading(true);
     try {
@@ -322,11 +399,12 @@ export const Admin: React.FC = () => {
   };
 
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
-    { id: "overview", label: "Overview",       icon: <BarChart2 className="w-4 h-4" /> },
-    { id: "grades",   label: "Grade Coverage", icon: <BookOpen className="w-4 h-4" /> },
-    { id: "queue",    label: "Gen Queue",       icon: <Cpu className="w-4 h-4" /> },
-    { id: "rag",      label: "RAG / Embeddings",icon: <Layers className="w-4 h-4" /> },
-    { id: "browser",  label: "Table Browser",  icon: <Table2 className="w-4 h-4" /> },
+    { id: "overview", label: "Overview",        icon: <BarChart2 className="w-4 h-4" /> },
+    { id: "grades",   label: "Grade Coverage",  icon: <BookOpen className="w-4 h-4" /> },
+    { id: "queue",    label: "Gen Queue",        icon: <Cpu className="w-4 h-4" /> },
+    { id: "rag",      label: "RAG / Embeddings", icon: <Layers className="w-4 h-4" /> },
+    { id: "browser",  label: "Table Browser",   icon: <Table2 className="w-4 h-4" /> },
+    { id: "ai",       label: "AI Analyst",       icon: <Sparkles className="w-4 h-4" /> },
   ];
 
   // ── RENDER ────────────────────────────────────────────────────────────────
@@ -720,6 +798,269 @@ export const Admin: React.FC = () => {
           </div>
         </div>
       )}
+      {/* ── AI ANALYST ── */}
+      {tab === "ai" && (
+        <div>
+          {/* Header card */}
+          <div className="bg-gradient-to-r from-gray-900 to-gray-800 rounded-xl p-5 mb-5 text-white flex items-start gap-4">
+            <div className="w-10 h-10 rounded-lg bg-red-500 flex items-center justify-center flex-shrink-0">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div className="flex-1">
+              <h2 className="font-bold text-base">AI Analyst Agent</h2>
+              <p className="text-gray-400 text-sm mt-0.5">
+                Powered by <span className="text-white font-medium">meta/llama-3.3-70b-instruct</span> via NVIDIA NIM.
+                Reads your live database metrics and returns insights, tasks, and strategy.
+              </p>
+            </div>
+          </div>
+
+          {/* Action tabs */}
+          <div className="flex gap-2 mb-5 flex-wrap">
+            {([
+              { id: "insights"     as AIAction, label: "Insights",       icon: <Lightbulb className="w-4 h-4" />, desc: "Interpret what the metrics mean" },
+              { id: "tasks"        as AIAction, label: "Task List",      icon: <ListChecks className="w-4 h-4" />, desc: "Prioritized action items" },
+              { id: "strategy"     as AIAction, label: "Strategy Plan",  icon: <Map className="w-4 h-4" />,       desc: "Phased roadmap to fix gaps" },
+              { id: "retry_failed" as AIAction, label: "Retry Failed",   icon: <RotateCcw className="w-4 h-4" />, desc: "Reset all failed queue jobs" },
+            ] as { id: AIAction; label: string; icon: React.ReactNode; desc: string }[]).map((a) => (
+              <button
+                key={a.id}
+                onClick={() => { setActiveAITab(a.id); callAgent(a.id); }}
+                disabled={aiLoading}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all disabled:opacity-50 ${
+                  activeAITab === a.id
+                    ? "bg-gray-900 text-white border-gray-900"
+                    : "bg-white text-gray-600 border-gray-200 hover:border-gray-900 hover:text-gray-900"
+                }`}
+              >
+                {a.icon}
+                {a.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Loading */}
+          {aiLoading && (
+            <div className="bg-white rounded-xl border border-gray-100 p-8 flex flex-col items-center gap-3 text-gray-400">
+              <div className="w-8 h-8 border-2 border-gray-200 border-t-red-500 rounded-full animate-spin" />
+              <p className="text-sm">Agent is reading your metrics and thinking…</p>
+            </div>
+          )}
+
+          {/* Error */}
+          {aiError && !aiLoading && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <div><strong>Agent error:</strong> {aiError}</div>
+            </div>
+          )}
+
+          {/* Retry result */}
+          {aiRetryMsg && !aiLoading && activeAITab === "retry_failed" && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-emerald-800 text-sm flex items-center gap-2">
+              <CheckCircle className="w-4 h-4" /> {aiRetryMsg}
+            </div>
+          )}
+
+          {/* ── INSIGHTS ── */}
+          {aiInsights && !aiLoading && activeAITab === "insights" && (
+            <div className="space-y-4">
+              <div className="bg-white rounded-xl border border-gray-100 p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <Info className="w-4 h-4 text-blue-500" />
+                  <h3 className="font-bold text-sm">Executive Summary</h3>
+                </div>
+                <p className="text-gray-700 text-sm leading-relaxed">{aiInsights.summary}</p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {aiInsights.highlights?.map((h, i) => {
+                  const colors = {
+                    warning: "border-l-amber-400 bg-amber-50",
+                    success: "border-l-emerald-400 bg-emerald-50",
+                    info:    "border-l-blue-400 bg-blue-50",
+                  };
+                  const icons = {
+                    warning: <TrendingDown className="w-4 h-4 text-amber-500" />,
+                    success: <TrendingUp className="w-4 h-4 text-emerald-500" />,
+                    info:    <Info className="w-4 h-4 text-blue-500" />,
+                  };
+                  return (
+                    <div key={i} className={`rounded-xl border-l-4 p-4 ${colors[h.type]}`}>
+                      <div className="flex items-center gap-2 mb-1">
+                        {icons[h.type]}
+                        <span className="font-semibold text-sm text-gray-800">{h.title}</span>
+                      </div>
+                      <p className="text-xs text-gray-600 leading-relaxed">{h.detail}</p>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {aiInsights.bottlenecks?.length > 0 && (
+                <div className="bg-white rounded-xl border border-gray-100 p-5">
+                  <h3 className="font-bold text-sm mb-3 flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-red-400" /> Top Bottlenecks
+                  </h3>
+                  <div className="space-y-3">
+                    {aiInsights.bottlenecks.map((b, i) => {
+                      const sev = { high: "bg-red-100 text-red-700", medium: "bg-amber-100 text-amber-700", low: "bg-gray-100 text-gray-600" };
+                      return (
+                        <div key={i} className="flex items-start gap-3">
+                          <span className={`mt-0.5 px-2 py-0.5 rounded-full text-xs font-bold flex-shrink-0 ${sev[b.severity]}`}>
+                            {b.severity}
+                          </span>
+                          <div>
+                            <div className="font-semibold text-sm text-gray-800">{b.area}</div>
+                            <div className="text-xs text-gray-500 mt-0.5">{b.description}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── TASK LIST ── */}
+          {aiTaskList && !aiLoading && activeAITab === "tasks" && (
+            <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+              <div className="px-5 py-3 border-b border-gray-50 flex items-center gap-2">
+                <ListChecks className="w-4 h-4 text-gray-400" />
+                <h3 className="font-bold text-sm">Prioritized Action Items</h3>
+                <span className="ml-auto text-xs bg-gray-50 border border-gray-100 px-2 py-0.5 rounded-full text-gray-500">
+                  {aiTaskList.tasks?.length ?? 0} tasks
+                </span>
+              </div>
+              <div className="divide-y divide-gray-50">
+                {aiTaskList.tasks?.map((t) => {
+                  const pColors = {
+                    critical: "bg-red-500 text-white",
+                    high:     "bg-orange-400 text-white",
+                    medium:   "bg-amber-400 text-white",
+                    low:      "bg-gray-200 text-gray-600",
+                  };
+                  const aColors = {
+                    fix:      "bg-red-50 text-red-700",
+                    generate: "bg-blue-50 text-blue-700",
+                    review:   "bg-purple-50 text-purple-700",
+                    optimize: "bg-teal-50 text-teal-700",
+                  };
+                  return (
+                    <div key={t.id} className="p-4 flex items-start gap-3 hover:bg-gray-50/50">
+                      <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5 ${pColors[t.priority]}`}>
+                        {t.id}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <span className="font-semibold text-sm text-gray-900">{t.title}</span>
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${aColors[t.action_type]}`}>
+                            {t.action_type}
+                          </span>
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${pColors[t.priority]}`}>
+                            {t.priority}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-600 mb-1.5">{t.description}</p>
+                        <div className="flex gap-4 text-xs text-gray-400 flex-wrap">
+                          <span><strong className="text-gray-500">Based on:</strong> {t.metric_basis}</span>
+                          <span><strong className="text-gray-500">Impact:</strong> {t.estimated_impact}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ── STRATEGY PLAN ── */}
+          {aiStrategy && !aiLoading && activeAITab === "strategy" && (
+            <div className="space-y-4">
+              <div className="bg-gradient-to-r from-gray-900 to-gray-800 rounded-xl p-5 text-white">
+                <div className="flex items-center gap-2 mb-1">
+                  <Zap className="w-4 h-4 text-yellow-400" />
+                  <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Strategic Goal</span>
+                </div>
+                <p className="text-base font-semibold">{aiStrategy.goal}</p>
+              </div>
+
+              <div className="space-y-3">
+                {aiStrategy.phases?.map((ph) => (
+                  <div key={ph.phase} className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+                    <div className="px-5 py-3 bg-gray-50 border-b border-gray-100 flex items-center gap-3">
+                      <span className="w-7 h-7 rounded-full bg-gray-900 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">
+                        {ph.phase}
+                      </span>
+                      <div>
+                        <div className="font-bold text-sm text-gray-900">{ph.name}</div>
+                        <div className="text-xs text-gray-400">{ph.duration} · Key metric: {ph.key_metric}</div>
+                      </div>
+                    </div>
+                    <div className="p-4 grid sm:grid-cols-2 gap-4">
+                      <div>
+                        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Objectives</div>
+                        <ul className="space-y-1">
+                          {ph.objectives?.map((o, i) => (
+                            <li key={i} className="flex items-start gap-2 text-xs text-gray-700">
+                              <ChevronRight className="w-3 h-3 mt-0.5 text-gray-400 flex-shrink-0" />{o}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div>
+                        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Actions</div>
+                        <ul className="space-y-1">
+                          {ph.actions?.map((a, i) => (
+                            <li key={i} className="flex items-start gap-2 text-xs text-gray-700">
+                              <ChevronRight className="w-3 h-3 mt-0.5 text-red-400 flex-shrink-0" />{a}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div className="bg-emerald-50 rounded-xl p-4">
+                  <div className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-2">Success Criteria</div>
+                  <ul className="space-y-1">
+                    {aiStrategy.success_criteria?.map((c, i) => (
+                      <li key={i} className="flex items-start gap-2 text-xs text-emerald-800">
+                        <CheckCircle className="w-3 h-3 mt-0.5 flex-shrink-0" />{c}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="bg-red-50 rounded-xl p-4">
+                  <div className="text-xs font-semibold text-red-700 uppercase tracking-wide mb-2">Risks</div>
+                  <ul className="space-y-2">
+                    {aiStrategy.risks?.map((r, i) => (
+                      <li key={i} className="text-xs text-red-800">
+                        <div className="font-semibold">{r.risk}</div>
+                        <div className="text-red-600 mt-0.5">↳ {r.mitigation}</div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Empty state */}
+          {!aiLoading && !aiError && !aiInsights && !aiTaskList && !aiStrategy && !aiRetryMsg && (
+            <div className="bg-white rounded-xl border border-dashed border-gray-200 p-10 flex flex-col items-center gap-3 text-center">
+              <Sparkles className="w-8 h-8 text-gray-300" />
+              <p className="text-gray-500 text-sm">Click an action above to run the AI Analyst against your live metrics.</p>
+              <p className="text-gray-400 text-xs">The agent reads all grade coverage, queue status, and RAG data before responding.</p>
+            </div>
+          )}
+        </div>
+      )}
+
     </Layout>
   );
 };
