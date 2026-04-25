@@ -43,10 +43,11 @@ import {
   PlayCircle
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import { useAppSettings } from "../hooks/useAppSettings";
+import { useAppSettings } from "../context/AppSettingsContext";
 import { saveLesson, deleteLessonsByScope, deleteLessonById, updateLesson } from "../services/ragService";
 import { LessonTemplate, generateFullLesson, generateSyllabus, askAdminAI, getLessonPrompt, getAIStatus, AIStatus, auditCurriculumConfig, CurriculumAuditResult, smartExtractFromResource, evaluateExtractionWeakness, findSimilarResources, ExtractionEvaluation } from "../services/geminiService";
 import { aiCrew, AITask } from "../services/aiCrewService";
+import { bulkFillService } from "../services/bulkFillService";
 import { contentService, Level, Subject, Content } from "../services/contentService";
 import { toast } from "sonner";
 import { useEffect, useRef } from "react";
@@ -145,6 +146,10 @@ export const Admin: React.FC = () => {
   const [isBulkGenerating, setIsBulkGenerating] = useState(false);
   const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0, currentTopic: "" });
   const [isGeneratingSyllabus, setIsGeneratingSyllabus] = useState(false);
+
+  // Auto-Fill State
+  const [isAutoFilling, setIsAutoFilling] = useState(false);
+  const [autoFillProgress, setAutoFillProgress] = useState<import('../services/bulkFillService').BulkFillProgress | null>(null);
 
   // Live RAG Viewer State
   const [ragLessons, setRagLessons] = useState<any[]>([]);
@@ -979,6 +984,37 @@ The output format should be a JSON array of lesson objects.`;
     } finally {
       setIsBulkGenerating(false);
       setBulkProgress({ current: 0, total: 0, currentTopic: "" });
+    }
+  };
+
+  const handleAutoFill = async () => {
+    if (!qgCountry || !qgGrade || !qgSubject || !bgSyllabus) {
+      toast.error("Please fill in Country, Grade, Subject, and Syllabus first.");
+      return;
+    }
+    const topics = bgSyllabus.split('\n').map(t => t.trim()).filter(t => t.length > 0);
+    if (topics.length === 0) {
+      toast.error("No valid topics found in syllabus.");
+      return;
+    }
+    setIsAutoFilling(true);
+    setAutoFillProgress(null);
+    try {
+      await bulkFillService.run(
+        topics,
+        qgCountry,
+        qgGrade,
+        qgSubject,
+        qgSubject,
+        user?.id || "anonymous",
+        (p) => setAutoFillProgress({ ...p })
+      );
+      toast.success("Auto-Fill complete! Supabase is fully populated.");
+      fetchRagLessons();
+    } catch (err: any) {
+      toast.error(err.message || "Auto-Fill failed.");
+    } finally {
+      setIsAutoFilling(false);
     }
   };
 
@@ -2024,7 +2060,7 @@ The output format should be a JSON array of lesson objects.`;
 
                 <button
                   onClick={handleBulkGenerate}
-                  disabled={isBulkGenerating || isDummyUser || !bgSyllabus.trim()}
+                  disabled={isBulkGenerating || isAutoFilling || isDummyUser || !bgSyllabus.trim()}
                   className="relative w-full py-3 bg-white/10 text-paper rounded-xl font-bold text-[10px] uppercase tracking-[0.2em] hover:bg-white/20 transition-all flex items-center justify-center gap-2 disabled:opacity-30 active:scale-[0.98]"
                 >
                   {isBulkGenerating ? (
@@ -2039,6 +2075,66 @@ The output format should be a JSON array of lesson objects.`;
                     </>
                   )}
                 </button>
+
+                {/* Auto-Fill: fills lessons + tops up quizzes + exercises to max */}
+                <div className="border-t border-white/10 pt-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Zap size={11} className="text-gold" />
+                    <span className="text-[9px] font-bold text-gold uppercase tracking-widest">Auto-Fill Engine</span>
+                  </div>
+                  <p className="text-[9px] text-paper/40 leading-relaxed">
+                    Generates missing lessons, then tops up each lesson to <strong className="text-paper/60">{5} quizzes</strong> + <strong className="text-paper/60">{5} exercises</strong>. Skips topics already in RAG (&ge;85% match).
+                  </p>
+
+                  {(isAutoFilling || autoFillProgress) && autoFillProgress && (
+                    <div className="p-3 bg-white/5 rounded-xl border border-white/10 space-y-2 text-[9px]">
+                      <div className="flex justify-between font-bold uppercase tracking-widest">
+                        <span className="text-paper/60">
+                          {autoFillProgress.done ? "Complete" : `Topic ${autoFillProgress.current} / ${autoFillProgress.total}`}
+                        </span>
+                        <span className="text-gold">
+                          {autoFillProgress.total > 0 ? Math.round((autoFillProgress.current / autoFillProgress.total) * 100) : 0}%
+                        </span>
+                      </div>
+                      <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
+                        <div
+                          className="bg-gold h-full transition-all duration-500"
+                          style={{ width: `${autoFillProgress.total > 0 ? (autoFillProgress.current / autoFillProgress.total) * 100 : 0}%` }}
+                        />
+                      </div>
+                      {!autoFillProgress.done && (
+                        <p className="text-paper/40 truncate font-mono">{autoFillProgress.currentTopic}</p>
+                      )}
+                      <div className="flex gap-3 pt-1 text-paper/50">
+                        <span className="text-success">+{autoFillProgress.lessonsGenerated} lessons</span>
+                        <span className="text-accent">+{autoFillProgress.quizzesAdded} quizzes</span>
+                        <span className="text-warning">+{autoFillProgress.exercisesAdded} exercises</span>
+                        <span className="text-paper/30">{autoFillProgress.skipped} skipped</span>
+                      </div>
+                      {autoFillProgress.errors.length > 0 && (
+                        <p className="text-error/70 font-mono truncate">{autoFillProgress.errors[autoFillProgress.errors.length - 1]}</p>
+                      )}
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handleAutoFill}
+                    disabled={isAutoFilling || isBulkGenerating || isDummyUser || !bgSyllabus.trim()}
+                    className="relative w-full py-3 bg-gold/20 text-gold rounded-xl font-bold text-[10px] uppercase tracking-[0.2em] hover:bg-gold/30 transition-all flex items-center justify-center gap-2 disabled:opacity-30 active:scale-[0.98] border border-gold/30"
+                  >
+                    {isAutoFilling ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        Auto-Filling...
+                      </>
+                    ) : (
+                      <>
+                        <Zap size={16} />
+                        Auto-Fill All (Max)
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
 

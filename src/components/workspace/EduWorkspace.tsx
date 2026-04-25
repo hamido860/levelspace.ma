@@ -27,7 +27,7 @@ import { WORKSPACE_CONFIG, ToolConfig, SubjectConfig } from './config';
 import { Modal } from '../Modal';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
-import { useAppSettings } from '../../hooks/useAppSettings';
+import { useAppSettings } from '../../context/AppSettingsContext';
 
 // Lazy load tools later if needed, for now let's build the structure
 import { MathEditor } from './tools/MathEditor';

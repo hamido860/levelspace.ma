@@ -156,16 +156,16 @@ export const Dashboard: React.FC = () => {
       }, user?.id || '');
       
       if (lesson) {
-        // Add to local DB for offline access
         const newLessonId = lesson.id || crypto.randomUUID();
-        await db.lessons.add({
+        await db.lessons.put({
           id: newLessonId,
           moduleId: selectedModule.id,
           title: lesson.title,
           content: '',
-          blocks: lesson.blocks as any,
+          blocks: (lesson.blocks || []) as any,
           subtitle: lesson.subtitle,
-          status: 'done',
+          // _pending means AI Crew is generating it — save as 'pending' so LessonView shows progress UI
+          status: (lesson as any)._pending ? 'pending' : 'done',
           createdAt: Date.now()
         });
         navigate(`/lesson/${newLessonId}`);

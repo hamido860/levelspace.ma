@@ -58,7 +58,7 @@ import { AIAssistant } from '../components/AIAssistant';
 import { EduWorkspace } from '../components/workspace/EduWorkspace';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
-import { useAppSettings } from '../hooks/useAppSettings';
+import { useAppSettings } from '../context/AppSettingsContext';
 import { indexLessonContent } from '../services/ragService';
 
 const BLOCK_TYPE_CONFIG: Record<string, { icon: React.ElementType; colorClass: string; label: string }> = {
@@ -117,6 +117,61 @@ const Timer = () => {
         Reset
       </button>
     </div>
+  );
+};
+
+// Shown when AI Crew is generating a lesson on-demand (status === 'pending')
+const PendingLessonView: React.FC<{ title: string; lessonId: string; onReady: () => void }> = ({ title, lessonId, onReady }) => {
+  const navigate = useNavigate();
+  const [dots, setDots] = useState('.');
+  const stages = ['Gemini Pro: investigating curriculum + RAG...', 'Building generation plan...', 'Gemma 4: generating lesson...', 'Validating + saving...'];
+  const [stageIdx, setStageIdx] = useState(0);
+
+  useEffect(() => {
+    const dotInterval = setInterval(() => setDots(d => d.length >= 3 ? '.' : d + '.'), 600);
+    const stageInterval = setInterval(() => setStageIdx(i => Math.min(i + 1, stages.length - 1)), 8000);
+
+    const handleReady = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      // If it's for this lesson (by title match or general signal), update DB and reload
+      clearInterval(dotInterval);
+      clearInterval(stageInterval);
+      // Mark lesson as done in IndexedDB so the reload shows content
+      import('../db/db').then(({ db }) => {
+        db.lessons.update(lessonId, { status: 'done' }).then(onReady);
+      });
+    };
+
+    window.addEventListener('lesson-ready', handleReady);
+    return () => {
+      clearInterval(dotInterval);
+      clearInterval(stageInterval);
+      window.removeEventListener('lesson-ready', handleReady);
+    };
+  }, [lessonId, onReady]);
+
+  return (
+    <Layout fullWidth>
+      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6 px-4">
+        <div className="relative">
+          <Loader2 className="w-12 h-12 text-accent animate-spin" />
+          <Sparkles className="w-5 h-5 text-warning absolute -top-1 -right-1 animate-pulse" />
+        </div>
+        <div className="text-center space-y-2 max-w-md">
+          <p className="text-ink font-semibold text-lg">"{title}"</p>
+          <p className="text-accent font-medium text-sm">{stages[stageIdx]}{dots}</p>
+          <p className="text-muted text-xs">AI Crew is building this lesson. This usually takes 30–90 seconds.</p>
+        </div>
+        <div className="flex gap-1.5">
+          {stages.map((_, i) => (
+            <div key={i} className={`h-1.5 rounded-full transition-all duration-500 ${i <= stageIdx ? 'w-8 bg-accent' : 'w-3 bg-ink/10'}`} />
+          ))}
+        </div>
+        <button onClick={() => navigate('/dashboard')} className="text-muted text-xs hover:text-accent transition-colors">
+          Go back — lesson will be ready when you return
+        </button>
+      </div>
+    </Layout>
   );
 };
 
@@ -565,6 +620,17 @@ export const LessonView: React.FC = () => {
           <button onClick={() => navigate('/dashboard')} className="text-accent hover:underline">Return to Dashboard</button>
         </div>
       </Layout>
+    );
+  }
+
+  // AI Crew is generating this lesson on-demand (Pro planned, Gemma 4 is executing)
+  if (lesson.status === 'pending') {
+    return (
+      <PendingLessonView
+        title={lesson.title}
+        lessonId={id!}
+        onReady={() => window.location.reload()}
+      />
     );
   }
 

@@ -36,14 +36,14 @@ import { supabase, checkSupabaseConnection } from '../db/supabase';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
-import { getCustomApiKey, setCustomApiKey } from '../services/geminiService';
+import { getCustomApiKey, setCustomApiKey, getNvidiaApiKey, setNvidiaApiKey } from '../services/geminiService';
 
 
 
 export const Settings: React.FC = () => {
   const navigate = useNavigate();
   const { t, language, setLanguage } = useLanguage();
-  const { dbConnected, refreshDbConnection, syncData } = useAuth();
+  const { dbConnected, refreshDbConnection, syncData, isAdmin } = useAuth();
   const [isSyncing, setIsSyncing] = useState(false);
   
   const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
@@ -80,6 +80,8 @@ export const Settings: React.FC = () => {
   // API Key State
   const [apiKey, setApiKey] = useState('');
   const [isApiKeySaved, setIsApiKeySaved] = useState(false);
+  const [nvidiaKey, setNvidiaKey] = useState('');
+  const [isNvidiaKeySaved, setIsNvidiaKeySaved] = useState(false);
 
   const languages = [
     { id: 'en', name: 'English', flag: '🇺🇸' },
@@ -127,6 +129,7 @@ export const Settings: React.FC = () => {
 
   useEffect(() => {
     setApiKey(getCustomApiKey());
+    setNvidiaKey(getNvidiaApiKey());
   }, []);
 
   const interests = [
@@ -294,6 +297,12 @@ export const Settings: React.FC = () => {
   ].filter(s => s.completed).length;
 
   const progressPercentage = (setupProgress / 4) * 100;
+
+  const handleSaveNvidiaKey = () => {
+    setNvidiaApiKey(nvidiaKey.trim());
+    setIsNvidiaKeySaved(true);
+    setTimeout(() => setIsNvidiaKeySaved(false), 3000);
+  };
 
   const handleSaveApiKey = () => {
     if (apiKey.trim()) {
@@ -802,6 +811,47 @@ export const Settings: React.FC = () => {
                 >
                   {isApiKeySaved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
                   {isApiKeySaved ? 'Saved' : 'Save Key'}
+                </button>
+              </div>
+            </section>
+
+            {/* NVIDIA API Key */}
+            <section className="p-5 bg-paper border border-ink/5 rounded-3xl space-y-5 shadow-sm flex flex-col">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-success/10 rounded-lg flex items-center justify-center text-success">
+                  <Key className="w-4 h-4" />
+                </div>
+                <div className="space-y-0.5">
+                  <h2 className="text-base font-medium text-ink leading-tight">NVIDIA NIM API Key</h2>
+                  <p className="text-[10px] text-muted/60 leading-tight">Enables Gemma 3 27B as AI fallback — free credits</p>
+                </div>
+              </div>
+
+              <div className="space-y-4 flex-grow">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted">API Key</label>
+                  <input
+                    type="password"
+                    value={nvidiaKey}
+                    onChange={(e) => setNvidiaKey(e.target.value)}
+                    placeholder="nvapi-..."
+                    className="w-full p-3 bg-background border border-ink/5 rounded-xl text-sm outline-none focus:ring-1 focus:ring-accent/20 font-mono"
+                  />
+                </div>
+                <div className="text-xs text-muted leading-relaxed">
+                  Used for lesson generation when Gemini quota is exceeded. Model: <span className="font-mono text-accent">google/gemma-3-27b-it</span>. Get a free key at <span className="font-mono">build.nvidia.com</span>.
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-ink/5 flex justify-end">
+                <button
+                  onClick={handleSaveNvidiaKey}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all flex items-center gap-2 ${
+                    isNvidiaKeySaved ? 'bg-emerald-500 text-paper' : 'bg-ink text-paper hover:bg-accent'
+                  }`}
+                >
+                  {isNvidiaKeySaved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+                  {isNvidiaKeySaved ? 'Saved' : 'Save Key'}
                 </button>
               </div>
             </section>
