@@ -886,9 +886,9 @@ Produce ONLY valid JSON matching this exact schema — no markdown, no explanati
   try {
     const response = await generateAIContent(
       {
-        model: "gemini-3.1-pro-preview",
+        model: modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]),
         contents: prompt,
-        config: { responseMimeType: "application/json", temperature: 0.3, maxOutputTokens: 1500 },
+        config: { responseMimeType: "application/json", temperature: 0.3, maxOutputTokens: 1000 },
         tools: [],
       },
       "investigateAndPlan"
@@ -945,7 +945,7 @@ Respond with VALID JSON only. No markdown fences. No explanation.`;
       prompt: workerPrompt,
       isJson: true,
       temperature: 0.6,
-      maxTokens: 6000,
+      maxTokens: 4000,
       model: NVIDIA_WORKER_MODEL,
     });
     if (nvidiaText) {
@@ -966,7 +966,7 @@ Respond with VALID JSON only. No markdown fences. No explanation.`;
       {
         model: flashModel,
         contents: workerPrompt,
-        config: { responseMimeType: "application/json", temperature: 0.6, maxOutputTokens: 6000 },
+        config: { responseMimeType: "application/json", temperature: 0.6, maxOutputTokens: 4000 },
         tools: [],
       },
       "generateLessonFromPlan_fallback"
@@ -1069,6 +1069,13 @@ export const getLessonPrompt = (
   return prompt;
 };
 
+function needsRefinement(content: string): boolean {
+  const latexCount = (content.match(/\$/g) || []).length;
+  if (latexCount >= 4) return false; // already has LaTeX — skip
+  const rawMathPatterns = [/lim\s+x\s*->/i, /\bD\s+f\b/, /dx\s*\/\s*dt(?!\$)/, /\bx\s+0\b/, /lim_{/];
+  return rawMathPatterns.some(p => p.test(content));
+}
+
 export async function refineLessonContent(rawContent: string): Promise<string> {
   const prompt = `You are an expert pedagogical editor and math formatter. Your task is to take the following raw lesson content and refine it to be production-ready.
 
@@ -1126,7 +1133,7 @@ export const generateFullLesson = async (
 
     const config: any = {
       responseMimeType: "application/json",
-      maxOutputTokens: 8192,
+      maxOutputTokens: 5000,
       tools: [{ googleSearch: {} }],
       responseSchema: {
         type: Type.OBJECT,
@@ -1208,8 +1215,8 @@ export const generateFullLesson = async (
     try {
       const parsed = safeJsonParse(text);
 
-      // Post-processing: refine content prose
-      if (parsed && parsed.content) {
+      // Post-processing: refine content prose only when raw math text is detected
+      if (parsed && parsed.content && needsRefinement(parsed.content)) {
         parsed.content = await refineLessonContent(parsed.content);
       }
 
