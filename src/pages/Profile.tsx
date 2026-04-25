@@ -32,28 +32,37 @@ export const Profile: React.FC = () => {
   const selectedCountry = settings['selected_country'] || localStorage.getItem('selected_country') || '';
   const selectedGoal = settings['selected_goal'] || localStorage.getItem('selected_goal') || 'mastery';
   const selectedBacTrackId = settings['selected_bac_track'] || localStorage.getItem('selected_bac_track') || '';
+  const selectedBacSectionId = settings['selected_bac_section'] || localStorage.getItem('selected_bac_section') || '';
 
   const [bacTrackName, setBacTrackName] = React.useState<string>('');
+  const [bacSectionName, setBacSectionName] = React.useState<string>('');
 
   React.useEffect(() => {
-    const fetchTrackName = async () => {
-      if (selectedBacTrackId) {
-        // UUID validation check
-        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(selectedBacTrackId);
+    const fetchNames = async () => {
+      const isUUID = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
-        if (isUUID) {
+      if (selectedBacTrackId) {
+        if (isUUID(selectedBacTrackId)) {
           const { data } = await supabase.from('bac_tracks').select('name').eq('id', selectedBacTrackId).single();
-          if (data) {
-            setBacTrackName(data.name);
-          }
+          if (data) setBacTrackName(data.name);
         } else {
-          // If not UUID, it's already the name
           setBacTrackName(selectedBacTrackId);
         }
       }
+
+      if (selectedBacSectionId) {
+        if (isUUID(selectedBacSectionId)) {
+          const { data } = await supabase.from('bac_sections').select('name').eq('id', selectedBacSectionId).single();
+          if (data) setBacSectionName(data.name);
+        } else {
+          setBacSectionName(selectedBacSectionId);
+        }
+      }
     };
-    fetchTrackName();
-  }, [selectedBacTrackId]);
+    fetchNames();
+  }, [selectedBacTrackId, selectedBacSectionId]);
+
+  const displayTrackName = bacTrackName || bacSectionName;
 
   const stats = [
     { label: 'Modules Active', value: '12', icon: <BookOpen className="w-4 h-4" />, color: 'text-blue-500' },
@@ -92,9 +101,9 @@ export const Profile: React.FC = () => {
                 <span className="inline-flex px-3 py-1 bg-ink text-paper text-[10px] font-bold uppercase tracking-widest rounded-full self-center md:self-auto whitespace-nowrap">
                   Academic Level: {selectedGrade}
                 </span>
-                {bacTrackName && (
+                {displayTrackName && (
                   <span className="inline-flex px-3 py-1 bg-accent/10 text-accent border border-accent/20 text-[10px] font-bold uppercase tracking-widest rounded-full self-center md:self-auto whitespace-nowrap">
-                    Track: {bacTrackName}
+                    {bacTrackName ? 'Track' : 'Section'}: {displayTrackName}
                   </span>
                 )}
               </div>
@@ -170,14 +179,14 @@ export const Profile: React.FC = () => {
                     </div>
                   </div>
 
-                  {bacTrackName && (
+                  {displayTrackName && (
                     <div className="flex items-center gap-4 p-4 bg-background rounded-2xl border border-ink/5">
                       <div className="w-10 h-10 rounded-xl bg-accent/5 flex items-center justify-center text-accent">
                         <BookOpen className="w-5 h-5" />
                       </div>
                       <div>
-                        <p className="text-[10px] font-bold text-muted uppercase tracking-widest">Track</p>
-                        <p className="text-sm font-medium text-ink">{bacTrackName}</p>
+                        <p className="text-[10px] font-bold text-muted uppercase tracking-widest">{bacTrackName ? 'Track' : 'Section'}</p>
+                        <p className="text-sm font-medium text-ink">{displayTrackName}</p>
                       </div>
                     </div>
                   )}
