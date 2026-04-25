@@ -148,7 +148,7 @@ export const Settings: React.FC = () => {
   ];
 
   const [dbCountries, setDbCountries] = useState<{code: string, name: string}[]>([]);
-  const [dbGrades, setDbGrades] = useState<Record<string, string[]>>({});
+  const [dbGrades, setDbGrades] = useState<Record<string, { cycleName: string; grades: string[] }[]>>({});
 
   useEffect(() => {
     const fetchMetadata = async () => {
@@ -163,15 +163,23 @@ export const Settings: React.FC = () => {
           };
         });
         
-        const gradesMap: Record<string, string[]> = {};
-        const { data: cyclesData } = await supabase.from('cycles').select('id, curriculum_id');
-        const { data: gradesData } = await supabase.from('grades').select('id, cycle_id, name');
+        const gradesMap: Record<string, { cycleName: string; grades: string[] }[]> = {};
+        const { data: cyclesData } = await supabase.from('cycles').select('id, curriculum_id, name, cycle_order').order('cycle_order');
+        const { data: gradesData } = await supabase.from('grades').select('id, cycle_id, name, grade_order').order('grade_order');
           
         if (cyclesData && gradesData) {
           curriculaData.forEach(curriculum => {
             const countryCycles = cyclesData.filter(c => c.curriculum_id === curriculum.id);
-            const countryGrades = gradesData.filter(g => countryCycles.some(c => c.id === g.cycle_id));
-            gradesMap[curriculum.country] = countryGrades.map(g => g.name);
+            const cycleGroups: { cycleName: string; grades: string[] }[] = [];
+
+            countryCycles.forEach(cycle => {
+              const cycleGrades = gradesData.filter(g => g.cycle_id === cycle.id).map(g => g.name);
+              if (cycleGrades.length > 0) {
+                cycleGroups.push({ cycleName: cycle.name, grades: cycleGrades });
+              }
+            });
+
+            gradesMap[curriculum.country] = cycleGroups;
           });
         }
 
@@ -201,7 +209,8 @@ export const Settings: React.FC = () => {
   }, []);
 
   const availableCountries = dbCountries;
-  const currentGrades = dbGrades[selectedCountry] || [];
+  const currentGradesGroups = dbGrades[selectedCountry] || [];
+  const currentGrades = currentGradesGroups.flatMap(g => g.grades);
 
   // Sync grade when country changes if current grade is not in the new system
   useEffect(() => {
@@ -474,20 +483,27 @@ export const Settings: React.FC = () => {
                 </div>
               </div>
               
-              <div key={selectedCountry} className="grid grid-cols-1 gap-2 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
-                {currentGrades.map((grade, index) => (
-                  <button
-                    key={`${grade}-${index}`}
-                    onClick={() => setSelectedGrade(grade)}
-                    className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
-                      selectedGrade === grade 
-                        ? 'bg-accent border-accent text-paper shadow-lg shadow-accent/20' 
-                        : 'bg-background border-ink/5 text-ink hover:border-accent/30'
-                    }`}
-                  >
-                    <span className="text-xs font-medium">{grade}</span>
-                    {selectedGrade === grade && <CheckCircle2 className="w-3.5 h-3.5 text-accent" />}
-                  </button>
+              <div key={selectedCountry} className="flex flex-col gap-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                {currentGradesGroups.map((group, groupIndex) => (
+                  <div key={`group-${groupIndex}`} className="space-y-2">
+                    <h3 className="text-[10px] font-bold text-muted uppercase tracking-widest pl-1">{group.cycleName}</h3>
+                    <div className="grid grid-cols-1 gap-2">
+                      {group.grades.map((grade, index) => (
+                        <button
+                          key={`${grade}-${index}`}
+                          onClick={() => setSelectedGrade(grade)}
+                          className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
+                            selectedGrade === grade
+                              ? 'bg-accent border-accent text-paper shadow-lg shadow-accent/20'
+                              : 'bg-background border-ink/5 text-ink hover:border-accent/30'
+                          }`}
+                        >
+                          <span className="text-xs font-medium">{grade}</span>
+                          {selectedGrade === grade && <CheckCircle2 className="w-3.5 h-3.5 text-accent" />}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
             </section>
