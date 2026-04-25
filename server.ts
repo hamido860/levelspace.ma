@@ -221,7 +221,7 @@ Return 3 phases.`
       const response = await axios.post(
         "https://integrate.api.nvidia.com/v1/chat/completions",
         {
-          model: "meta/llama-3.3-70b-instruct",
+          model: "qwen/qwen3-coder-480b-a35b-instruct",
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user",   content: userPrompt }
@@ -243,7 +243,7 @@ Return 3 phases.`
       let parsed: any;
       try { parsed = JSON.parse(raw); }
       catch { parsed = { raw }; }
-      return res.json({ ok: true, result: parsed, model: "meta/llama-3.3-70b-instruct" });
+      return res.json({ ok: true, result: parsed, model: "qwen/qwen3-coder-480b-a35b-instruct" });
     } catch (err: any) {
       const msg = err?.response?.data?.detail || err?.response?.data?.message || err.message;
       console.error("[AI Analyst] NVIDIA API error:", msg);
