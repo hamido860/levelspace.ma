@@ -251,6 +251,189 @@ Return 3 phases.`
     }
   });
 
+  // ── Admin: Retry single failed queue job ──────────────────────────────────
+  apiRouter.post("/admin/retry-job", async (req, res) => {
+    if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
+    const { jobId } = req.body;
+    if (!jobId) return res.status(400).json({ error: "jobId required" });
+    try {
+      const { error } = await supabase
+        .from("lesson_gen_queue")
+        .update({ status: "pending", attempts: 0, last_error: null, claimed_at: null })
+        .eq("id", jobId);
+      if (error) return res.status(500).json({ error: error.message });
+      return res.json({ ok: true });
+    } catch (err: any) { return res.status(500).json({ error: err.message }); }
+  });
+
+  // ── Admin: Delete single queue job ────────────────────────────────────────
+  apiRouter.post("/admin/delete-job", async (req, res) => {
+    if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
+    const { jobId } = req.body;
+    if (!jobId) return res.status(400).json({ error: "jobId required" });
+    try {
+      const { error } = await supabase.from("lesson_gen_queue").delete().eq("id", jobId);
+      if (error) return res.status(500).json({ error: error.message });
+      return res.json({ ok: true });
+    } catch (err: any) { return res.status(500).json({ error: err.message }); }
+  });
+
+  // ── Admin: Generate lesson for a topic via Qwen ───────────────────────────
+  apiRouter.post("/admin/generate-lesson", async (req, res) => {
+    const nvidiaKey = process.env.NVIDIA_API_KEY || process.env.VITE_NVIDIA_API_KEY;
+    if (!nvidiaKey || nvidiaKey === "MY_NVIDIA_API_KEY") {
+      return res.status(503).json({ error: "NVIDIA API key not configured" });
+    }
+    if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
+    const { topicId, topicTitle, gradeName, subjectName, cycle } = req.body;
+    if (!topicId || !topicTitle) return res.status(400).json({ error: "topicId and topicTitle required" });
+    try {
+      const response = await axios.post(
+        "https://integrate.api.nvidia.com/v1/chat/completions",
+        {
+          model: "qwen/qwen3-coder-480b-a35b-instruct",
+          messages: [
+            { role: "system", content: "You are an expert educational content creator for Moroccan K-12 students. Return valid JSON only, no markdown." },
+            { role: "user", content: `Generate a complete lesson for Moroccan students.\nTopic: "${topicTitle}"\nGrade: ${gradeName || "unknown"}\nSubject: ${subjectName || "unknown"}\nCycle: ${cycle || "unknown"}\n\nReturn JSON:\n{\n  "title": "${topicTitle}",\n  "intro": "2-3 sentence introduction",\n  "blocks": [\n    { "type": "text", "heading": "...", "content": "..." },\n    { "type": "example", "heading": "Example", "content": "..." },\n    { "type": "text", "heading": "Key Concepts", "content": "..." },\n    { "type": "activity", "heading": "Practice", "content": "..." }\n  ],\n  "summary": "2-3 sentence summary",\n  "objectives": ["...", "...", "..."],\n  "keywords": ["...", "...", "..."]\n}` }
+          ],
+          temperature: 0.3,
+          max_tokens: 3000,
+          response_format: { type: "json_object" }
+        },
+        { headers: { Authorization: `Bearer ${nvidiaKey}`, "Content-Type": "application/json" }, timeout: 90000 }
+      );
+      const raw = response.data?.choices?.[0]?.message?.content ?? "{}";
+      let lesson: any;
+      try { lesson = JSON.parse(raw); } catch { return res.status(500).json({ error: "Qwen returned invalid JSON" }); }
+
+      const { data: savedLesson, error: saveError } = await supabase
+        .from("lessons")
+        .insert({ topic_id: topicId, content: lesson, title: lesson.title || topicTitle })
+        .select("id")
+        .single();
+      if (saveError) return res.status(500).json({ error: `DB save failed: ${saveError.message}` });
+
+      await supabase.from("lesson_gen_queue").update({ status: "done" }).eq("topic_id", topicId);
+      return res.json({ ok: true, lessonId: savedLesson?.id });
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail || err?.response?.data?.message || err.message;
+      return res.status(502).json({ error: `Generation failed: ${msg}` });
+    }
+  });
+
+  // ── Admin: Bulk queue missing topics for a grade ───────────────────────────
+  apiRouter.post("/admin/bulk-generate", async (req, res) => {
+    if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
+    const { gradeId } = req.body;
+    if (!gradeId) return res.status(400).json({ error: "gradeId required" });
+    try {
+      const { data: topics, error: topicsErr } = await supabase.from("topics").select("id").eq("grade_id", gradeId);
+      if (topicsErr) return res.status(500).json({ error: topicsErr.message });
+      const topicIds = (topics || []).map((t: any) => t.id);
+      if (!topicIds.length) return res.json({ ok: true, queued: 0, message: "No topics found for this grade" });
+
+      const { data: existingLessons } = await supabase.from("lessons").select("topic_id").in("topic_id", topicIds);
+      const { data: existingQueue } = await supabase.from("lesson_gen_queue").select("topic_id").in("topic_id", topicIds);
+      const hasLesson = new Set((existingLessons || []).map((l: any) => l.topic_id));
+      const inQueue   = new Set((existingQueue   || []).map((q: any) => q.topic_id));
+
+      const missing = topicIds.filter((id: string) => !hasLesson.has(id) && !inQueue.has(id));
+      if (!missing.length) return res.json({ ok: true, queued: 0, message: "All topics already have lessons or are queued" });
+
+      const { error: insertErr } = await supabase.from("lesson_gen_queue").insert(
+        missing.map((id: string) => ({ topic_id: id, status: "pending", attempts: 0 }))
+      );
+      if (insertErr) return res.status(500).json({ error: insertErr.message });
+      return res.json({ ok: true, queued: missing.length, message: `Queued ${missing.length} topics` });
+    } catch (err: any) { return res.status(500).json({ error: err.message }); }
+  });
+
+  // ── Admin: Repair RAG chunk via Qwen ──────────────────────────────────────
+  apiRouter.post("/admin/repair-chunk", async (req, res) => {
+    const nvidiaKey = process.env.NVIDIA_API_KEY || process.env.VITE_NVIDIA_API_KEY;
+    if (!nvidiaKey || nvidiaKey === "MY_NVIDIA_API_KEY") return res.status(503).json({ error: "NVIDIA API key not configured" });
+    if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
+    const { chunkId, content } = req.body;
+    if (!chunkId || !content) return res.status(400).json({ error: "chunkId and content required" });
+    try {
+      const response = await axios.post(
+        "https://integrate.api.nvidia.com/v1/chat/completions",
+        {
+          model: "qwen/qwen3-coder-480b-a35b-instruct",
+          messages: [
+            { role: "system", content: "You clean and fix educational content chunks for a RAG knowledge base. Return JSON only." },
+            { role: "user", content: `Clean and improve this chunk. Return: { "content": "improved text" }\n\nOriginal:\n${content}` }
+          ],
+          temperature: 0.2,
+          max_tokens: 1500,
+          response_format: { type: "json_object" }
+        },
+        { headers: { Authorization: `Bearer ${nvidiaKey}`, "Content-Type": "application/json" }, timeout: 60000 }
+      );
+      const raw = response.data?.choices?.[0]?.message?.content ?? "{}";
+      let result: any;
+      try { result = JSON.parse(raw); } catch { return res.status(500).json({ error: "Qwen returned invalid JSON" }); }
+      const newContent = result.content || content;
+      const { error: updateErr } = await supabase
+        .from("rag_chunks")
+        .update({ content: newContent, embedding_status: "pending" })
+        .eq("id", chunkId);
+      if (updateErr) return res.status(500).json({ error: updateErr.message });
+      return res.json({ ok: true, content: newContent });
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail || err?.response?.data?.message || err.message;
+      return res.status(502).json({ error: `Repair failed: ${msg}` });
+    }
+  });
+
+  // ── Admin: Delete RAG chunk ────────────────────────────────────────────────
+  apiRouter.post("/admin/delete-chunk", async (req, res) => {
+    if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
+    const { chunkId } = req.body;
+    if (!chunkId) return res.status(400).json({ error: "chunkId required" });
+    try {
+      const { error } = await supabase.from("rag_chunks").delete().eq("id", chunkId);
+      if (error) return res.status(500).json({ error: error.message });
+      return res.json({ ok: true });
+    } catch (err: any) { return res.status(500).json({ error: err.message }); }
+  });
+
+  // ── Admin: Re-embed chunk (reset to pending) ──────────────────────────────
+  apiRouter.post("/admin/re-embed-chunk", async (req, res) => {
+    if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
+    const { chunkId } = req.body;
+    if (!chunkId) return res.status(400).json({ error: "chunkId required" });
+    try {
+      const { error } = await supabase.from("rag_chunks").update({ embedding_status: "pending" }).eq("id", chunkId);
+      if (error) return res.status(500).json({ error: error.message });
+      return res.json({ ok: true });
+    } catch (err: any) { return res.status(500).json({ error: err.message }); }
+  });
+
+  // ── Admin: Update any table row ───────────────────────────────────────────
+  apiRouter.post("/admin/update-row", async (req, res) => {
+    if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
+    const { table, id, data } = req.body;
+    if (!table || !id || !data) return res.status(400).json({ error: "table, id, and data required" });
+    try {
+      const { error } = await supabase.from(table).update(data).eq("id", id);
+      if (error) return res.status(500).json({ error: error.message });
+      return res.json({ ok: true });
+    } catch (err: any) { return res.status(500).json({ error: err.message }); }
+  });
+
+  // ── Admin: Delete any table row ───────────────────────────────────────────
+  apiRouter.post("/admin/delete-row", async (req, res) => {
+    if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
+    const { table, id } = req.body;
+    if (!table || !id) return res.status(400).json({ error: "table and id required" });
+    try {
+      const { error } = await supabase.from(table).delete().eq("id", id);
+      if (error) return res.status(500).json({ error: error.message });
+      return res.json({ ok: true });
+    } catch (err: any) { return res.status(500).json({ error: err.message }); }
+  });
+
   // Scraping Agent Endpoint
   apiRouter.get("/scrape", async (req, res) => {
     console.log("Incoming request to /api/scrape");

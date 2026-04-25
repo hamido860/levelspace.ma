@@ -7,11 +7,13 @@ import {
   RefreshCw, Database, BarChart2, BookOpen, Cpu, Table2,
   AlertTriangle, CheckCircle, Clock, Layers, Sparkles,
   Lightbulb, ListChecks, Map, RotateCcw, ChevronRight,
-  TrendingUp, TrendingDown, Info, Zap
+  TrendingUp, TrendingDown, Info, Zap,
+  Trash2, Wrench, Play, Pencil, ChevronDown
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface GradeRow {
+  id: string;
   cycle: string;
   cycle_order: number;
   grade: string;
@@ -30,6 +32,7 @@ interface TableHealth {
 
 
 interface RagByGrade {
+  id: string;
   grade: string;
   grade_order: number;
   cycle_order: number;
@@ -152,6 +155,24 @@ export const Admin: React.FC = () => {
   const [browseCols, setBrowseCols] = useState<string[]>([]);
   const [browseLoading, setBrowseLoading] = useState(false);
   const [browseError, setBrowseError] = useState("");
+  const [editRow, setEditRow] = useState<{ id: any; row: BrowseRow } | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+  const [rowDeleteLoading, setRowDeleteLoading] = useState<string | null>(null);
+
+  // Queue per-job actions
+  const [jobLoading, setJobLoading] = useState<Record<string, string | null>>({});
+  const [jobMsg, setJobMsg] = useState<Record<string, string>>({});
+
+  // Grade bulk queue
+  const [bulkLoading, setBulkLoading] = useState<Record<string, boolean>>({});
+  const [bulkMsg, setBulkMsg] = useState<Record<string, string>>({});
+
+  // RAG chunk browser
+  const [ragChunkGradeId, setRagChunkGradeId] = useState<string | null>(null);
+  const [ragChunks, setRagChunks] = useState<any[]>([]);
+  const [ragChunkLoading, setRagChunkLoading] = useState(false);
+  const [chunkLoading, setChunkLoading] = useState<Record<string, string | null>>({});
+  const [chunkMsg, setChunkMsg] = useState<Record<string, string>>({});
 
 
   // Fallback: use regular Supabase queries instead of raw SQL RPC
@@ -230,6 +251,7 @@ export const Admin: React.FC = () => {
       const gradeQueue = (queue || []).filter((q: any) => topicIds.has(q.topic_id));
       const cycle: any = g.cycles;
       return {
+        id: g.id,
         cycle: cycle?.name ?? "Unknown",
         cycle_order: cycle?.cycle_order ?? 0,
         grade: g.name,
@@ -278,6 +300,7 @@ export const Admin: React.FC = () => {
       const chunks = (all || []).filter((c: any) => c.grade_id === g.id);
       const cycle: any = g.cycles;
       return {
+        id: g.id,
         grade: g.name,
         grade_order: g.grade_order,
         cycle_order: cycle?.cycle_order ?? 0,
@@ -357,6 +380,127 @@ export const Admin: React.FC = () => {
   }, [loadOverview, loadTableHealth, loadGrades, loadQueue, loadRag]);
 
   useEffect(() => { refreshAll(); }, []);
+
+  // ── Shared fetch helper ────────────────────────────────────────────────────
+  const adminPost = async (endpoint: string, body: any) => {
+    const res = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const text = await res.text();
+    if (!text) throw new Error(`Empty response (HTTP ${res.status})`);
+    let json: any;
+    try { json = JSON.parse(text); } catch { throw new Error(`Non-JSON response (HTTP ${res.status})`); }
+    if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+    return json;
+  };
+
+  // ── Queue actions ──────────────────────────────────────────────────────────
+  const retryJob = async (jobId: string) => {
+    setJobLoading(p => ({ ...p, [jobId]: "retry" }));
+    try {
+      await adminPost("/api/admin/retry-job", { jobId });
+      setJobMsg(p => ({ ...p, [jobId]: "Reset to pending" }));
+      await loadQueue();
+    } catch (e: any) { setJobMsg(p => ({ ...p, [jobId]: `Error: ${e.message}` })); }
+    setJobLoading(p => ({ ...p, [jobId]: null }));
+  };
+
+  const deleteJob = async (jobId: string) => {
+    setJobLoading(p => ({ ...p, [jobId]: "delete" }));
+    try {
+      await adminPost("/api/admin/delete-job", { jobId });
+      setFailedJobs(prev => prev.filter(j => j.id !== jobId));
+      await loadQueue();
+    } catch (e: any) { setJobMsg(p => ({ ...p, [jobId]: `Error: ${e.message}` })); }
+    setJobLoading(p => ({ ...p, [jobId]: null }));
+  };
+
+  const generateLesson = async (job: any) => {
+    const topicTitle = (job.topics as any)?.title ?? job.topic_id;
+    setJobLoading(p => ({ ...p, [job.id]: "generate" }));
+    try {
+      await adminPost("/api/admin/generate-lesson", { topicId: job.topic_id, topicTitle });
+      setJobMsg(p => ({ ...p, [job.id]: "Lesson generated" }));
+      setFailedJobs(prev => prev.filter(j => j.id !== job.id));
+      await Promise.all([loadQueue(), loadGrades()]);
+    } catch (e: any) { setJobMsg(p => ({ ...p, [job.id]: `Error: ${e.message}` })); }
+    setJobLoading(p => ({ ...p, [job.id]: null }));
+  };
+
+  // ── Grade bulk actions ─────────────────────────────────────────────────────
+  const bulkGenerate = async (gradeId: string) => {
+    setBulkLoading(p => ({ ...p, [gradeId]: true }));
+    try {
+      const res = await adminPost("/api/admin/bulk-generate", { gradeId });
+      setBulkMsg(p => ({ ...p, [gradeId]: res.message }));
+      await loadGrades();
+    } catch (e: any) { setBulkMsg(p => ({ ...p, [gradeId]: `Error: ${e.message}` })); }
+    setBulkLoading(p => ({ ...p, [gradeId]: false }));
+  };
+
+  // ── RAG chunk actions ──────────────────────────────────────────────────────
+  const loadRagChunks = async (gradeId: string) => {
+    if (ragChunkGradeId === gradeId) { setRagChunkGradeId(null); setRagChunks([]); return; }
+    setRagChunkGradeId(gradeId);
+    setRagChunkLoading(true);
+    const { data } = await supabase.from("rag_chunks").select("id, content, embedding_status, source_url").eq("grade_id", gradeId).order("embedding_status").limit(100);
+    setRagChunks(data || []);
+    setRagChunkLoading(false);
+  };
+
+  const repairChunk = async (chunkId: string, content: string) => {
+    setChunkLoading(p => ({ ...p, [chunkId]: "repair" }));
+    try {
+      const res = await adminPost("/api/admin/repair-chunk", { chunkId, content });
+      setRagChunks(prev => prev.map(c => c.id === chunkId ? { ...c, content: res.content, embedding_status: "pending" } : c));
+      setChunkMsg(p => ({ ...p, [chunkId]: "Repaired & re-queued" }));
+    } catch (e: any) { setChunkMsg(p => ({ ...p, [chunkId]: `Error: ${e.message}` })); }
+    setChunkLoading(p => ({ ...p, [chunkId]: null }));
+  };
+
+  const deleteChunk = async (chunkId: string) => {
+    setChunkLoading(p => ({ ...p, [chunkId]: "delete" }));
+    try {
+      await adminPost("/api/admin/delete-chunk", { chunkId });
+      setRagChunks(prev => prev.filter(c => c.id !== chunkId));
+      await loadRag();
+    } catch (e: any) { setChunkMsg(p => ({ ...p, [chunkId]: `Error: ${e.message}` })); }
+    setChunkLoading(p => ({ ...p, [chunkId]: null }));
+  };
+
+  const reEmbedChunk = async (chunkId: string) => {
+    setChunkLoading(p => ({ ...p, [chunkId]: "embed" }));
+    try {
+      await adminPost("/api/admin/re-embed-chunk", { chunkId });
+      setRagChunks(prev => prev.map(c => c.id === chunkId ? { ...c, embedding_status: "pending" } : c));
+      setChunkMsg(p => ({ ...p, [chunkId]: "Re-queued for embedding" }));
+    } catch (e: any) { setChunkMsg(p => ({ ...p, [chunkId]: `Error: ${e.message}` })); }
+    setChunkLoading(p => ({ ...p, [chunkId]: null }));
+  };
+
+  // ── Table browser actions ──────────────────────────────────────────────────
+  const saveRowEdit = async () => {
+    if (!editRow || !selectedTable) return;
+    setEditSaving(true);
+    try {
+      const clean: Record<string, any> = {};
+      Object.entries(editRow.row).forEach(([k, v]) => {
+        if (k !== "id" && k !== "created_at" && k !== "updated_at") clean[k] = v;
+      });
+      await adminPost("/api/admin/update-row", { table: selectedTable, id: editRow.id, data: clean });
+      setBrowseRows(prev => prev.map(r => r.id === editRow.id ? { ...r, ...editRow.row } : r));
+      setEditRow(null);
+    } catch (e: any) { alert(e.message); }
+    setEditSaving(false);
+  };
+
+  const deleteTableRow = async (id: any) => {
+    if (!selectedTable || !window.confirm("Delete this row?")) return;
+    setRowDeleteLoading(String(id));
+    try {
+      await adminPost("/api/admin/delete-row", { table: selectedTable, id });
+      setBrowseRows(prev => prev.filter(r => r.id !== id));
+    } catch (e: any) { alert(e.message); }
+    setRowDeleteLoading(null);
+  };
 
   const browseTable = async (tableName?: string) => {
     const t = tableName ?? selectedTable;
@@ -504,6 +648,7 @@ export const Admin: React.FC = () => {
                     <th className="px-4 py-2 text-left">Done</th>
                     <th className="px-4 py-2 text-left">Pending</th>
                     <th className="px-4 py-2 text-left">Failed</th>
+                    <th className="px-4 py-2 text-left">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -516,7 +661,7 @@ export const Admin: React.FC = () => {
                         <React.Fragment key={i}>
                           {header && (
                             <tr className="bg-gray-100">
-                              <td colSpan={7} className="px-4 py-2 font-bold text-xs text-gray-600">
+                              <td colSpan={8} className="px-4 py-2 font-bold text-xs text-gray-600">
                                 🎓 {row.cycle}
                               </td>
                             </tr>
@@ -532,6 +677,13 @@ export const Admin: React.FC = () => {
                               {row.q_failed > 0
                                 ? <Pill status="failed" label={row.q_failed} />
                                 : <span className="text-gray-300 text-xs">0</span>}
+                            </td>
+                            <td className="px-4 py-2">
+                              <button onClick={() => bulkGenerate(row.id)} disabled={bulkLoading[row.id]}
+                                className="flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium bg-gray-900 text-white hover:bg-red-500 disabled:opacity-40 transition-colors whitespace-nowrap">
+                                <Play className="w-3 h-3" />{bulkLoading[row.id] ? "Queuing…" : "Bulk Queue"}
+                              </button>
+                              {bulkMsg[row.id] && <p className="text-xs mt-1 text-emerald-600 whitespace-nowrap">{bulkMsg[row.id]}</p>}
                             </td>
                           </tr>
                         </React.Fragment>
@@ -627,17 +779,38 @@ export const Admin: React.FC = () => {
                       <th className="px-4 py-2 text-left">Attempts</th>
                       <th className="px-4 py-2 text-left">Error</th>
                       <th className="px-4 py-2 text-left">Date</th>
+                      <th className="px-4 py-2 text-left">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {failedJobs.map((j: any) => (
-                      <tr key={j.id} className="border-t border-gray-50 hover:bg-gray-50/40">
-                        <td className="px-4 py-2">{(j.topics as any)?.title ?? j.topic_id}</td>
-                        <td className="px-4 py-2">{j.attempts}</td>
-                        <td className="px-4 py-2 text-red-500 text-xs max-w-xs truncate">{(j.last_error ?? "").substring(0, 100)}</td>
-                        <td className="px-4 py-2 text-xs text-gray-400">{new Date(j.created_at).toLocaleDateString()}</td>
-                      </tr>
-                    ))}
+                    {failedJobs.map((j: any) => {
+                      const busy = jobLoading[j.id];
+                      return (
+                        <tr key={j.id} className="border-t border-gray-50 hover:bg-gray-50/40">
+                          <td className="px-4 py-2">{(j.topics as any)?.title ?? j.topic_id}</td>
+                          <td className="px-4 py-2">{j.attempts}</td>
+                          <td className="px-4 py-2 text-red-500 text-xs max-w-xs truncate">{(j.last_error ?? "").substring(0, 100)}</td>
+                          <td className="px-4 py-2 text-xs text-gray-400">{new Date(j.created_at).toLocaleDateString()}</td>
+                          <td className="px-4 py-2">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <button onClick={() => retryJob(j.id)} disabled={!!busy}
+                                className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-amber-50 text-amber-700 hover:bg-amber-100 disabled:opacity-40">
+                                <RotateCcw className="w-3 h-3" />{busy === "retry" ? "…" : "Retry"}
+                              </button>
+                              <button onClick={() => generateLesson(j)} disabled={!!busy}
+                                className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-40">
+                                <Play className="w-3 h-3" />{busy === "generate" ? "…" : "Generate"}
+                              </button>
+                              <button onClick={() => deleteJob(j.id)} disabled={!!busy}
+                                className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-40">
+                                <Trash2 className="w-3 h-3" />{busy === "delete" ? "…" : "Delete"}
+                              </button>
+                            </div>
+                            {jobMsg[j.id] && <p className="text-xs mt-1 text-emerald-600">{jobMsg[j.id]}</p>}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -660,6 +833,7 @@ export const Admin: React.FC = () => {
             <div className="px-5 py-3 border-b border-gray-50 flex items-center gap-2">
               <Layers className="w-4 h-4 text-gray-400" />
               <h2 className="font-bold text-sm">RAG Chunks — by Grade</h2>
+              <span className="ml-auto text-xs text-gray-400">Click a row to browse & manage chunks</span>
             </div>
             {loading ? <Spinner /> : (
               <div className="overflow-x-auto">
@@ -667,21 +841,72 @@ export const Admin: React.FC = () => {
                   <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
                     <tr>
                       <th className="px-4 py-2 text-left">Grade</th>
-                      <th className="px-4 py-2 text-left">Total Chunks</th>
+                      <th className="px-4 py-2 text-left">Total</th>
                       <th className="px-4 py-2 text-left">Embedded</th>
                       <th className="px-4 py-2 text-left">Pending</th>
                       <th className="px-4 py-2 text-left">Coverage</th>
+                      <th className="px-4 py-2 text-left">Chunks</th>
                     </tr>
                   </thead>
                   <tbody>
                     {ragByGrade.map((row, i) => (
-                      <tr key={i} className="border-t border-gray-50 hover:bg-gray-50/40">
-                        <td className="px-4 py-2">{row.grade}</td>
-                        <td className="px-4 py-2">{row.total.toLocaleString()}</td>
-                        <td className="px-4 py-2"><Pill status="done" label={row.done.toLocaleString()} /></td>
-                        <td className="px-4 py-2"><Pill status="pending" label={(row.total - row.done).toLocaleString()} /></td>
-                        <td className="px-4 py-2"><ProgressBar val={row.done} total={row.total || 1} /></td>
-                      </tr>
+                      <React.Fragment key={i}>
+                        <tr className="border-t border-gray-50 hover:bg-gray-50/40">
+                          <td className="px-4 py-2">{row.grade}</td>
+                          <td className="px-4 py-2">{row.total.toLocaleString()}</td>
+                          <td className="px-4 py-2"><Pill status="done" label={row.done.toLocaleString()} /></td>
+                          <td className="px-4 py-2"><Pill status="pending" label={(row.total - row.done).toLocaleString()} /></td>
+                          <td className="px-4 py-2"><ProgressBar val={row.done} total={row.total || 1} /></td>
+                          <td className="px-4 py-2">
+                            <button onClick={() => loadRagChunks(row.id)}
+                              className="flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
+                              <ChevronDown className={`w-3 h-3 transition-transform ${ragChunkGradeId === row.id ? "rotate-180" : ""}`} />
+                              {ragChunkGradeId === row.id ? "Hide" : "Browse"}
+                            </button>
+                          </td>
+                        </tr>
+                        {ragChunkGradeId === row.id && (
+                          <tr>
+                            <td colSpan={6} className="bg-gray-50 px-4 py-3">
+                              {ragChunkLoading ? <Spinner /> : ragChunks.length === 0 ? (
+                                <p className="text-xs text-gray-400">No chunks found.</p>
+                              ) : (
+                                <div className="space-y-2 max-h-80 overflow-y-auto">
+                                  {ragChunks.map((c: any) => (
+                                    <div key={c.id} className="bg-white rounded-lg border border-gray-100 p-3 flex items-start gap-3">
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 mb-1">
+                                          <Pill status={c.embedding_status === "done" ? "done" : "pending"} label={c.embedding_status} />
+                                          {c.source_url && <span className="text-xs text-gray-400 truncate max-w-[200px]">{c.source_url}</span>}
+                                        </div>
+                                        <p className="text-xs text-gray-600 leading-relaxed line-clamp-2">{c.content}</p>
+                                        {chunkMsg[c.id] && <p className="text-xs mt-1 text-emerald-600">{chunkMsg[c.id]}</p>}
+                                      </div>
+                                      <div className="flex gap-1.5 flex-shrink-0">
+                                        <button onClick={() => repairChunk(c.id, c.content)} disabled={!!chunkLoading[c.id]}
+                                          title="Repair with Qwen"
+                                          className="p-1.5 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 disabled:opacity-40">
+                                          {chunkLoading[c.id] === "repair" ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Wrench className="w-3 h-3" />}
+                                        </button>
+                                        <button onClick={() => reEmbedChunk(c.id)} disabled={!!chunkLoading[c.id]}
+                                          title="Re-embed"
+                                          className="p-1.5 rounded bg-amber-50 text-amber-600 hover:bg-amber-100 disabled:opacity-40">
+                                          {chunkLoading[c.id] === "embed" ? <RefreshCw className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />}
+                                        </button>
+                                        <button onClick={() => deleteChunk(c.id)} disabled={!!chunkLoading[c.id]}
+                                          title="Delete chunk"
+                                          className="p-1.5 rounded bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-40">
+                                          {chunkLoading[c.id] === "delete" ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
                     ))}
                   </tbody>
                 </table>
@@ -760,6 +985,7 @@ export const Admin: React.FC = () => {
                       {browseCols.map((c) => (
                         <th key={c} className="px-3 py-2 text-left font-semibold whitespace-nowrap">{c}</th>
                       ))}
+                      <th className="px-3 py-2 text-left font-semibold">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -776,11 +1002,54 @@ export const Admin: React.FC = () => {
                             </td>
                           );
                         })}
+                        <td className="px-3 py-2">
+                          <div className="flex gap-1">
+                            <button onClick={() => setEditRow({ id: row.id, row: { ...row } })}
+                              className="p-1 rounded bg-gray-100 text-gray-600 hover:bg-blue-50 hover:text-blue-600">
+                              <Pencil className="w-3 h-3" />
+                            </button>
+                            <button onClick={() => deleteTableRow(row.id)} disabled={rowDeleteLoading === String(row.id)}
+                              className="p-1 rounded bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-600 disabled:opacity-40">
+                              {rowDeleteLoading === String(row.id) ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
                 <p className="text-xs text-gray-400 mt-2">{browseRows.length} row(s) from <strong>{selectedTable}</strong></p>
+              </div>
+            )}
+
+            {/* ── Edit row modal ── */}
+            {editRow && (
+              <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+                <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col">
+                  <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                    <h3 className="font-bold text-sm">Edit Row — {selectedTable}</h3>
+                    <button onClick={() => setEditRow(null)} className="text-gray-400 hover:text-gray-700">✕</button>
+                  </div>
+                  <div className="overflow-y-auto p-5 space-y-3 flex-1">
+                    {Object.entries(editRow.row).filter(([k]) => k !== "id" && k !== "created_at" && k !== "updated_at").map(([k, v]) => (
+                      <div key={k}>
+                        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{k}</label>
+                        <input
+                          value={typeof v === "object" ? JSON.stringify(v) : String(v ?? "")}
+                          onChange={(e) => setEditRow(prev => prev ? { ...prev, row: { ...prev.row, [k]: e.target.value } } : null)}
+                          className="w-full mt-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex gap-2 justify-end px-5 py-4 border-t border-gray-100">
+                    <button onClick={() => setEditRow(null)} className="px-4 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100">Cancel</button>
+                    <button onClick={saveRowEdit} disabled={editSaving}
+                      className="px-4 py-2 rounded-lg text-sm font-semibold bg-gray-900 text-white hover:bg-red-500 disabled:opacity-50">
+                      {editSaving ? "Saving…" : "Save"}
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -797,7 +1066,7 @@ export const Admin: React.FC = () => {
             <div className="flex-1">
               <h2 className="font-bold text-base">AI Analyst Agent</h2>
               <p className="text-gray-400 text-sm mt-0.5">
-                Powered by <span className="text-white font-medium">meta/llama-3.3-70b-instruct</span> via NVIDIA NIM.
+                Powered by <span className="text-white font-medium">qwen/qwen3-coder-480b-a35b-instruct</span> via NVIDIA NIM.
                 Reads your live database metrics and returns insights, tasks, and strategy.
               </p>
             </div>
