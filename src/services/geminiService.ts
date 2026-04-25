@@ -24,20 +24,22 @@ export const setNvidiaApiKey = (key: string) => {
 };
 
 export const NVIDIA_MODEL = "google/gemma-3-27b-it";
+export const NVIDIA_WORKER_MODEL = "google/gemma-4-27b-it"; // Gemma 4 — primary bulk lesson worker
 
 export async function callNvidiaAPI(params: {
   prompt: string;
   isJson?: boolean;
   temperature?: number;
   maxTokens?: number;
+  model?: string;
 }): Promise<string | null> {
   const apiKey = getNvidiaApiKey();
   if (!apiKey) return null;
 
-  const { prompt, isJson = false, temperature = 0.7, maxTokens = 4096 } = params;
+  const { prompt, isJson = false, temperature = 0.7, maxTokens = 4096, model = NVIDIA_MODEL } = params;
 
   const body: any = {
-    model: NVIDIA_MODEL,
+    model,
     messages: [{ role: "user", content: prompt }],
     temperature,
     max_tokens: maxTokens,
@@ -95,6 +97,43 @@ export class ServiceUnavailableError extends Error {
     this.name = "ServiceUnavailableError";
   }
 }
+
+// --- Model Quota Tracker ---
+// Tracks which models have hit quota and skips them for QUOTA_COOLDOWN_MS
+const QUOTA_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
+const QUOTA_STORAGE_KEY = "ai_model_quota_hits";
+
+export const modelQuotaTracker = {
+  _load(): Record<string, number> {
+    try { return JSON.parse(localStorage.getItem(QUOTA_STORAGE_KEY) || "{}"); }
+    catch { return {}; }
+  },
+  markExhausted(model: string) {
+    const hits = this._load();
+    hits[model] = Date.now();
+    localStorage.setItem(QUOTA_STORAGE_KEY, JSON.stringify(hits));
+    console.warn(`[QuotaTracker] ${model} marked exhausted for ${QUOTA_COOLDOWN_MS / 60000}min`);
+  },
+  isExhausted(model: string): boolean {
+    const hits = this._load();
+    const hitAt = hits[model];
+    if (!hitAt) return false;
+    return Date.now() - hitAt < QUOTA_COOLDOWN_MS;
+  },
+  // Returns first non-exhausted model from the priority list
+  getBestModel(preferred: string, fallbacks: string[] = []): string {
+    const candidates = [preferred, ...fallbacks];
+    for (const m of candidates) {
+      if (!this.isExhausted(m)) return m;
+    }
+    // All exhausted — reset the preferred and return it (better than nothing)
+    console.warn("[QuotaTracker] All models exhausted, resetting preferred:", preferred);
+    const hits = this._load();
+    delete hits[preferred];
+    localStorage.setItem(QUOTA_STORAGE_KEY, JSON.stringify(hits));
+    return preferred;
+  },
+};
 
 export interface CurriculumAuditResult {
   isValid: boolean;
@@ -326,13 +365,12 @@ export function determineModel(
   const isLongMessage = message.length > 150;
   const isLongContext = contextLength > 2000;
 
-  // Use big model for complex reasoning
+  // Use Flash for complex reasoning (Pro exhausts quota too fast)
   if (hasComplexKeyword || isLongMessage || isLongContext) {
-    return "gemini-3.1-pro-preview";
+    return modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]);
   }
 
-  // Use standard flash model for simple queries
-  return "gemini-3-flash-preview";
+  return modelQuotaTracker.getBestModel("gemini-2.5-flash-lite", ["gemini-2.5-flash"]);
 }
 
 /**
@@ -607,12 +645,9 @@ export async function generateAIContent(
       errorMessage.includes("quota");
 
     if (isQuotaError) {
-      console.warn(`Pipeline: Quota exceeded for ${primaryModel}. Attempting local fallback to Ollama (gemma).`);
-      updateAIStatus({ lastError: "Quota Exceeded", isLocal: true });
-      toast.info("Switching to Local AI", {
-        description: "Online quota reached. Falling back to local Gemma model.",
-        duration: 3000,
-      });
+      // Mark this model as exhausted so future calls skip it
+      modelQuotaTracker.markExhausted(primaryModel);
+      updateAIStatus({ lastError: "Quota Exceeded", isLocal: false });
 
       let promptText = "";
       if (typeof params.contents === 'string') {
@@ -627,7 +662,24 @@ export async function generateAIContent(
 
       const isJson = params.config?.responseMimeType === "application/json";
 
-      // Fallback 1: NVIDIA NIM (Gemma 3 27B) — cloud, no local setup needed
+      // Fallback 1: next best Gemini Flash model
+      const GEMINI_FALLBACKS = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-3-flash-preview"];
+      for (const fallbackModel of GEMINI_FALLBACKS) {
+        if (fallbackModel === primaryModel || modelQuotaTracker.isExhausted(fallbackModel)) continue;
+        try {
+          console.warn(`[Quota] Falling back to ${fallbackModel}`);
+          const result = await ai.models.generateContent({ ...params, model: fallbackModel });
+          updateAIStatus({ lastModel: fallbackModel, isLocal: false, lastError: null });
+          toast.info(`Using ${fallbackModel}`, { description: "Switched model due to quota.", duration: 2000 });
+          return result;
+        } catch (fbErr: any) {
+          const isFbQuota = String(fbErr?.message).includes("429") || String(fbErr?.message).includes("RESOURCE_EXHAUSTED");
+          if (isFbQuota) modelQuotaTracker.markExhausted(fallbackModel);
+          console.warn(`[Quota] ${fallbackModel} also failed:`, fbErr);
+        }
+      }
+
+      // Fallback 2: NVIDIA NIM (Gemma 3 27B) — cloud, no local setup needed
       try {
         const nvidiaText = await callNvidiaAPI({
           prompt: promptText,
@@ -644,7 +696,7 @@ export async function generateAIContent(
         console.warn("NVIDIA fallback failed:", nvidiaError);
       }
 
-      // Fallback 2: Ollama (local Gemma)
+      // Fallback 3: Ollama (local Gemma)
       try {
         const ollamaResponse = await fetch('http://localhost:11434/api/generate', {
           method: 'POST',
@@ -662,22 +714,11 @@ export async function generateAIContent(
 
         const ollamaData = await ollamaResponse.json();
         updateAIStatus({ lastModel: "Gemma (local Ollama)", isLocal: true, lastError: null });
+        toast.info("Using local Gemma", { description: "All cloud models quota-exceeded. Using local Ollama.", duration: 3000 });
         return { text: ollamaData.response, candidates: [{ content: { parts: [{ text: ollamaData.response }] } }] };
       } catch (localError) {
         console.warn("Local Ollama fallback failed:", localError);
-        updateAIStatus({ lastError: "Local Fallback Failed", isLocal: false });
-      }
-
-      // Fallback 3: gemini-2.5-flash-lite (last resort)
-      try {
-        if (primaryModel !== "gemini-2.5-flash-lite") {
-          console.warn("Falling back to gemini-2.5-flash-lite.");
-          const result = await ai.models.generateContent({ ...params, model: "gemini-2.5-flash-lite" });
-          updateAIStatus({ lastModel: "gemini-2.5-flash-lite", isLocal: false, lastError: null });
-          return result;
-        }
-      } catch (liteError) {
-        console.error("gemini-2.5-flash-lite fallback failed:", liteError);
+        updateAIStatus({ lastError: "All models quota-exceeded", isLocal: false });
       }
     }
 
@@ -721,6 +762,8 @@ export interface AILesson {
   title: string;
   subtitle: string;
   blocks: AILessonBlock[];
+  _pending?: boolean;   // true while AI Crew is generating this lesson on-demand
+  _taskId?: string;     // AI Crew task ID to track progress
 }
 
 export interface AuditResult {
@@ -748,6 +791,201 @@ export interface LessonTemplate {
   exam: any;
   similarity?: number;
 }
+
+// ─── Orchestration: Pro plans, Gemma 4 executes ──────────────────────────────
+
+export interface GenerationPlan {
+  lesson_title: string;
+  grade: string;
+  subject: string;
+  country: string;
+  language: string;
+  bloom_level: number;
+  depth: "introductory" | "standard" | "advanced";
+  required_sections: string[];
+  prerequisite_concepts: string[];
+  key_concepts: string[];
+  exercise_types: string[];
+  quiz_count: number;
+  exercise_count: number;
+  existing_context: string;
+  curriculum_injection: string;
+  pedagogy_injection: string;
+  timeline: {
+    estimated_tokens: number;
+    complexity: "low" | "medium" | "high";
+    priority: number;
+  };
+  worker_instruction: string;
+  validation_checklist: string[];
+}
+
+/**
+ * STAGE 1 — Gemini Pro investigates RAG + curriculum + pedagogy and produces
+ * a structured GenerationPlan that tells the worker exactly what to build.
+ * This is a short focused call (~800 output tokens) — Pro is only planning.
+ */
+export async function investigateAndPlan(params: {
+  title: string;
+  grade: string;
+  subject: string;
+  country: string;
+  moduleId?: string;
+  userId?: string;
+  ragContext?: string;
+  similarLessons?: LessonTemplate[];
+}): Promise<GenerationPlan | null> {
+  const { title, grade, subject, country, ragContext = "", similarLessons = [] } = params;
+
+  const { mcpClient } = await import("./mcpClient");
+  const curriculumCtx = mcpClient.getCurriculum({ country, grade, subject });
+  const pedagogyCtx   = mcpClient.getPedagogyRules({ grade, subject });
+
+  const existingContext = similarLessons.length > 0
+    ? similarLessons.map(l => `- "${l.lesson_title}" (similarity ${((l.similarity || 0) * 100).toFixed(0)}%): ${(l.content || "").slice(0, 200)}...`).join("\n")
+    : "No similar lessons found in RAG.";
+
+  const prompt = `You are an educational curriculum planner. Your job is to produce a JSON GenerationPlan that a separate AI worker will use to generate a complete lesson.
+
+TASK: Plan the lesson titled "${title}" for grade "${grade}", subject "${subject}", country "${country}".
+
+RAG DATABASE CONTEXT (existing similar lessons):
+${existingContext}
+
+ADDITIONAL RAG CHUNKS:
+${ragContext || "None."}
+
+CURRICULUM AUTHORITY:
+${curriculumCtx.promptInjection}
+
+PEDAGOGY AUTHORITY:
+${pedagogyCtx.promptInjection}
+
+Produce ONLY valid JSON matching this exact schema — no markdown, no explanation:
+{
+  "lesson_title": string,
+  "grade": string,
+  "subject": string,
+  "country": string,
+  "language": "ar" | "fr" | "en",
+  "bloom_level": number (1-6),
+  "depth": "introductory" | "standard" | "advanced",
+  "required_sections": string[],
+  "prerequisite_concepts": string[],
+  "key_concepts": string[],
+  "exercise_types": string[],
+  "quiz_count": number,
+  "exercise_count": number,
+  "existing_context": string (short summary of what exists in RAG),
+  "curriculum_injection": string (paste the full curriculum authority text),
+  "pedagogy_injection": string (paste the full pedagogy authority text),
+  "timeline": { "estimated_tokens": number, "complexity": "low"|"medium"|"high", "priority": number },
+  "worker_instruction": string (detailed 200-400 word instruction for the generation worker — include language, structure, depth, all requirements),
+  "validation_checklist": string[] (list of specific things to verify after generation)
+}`;
+
+  try {
+    const response = await generateAIContent(
+      {
+        model: "gemini-3.1-pro-preview",
+        contents: prompt,
+        config: { responseMimeType: "application/json", temperature: 0.3, maxOutputTokens: 1500 },
+        tools: [],
+      },
+      "investigateAndPlan"
+    );
+    const text = response?.text || response?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const plan = safeJsonParse(text) as GenerationPlan;
+    if (!plan?.worker_instruction) return null;
+    plan.existing_context = existingContext;
+    plan.curriculum_injection = curriculumCtx.promptInjection;
+    plan.pedagogy_injection = pedagogyCtx.promptInjection;
+    return plan;
+  } catch (err) {
+    console.error("[investigateAndPlan] failed:", err);
+    return null;
+  }
+}
+
+/**
+ * STAGE 2 — NVIDIA Gemma 4 receives the GenerationPlan and produces the full
+ * LessonTemplate JSON. Falls back to Gemini Flash if NVIDIA is unavailable.
+ */
+export async function generateLessonFromPlan(plan: GenerationPlan): Promise<LessonTemplate | null> {
+  const workerPrompt = `${plan.worker_instruction}
+
+CURRICULUM REQUIREMENTS:
+${plan.curriculum_injection}
+
+PEDAGOGY REQUIREMENTS:
+${plan.pedagogy_injection}
+
+EXISTING CONTEXT (do NOT duplicate — complement and deepen):
+${plan.existing_context}
+
+VALIDATION CHECKLIST — your output MUST satisfy ALL of these:
+${plan.validation_checklist.map((c, i) => `${i + 1}. ${c}`).join("\n")}
+
+Generate a complete lesson as JSON with this structure:
+{
+  "country": "${plan.country}",
+  "grade": "${plan.grade}",
+  "subject": "${plan.subject}",
+  "lesson_title": "${plan.lesson_title}",
+  "mod": "${plan.subject}",
+  "content": "full markdown lesson content",
+  "exercises": [{"question": "...", "solution": "...", "hint": "..."}],
+  "quizzes": [{"question": "...", "options": ["A","B","C","D"], "correctAnswer": "A", "explanation": "..."}],
+  "exam": {"question": "...", "hint": "...", "solution": "..."}
+}
+
+Respond with VALID JSON only. No markdown fences. No explanation.`;
+
+  // Primary: NVIDIA Gemma 4
+  try {
+    const nvidiaText = await callNvidiaAPI({
+      prompt: workerPrompt,
+      isJson: true,
+      temperature: 0.6,
+      maxTokens: 6000,
+      model: NVIDIA_WORKER_MODEL,
+    });
+    if (nvidiaText) {
+      const parsed = safeJsonParse(nvidiaText) as LessonTemplate;
+      if (parsed?.lesson_title) {
+        console.log("[generateLessonFromPlan] Gemma 4 (NVIDIA) succeeded");
+        return parsed;
+      }
+    }
+  } catch (nvErr) {
+    console.warn("[generateLessonFromPlan] Gemma 4 NVIDIA failed, falling back:", nvErr);
+  }
+
+  // Fallback: Gemini Flash
+  try {
+    const flashModel = modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]);
+    const response = await generateAIContent(
+      {
+        model: flashModel,
+        contents: workerPrompt,
+        config: { responseMimeType: "application/json", temperature: 0.6, maxOutputTokens: 6000 },
+        tools: [],
+      },
+      "generateLessonFromPlan_fallback"
+    );
+    const text = response?.text || response?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const parsed = safeJsonParse(text) as LessonTemplate;
+    if (parsed?.lesson_title) {
+      console.log(`[generateLessonFromPlan] Flash fallback (${flashModel}) succeeded`);
+      return parsed;
+    }
+  } catch (flashErr) {
+    console.error("[generateLessonFromPlan] Flash fallback also failed:", flashErr);
+  }
+
+  return null;
+}
+
 
 export const getLessonPrompt = (
   topic: string,
@@ -960,7 +1198,7 @@ export const generateFullLesson = async (
 
     const response = await generateContentWithFallback(
       {
-        model: "gemini-3.1-pro-preview", // Use Pro model for generation (more accurate, better for complex lessons)
+        model: modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]),
         contents: prompt,
         config: config,
       },
