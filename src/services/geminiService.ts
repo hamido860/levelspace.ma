@@ -103,6 +103,8 @@ export class ServiceUnavailableError extends Error {
 const QUOTA_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
 const QUOTA_STORAGE_KEY = "ai_model_quota_hits";
 
+const GEMINI_FALLBACKS = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-3-flash-preview"] as const;
+
 export const modelQuotaTracker = {
   _load(): Record<string, number> {
     try { return JSON.parse(localStorage.getItem(QUOTA_STORAGE_KEY) || "{}"); }
@@ -114,26 +116,27 @@ export const modelQuotaTracker = {
     localStorage.setItem(QUOTA_STORAGE_KEY, JSON.stringify(hits));
     console.warn(`[QuotaTracker] ${model} marked exhausted for ${QUOTA_COOLDOWN_MS / 60000}min`);
   },
-  isExhausted(model: string): boolean {
-    const hits = this._load();
-    const hitAt = hits[model];
-    if (!hitAt) return false;
-    return Date.now() - hitAt < QUOTA_COOLDOWN_MS;
-  },
-  // Returns first non-exhausted model from the priority list
   getBestModel(preferred: string, fallbacks: string[] = []): string {
-    const candidates = [preferred, ...fallbacks];
-    for (const m of candidates) {
-      if (!this.isExhausted(m)) return m;
+    const hits = this._load(); // single read for the entire selection
+    const now = Date.now();
+    const isExhausted = (m: string) => !!hits[m] && now - hits[m] < QUOTA_COOLDOWN_MS;
+    for (const m of [preferred, ...fallbacks]) {
+      if (!isExhausted(m)) return m;
     }
-    // All exhausted — reset the preferred and return it (better than nothing)
+    // All exhausted — reset preferred and return it
     console.warn("[QuotaTracker] All models exhausted, resetting preferred:", preferred);
-    const hits = this._load();
     delete hits[preferred];
     localStorage.setItem(QUOTA_STORAGE_KEY, JSON.stringify(hits));
     return preferred;
   },
+  isExhausted(model: string): boolean {
+    const hits = this._load();
+    return !!hits[model] && Date.now() - hits[model] < QUOTA_COOLDOWN_MS;
+  },
 };
+
+const extractResponseText = (response: any): string =>
+  response?.text ?? response?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 
 export interface CurriculumAuditResult {
   isValid: boolean;
@@ -663,7 +666,6 @@ export async function generateAIContent(
       const isJson = params.config?.responseMimeType === "application/json";
 
       // Fallback 1: next best Gemini Flash model
-      const GEMINI_FALLBACKS = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-3-flash-preview"];
       for (const fallbackModel of GEMINI_FALLBACKS) {
         if (fallbackModel === primaryModel || modelQuotaTracker.isExhausted(fallbackModel)) continue;
         try {
@@ -830,14 +832,11 @@ export async function investigateAndPlan(params: {
   grade: string;
   subject: string;
   country: string;
-  moduleId?: string;
-  userId?: string;
   ragContext?: string;
   similarLessons?: LessonTemplate[];
 }): Promise<GenerationPlan | null> {
   const { title, grade, subject, country, ragContext = "", similarLessons = [] } = params;
 
-  const { mcpClient } = await import("./mcpClient");
   const curriculumCtx = mcpClient.getCurriculum({ country, grade, subject });
   const pedagogyCtx   = mcpClient.getPedagogyRules({ grade, subject });
 
@@ -894,8 +893,7 @@ Produce ONLY valid JSON matching this exact schema — no markdown, no explanati
       },
       "investigateAndPlan"
     );
-    const text = response?.text || response?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-    const plan = safeJsonParse(text) as GenerationPlan;
+    const plan = safeJsonParse(extractResponseText(response)) as GenerationPlan;
     if (!plan?.worker_instruction) return null;
     plan.existing_context = existingContext;
     plan.curriculum_injection = curriculumCtx.promptInjection;
@@ -973,8 +971,7 @@ Respond with VALID JSON only. No markdown fences. No explanation.`;
       },
       "generateLessonFromPlan_fallback"
     );
-    const text = response?.text || response?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-    const parsed = safeJsonParse(text) as LessonTemplate;
+    const parsed = safeJsonParse(extractResponseText(response)) as LessonTemplate;
     if (parsed?.lesson_title) {
       console.log(`[generateLessonFromPlan] Flash fallback (${flashModel}) succeeded`);
       return parsed;

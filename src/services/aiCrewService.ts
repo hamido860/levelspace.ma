@@ -83,44 +83,34 @@ class AICrewService {
     localStorage.setItem(MISS_LOG_KEY, JSON.stringify(log.slice(-100))); // keep last 100
   }
 
-  /**
-   * Called when a user tries to fetch a lesson that doesn't exist.
-   * Deduplicates: if a task is already pending/running for this lesson, skips.
-   * Returns the task ID (new or existing).
-   */
   logLessonMiss(miss: Omit<LessonMiss, "timestamp" | "taskId">): string {
-    const log = this.getMissLog();
-    const key = `${miss.title}::${miss.grade}::${miss.subject}::${miss.country}`.toLowerCase();
+    const lessonKey = (t: string, g: string, s: string, c: string) =>
+      `${t}::${g}::${s}::${c}`.toLowerCase();
+    const key = lessonKey(miss.title, miss.grade, miss.subject, miss.country);
 
-    // Check if already queued (pending or running)
     const existing = this.tasks.find(
       t => t.type === "lesson_demand" &&
         ["pending", "running"].includes(t.status) &&
-        `${t.payload.title}::${t.payload.grade}::${t.payload.subject}::${t.payload.country}`.toLowerCase() === key
+        lessonKey(t.payload.title, t.payload.grade, t.payload.subject, t.payload.country) === key
     );
     if (existing) {
       console.log("[AICrew] Lesson demand already queued:", existing.id);
       return existing.id;
     }
 
-    // Log the miss
+    const log = this.getMissLog(); // single read
     const missEntry: LessonMiss = { ...miss, timestamp: Date.now() };
     log.push(missEntry);
     this.saveMissLog(log);
 
-    // Auto-queue the task
     const taskId = this._enqueue("lesson_demand", {
-      title: miss.title,
-      grade: miss.grade,
-      subject: miss.subject,
-      country: miss.country,
-      moduleId: miss.moduleId,
-      userId: miss.userId,
+      title: miss.title, grade: miss.grade, subject: miss.subject,
+      country: miss.country, moduleId: miss.moduleId, userId: miss.userId,
     });
 
-    // Back-fill taskId in log
+    // Back-fill taskId without re-reading localStorage
     missEntry.taskId = taskId;
-    this.saveMissLog(this.getMissLog().map(m =>
+    this.saveMissLog(log.map(m =>
       m.title === miss.title && m.grade === miss.grade && !m.taskId ? { ...m, taskId } : m
     ));
 
@@ -322,10 +312,7 @@ class AICrewService {
     }
 
     const plan: GenerationPlan | null = await investigateAndPlan({
-      title, grade, subject, country, moduleId,
-      userId: userId || "system",
-      ragContext,
-      similarLessons,
+      title, grade, subject, country, ragContext, similarLessons,
     });
 
     if (!plan) {

@@ -120,26 +120,27 @@ const Timer = () => {
   );
 };
 
+const PENDING_STAGES = [
+  'Gemini Pro: investigating curriculum + RAG...',
+  'Building generation plan...',
+  'Gemma 4: generating lesson...',
+  'Validating + saving...',
+];
+
 // Shown when AI Crew is generating a lesson on-demand (status === 'pending')
 const PendingLessonView: React.FC<{ title: string; lessonId: string; onReady: () => void }> = ({ title, lessonId, onReady }) => {
   const navigate = useNavigate();
   const [dots, setDots] = useState('.');
-  const stages = ['Gemini Pro: investigating curriculum + RAG...', 'Building generation plan...', 'Gemma 4: generating lesson...', 'Validating + saving...'];
   const [stageIdx, setStageIdx] = useState(0);
 
   useEffect(() => {
-    const dotInterval = setInterval(() => setDots(d => d.length >= 3 ? '.' : d + '.'), 600);
-    const stageInterval = setInterval(() => setStageIdx(i => Math.min(i + 1, stages.length - 1)), 8000);
+    const dotInterval  = setInterval(() => setDots(d => d.length >= 3 ? '.' : d + '.'), 600);
+    const stageInterval = setInterval(() => setStageIdx(i => Math.min(i + 1, PENDING_STAGES.length - 1)), 8000);
 
-    const handleReady = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      // If it's for this lesson (by title match or general signal), update DB and reload
+    const handleReady = () => {
       clearInterval(dotInterval);
       clearInterval(stageInterval);
-      // Mark lesson as done in IndexedDB so the reload shows content
-      import('../db/db').then(({ db }) => {
-        db.lessons.update(lessonId, { status: 'done' }).then(onReady);
-      });
+      db.lessons.update(lessonId, { status: 'done' }).then(onReady);
     };
 
     window.addEventListener('lesson-ready', handleReady);
@@ -159,11 +160,11 @@ const PendingLessonView: React.FC<{ title: string; lessonId: string; onReady: ()
         </div>
         <div className="text-center space-y-2 max-w-md">
           <p className="text-ink font-semibold text-lg">"{title}"</p>
-          <p className="text-accent font-medium text-sm">{stages[stageIdx]}{dots}</p>
+          <p className="text-accent font-medium text-sm">{PENDING_STAGES[stageIdx]}{dots}</p>
           <p className="text-muted text-xs">AI Crew is building this lesson. This usually takes 30–90 seconds.</p>
         </div>
         <div className="flex gap-1.5">
-          {stages.map((_, i) => (
+          {PENDING_STAGES.map((_, i) => (
             <div key={i} className={`h-1.5 rounded-full transition-all duration-500 ${i <= stageIdx ? 'w-8 bg-accent' : 'w-3 bg-ink/10'}`} />
           ))}
         </div>
