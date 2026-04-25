@@ -232,9 +232,11 @@ export const handleApiError = (error: any, context: string) => {
     errorMessage.includes("RESOURCE_EXHAUSTED") ||
     errorMessage.includes("quota")
   ) {
+    const hasCustomKey = !!getCustomApiKey();
     toast.error("AI Quota Exceeded", {
-      description:
-        "You've reached the free tier limit. Please add your own API key in Settings.",
+      description: hasCustomKey
+        ? "Your API key has hit its rate limit. Please wait a moment and try again."
+        : "You've reached the free tier limit. Please add your own API key in Settings.",
       duration: 5000,
     });
     throw new QuotaExceededError("AI Quota Exceeded");
