@@ -254,3 +254,43 @@
   margin: 1em 0;
 }
 
+/* ═══════════════════════════════════════════════
+   AI EXPLANATION ENHANCEMENTS
+═══════════════════════════════════════════════ */
+.markdown-body strong {
+  @apply text-accent font-extrabold;
+}
+
+.markdown-body h1, .markdown-body h2, .markdown-body h3 {
+  @apply text-ink font-display border-none mt-6 mb-3;
+}
+
+/* Enhanced typography for AI explanations */
+.markdown-body {
+  @apply text-[15px] leading-relaxed;
+}
+
+.markdown-body strong {
+  @apply text-accent font-bold;
+}
+
+.markdown-body blockquote {
+  @apply border-l-4 border-accent/20 bg-accent/5 p-4 rounded-r-2xl my-4 italic text-ink-secondary;
+}
+
+/* Simplified blockquote styling as :contains() is not standard CSS */
+.markdown-body blockquote {
+  @apply border-l-4 border-accent/20 bg-accent/5 p-4 rounded-r-2xl my-4 italic text-ink-secondary;
+}
+
+.markdown-body blockquote strong {
+  @apply text-accent font-bold;
+}
+
+.markdown-body ul {
+  @apply space-y-2;
+}
+
+.markdown-body li {
+  @apply relative pl-6 before:content-[''] before:absolute before:left-0 before:top-[0.6em] before:w-2 before:h-2 before:bg-accent/30 before:rounded-full;
+}
