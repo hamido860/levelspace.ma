@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Timer, 
@@ -93,11 +93,13 @@ export const Dashboard: React.FC = () => {
   });
   const lastLesson = useLiveQuery(() => lastViewedLessonId ? db.lessons.get(lastViewedLessonId) : undefined, [lastViewedLessonId]);
 
-  const activeModules = allModules.filter(m => m.selected);
+  // ⚡ Bolt: Memoize filtered modules to maintain referential equality and prevent unnecessary re-renders
+  const activeModules = useMemo(() => allModules.filter(m => m.selected), [allModules]);
   const reminders = useLiveQuery(() => db.tasks.toArray()) || [];
   const schedule = useLiveQuery(() => db.schedule.toArray()) || [];
   const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
-  const settingsMap = Object.fromEntries(dbSettings.map(s => [s.key, s.value]));
+  // ⚡ Bolt: Memoize settings map construction to avoid recreating objects on every render
+  const settingsMap = useMemo(() => Object.fromEntries(dbSettings.map(s => [s.key, s.value])), [dbSettings]);
 
   const selectedGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
   const selectedCountry = settingsMap['selected_country'] || localStorage.getItem('selected_country') || '';
