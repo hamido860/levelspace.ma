@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  GraduationCap, ArrowRight, CheckCircle2, Sparkles, BookOpen, Layers, 
+import {
+  GraduationCap, ArrowRight, CheckCircle2, Sparkles, BookOpen, Layers,
   BookA, BrainCircuit, LibraryBig, Globe
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { updateProfile } from '../db/supabase';
 import { db } from '../db/db';
 
 interface OnboardingModalProps {
@@ -72,6 +73,19 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
     if (selectedTrack) await db.settings.put({ key: 'selected_bac_track', value: selectedTrack });
     if (selectedOption) await db.settings.put({ key: 'selected_option', value: selectedOption });
     await db.settings.put({ key: 'has_completed_onboarding', value: 'true' });
+
+    // Persist academic profile to Supabase for backend enforcement
+    if (user) {
+      try {
+        await updateProfile(user.id, {
+          onboarding_completed: true,
+          selected_grade: selectedGrade,
+          selected_bac_track: selectedTrack || null,
+        });
+      } catch (err: any) {
+        console.error('Failed to persist onboarding to database:', err.message);
+      }
+    }
 
     onComplete();
   };
