@@ -36,6 +36,7 @@ import { supabase, checkSupabaseConnection } from '../db/supabase';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+import { updateProfile } from '../db/supabase';
 import { getCustomApiKey, setCustomApiKey, getNvidiaApiKey, setNvidiaApiKey } from '../services/geminiService';
 
 
@@ -43,8 +44,9 @@ import { getCustomApiKey, setCustomApiKey, getNvidiaApiKey, setNvidiaApiKey } fr
 export const Settings: React.FC = () => {
   const navigate = useNavigate();
   const { t, language, setLanguage } = useLanguage();
-  const { dbConnected, refreshDbConnection, syncData, isAdmin } = useAuth();
+  const { dbConnected, refreshDbConnection, syncData, isAdmin, profile, user } = useAuth();
   const [isSyncing, setIsSyncing] = useState(false);
+  const isLocked = !!profile?.onboarding_completed && !isAdmin;
   
   const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
   const settingsMap = useMemo(() => {
@@ -261,7 +263,7 @@ export const Settings: React.FC = () => {
     localStorage.setItem('selected_goal', selectedGoal);
     localStorage.setItem('current_session', currentSession);
     localStorage.setItem('default_session_duration', defaultDuration.toString());
-    
+
     // Save to DB
     await db.settings.bulkPut([
       { key: 'selected_country', value: selectedCountry },
@@ -272,8 +274,32 @@ export const Settings: React.FC = () => {
       { key: 'default_session_duration', value: defaultDuration }
     ]);
 
+    // Persist academic profile to Supabase for backend enforcement
+    if (user && !isLocked) {
+      try {
+        await updateProfile(user.id, {
+          selected_grade: selectedGrade,
+          selected_bac_track: bacTrack || null,
+        });
+      } catch (err: any) {
+        console.error('Failed to save academic profile:', err.message);
+      }
+    } else if (user && isLocked) {
+      try {
+        await updateProfile(user.id, {
+          selected_grade: selectedGrade,
+          selected_bac_track: bacTrack || null,
+        });
+      } catch (err: any) {
+        if (err.message?.includes('locked')) {
+          alert('Your academic profile is locked. Contact support to request a change.');
+        }
+        console.error('Failed to save academic profile:', err.message);
+      }
+    }
+
     localStorage.removeItem('curated_modules'); // Force refresh
-    
+
     // Clear database to force regeneration
     await db.modules.clear();
     await db.tasks.clear();
@@ -464,56 +490,97 @@ export const Settings: React.FC = () => {
 
             {/* Grade Selection */}
             <section className="p-5 bg-paper border border-ink/5 rounded-3xl space-y-5 shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-accent/5 rounded-lg flex items-center justify-center text-accent">
-                  <GraduationCap className="w-4 h-4" />
+              <div className="flex items-center gap-3 justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-accent/5 rounded-lg flex items-center justify-center text-accent">
+                    <GraduationCap className="w-4 h-4" />
+                  </div>
+                  <div className="space-y-0.5">
+                    <h2 className="text-base font-medium text-ink leading-tight">{t('academic_level')}</h2>
+                    <p className="text-[10px] text-muted/60 leading-tight">{t('grade')}</p>
+                  </div>
                 </div>
-                <div className="space-y-0.5">
-                  <h2 className="text-base font-medium text-ink leading-tight">{t('academic_level')}</h2>
-                  <p className="text-[10px] text-muted/60 leading-tight">{t('grade')}</p>
+                {isAdmin && profile?.onboarding_completed && (
+                  <div className="px-3 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full text-amber-700 text-[10px] font-bold uppercase tracking-wider">
+                    Admin / Testing Mode
+                  </div>
+                )}
+              </div>
+
+              {isLocked ? (
+                <div className="p-4 bg-background border border-ink/10 rounded-2xl flex items-center gap-3">
+                  <div className="w-8 h-8 bg-ink/5 rounded-lg flex items-center justify-center text-muted shrink-0">
+                    <GraduationCap className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-ink">{selectedGrade}</p>
+                    <p className="text-[10px] text-muted mt-1">Your academic profile is locked after onboarding.</p>
+                  </div>
                 </div>
-              </div>
-              
-              <div key={selectedCountry} className="grid grid-cols-1 gap-2 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
-                {currentGrades.map((grade, index) => (
-                  <button
-                    key={`${grade}-${index}`}
-                    onClick={() => setSelectedGrade(grade)}
-                    className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
-                      selectedGrade === grade 
-                        ? 'bg-accent border-accent text-paper shadow-lg shadow-accent/20' 
-                        : 'bg-background border-ink/5 text-ink hover:border-accent/30'
-                    }`}
-                  >
-                    <span className="text-xs font-medium">{grade}</span>
-                    {selectedGrade === grade && <CheckCircle2 className="w-3.5 h-3.5 text-accent" />}
-                  </button>
-                ))}
-              </div>
+              ) : (
+                <div key={selectedCountry} className="grid grid-cols-1 gap-2 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
+                  {currentGrades.map((grade, index) => (
+                    <button
+                      key={`${grade}-${index}`}
+                      onClick={() => setSelectedGrade(grade)}
+                      className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
+                        selectedGrade === grade
+                          ? 'bg-accent border-accent text-paper shadow-lg shadow-accent/20'
+                          : 'bg-background border-ink/5 text-ink hover:border-accent/30'
+                      }`}
+                    >
+                      <span className="text-xs font-medium">{grade}</span>
+                      {selectedGrade === grade && <CheckCircle2 className="w-3.5 h-3.5 text-accent" />}
+                    </button>
+                  ))}
+                </div>
+              )}
             </section>
 
             {/* Baccalaureate Options (Only for Morocco Bac grades) */}
             {selectedCountry === 'Morocco' && (selectedGrade.includes('Bac') || selectedGrade.includes('Tronc Commun')) && (
               <section className="p-5 bg-paper border border-ink/5 rounded-3xl space-y-5 shadow-sm col-span-1 md:col-span-2">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-accent/5 rounded-lg flex items-center justify-center text-accent">
-                    <BookOpen className="w-4 h-4" />
+                <div className="flex items-center gap-3 justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-accent/5 rounded-lg flex items-center justify-center text-accent">
+                      <BookOpen className="w-4 h-4" />
+                    </div>
+                    <div className="space-y-0.5">
+                      <h2 className="text-base font-medium text-ink leading-tight">
+                        {selectedGrade.includes('Tronc Commun') ? 'Common Core Section' : 'Baccalaureate Track'}
+                      </h2>
+                      <p className="text-[10px] text-muted/60 leading-tight">
+                        {selectedGrade.includes('Tronc Commun')
+                          ? 'Select your foundation year section.'
+                          : 'Select your specific track to get the correct curriculum.'}
+                      </p>
+                    </div>
                   </div>
-                  <div className="space-y-0.5">
-                    <h2 className="text-base font-medium text-ink leading-tight">
-                      {selectedGrade.includes('Tronc Commun') ? 'Common Core Section' : 'Baccalaureate Track'}
-                    </h2>
-                    <p className="text-[10px] text-muted/60 leading-tight">
-                      {selectedGrade.includes('Tronc Commun') 
-                        ? 'Select your foundation year section.' 
-                        : 'Select your specific track to get the correct curriculum.'}
-                    </p>
-                  </div>
+                  {isAdmin && profile?.onboarding_completed && (
+                    <div className="px-3 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full text-amber-700 text-[10px] font-bold uppercase tracking-wider">
+                      Admin / Testing Mode
+                    </div>
+                  )}
                 </div>
-                
-                <div className="flex flex-col md:flex-row gap-4">
-                  {/* Section */}
-                  <div className="space-y-2 flex-1">
+
+
+                {isLocked ? (
+                  <div className="p-4 bg-background border border-ink/10 rounded-2xl flex items-center gap-3">
+                    <div className="w-8 h-8 bg-ink/5 rounded-lg flex items-center justify-center text-muted shrink-0">
+                      <BookOpen className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-ink">{bacSection && dbBacSections.find(s => s.id === bacSection)?.name || 'No selection'}</p>
+                      {bacTrack && (
+                        <p className="text-xs text-muted mt-1">{dbBacTracks.find(t => t.id === bacTrack)?.name || 'No track selected'}</p>
+                      )}
+                      <p className="text-[10px] text-muted mt-2">Your academic profile is locked after onboarding.</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col md:flex-row gap-4">
+                    {/* Section */}
+                    <div className="space-y-2 flex-1">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-muted">Section</label>
                     <div className="grid grid-cols-1 gap-2 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
                       {dbBacSections.map((s) => (
@@ -603,6 +670,7 @@ export const Settings: React.FC = () => {
                     </div>
                   )}
                 </div>
+                )}
               </section>
             )}
 

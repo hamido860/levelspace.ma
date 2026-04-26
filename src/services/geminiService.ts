@@ -15,6 +15,9 @@ export const getEffectiveApiKey = () => getCustomApiKey() || import.meta.env.VIT
 export const getNvidiaApiKey = () =>
   localStorage.getItem("CUSTOM_NVIDIA_API_KEY") || import.meta.env.VITE_NVIDIA_API_KEY || "";
 
+export const checkAIProvider = (): boolean =>
+  !!(getEffectiveApiKey() || getNvidiaApiKey());
+
 export const setNvidiaApiKey = (key: string) => {
   if (key) {
     localStorage.setItem("CUSTOM_NVIDIA_API_KEY", key);
@@ -24,7 +27,7 @@ export const setNvidiaApiKey = (key: string) => {
 };
 
 export const NVIDIA_MODEL = "google/gemma-3-27b-it";
-export const NVIDIA_WORKER_MODEL = "google/gemma-4-31b-it"; // Gemma 4 — primary bulk lesson worker
+export const NVIDIA_WORKER_MODEL = "google/gemma-3-27b-it"; // Gemma 3 27B — primary bulk lesson worker
 
 export async function callNvidiaAPI(params: {
   prompt: string;
@@ -103,7 +106,7 @@ export class ServiceUnavailableError extends Error {
 const QUOTA_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
 const QUOTA_STORAGE_KEY = "ai_model_quota_hits";
 
-const GEMINI_FALLBACKS = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-3-flash-preview"] as const;
+const GEMINI_FALLBACKS = ["gemini-2.5-flash", "gemini-2.5-flash-lite"] as const;
 
 export const modelQuotaTracker = {
   _load(): Record<string, number> {
@@ -202,7 +205,7 @@ Respond strictly in JSON format with the following schema:
     };
 
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]),
       contents: prompt,
       config: config
     });
@@ -232,9 +235,11 @@ export const handleApiError = (error: any, context: string) => {
     errorMessage.includes("RESOURCE_EXHAUSTED") ||
     errorMessage.includes("quota")
   ) {
+    const hasCustomKey = !!getCustomApiKey();
     toast.error("AI Quota Exceeded", {
-      description:
-        "You've reached the free tier limit. Please add your own API key in Settings.",
+      description: hasCustomKey
+        ? "Your API key has hit its rate limit. Please wait a moment and try again."
+        : "You've reached the free tier limit. Please add your own API key in Settings.",
       duration: 5000,
     });
     throw new QuotaExceededError("AI Quota Exceeded");
@@ -569,7 +574,7 @@ export type AIStatus = {
 };
 
 let aiStatus: AIStatus = {
-  lastModel: "gemini-3-flash-preview",
+  lastModel: "gemini-2.5-flash",
   isLocal: false,
   lastError: null,
   timestamp: new Date().toISOString(),
@@ -616,21 +621,32 @@ export async function generateAIContent(
   context: string,
 ): Promise<any> {
   if (!currentApiKey) {
-    const errorMsg = "Gemini API key is missing. Please configure it in the Secrets panel.";
+    // No Gemini key — skip straight to NVIDIA if available
+    if (getNvidiaApiKey()) {
+      let promptText = "";
+      if (typeof params.contents === "string") promptText = params.contents;
+      else if (Array.isArray(params.contents)) promptText = params.contents.map((p: any) => p.text || JSON.stringify(p)).join("\n");
+      else promptText = JSON.stringify(params.contents);
+      const isJson = params.config?.responseMimeType === "application/json";
+      try {
+        const nvidiaText = await callNvidiaAPI({ prompt: promptText, isJson, maxTokens: Math.min(params.config?.maxOutputTokens || 4096, 4096) });
+        if (nvidiaText) {
+          updateAIStatus({ lastModel: "Gemma 3 (NVIDIA NIM)", isLocal: false, lastError: null });
+          return { text: nvidiaText, candidates: [{ content: { parts: [{ text: nvidiaText }] } }] };
+        }
+      } catch (e) { console.warn("[generateAIContent] NVIDIA-only path failed:", e); }
+    }
+    const errorMsg = "No AI API key configured. Add a Gemini or NVIDIA key in Settings.";
     console.error(errorMsg);
     updateAIStatus({ lastError: errorMsg });
-    toast.error("AI Configuration Error", {
-      description: errorMsg,
-      duration: 5000,
-    });
+    toast.error("AI Configuration Error", { description: errorMsg, duration: 5000 });
     throw new Error(errorMsg);
   }
-  const primaryModel = params.model || "gemini-3-flash-preview";
+  const primaryModel = params.model || "gemini-2.5-flash";
   try {
     const config = params.config || {};
-    
-    // Always enable Google Search grounding for better factual accuracy
-    const tools = params.tools || [{ googleSearch: {} }];
+    const isJsonMode = config.responseMimeType === "application/json";
+    const tools = params.tools !== undefined ? params.tools : (isJsonMode ? [] : [{ googleSearch: {} }]);
 
     const result = await ai.models.generateContent({
       ...params,
@@ -745,10 +761,26 @@ export interface AICuratedModule {
 }
 
 export interface AILessonBlock {
-  type: "definition" | "rules" | "examples" | "quiz" | "exam" | "content";
-  title: string;
+  type: "intro" | "theory" | "formula" | "example" | "exercise" | "quiz" | "exam" | "summary" | "definition" | "rules" | "examples" | "content";
+  // intro & common
   content?: string;
+  title?: string;
+  // formula
+  label?: string;
+  // exercise
+  solution?: string;
+  hint?: string;
+  // quiz
+  question?: string;
+  options?: string[];
+  correctAnswer?: string;
+  explanation?: string;
+  // exam
   source?: string;
+  // summary
+  points?: string[];
+
+  // Legacy fields for backward compatibility
   rules?: string[];
   examples?: { question: string; steps: string[]; answer: string }[];
   quiz?: {
@@ -758,6 +790,7 @@ export interface AILessonBlock {
     explanation: string;
   };
   exam?: { source: string; question: string; hint: string; solution: string };
+  exercise?: { question: string; solution: string };
 }
 
 export interface AILesson {
@@ -792,6 +825,7 @@ export interface LessonTemplate {
   mod: string;
   exam: any;
   similarity?: number;
+  blocks?: AILessonBlock[];
 }
 
 // ─── Orchestration: Pro plans, Gemma 4 executes ──────────────────────────────
@@ -932,6 +966,16 @@ Generate a complete lesson as JSON with this structure:
   "lesson_title": "${plan.lesson_title}",
   "mod": "${plan.subject}",
   "content": "full markdown lesson content",
+  "blocks": [
+    { "type": "intro", "content": "string" },
+    { "type": "theory", "title": "string", "content": "string" },
+    { "type": "formula", "label": "string", "content": "string" },
+    { "type": "example", "title": "string", "content": "string" },
+    { "type": "exercise", "title": "string", "content": "string", "solution": "string", "hint": "string" },
+    { "type": "quiz", "question": "string", "options": ["A","B","C","D"], "correctAnswer": "A", "explanation": "string" },
+    { "type": "exam", "question": "string", "hint": "string", "solution": "string", "source": "string" },
+    { "type": "summary", "points": ["string"] }
+  ],
   "exercises": [{"question": "...", "solution": "...", "hint": "..."}],
   "quizzes": [{"question": "...", "options": ["A","B","C","D"], "correctAnswer": "A", "explanation": "..."}],
   "exam": {"question": "...", "hint": "...", "solution": "..."}
@@ -1059,12 +1103,35 @@ export const getLessonPrompt = (
     "grade": "string",
     "subject": "string",
     "lesson_title": "string",
-    "content": "string (Markdown)",
-    "mod": "string (Module name)",
-    "exercises": [{"question": "string", "solution": "string"}],
-    "quizzes": [{"question": "string", "options": ["string"], "correctAnswer": "string", "explanation": "string"}],
-    "exam": {"question": "string", "hint": "string", "solution": "string"}
-  }`;
+    "mod": "string",
+    "content": "string (full lesson in Markdown — kept for RAG/embedding use)",
+    "blocks": [
+      { "type": "intro", "content": "string" },
+      { "type": "theory", "title": "string", "content": "string" },
+      { "type": "formula", "label": "string", "content": "string" },
+      { "type": "example", "title": "string", "content": "string" },
+      { "type": "exercise", "title": "string", "content": "string", "solution": "string", "hint": "string (optional)" },
+      { "type": "quiz", "question": "string", "options": ["A","B","C","D"], "correctAnswer": "string", "explanation": "string" },
+      { "type": "exam", "question": "string", "hint": "string", "solution": "string", "source": "string (optional)" },
+      { "type": "summary", "points": ["string"] }
+    ],
+    "exercises": [{ "question": "string", "solution": "string" }],
+    "quizzes": [{ "question": "string", "options": ["string"], "correctAnswer": "string", "explanation": "string" }],
+    "exam": { "question": "string", "hint": "string", "solution": "string" }
+  }
+
+BLOCK GENERATION RULES:
+- Generate 8–12 blocks total
+- Always start with exactly one "intro" block
+- Always end with exactly one "summary" block with 5–8 bullet points
+- Include 1–3 "theory" blocks for core concepts
+- Include 1–3 "formula" blocks for any equations or rules
+- Include 2–3 "example" blocks showing solved problems
+- Include 1–2 "exercise" blocks for student practice
+- Include 2–3 "quiz" blocks (multiple choice)
+- Include 1 "exam" block for national-exam-style question
+- The "content" field must be the full lesson as Markdown (concatenate all blocks)
+- The "exercises", "quizzes", "exam" top-level fields must mirror the blocks (kept for backward compat)`;
 
   return prompt;
 };
@@ -1134,7 +1201,6 @@ export const generateFullLesson = async (
     const config: any = {
       responseMimeType: "application/json",
       maxOutputTokens: 5000,
-      tools: [{ googleSearch: {} }],
       responseSchema: {
         type: Type.OBJECT,
         properties: {
@@ -1301,7 +1367,7 @@ export const generateCurriculum = async (
 
     let response = await generateContentWithFallback(
       {
-        model: "gemini-3-flash-preview",
+        model: modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]),
         contents: `Generate a list of 10 academic classrooms (modules) for a student in ${country} at the ${grade} level. 
       The classrooms should be from trusted academic resources and follow the standard curriculum of that region.
       ${adminContext}
@@ -1390,11 +1456,56 @@ export const generateSeedLesson = async (
       return safeJsonParse(cachedResponse);
     }
 
-    const ragInstruction = strictRAG ? `\nSTRICT RAG MODE IS ENABLED: You MUST firmly base the entire generated lesson strictly on this provided existing context. Do NOT hallucinate concepts outside of this context:\n<EXISTING_CONTEXT>\n${existingContext}\n</EXISTING_CONTEXT>\n\nIf the existing context is empty, simply summarize the topic briefly without generating deep educational material.` : "";
+    const ragInstruction = strictRAG && existingContext
+      ? `\nSTRICT RAG MODE: Base the entire lesson on this context only:\n<EXISTING_CONTEXT>\n${existingContext}\n</EXISTING_CONTEXT>`
+      : existingContext
+        ? `\nUse this existing curriculum as chaining context to stay consistent:\n<CONTEXT>\n${existingContext}\n</CONTEXT>`
+        : "";
+
+    const basePrompt = `Generate a concise introductory seed lesson for the classroom "${moduleName}" for a student in ${country} at the ${grade} level.
+The lesson must be engaging and structured into blocks: definition, rules, worked examples, a multiple-choice quiz, a practice exercise, and a national exam style question.
+${ragInstruction}
+
+CONSTRAINTS:
+- Keep total content under 3000 characters.
+- Use Markdown inside "content" and "question" fields.
+- No walls of text: use bullet points, bold key terms, short paragraphs.
+- Write entirely in the official language of instruction for "${moduleName}" in ${country} for ${grade} (e.g. Arabic for Philosophy/History in Morocco, French for Sciences/Math).
+
+Return ONLY valid JSON (no markdown fences) matching this exact structure:
+{
+  "title": "string",
+  "subtitle": "string (e.g. '6 blocks · ~20 min')",
+  "blocks": [
+    {"type": "definition", "title": "string", "content": "markdown string"},
+    {"type": "rules", "title": "string", "rules": ["rule 1", "rule 2"]},
+    {"type": "examples", "title": "string", "examples": [{"question": "string", "steps": ["string"], "answer": "string"}]},
+    {"type": "quiz", "title": "string", "quiz": {"question": "string", "options": ["A","B","C","D"], "correctAnswer": "string", "explanation": "string"}},
+    {"type": "exercise", "title": "string", "exercise": {"question": "string", "hint": "string", "solution": "string"}},
+    {"type": "exam", "title": "string", "exam": {"source": "string", "question": "string", "hint": "string", "solution": "string"}}
+  ]
+}`;
+
+    // ── Primary: NVIDIA (free tier, no Gemini quota consumed) ─────────────────
+    if (getNvidiaApiKey()) {
+      try {
+        const nvidiaText = await callNvidiaAPI({ prompt: basePrompt, isJson: true, maxTokens: 4096 });
+        if (nvidiaText) {
+          const parsed = safeJsonParse(nvidiaText) as AILesson;
+          if (parsed?.title && Array.isArray(parsed.blocks)) {
+            await responseCache.set(cacheKey, nvidiaText);
+            updateAIStatus({ lastModel: "Gemma 3 (NVIDIA NIM)", isLocal: false, lastError: null });
+            return parsed;
+          }
+        }
+      } catch (nvidiaErr) {
+        console.warn("[generateSeedLesson] NVIDIA failed, falling back to Gemini:", nvidiaErr);
+      }
+    }
 
     const response = await generateContentWithFallback(
       {
-        model: "gemini-3-flash-preview",
+        model: modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]),
         contents: `Generate a concise introductory seed lesson for the classroom "${moduleName}" for a student in ${country} at the ${grade} level.
       The lesson should be engaging and structured into specific blocks: definition, rules, worked examples, a multiple-choice quiz, a practice exercise, and a national exam style question.
       ${ragInstruction}
@@ -1619,19 +1730,38 @@ export const generateLessonSuggestions = async (
     }
 
     const topicsContext = existingTopics && existingTopics.length > 0
-      ? `\n\nCRITICAL: The admin has already defined the following topics for this subject. You MUST use these topics as the basis for your suggestions:\n${existingTopics.join('\n')}`
+      ? `\n\nCRITICAL: The admin has already defined the following topics. Use these as the basis:\n${existingTopics.join('\n')}`
       : "";
+
+    const suggestionsPrompt = `Provide a list of 10 specific lesson topics for a curriculum module named "${moduleName}" for ${grade} in ${country}.${topicsContext}
+Each topic should have a title and a short 1-sentence description (max 150 characters).
+Write titles and descriptions ENTIRELY in the official language of instruction for "${moduleName}" in ${country} for ${grade} (e.g. Arabic for Philosophy/History in Morocco). No English translations.
+
+Return ONLY valid JSON array (no markdown fences):
+[{"title": "string", "description": "string"}, ...]`;
+
+    // ── Primary: NVIDIA ───────────────────────────────────────────────────────
+    if (getNvidiaApiKey()) {
+      try {
+        const nvidiaText = await callNvidiaAPI({ prompt: suggestionsPrompt, isJson: true, maxTokens: 2048 });
+        if (nvidiaText) {
+          const parsed = safeJsonParse(nvidiaText);
+          const list = Array.isArray(parsed) ? parsed : parsed?.suggestions ?? parsed?.topics ?? null;
+          if (Array.isArray(list) && list.length > 0 && list[0]?.title) {
+            await responseCache.set(cacheKey, JSON.stringify(list));
+            updateAIStatus({ lastModel: "Gemma 3 (NVIDIA NIM)", isLocal: false, lastError: null });
+            return list as LessonSuggestion[];
+          }
+        }
+      } catch (nvidiaErr) {
+        console.warn("[generateLessonSuggestions] NVIDIA failed, falling back to Gemini:", nvidiaErr);
+      }
+    }
 
     const response = await generateContentWithFallback(
       {
-        model: "gemini-3-flash-preview",
-        contents: `Provide a list of 10 specific lesson topics for a curriculum module named "${moduleName}" for ${grade} in ${country}.${topicsContext}
-      Each topic should have a title and a short 1-sentence description of what it covers.
-      Keep descriptions concise (max 150 characters).
-      CRITICAL INSTRUCTION REGARDING LANGUAGE: 
-      1. First, identify the official national language of instruction for the specific subject "${moduleName}" in ${country} for ${grade}. For example, in the Moroccan educational system, Philosophy, History, Geography, and Islamic Education are taught EXCLUSIVELY in Arabic.
-      2. Generate the titles and descriptions STRICTLY in that SINGLE official native language of instruction. 
-      3. DO NOT mix languages. DO NOT provide English translations.`,
+        model: modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]),
+        contents: suggestionsPrompt,
         config: {
           responseMimeType: "application/json",
           maxOutputTokens: 4096,
@@ -1791,7 +1921,7 @@ export const auditLessonLanguage = async (
 
     const response = await generateContentWithFallback(
       {
-        model: "gemini-3-flash-preview",
+        model: modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]),
         contents: `You are an educational content auditor.
       Review the following lesson content for a student in ${country} at the ${grade} level, studying "${moduleName}".
       1. Determine the SINGLE primary native language of instruction expected for this specific subject in this country. For example, in Morocco, Philosophy, History, Geography, and Islamic Education are taught EXCLUSIVELY in Arabic.
@@ -1897,7 +2027,7 @@ export const generateLessonTags = async (
 
     const response = await generateContentWithFallback(
       {
-        model: "gemini-3-flash-preview",
+        model: modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]),
         contents: `Generate a list of 5-7 relevant academic tags for the following lesson.
       
       Lesson Title: "${lessonTitle}"
@@ -1933,6 +2063,8 @@ export const generateLessonTags = async (
 export const generateProactiveGreeting = async (
   lessonContent: string,
   userLanguage?: string,
+  subject?: string,
+  grade?: string,
 ): Promise<string> => {
   try {
     // 1. Check Cache
@@ -1940,6 +2072,8 @@ export const generateProactiveGreeting = async (
       "generateProactiveGreeting",
       lessonContent,
       userLanguage,
+      subject,
+      grade,
     );
     const cachedResponse = await responseCache.get(cacheKey);
     if (cachedResponse) {
@@ -1957,9 +2091,11 @@ export const generateProactiveGreeting = async (
       {
         model: modelToUse,
         contents: `Analyze the following lesson content. If the concepts appear particularly complex, advanced, or dense, generate a friendly, proactive message offering to break down the complex parts step-by-step or provide simpler examples. If the content is straightforward, offer to help with any questions, summarize it, or quiz the student on the material. Keep the message brief (1-3 sentences), encouraging, and conversational. Respond in the same language as the lesson content, unless the user's preferred language (${userLanguage || "unknown"}) is different and you think it would help them understand better.
-      
-      LESSON CONTENT:
-      ${lessonContent.substring(0, 4000)}`,
+${subject ? `SUBJECT: ${subject}` : ""}
+${grade ? `STUDENT LEVEL: ${grade}` : ""}
+
+LESSON CONTENT:
+${lessonContent.substring(0, 4000)}`,
         config: {
         },
       },
@@ -1991,7 +2127,9 @@ export const chatWithTutor = async (
   history: ChatMessage[],
   userLanguage?: string,
   userId?: string,
-  strictRAG?: boolean
+  strictRAG?: boolean,
+  subject?: string,
+  grade?: string,
 ): Promise<string> => {
   try {
     // 1. Check Cache
@@ -2002,7 +2140,9 @@ export const chatWithTutor = async (
       history,
       userLanguage,
       userId,
-      strictRAG
+      strictRAG,
+      subject,
+      grade,
     );
     const cachedResponse = await responseCache.get(cacheKey);
     if (cachedResponse) {
@@ -2044,9 +2184,11 @@ export const chatWithTutor = async (
       ai.chats.create({
         model: model,
         config: {
-          systemInstruction: `You are an AI tutor helping a student understand a specific lesson. 
+          systemInstruction: `You are an AI tutor helping a student understand a specific lesson.
 PRIMARY RULE: You should first try to answer questions, explain concepts, extend ideas, or generate practice questions using ONLY the provided LESSON CONTENT and ADDITIONAL RELEVANT CONTEXT.
 ${strictRagInstruction}
+${subject ? `SUBJECT: ${subject}` : ""}
+${grade ? `STUDENT LEVEL: ${grade}` : ""}
 ${userLanguage ? `\nThe user's preferred interface language is '${userLanguage}'. If they ask for explanations in another language, or if it helps them understand better, feel free to use their preferred language or any other language they request.` : ""}
 
 LESSON CONTENT:
@@ -2073,11 +2215,7 @@ ${augmentedContext}`,
         console.warn(
           `Pipeline: Quota exceeded for ${modelToUse}. Falling back to gemini-2.5-flash-lite for chat.`,
         );
-        toast.info("Switching AI Model", {
-          description:
-            "Primary model quota reached. Switching to a lighter model for this chat.",
-          duration: 3000,
-        });
+        toast.info("Adjusting response quality...", { duration: 2000 });
         chat = createChat("gemini-2.5-flash-lite");
         response = await chat.sendMessage({ message });
       } else {
@@ -2112,7 +2250,7 @@ export const generateFlashcards = async (
 
     const response = await generateContentWithFallback(
       {
-        model: "gemini-3-flash-preview",
+        model: modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]),
         contents: `Generate 5 to 10 study flashcards based on the following lesson content. 
       Extract the most important key terms, concepts, or questions for the front of the card, and provide clear, concise definitions or answers for the back.
       
@@ -2192,7 +2330,7 @@ export const generateInteractiveContent = async (
 
     const response = await generateContentWithFallback(
       {
-        model: "gemini-3-flash-preview",
+        model: modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]),
         contents: `${prompt}
       
       LESSON CONTENT:
@@ -2231,7 +2369,7 @@ export const generateCauseEffect = async (
 
     const response = await generateContentWithFallback(
       {
-        model: "gemini-3-flash-preview",
+        model: modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]),
         contents: `Analyze the following lesson content and identify 3 to 6 cause-and-effect relationships.
       For each relationship, provide a clear 'cause' (the trigger or event) and its corresponding 'effect' (the result or consequence).
       
@@ -2281,7 +2419,7 @@ export const summarizeWithFallback = async (text: string): Promise<string> => {
     // Try the "Smart" AI (Gemini)
     const response = await generateContentWithFallback(
       {
-        model: "gemini-3-flash-preview",
+        model: modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]),
         contents: `Summarize the following text in a concise manner:\n\n${text}`,
         config: {
         },
@@ -2346,7 +2484,7 @@ export const generateSyllabus = async (
 
     const response = await generateContentWithFallback(
       {
-        model: "gemini-3-flash-preview",
+        model: modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]),
         contents: prompt,
         config: {
           temperature: 0.2,
@@ -2642,7 +2780,7 @@ Return ONLY a JSON array (no markdown):
 
   try {
     const response = await generateContentWithFallback(
-      { model: "gemini-3-flash-preview", contents: prompt, config: { responseMimeType: "application/json", maxOutputTokens: 2048 } },
+      { model: modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]), contents: prompt, config: { responseMimeType: "application/json", maxOutputTokens: 2048 } },
       "generateQuizzesForLesson"
     );
     const parsed = safeJsonParse(response.text || "");
@@ -2673,7 +2811,7 @@ Return ONLY a JSON array (no markdown):
 
   try {
     const response = await generateContentWithFallback(
-      { model: "gemini-3-flash-preview", contents: prompt, config: { responseMimeType: "application/json", maxOutputTokens: 2048 } },
+      { model: modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]), contents: prompt, config: { responseMimeType: "application/json", maxOutputTokens: 2048 } },
       "generateExercisesForLesson"
     );
     const parsed = safeJsonParse(response.text || "");
@@ -2708,4 +2846,66 @@ export async function findSimilarResources(
     handleApiError(error, "findSimilarResources");
     return null;
   }
+}
+
+/**
+ * Converts a legacy flat LessonTemplate (no blocks) into the canonical blocks format.
+ * Used for backward compat when loading old Supabase lessons that predate blocks.
+ */
+export function flatLessonToBlocks(lesson: LessonTemplate): AILessonBlock[] {
+  const blocks: AILessonBlock[] = [];
+
+  // Intro from the start of content
+  const lines = (lesson.content || "").split("\n").filter(l => l.trim());
+  const introParagraph = lines.slice(0, 3).join("\n");
+  if (introParagraph) {
+    blocks.push({ type: "intro", content: introParagraph });
+  }
+
+  // Main content as a theory block
+  const rest = lines.slice(3).join("\n");
+  if (rest) {
+    blocks.push({ type: "theory", title: lesson.lesson_title, content: rest });
+  }
+
+  // Exercises
+  (lesson.exercises || []).forEach((ex: any, i: number) => {
+    blocks.push({
+      type: "exercise",
+      title: `Exercise ${i + 1}`,
+      content: ex.question || ex.prompt || "",
+      solution: ex.solution || "",
+      hint: ex.hint || undefined,
+    });
+  });
+
+  // Quizzes
+  (lesson.quizzes || []).forEach((q: any) => {
+    blocks.push({
+      type: "quiz",
+      question: q.question || "",
+      options: q.options || [],
+      correctAnswer: q.correctAnswer || "",
+      explanation: q.explanation || "",
+    });
+  });
+
+  // Exam
+  if (lesson.exam) {
+    blocks.push({
+      type: "exam",
+      question: lesson.exam.question || "",
+      hint: lesson.exam.hint || undefined,
+      solution: lesson.exam.solution || "",
+      source: lesson.exam.source || "National Exam Style",
+    });
+  }
+
+  // Summary
+  blocks.push({
+    type: "summary",
+    points: [`Leçon : ${lesson.lesson_title}`, `Matière : ${lesson.subject}`, `Niveau : ${lesson.grade}`],
+  });
+
+  return blocks;
 }

@@ -32,18 +32,20 @@ import {
 
 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { supabase } from '../db/supabase';
 import { db } from '../db/db';
 import Markdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import { toast } from 'sonner';
-import { 
-  auditLessonLanguage, 
-  AuditResult, 
-  explainText, 
+import {
+  auditLessonLanguage,
+  AuditResult,
+  explainText,
   generateLessonTags,
   generateInteractiveContent,
-  generateAnotherExample
+  generateAnotherExample,
+  checkAIProvider
 } from '../services/geminiService';
 import { fetchDefinition, DictionaryEntry } from '../services/dictionaryService';
 import { getQuizzesByLesson } from '../services/quizService';
@@ -59,13 +61,20 @@ import { useAppSettings } from '../context/AppSettingsContext';
 import { indexLessonContent } from '../services/ragService';
 
 const BLOCK_TYPE_CONFIG: Record<string, { icon: React.ElementType; colorClass: string; label: string }> = {
-  definition: { icon: BookOpen,     colorClass: 'text-accent',   label: 'Definition'  },
-  content:    { icon: FileText,     colorClass: 'text-accent',   label: 'Content'     },
-  rules:      { icon: List,         colorClass: 'text-success',  label: 'Key Rules'   },
-  examples:   { icon: FlaskConical, colorClass: 'text-warning',  label: 'Examples'    },
-  quiz:       { icon: HelpCircle,   colorClass: 'text-accent',   label: 'Quiz'        },
-  exercise:   { icon: Dumbbell,     colorClass: 'text-success',  label: 'Exercise'    },
-  exam:       { icon: GraduationCap,colorClass: 'text-warning',  label: 'Exam'        },
+  // New canonical types
+  intro:    { icon: BookOpen,      colorClass: 'text-accent',   label: 'Introduction' },
+  theory:   { icon: FileText,      colorClass: 'text-accent',   label: 'Theory'       },
+  formula:  { icon: Type,          colorClass: 'text-warning',  label: 'Formula'      },
+  example:  { icon: FlaskConical,  colorClass: 'text-warning',  label: 'Example'      },
+  exercise: { icon: Dumbbell,      colorClass: 'text-success',  label: 'Exercise'     },
+  quiz:     { icon: HelpCircle,    colorClass: 'text-accent',   label: 'Quiz'         },
+  exam:     { icon: GraduationCap, colorClass: 'text-warning',  label: 'Exam'         },
+  summary:  { icon: List,          colorClass: 'text-success',  label: 'Summary'      },
+  // Legacy fallback types
+  definition: { icon: BookOpen,    colorClass: 'text-accent',   label: 'Definition'   },
+  content:    { icon: FileText,    colorClass: 'text-accent',   label: 'Content'      },
+  rules:      { icon: List,        colorClass: 'text-success',  label: 'Key Rules'    },
+  examples:   { icon: FlaskConical,colorClass: 'text-warning',  label: 'Examples'     },
 };
 
 const getBlockTypeConfig = (type: string) =>
@@ -118,10 +127,10 @@ const Timer = () => {
 };
 
 const PENDING_STAGES = [
-  'Gemini Pro: investigating curriculum + RAG...',
+  'Analyzing curriculum...',
   'Building generation plan...',
-  'Gemma 4: generating lesson...',
-  'Validating + saving...',
+  'Generating lesson content...',
+  'Validating and saving...',
 ];
 
 // Shown when AI Crew is generating a lesson on-demand (status === 'pending')
@@ -181,6 +190,7 @@ export const LessonView: React.FC = () => {
   const { settings } = useAppSettings();
   const askAiAccess = settings.ask_ai_access || 'admin';
   const hasAiAccess = askAiAccess === 'all' || (askAiAccess === 'admin' && isAdmin);
+  const aiAvailable = checkAIProvider();
 
   const [openBlocks, setOpenBlocks] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'content' | 'quizzes' | 'exercises'>('content');
@@ -321,7 +331,7 @@ export const LessonView: React.FC = () => {
   };
 
   const handleExplain = async () => {
-    if (!selectedText || !lesson || !hasAiAccess) return;
+    if (!selectedText || !lesson || !hasAiAccess || !aiAvailable) return;
     setIsExplaining(true);
     setExplanation(null);
     setDictionaryData(null);
@@ -333,7 +343,7 @@ export const LessonView: React.FC = () => {
     }
 
     try {
-      const context = lesson.blocks?.map(b => b.content || '').join('\n') || lesson.content || '';
+      const context = effectiveLesson.blocks?.map(b => b.content || '').join('\n') || effectiveLesson.content || '';
       const result = await explainText(selectedText, context, selectedGrade, selectedCountry, language, module?.strictRAG);
       setExplanation(result);
     } catch (error) {
@@ -345,13 +355,41 @@ export const LessonView: React.FC = () => {
   };
 
   const lesson = useLiveQuery(() => id ? db.lessons.get(id) : undefined, [id]);
+  const [supabaseLesson, setSupabaseLesson] = useState<any>(null);
+
+  useEffect(() => {
+    // If not found in IndexedDB, try Supabase by topic_id
+    if (lesson === undefined && id) {
+      supabase
+        .from('lessons')
+        .select('*')
+        .eq('topic_id', id)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data) setSupabaseLesson(data);
+        });
+    }
+  }, [lesson, id]);
+
+  // Merge: prefer IndexedDB lesson, fall back to Supabase
+  const effectiveLesson = lesson || (supabaseLesson ? {
+    id: supabaseLesson.id,
+    moduleId: supabaseLesson.topic_id,
+    title: supabaseLesson.lesson_title,
+    content: supabaseLesson.content,
+    status: 'done' as const,
+    createdAt: Date.now(),
+    blocks: supabaseLesson.blocks || [],
+    subtitle: supabaseLesson.subtitle,
+    tags: supabaseLesson.tags,
+  } : undefined);
 
   const contentDir = useMemo(() => {
     if (forceDir) return forceDir;
-    if (!lesson) return language === 'ar' ? 'rtl' : 'ltr';
+    if (!effectiveLesson) return language === 'ar' ? 'rtl' : 'ltr';
     
     // Check title and first block for RTL characters
-    const sampleText = (lesson.title || '') + (lesson.blocks?.[0]?.content || '');
+    const sampleText = (effectiveLesson.title || '') + (effectiveLesson.blocks?.[0]?.content || '');
     return isRTL(sampleText) ? 'rtl' : 'ltr';
   }, [lesson, language, forceDir]);
 
@@ -359,7 +397,7 @@ export const LessonView: React.FC = () => {
     const uiDir = language === 'ar' ? 'rtl' : 'ltr';
     return contentDir !== uiDir;
   }, [contentDir, language]);
-  const module = useLiveQuery(() => lesson?.moduleId ? db.modules.get(lesson.moduleId) : undefined, [lesson?.moduleId]);
+  const module = useLiveQuery(() => effectiveLesson?.moduleId ? db.modules.get(effectiveLesson.moduleId) : undefined, [effectiveLesson?.moduleId]);
   const notes = useLiveQuery(() => id ? db.notes.where('lessonId').equals(id).toArray() : [], [id]) || [];
   const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
   const settingsMap = Object.fromEntries(dbSettings.map(s => [s.key, s.value]));
@@ -369,15 +407,15 @@ export const LessonView: React.FC = () => {
 
   // Initialize first block open
   useEffect(() => {
-    if (lesson?.blocks && lesson.blocks.length > 0 && openBlocks.length === 0) {
+    if (effectiveLesson?.blocks && effectiveLesson.blocks.length > 0 && openBlocks.length === 0) {
       setOpenBlocks(['block-0']);
-    } else if (lesson && !lesson.blocks && openBlocks.length === 0) {
+    } else if (effectiveLesson && !effectiveLesson.blocks && openBlocks.length === 0) {
       setOpenBlocks(['content']);
     }
 
     if (lesson) {
       // Save last viewed lesson
-      db.settings.put({ key: 'last_viewed_lesson_id', value: lesson.id });
+      db.settings.put({ key: 'last_viewed_lesson_id', value: effectiveLesson.id });
     }
   }, [lesson]);
 
@@ -412,16 +450,16 @@ export const LessonView: React.FC = () => {
 
   const markLessonComplete = async () => {
     if (lesson) {
-      await db.lessons.update(lesson.id, { status: 'done' });
+      await db.lessons.update(effectiveLesson.id, { status: 'done' });
       
       // Index lesson content for RAG if user is logged in
       if (user) {
         try {
-          const content = lesson.blocks?.map(b => b.content || '').join('\n') || lesson.content || '';
+          const content = effectiveLesson.blocks?.map(b => b.content || '').join('\n') || effectiveLesson.content || '';
           await indexLessonContent(
             user.id,
-            lesson.id,
-            `${lesson.title}\n\n${content}`
+            effectiveLesson.id,
+            `${effectiveLesson.title}\n\n${content}`
           );
           console.log('Lesson content indexed for RAG');
         } catch (error) {
@@ -456,13 +494,13 @@ export const LessonView: React.FC = () => {
   };
 
   const handleAudit = async () => {
-    if (!lesson || !module || !hasAiAccess) return;
+    if (!effectiveLesson || !module || !hasAiAccess || !aiAvailable) return;
     setIsAuditing(true);
     setAuditResult(null);
     try {
       const result = await auditLessonLanguage(
-        lesson.title,
-        lesson.blocks || [{ content: lesson.content }],
+        effectiveLesson.title,
+        effectiveLesson.blocks || [{ content: effectiveLesson.content }],
         module.name,
         selectedGrade,
         selectedCountry
@@ -476,15 +514,15 @@ export const LessonView: React.FC = () => {
   };
 
   const handleGenerateTags = async () => {
-    if (!lesson || !hasAiAccess) return;
+    if (!effectiveLesson || !hasAiAccess || !aiAvailable) return;
     setIsGeneratingTags(true);
     try {
-      const content = lesson.blocks?.map(b => b.content || '').join('\n') || lesson.content || '';
-      const newTags = await generateLessonTags(lesson.title, content, selectedGrade, selectedCountry);
+      const content = effectiveLesson.blocks?.map(b => b.content || '').join('\n') || effectiveLesson.content || '';
+      const newTags = await generateLessonTags(effectiveLesson.title, content, selectedGrade, selectedCountry);
       if (newTags.length > 0) {
-        const currentTags = lesson.tags || [];
+        const currentTags = effectiveLesson.tags || [];
         const combined = Array.from(new Set([...currentTags, ...newTags]));
-        await db.lessons.update(lesson.id, { tags: combined });
+        await db.lessons.update(effectiveLesson.id, { tags: combined });
       }
     } catch (error) {
       console.error("Failed to generate tags", error);
@@ -511,7 +549,7 @@ export const LessonView: React.FC = () => {
     if (!noteContent || !lesson) return;
     await db.notes.add({
       id: crypto.randomUUID(),
-      lessonId: lesson.id,
+      lessonId: effectiveLesson.id,
       content: noteContent,
       createdAt: Date.now()
     });
@@ -530,14 +568,14 @@ export const LessonView: React.FC = () => {
   };
 
   const saveEdit = async () => {
-    if (!lesson || editingBlockIndex === null) return;
-    const newBlocks = [...(lesson.blocks || [])];
+    if (!effectiveLesson || editingBlockIndex === null) return;
+    const newBlocks = [...(effectiveLesson.blocks || [])];
     newBlocks[editingBlockIndex] = {
       ...newBlocks[editingBlockIndex],
       title: editTitle,
       content: editContent
     };
-    await db.lessons.update(lesson.id, { blocks: newBlocks });
+    await db.lessons.update(effectiveLesson.id, { blocks: newBlocks });
     setEditingBlockIndex(null);
   };
 
@@ -560,12 +598,12 @@ export const LessonView: React.FC = () => {
   };
 
   const handleGenerateInteractive = async (type: 'hard_questions' | 'more_examples' | 'exam_questions') => {
-    if (!lesson || !hasAiAccess) return;
+    if (!effectiveLesson || !hasAiAccess || !aiAvailable) return;
     setIsGeneratingInteractive(true);
     setActiveInteractiveType(type);
     setInteractiveContent(null);
     try {
-      const content = lesson.blocks?.map((b: any) => b.content || '').join('\n') || lesson.content || '';
+      const content = effectiveLesson.blocks?.map((b: any) => b.content || '').join('\n') || effectiveLesson.content || '';
       const result = await generateInteractiveContent(type, content, selectedGrade, selectedCountry, module?.strictRAG);
       setInteractiveContent(result);
     } catch (error) {
@@ -579,14 +617,14 @@ export const LessonView: React.FC = () => {
   const [isGeneratingExample, setIsGeneratingExample] = useState<number | null>(null);
 
   const handleGenerateAnotherExample = async (blockIndex: number) => {
-    if (!lesson || !lesson.blocks) return;
-    const block = lesson.blocks[blockIndex];
+    if (!effectiveLesson || !effectiveLesson.blocks) return;
+    const block = effectiveLesson.blocks[blockIndex];
     if (!block || block.type !== 'examples' || !block.examples) return;
 
     setIsGeneratingExample(blockIndex);
     try {
       const newExample = await generateAnotherExample(
-        lesson.title,
+        effectiveLesson.title,
         block.title || 'Examples',
         block.examples,
         selectedGrade,
@@ -595,12 +633,12 @@ export const LessonView: React.FC = () => {
       );
 
       if (newExample) {
-        const newBlocks = [...lesson.blocks];
+        const newBlocks = [...effectiveLesson.blocks];
         newBlocks[blockIndex] = {
           ...block,
           examples: [...block.examples, newExample]
         };
-        await db.lessons.update(lesson.id, { blocks: newBlocks });
+        await db.lessons.update(effectiveLesson.id, { blocks: newBlocks });
         toast.success("New example generated!");
       } else {
         toast.error("Failed to generate a new example.");
@@ -613,7 +651,7 @@ export const LessonView: React.FC = () => {
     }
   };
 
-  if (lesson === undefined) {
+  if (effectiveLesson === undefined) {
     return (
       <Layout fullWidth>
         <div className="flex items-center justify-center min-h-[50vh]">
@@ -623,7 +661,7 @@ export const LessonView: React.FC = () => {
     );
   }
 
-  if (lesson === null) {
+  if (effectiveLesson === null) {
     return (
       <Layout fullWidth>
         <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
@@ -636,17 +674,17 @@ export const LessonView: React.FC = () => {
   }
 
   // AI Crew is generating this lesson on-demand (Pro planned, Gemma 4 is executing)
-  if (lesson.status === 'pending') {
+  if (effectiveLesson.status === 'pending') {
     return (
       <PendingLessonView
-        title={lesson.title}
+        title={effectiveLesson.title}
         lessonId={id!}
         onReady={() => window.location.reload()}
       />
     );
   }
 
-  const blocks = lesson.blocks || [];
+  const blocks = effectiveLesson.blocks || [];
   const totalBlocks = blocks.length > 0 ? blocks.length : 1;
   const openCount = openBlocks.length;
   const progressPct = Math.round((openCount / totalBlocks) * 100);
@@ -713,9 +751,11 @@ export const LessonView: React.FC = () => {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleExplain();
+                    if (aiAvailable) handleExplain();
                   }}
-                  className="explain-btn shrink-0 bg-accent text-paper px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-accent-hover transition-colors"
+                  disabled={!aiAvailable}
+                  title={!aiAvailable ? "AI help requires API key" : undefined}
+                  className="explain-btn shrink-0 bg-accent text-paper px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-accent"
                 >
                   <Brain size={14} />
                   Explain
@@ -741,8 +781,7 @@ export const LessonView: React.FC = () => {
                 <Brain size={22} />
               </div>
               <div>
-                <h3 className="text-sm font-bold uppercase tracking-widest text-ink">AI Insights & Dictionary</h3>
-                <p className="text-[10px] text-muted font-medium">Contextual deep learning & language support</p>
+
               </div>
             </div>
           }
@@ -1007,26 +1046,26 @@ export const LessonView: React.FC = () => {
           </div>
 
           <h1 className="lesson-header__title">
-            {lesson.title}
+            {effectiveLesson.title}
           </h1>
 
           <p className="lesson-header__sub">
-            {lesson.subtitle || `${totalBlocks} blocks · ~15 min · AI Generated`}
+            {effectiveLesson.subtitle || `${totalBlocks} blocks · ~15 min · AI Generated`}
           </p>
 
           <div className="mt-4 mb-6 flex items-center gap-4">
             <div className="flex-grow">
               <TagsManager 
-                tags={lesson.tags || []} 
+                tags={effectiveLesson.tags || []}
                 onAddTag={async (tag) => {
-                  const currentTags = lesson.tags || [];
+                  const currentTags = effectiveLesson.tags || [];
                   if (!currentTags.includes(tag)) {
-                    await db.lessons.update(lesson.id, { tags: [...currentTags, tag] });
+                    await db.lessons.update(effectiveLesson.id, { tags: [...currentTags, tag] });
                   }
                 }}
                 onRemoveTag={async (tag) => {
-                  const currentTags = lesson.tags || [];
-                  await db.lessons.update(lesson.id, { tags: currentTags.filter(t => t !== tag) });
+                  const currentTags = effectiveLesson.tags || [];
+                  await db.lessons.update(effectiveLesson.id, { tags: currentTags.filter(t => t !== tag) });
                 }}
                 maxDisplay={7}
               />
@@ -1039,10 +1078,11 @@ export const LessonView: React.FC = () => {
                 <Sparkles className="w-3 h-3" />
                 Workspace
               </button>
-              <button 
+              <button
                 onClick={handleGenerateTags}
-                disabled={isGeneratingTags || !hasAiAccess}
-                className="flex items-center gap-2 px-3 py-1.5 bg-accent/5 text-accent rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-accent/10 transition-all disabled:opacity-50"
+                disabled={isGeneratingTags || !hasAiAccess || !aiAvailable}
+                title={!aiAvailable ? "AI features need an API key — configure one in Settings to enable." : ""}
+                className="flex items-center gap-2 px-3 py-1.5 bg-accent/5 text-accent rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-accent/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isGeneratingTags ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
                 {isGeneratingTags ? 'Generating...' : 'Auto Tags'}
@@ -1066,7 +1106,7 @@ export const LessonView: React.FC = () => {
           <div>
             <div className="config-strip__label">Config used</div>
             <div className="config-strip__name">
-              {lesson.title} · {totalBlocks} blocks
+              {effectiveLesson.title} · {totalBlocks} blocks
             </div>
           </div>
           <div className="config-strip__author">
@@ -1262,6 +1302,86 @@ export const LessonView: React.FC = () => {
                         </div>
                       ) : null}
                       
+                                            {/* Intro */}
+                      {block.type === 'intro' && block.content && (
+                        <div className="p-4 rounded-2xl bg-accent/5 border border-accent/15">
+                          <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>
+                            {block.content}
+                          </Markdown>
+                        </div>
+                      )}
+
+                      {/* Theory */}
+                      {block.type === 'theory' && block.content && (
+                        <div className="def-box">
+                          <div className="flex items-center gap-1.5 mb-2.5 pb-2 border-b border-accent/15">
+                            <FileText size={11} className="text-accent" />
+                            <span className="text-[9px] font-bold text-accent uppercase tracking-widest">
+                              {block.title || 'Theory'}
+                            </span>
+                          </div>
+                          <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>
+                            {block.content}
+                          </Markdown>
+                        </div>
+                      )}
+
+                      {/* Formula */}
+                      {block.type === 'formula' && block.content && (
+                        <div className="p-4 rounded-2xl bg-warning/5 border border-warning/20">
+                          <div className="flex items-center gap-1.5 mb-2 pb-2 border-b border-warning/15">
+                            <Type size={11} className="text-warning" />
+                            <span className="text-[9px] font-bold text-warning uppercase tracking-widest">
+                              {block.label || 'Formula'}
+                            </span>
+                          </div>
+                          <div className="font-mono text-sm">
+                            <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>
+                              {block.content}
+                            </Markdown>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Example */}
+                      {block.type === 'example' && block.content && (
+                        <div className="example-card">
+                          <div className="flex items-center gap-1.5 mb-2 pb-2 border-b border-warning/15">
+                            <FlaskConical size={11} className="text-warning" />
+                            <span className="text-[9px] font-bold text-warning uppercase tracking-widest">
+                              {block.title || 'Example'}
+                            </span>
+                          </div>
+                          <div className="example-card__question">
+                            <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>
+                              {block.content}
+                            </Markdown>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Summary */}
+                      {block.type === 'summary' && block.points && Array.isArray(block.points) && (
+                        <div className="p-4 rounded-2xl bg-success/5 border border-success/20">
+                          <div className="flex items-center gap-1.5 mb-3 pb-2 border-b border-success/15">
+                            <List size={11} className="text-success" />
+                            <span className="text-[9px] font-bold text-success uppercase tracking-widest">Key Takeaways</span>
+                          </div>
+                          <ul className="rules-list">
+                            {block.points.map((point: string, i: number) => (
+                              <li key={i} className="rules-list__item">
+                                <div className="rules-list__dot"></div>
+                                <span>
+                                  <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>
+                                    {point}
+                                  </Markdown>
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
                       {/* Definition / Content */}
                           {(block.type === 'definition' || block.type === 'content') && block.content && (
                             <div className="def-box">
@@ -1327,6 +1447,65 @@ export const LessonView: React.FC = () => {
                                 </button>
                               </div>
                             </>
+                          )}
+
+                          {/* Quiz — new canonical flat format */}
+                          {block.type === 'quiz' && !block.quiz && block.question && Array.isArray(block.options) && (
+                            <div className="bg-surface-low rounded-2xl p-4 mt-4 border border-ink/5">
+                              <p className="font-bold text-sm mb-4 text-ink leading-relaxed"><Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{block.question}</Markdown></p>
+                              <div className="grid gap-2">
+                                {block.options.map((opt, i) => {
+                                  const isSelected = quizAnswered[index] === opt;
+                                  const isCorrect = opt === block.correctAnswer;
+                                  const showResult = quizAnswered[index];
+
+                                  let bgClass = "bg-paper border-surface-mid hover:border-accent hover:bg-accent/5";
+                                  if (showResult) {
+                                    if (isCorrect) bgClass = "bg-success/10 border-success text-success-dark";
+                                    else if (isSelected) bgClass = "bg-error/10 border-error text-error-dark";
+                                    else bgClass = "bg-paper border-surface-mid opacity-50";
+                                  }
+
+                                  return (
+                                    <button
+                                      key={i}
+                                      onClick={() => handleQuizSubmit(index, opt, block.correctAnswer!)}
+                                      disabled={!!showResult}
+                                      className={`w-full text-left p-4 rounded-xl border-2 transition-all ${bgClass} flex items-center justify-between group`}
+                                    >
+                                      <span className="text-sm font-medium"><Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{opt}</Markdown></span>
+                                      {showResult && isCorrect && <CheckCircle2 size={18} className="text-success" />}
+                                      {showResult && isSelected && !isCorrect && <X size={18} className="text-error" />}
+                                      {!showResult && <ChevronRight size={16} className="text-ink-muted opacity-0 group-hover:opacity-100 transition-opacity" />}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+
+                              <AnimatePresence>
+                                {quizAnswered[index] && (
+                                  <motion.div
+                                    initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                                    animate={{ opacity: 1, height: 'auto', marginTop: 16 }}
+                                    className={`p-4 rounded-xl border ${quizCorrect[index] ? 'bg-success/10 border-success/20 text-success-dark' : 'bg-surface-mid border-ink/10 text-ink'}`}
+                                  >
+                                    <div className="flex gap-3">
+                                      <div className="mt-0.5">
+                                        {quizCorrect[index] ? <CheckCircle2 size={18} className="text-success" /> : <Lightbulb size={18} className="text-warning" />}
+                                      </div>
+                                      <div>
+                                        <p className="font-bold text-sm mb-1">
+                                          {quizCorrect[index] ? 'Correct! +15 XP' : 'Not quite right'}
+                                        </p>
+                                        <p className="text-xs opacity-90 leading-relaxed">
+                                          {quizCorrect[index] ? 'Great job! You nailed it.' : block.explanation}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </div>
                           )}
 
                           {/* Quiz */}
@@ -1401,6 +1580,43 @@ export const LessonView: React.FC = () => {
                                   </motion.div>
                                 )}
                               </AnimatePresence>
+                            </div>
+                          )}
+
+                          {/* Exercise — new canonical format */}
+                          {block.type === 'exercise' && !block.exercise && block.content && (
+                            <div className="bg-surface-low rounded-2xl p-5 mt-4 border border-ink/5">
+                              <div className="text-sm font-medium text-ink mb-4 leading-relaxed">
+                                <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{block.content}</Markdown>
+                              </div>
+                              {!exerciseResult[index] ? (
+                                <div className="flex gap-3">
+                                  {block.hint && (
+                                    <button
+                                      className="flex-1 py-3 bg-paper border-2 border-surface-mid text-ink-secondary rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-surface-mid transition-colors flex items-center justify-center gap-2"
+                                      onClick={() => setExerciseHintShown(prev => ({ ...prev, [index]: true }))}
+                                      disabled={exerciseHintShown[index]}
+                                    >
+                                      <Lightbulb size={16} />
+                                      {exerciseHintShown[index] ? block.hint : 'Show Hint'}
+                                    </button>
+                                  )}
+                                  <button
+                                    className="flex-[2] py-3 bg-accent text-paper rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-accent/90 transition-all shadow-lg shadow-accent/20 flex items-center justify-center gap-2"
+                                    onClick={() => handleExerciseSubmit(index, block.solution || '')}
+                                  >
+                                    <CheckCircle2 size={16} />
+                                    I'm Done, Show Solution
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="p-4 rounded-xl bg-surface-low border border-surface-mid">
+                                  <p className="font-bold text-sm mb-1 text-ink">Solution</p>
+                                  <div className="text-xs leading-relaxed mt-2 pt-2 border-t border-current/10 text-ink">
+                                    <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{block.solution || ''}</Markdown>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )}
 
@@ -1736,7 +1952,7 @@ export const LessonView: React.FC = () => {
           </div>
 
           <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-2">
-            {lesson?.blocks?.map((block, index) => {
+            {effectiveLesson?.blocks?.map((block, index) => {
               const isReading = readingBlockIndex === index;
               return (
                 <button
@@ -1774,7 +1990,7 @@ export const LessonView: React.FC = () => {
               );
             })}
 
-            {(!lesson?.blocks || lesson.blocks.length === 0) && (
+            {(!effectiveLesson?.blocks || effectiveLesson.blocks.length === 0) && (
               <div className="text-center p-8 text-muted">
                 No sections found in this lesson.
               </div>
@@ -1862,18 +2078,21 @@ export const LessonView: React.FC = () => {
       <EduWorkspace 
         isOpen={isWorkspaceOpen}
         onClose={() => setIsWorkspaceOpen(false)}
-        subjectId={lesson?.moduleId || 'math'}
+        subjectId={effectiveLesson?.moduleId || 'math'}
         lessonContext={{
           title: lesson?.title || '',
-          content: lesson?.blocks?.map(b => b.content || '').join('\n') || lesson?.content || '',
+          content: effectiveLesson?.blocks?.map(b => b.content || '').join('\n') || effectiveLesson?.content || '',
           grade: selectedGrade,
           country: selectedCountry
         }}
       />
 
-      <AIAssistant 
-        lessonContent={lesson?.blocks?.map((b: any) => b.content || '').join('\n') || lesson?.content || ''} 
+      <AIAssistant
+        lessonContent={effectiveLesson?.blocks?.map((b: any) => b.content || '').join('\n') || effectiveLesson?.content || ''}
         strictRAG={module?.strictRAG}
+        subject={module?.name}
+        grade={selectedGrade}
+        aiAvailable={aiAvailable}
       />
     </Layout>
   );

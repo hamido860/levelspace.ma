@@ -185,6 +185,7 @@ export const saveLesson = async (
       subject: lesson.subject,
       lesson_title: lesson.lesson_title,
       content: lesson.content,
+      blocks: lesson.blocks && lesson.blocks.length > 0 ? lesson.blocks : null, // NEW
       exercises: lesson.exercises || [],
       quizzes: lesson.quizzes || [],
       mod: lesson.mod,
