@@ -8,7 +8,8 @@ import {
   AlertTriangle, CheckCircle, Clock, Layers, Sparkles,
   Lightbulb, ListChecks, Map, RotateCcw, ChevronRight,
   TrendingUp, TrendingDown, Info, Zap,
-  Trash2, Wrench, Play, Pencil, ChevronDown
+  Trash2, Wrench, Play, Pencil, ChevronDown,
+  Copy, Check
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -27,7 +28,7 @@ interface GradeRow {
 
 interface TableHealth {
   table_name: string;
-  row_count: number;
+  row_count: number | null; // null = RLS-denied or query failed (do NOT treat as 0)
 }
 
 
@@ -75,7 +76,7 @@ const ProgressBar: React.FC<{ val: number; total: number }> = ({ val, total }) =
   );
 };
 
-const Pill: React.FC<{ status: "done" | "pending" | "failed" | "empty" | "partial" | "populated"; label?: string | number }> = ({ status, label }) => {
+const Pill: React.FC<{ status: "done" | "pending" | "failed" | "empty" | "partial" | "populated" | "unknown"; label?: string | number }> = ({ status, label }) => {
   const map = {
     done:      "bg-emerald-100 text-emerald-800",
     pending:   "bg-amber-100 text-amber-800",
@@ -83,12 +84,60 @@ const Pill: React.FC<{ status: "done" | "pending" | "failed" | "empty" | "partia
     empty:     "bg-red-100 text-red-700",
     partial:   "bg-amber-100 text-amber-700",
     populated: "bg-emerald-100 text-emerald-700",
+    unknown:   "bg-gray-100 text-gray-600",
   };
   return (
     <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${map[status]}`}>
       {label ?? status}
     </span>
   );
+};
+
+const CopyButton: React.FC<{ getText: () => string; label?: string; className?: string; iconClass?: string }> = ({
+  getText, label, className = "", iconClass = "w-3 h-3",
+}) => {
+  const [copied, setCopied] = useState(false);
+  const onClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(getText());
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // ignore — clipboard may be blocked in non-secure contexts
+    }
+  };
+  const Icon = copied ? Check : Copy;
+  return (
+    <button
+      onClick={onClick}
+      title={copied ? "Copied!" : "Copy to clipboard"}
+      className={`inline-flex items-center gap-1 ${className}`}
+    >
+      <Icon className={`${iconClass} ${copied ? "text-emerald-600" : ""}`} />
+      {label && <span>{copied ? "Copied" : label}</span>}
+    </button>
+  );
+};
+
+const formatTaskForCopy = (t: any) =>
+  `${t.id}. [${String(t.priority).toUpperCase()}] ${t.title}\n` +
+  `${t.description}\n` +
+  `Based on: ${t.metric_basis}\n` +
+  `Impact: ${t.estimated_impact}\n` +
+  `Action: ${t.action_type}`;
+
+const formatTaskListForCopy = (tasks: any[]) => tasks.map(formatTaskForCopy).join("\n\n");
+
+const formatRowsAsTSV = (cols: string[], rows: any[]) => {
+  const sanitize = (v: any) => {
+    if (v === null || v === undefined) return "";
+    if (typeof v === "object") return JSON.stringify(v);
+    return String(v).replace(/[\t\n\r]+/g, " ");
+  };
+  const header = cols.join("\t");
+  const body = rows.map(r => cols.map(c => sanitize(r[c])).join("\t")).join("\n");
+  return `${header}\n${body}`;
 };
 
 const Spinner: React.FC = () => (
@@ -118,7 +167,7 @@ const KPI: React.FC<{ label: string; value: number | string; sub?: string; varia
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export const Admin: React.FC = () => {
-  useAuth();
+  const { loading: authLoading } = useAuth();
   const [tab, setTab] = useState<Tab>("overview");
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<string>("");
@@ -146,6 +195,11 @@ export const Admin: React.FC = () => {
   const [aiStrategy, setAiStrategy]   = useState<AIStrategy | null>(null);
   const [aiRetryMsg, setAiRetryMsg]   = useState("");
   const [activeAITab, setActiveAITab] = useState<AIAction>("insights");
+
+  // Task executor
+  const [execModal, setExecModal] = useState<{ task: any; open: boolean } | null>(null);
+  const [execLoading, setExecLoading] = useState(false);
+  const [execResult, setExecResult] = useState<any>(null);
 
   // Browser
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
@@ -218,11 +272,12 @@ export const Admin: React.FC = () => {
     ];
     const results = await Promise.all(
       tableNames.map(async (t) => {
+        // count is null when RLS denies access — preserve that signal instead of coercing to 0.
         const { count } = await supabase.from(t as any).select("*", { count: "exact", head: true });
-        return { table_name: t, row_count: count ?? 0 };
+        return { table_name: t, row_count: count };
       })
     );
-    setTableHealth(results.sort((a, b) => b.row_count - a.row_count));
+    setTableHealth(results.sort((a, b) => (b.row_count ?? -1) - (a.row_count ?? -1)));
   }, []);
 
   const loadGrades = useCallback(async () => {
@@ -341,7 +396,11 @@ export const Admin: React.FC = () => {
       tableHealth: tableHealth.slice(0, 15).map(t => ({
         table: t.table_name,
         rows: t.row_count,
-        status: t.row_count > 100 ? "populated" : t.row_count > 0 ? "partial" : "empty",
+        status:
+          t.row_count === null ? "unknown (no read access — do NOT generate tasks for this table)"
+          : t.row_count > 100 ? "populated"
+          : t.row_count > 0 ? "partial"
+          : "empty",
       })),
     };
 
@@ -379,7 +438,10 @@ export const Admin: React.FC = () => {
     setLoading(false);
   }, [loadOverview, loadTableHealth, loadGrades, loadQueue, loadRag]);
 
-  useEffect(() => { refreshAll(); }, []);
+  // Wait for auth to hydrate before firing queries — anon role has no SELECT
+  // policy on most tables, so running these as anon would return 0 / null and
+  // mislead the AI Analyst into reporting tables as "empty".
+  useEffect(() => { if (!authLoading) refreshAll(); }, [authLoading]);
 
   // ── Shared fetch helper ────────────────────────────────────────────────────
   const adminPost = async (endpoint: string, body: any) => {
@@ -434,6 +496,27 @@ export const Admin: React.FC = () => {
       await loadGrades();
     } catch (e: any) { setBulkMsg(p => ({ ...p, [gradeId]: `Error: ${e.message}` })); }
     setBulkLoading(p => ({ ...p, [gradeId]: false }));
+  };
+
+  // ── Task executor (gated: preview + confirm) ──────────────────────────────
+  const executeTask = async (task: any) => {
+    setExecLoading(true);
+    setExecResult(null);
+    try {
+      const res = await adminPost("/api/admin/exec-task", {
+        action_type: task.action_type,
+        task_id: task.id,
+      });
+      setExecResult(res);
+      if (res.ok) {
+        setExecModal(null);
+        // Refresh relevant data
+        await Promise.all([loadOverview(), loadTableHealth(), loadQueue()]);
+      }
+    } catch (e: any) {
+      setExecResult({ error: e.message });
+    }
+    setExecLoading(false);
   };
 
   // ── RAG chunk actions ──────────────────────────────────────────────────────
@@ -611,16 +694,22 @@ export const Admin: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {tableHealth.map((t) => (
-                      <tr key={t.table_name} className="border-t border-gray-50 hover:bg-gray-50/50">
-                        <td className="px-4 py-2 font-medium">{t.table_name}</td>
-                        <td className="px-4 py-2">{t.row_count.toLocaleString()}</td>
-                        <td className="px-4 py-2">
-                          <Pill status={t.row_count > 100 ? "populated" : t.row_count > 0 ? "partial" : "empty"}
-                                label={t.row_count > 100 ? "populated" : t.row_count > 0 ? "partial" : "empty"} />
-                        </td>
-                      </tr>
-                    ))}
+                    {tableHealth.map((t) => {
+                      const status: "populated" | "partial" | "empty" | "unknown" =
+                        t.row_count === null ? "unknown"
+                        : t.row_count > 100 ? "populated"
+                        : t.row_count > 0 ? "partial"
+                        : "empty";
+                      return (
+                        <tr key={t.table_name} className="border-t border-gray-50 hover:bg-gray-50/50">
+                          <td className="px-4 py-2 font-medium">{t.table_name}</td>
+                          <td className="px-4 py-2">{t.row_count === null ? "—" : t.row_count.toLocaleString()}</td>
+                          <td className="px-4 py-2">
+                            <Pill status={status} label={status === "unknown" ? "no access" : status} />
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -922,7 +1011,27 @@ export const Admin: React.FC = () => {
           <div className="px-5 py-3 border-b border-gray-50 flex items-center gap-2">
             <Table2 className="w-4 h-4 text-gray-400" />
             <h2 className="font-bold text-sm">Table Browser</h2>
-            <span className="ml-auto text-xs text-gray-400">Select a table to inspect rows</span>
+            <span className="ml-auto text-xs text-gray-400">
+              {browseRows.length > 0 && selectedTable
+                ? `${browseRows.length} row(s) from ${selectedTable}`
+                : "Select a table to inspect rows"}
+            </span>
+            {browseRows.length > 0 && (
+              <>
+                <CopyButton
+                  getText={() => formatRowsAsTSV(browseCols, browseRows)}
+                  label="Copy TSV"
+                  iconClass="w-3.5 h-3.5"
+                  className="text-xs font-medium text-gray-600 hover:text-gray-900 px-2.5 py-1 rounded border border-gray-200 hover:border-gray-300 transition-colors"
+                />
+                <CopyButton
+                  getText={() => JSON.stringify(browseRows, null, 2)}
+                  label="Copy JSON"
+                  iconClass="w-3.5 h-3.5"
+                  className="text-xs font-medium text-gray-600 hover:text-gray-900 px-2.5 py-1 rounded border border-gray-200 hover:border-gray-300 transition-colors"
+                />
+              </>
+            )}
           </div>
           <div className="p-5">
             {/* Table selector */}
@@ -938,7 +1047,7 @@ export const Admin: React.FC = () => {
                   }`}
                 >
                   {t.table_name}
-                  <span className="ml-1.5 opacity-60">{t.row_count.toLocaleString()}</span>
+                  <span className="ml-1.5 opacity-60">{t.row_count === null ? "—" : t.row_count.toLocaleString()}</span>
                 </button>
               ))}
             </div>
@@ -1004,6 +1113,10 @@ export const Admin: React.FC = () => {
                         })}
                         <td className="px-3 py-2">
                           <div className="flex gap-1">
+                            <CopyButton
+                              getText={() => JSON.stringify(row, null, 2)}
+                              className="p-1 rounded bg-gray-100 text-gray-600 hover:bg-emerald-50 hover:text-emerald-600"
+                            />
                             <button onClick={() => setEditRow({ id: row.id, row: { ...row } })}
                               className="p-1 rounded bg-gray-100 text-gray-600 hover:bg-blue-50 hover:text-blue-600">
                               <Pencil className="w-3 h-3" />
@@ -1189,6 +1302,12 @@ export const Admin: React.FC = () => {
                 <span className="ml-auto text-xs bg-gray-50 border border-gray-100 px-2 py-0.5 rounded-full text-gray-500">
                   {aiTaskList.tasks?.length ?? 0} tasks
                 </span>
+                <CopyButton
+                  getText={() => formatTaskListForCopy(aiTaskList.tasks ?? [])}
+                  label="Copy all"
+                  iconClass="w-3.5 h-3.5"
+                  className="text-xs font-medium text-gray-600 hover:text-gray-900 px-2.5 py-1 rounded border border-gray-200 hover:border-gray-300 transition-colors"
+                />
               </div>
               <div className="divide-y divide-gray-50">
                 {aiTaskList.tasks?.map((t) => {
@@ -1224,6 +1343,18 @@ export const Admin: React.FC = () => {
                           <span><strong className="text-gray-500">Based on:</strong> {t.metric_basis}</span>
                           <span><strong className="text-gray-500">Impact:</strong> {t.estimated_impact}</span>
                         </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <button
+                          onClick={() => setExecModal({ task: t, open: true })}
+                          className="px-2.5 py-1 rounded text-xs font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
+                        >
+                          Execute
+                        </button>
+                        <CopyButton
+                          getText={() => formatTaskForCopy(t)}
+                          className="text-gray-400 hover:text-gray-700 p-1.5 rounded hover:bg-gray-100"
+                        />
                       </div>
                     </div>
                   );
@@ -1315,6 +1446,96 @@ export const Admin: React.FC = () => {
               <p className="text-gray-400 text-xs">The agent reads all grade coverage, queue status, and RAG data before responding.</p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── Execute Task Modal ── */}
+      {execModal?.open && execModal.task && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
+              <Zap className="w-5 h-5 text-amber-600" />
+              <h3 className="font-bold text-lg">Confirm Task Execution</h3>
+            </div>
+
+            <div className="px-6 py-4 space-y-4">
+              {/* Task Summary */}
+              <div className="bg-gray-50 rounded-lg p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-sm text-gray-900">{execModal.task.title}</span>
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
+                    {execModal.task.action_type}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-600">{execModal.task.description}</p>
+                <div className="text-xs text-gray-500 space-y-1">
+                  <div><strong>Metric:</strong> {execModal.task.metric_basis}</div>
+                  <div><strong>Impact:</strong> {execModal.task.estimated_impact}</div>
+                </div>
+              </div>
+
+              {/* Result / Error */}
+              {execResult && (
+                <div className={`rounded-lg p-3 text-sm ${
+                  execResult.error
+                    ? "bg-red-50 text-red-700"
+                    : execResult.executed
+                    ? "bg-emerald-50 text-emerald-700"
+                    : "bg-blue-50 text-blue-700"
+                }`}>
+                  {execResult.error ? (
+                    <>
+                      <div className="font-semibold mb-1">Error</div>
+                      <p>{execResult.error}</p>
+                    </>
+                  ) : execResult.executed ? (
+                    <>
+                      <div className="font-semibold mb-1">✓ Executed Successfully</div>
+                      <p>{execResult.preview}</p>
+                      {execResult.rows_affected !== undefined && (
+                        <div className="mt-1 text-xs font-semibold">{execResult.rows_affected} row(s) affected</div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <div className="font-semibold mb-1">Preview</div>
+                      <p>{execResult.preview}</p>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex gap-3 pt-4 border-t border-gray-100">
+                <button
+                  onClick={() => setExecModal(null)}
+                  disabled={execLoading}
+                  className="flex-1 px-4 py-2 rounded-lg border border-gray-200 text-gray-700 font-semibold hover:bg-gray-50 disabled:opacity-40 transition-colors"
+                >
+                  {execResult?.executed ? "Close" : "Cancel"}
+                </button>
+                {!execResult && (
+                  <button
+                    onClick={() => executeTask(execModal.task)}
+                    disabled={execLoading}
+                    className="flex-1 px-4 py-2 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700 disabled:opacity-40 transition-colors flex items-center justify-center gap-2"
+                  >
+                    {execLoading ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        Executing...
+                      </>
+                    ) : (
+                      <>
+                        <Play className="w-4 h-4" />
+                        Execute Now
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

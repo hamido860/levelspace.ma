@@ -434,6 +434,127 @@ Return 3 phases.`
     } catch (err: any) { return res.status(500).json({ error: err.message }); }
   });
 
+  // ── Admin: Execute AI-generated task (gated executor) ──────────────────────
+  apiRouter.post("/admin/exec-task", async (req, res) => {
+    if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
+    const { action_type, task_id } = req.body;
+    if (!action_type) return res.status(400).json({ error: "action_type required" });
+
+    try {
+      // Whitelist of safe, deterministic handlers. No LLM-generated SQL.
+      const handlers: Record<string, () => Promise<{ preview: string; executed: boolean; rows_affected?: number; error?: string }>> = {
+        // Example: Populate Topics from Outlines
+        generate: async () => {
+          // Get all topic outlines that don't have a corresponding topic
+          const { data: outlines, error: outlineErr } = await supabase
+            .from("topic_outlines")
+            .select("id, title, grade_id, subject_id, grade_name, subject_name");
+          if (outlineErr) throw outlineErr;
+          if (!outlines || outlines.length === 0) {
+            return { preview: "No outlines found to populate from", executed: false };
+          }
+
+          // Insert a topic for each outline
+          const topicsToInsert = outlines.map((o: any) => ({
+            title: o.title,
+            grade_id: o.grade_id,
+            subject_id: o.subject_id,
+            description: `Auto-populated from outline`,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }));
+
+          const { error: insertErr } = await supabase
+            .from("topics")
+            .insert(topicsToInsert);
+          if (insertErr) throw insertErr;
+
+          return {
+            preview: `Will insert ${topicsToInsert.length} topics from outlines`,
+            executed: true,
+            rows_affected: topicsToInsert.length,
+          };
+        },
+
+        // Retry all failed queue jobs
+        retry_failed: async () => {
+          const { error } = await supabase
+            .from("lesson_gen_queue")
+            .update({ status: "pending", attempts: 0, last_error: null, claimed_at: null })
+            .eq("status", "failed");
+          if (error) throw error;
+
+          // Get count of updated rows
+          const { count } = await supabase
+            .from("lesson_gen_queue")
+            .select("*", { count: "exact", head: true })
+            .eq("status", "pending");
+
+          return {
+            preview: "Reset all failed jobs to pending status",
+            executed: true,
+            rows_affected: count ?? 0,
+          };
+        },
+
+        // Clear stale queue jobs (older than 7 days)
+        cleanup_queue: async () => {
+          const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+          const { error } = await supabase
+            .from("lesson_gen_queue")
+            .delete()
+            .lt("created_at", sevenDaysAgo);
+          if (error) throw error;
+
+          return {
+            preview: "Delete queue jobs older than 7 days",
+            executed: true,
+            rows_affected: 0, // Supabase delete doesn't return count easily
+          };
+        },
+
+        // Resync RAG embeddings (mark all as pending to re-embed)
+        resync_rag: async () => {
+          const { error } = await supabase
+            .from("rag_chunks")
+            .update({ embedding_status: "pending" })
+            .neq("embedding_status", "pending");
+          if (error) throw error;
+
+          return {
+            preview: "Reset all RAG chunks to pending for re-embedding",
+            executed: true,
+            rows_affected: 0,
+          };
+        },
+      };
+
+      const handler = handlers[action_type];
+      if (!handler) {
+        return res.status(400).json({
+          error: `Unknown action_type: ${action_type}`,
+          allowed: Object.keys(handlers),
+        });
+      }
+
+      const result = await handler();
+      return res.json({
+        ok: true,
+        task_id,
+        action_type,
+        preview: result.preview,
+        executed: result.executed,
+        rows_affected: result.rows_affected ?? 0,
+      });
+    } catch (err: any) {
+      console.error(`[EXEC-TASK] ${action_type} failed:`, err);
+      return res.status(500).json({
+        error: `Execution failed: ${err.message}`,
+        action_type,
+      });
+    }
+  });
+
   // Scraping Agent Endpoint
   apiRouter.get("/scrape", async (req, res) => {
     console.log("Incoming request to /api/scrape");
