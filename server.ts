@@ -443,36 +443,12 @@ Return 3 phases.`
     try {
       // Whitelist of safe, deterministic handlers. No LLM-generated SQL.
       const handlers: Record<string, () => Promise<{ preview: string; executed: boolean; rows_affected?: number; error?: string }>> = {
-        // Example: Populate Topics from Outlines
+        // Placeholder: "generate" requires more context
+        // (what to generate? topics? lessons? depends on metric analysis)
         generate: async () => {
-          // Get all topic outlines that don't have a corresponding topic
-          const { data: outlines, error: outlineErr } = await supabase
-            .from("topic_outlines")
-            .select("id, title, grade_id, subject_id, grade_name, subject_name");
-          if (outlineErr) throw outlineErr;
-          if (!outlines || outlines.length === 0) {
-            return { preview: "No outlines found to populate from", executed: false };
-          }
-
-          // Insert a topic for each outline
-          const topicsToInsert = outlines.map((o: any) => ({
-            title: o.title,
-            grade_id: o.grade_id,
-            subject_id: o.subject_id,
-            description: `Auto-populated from outline`,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          }));
-
-          const { error: insertErr } = await supabase
-            .from("topics")
-            .insert(topicsToInsert);
-          if (insertErr) throw insertErr;
-
           return {
-            preview: `Will insert ${topicsToInsert.length} topics from outlines`,
-            executed: true,
-            rows_affected: topicsToInsert.length,
+            preview: "generate action requires specific context (not yet mapped to a safe handler)",
+            executed: false,
           };
         },
 
