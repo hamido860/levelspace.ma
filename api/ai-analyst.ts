@@ -7,9 +7,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  // Testing fallback — key is also committed in .env. Move to Vercel env vars before going public.
-  const FALLBACK_NVIDIA_KEY = "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";
-  const nvidiaKey = process.env.NVIDIA_API_KEY || process.env.VITE_NVIDIA_API_KEY || FALLBACK_NVIDIA_KEY;
+  const nvidiaKey = process.env.NVIDIA_API_KEY || process.env.VITE_NVIDIA_API_KEY;
   if (!nvidiaKey || nvidiaKey === "MY_NVIDIA_API_KEY") {
     return res.status(503).json({ error: "NVIDIA API key not configured." });
   }
