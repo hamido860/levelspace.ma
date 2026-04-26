@@ -14,6 +14,67 @@ import { getExercisesByLesson } from '../services/exerciseService';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 
+// Moroccan bilingual system — map English ↔ French subject/grade names
+const SUBJECT_ALIASES: Record<string, string[]> = {
+  'mathematics': ['mathématiques', 'maths', 'math'],
+  'mathématiques': ['mathematics', 'maths', 'math'],
+  'physics': ['physique-chimie', 'physique', 'physics-chemistry'],
+  'chemistry': ['physique-chimie', 'chimie'],
+  'physics-chemistry': ['physique-chimie', 'physics', 'chemistry'],
+  'physique-chimie': ['physics-chemistry', 'physics', 'chemistry'],
+  'biology': ['sciences de la vie et de la terre', 'svt', 'life and earth sciences'],
+  'svt': ['biology', 'sciences de la vie et de la terre', 'life and earth sciences'],
+  'sciences de la vie et de la terre': ['biology', 'svt', 'life and earth sciences'],
+  'life and earth sciences': ['sciences de la vie et de la terre', 'svt', 'biology'],
+  'engineering': ['sciences de l\'ingénieur', 'engineering sciences', 'technology'],
+  'sciences de l\'ingénieur': ['engineering', 'engineering sciences', 'technology'],
+  'engineering sciences': ['sciences de l\'ingénieur', 'engineering', 'technology'],
+  'accounting': ['comptabilité', 'finance', 'business'],
+  'comptabilité': ['accounting', 'finance', 'business'],
+  'philosophy': ['philosophie'],
+  'philosophie': ['philosophy'],
+  'history': ['histoire-géographie', 'histoire', 'history-geography'],
+  'histoire': ['history', 'histoire-géographie', 'history-geography'],
+  'histoire-géographie': ['history', 'geography', 'history-geography'],
+  'geography': ['géographie', 'histoire-géographie'],
+  'french': ['langue française', 'français', 'french language'],
+  'français': ['french', 'langue française', 'french language'],
+  'arabic': ['langue arabe', 'arabe', 'arabic language'],
+  'arabe': ['arabic', 'langue arabe', 'arabic language'],
+  'english': ['anglais', 'english language'],
+  'anglais': ['english', 'english language'],
+  'computer science': ['informatique', 'it', 'computer'],
+  'informatique': ['computer science', 'it'],
+  'economics': ['économie', 'economy'],
+  'économie': ['economics', 'economy'],
+  'management': ['sciences de gestion', 'business studies', 'gestion'],
+  'sciences de gestion': ['management', 'business studies', 'gestion'],
+};
+
+const GRADE_ALIASES: Record<string, string[]> = {
+  'grade 12': ['terminale', '2ème bac', 'bac 2', 'tle'],
+  'terminale': ['grade 12', '2ème bac', 'bac 2', 'tle'],
+  '2ème bac': ['grade 12', 'terminale'],
+  'grade 11': ['première', '1ère bac', 'bac 1'],
+  'première': ['grade 11', '1ère bac', 'bac 1'],
+  '1ère bac': ['grade 11', 'première'],
+  'grade 10': ['tronc commun', 'seconde', 'tc'],
+  'tronc commun': ['grade 10', 'seconde'],
+  'seconde': ['grade 10', 'tronc commun'],
+};
+
+const getSubjectSearchTerms = (name: string): string[] => {
+  const key = name.toLowerCase().trim();
+  const aliases = SUBJECT_ALIASES[key] || [];
+  return [name, ...aliases];
+};
+
+const getGradeSearchTerms = (grade: string): string[] => {
+  const key = grade.toLowerCase().trim();
+  const aliases = GRADE_ALIASES[key] || [];
+  return [grade, ...aliases];
+};
+
 export const ClassroomView: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -39,11 +100,16 @@ export const ClassroomView: React.FC = () => {
     if (allLessons.filter(l => l.status !== 'suggested').length > 0) return;
     (async () => {
       try {
+        const subjectTerms = getSubjectSearchTerms(module.name);
+        const gradeTerms = getGradeSearchTerms(selectedGrade);
+        // Build OR of (subject AND grade) pairs to handle bilingual name mismatches
+        const pairs = subjectTerms.flatMap(st =>
+          gradeTerms.map(gt => `and(subject.ilike.%${st}%,grade.ilike.%${gt}%)`)
+        ).join(',');
         const { data: dbLessons } = await supabase
           .from('lessons')
           .select('id, lesson_title, content, blocks, subtitle, status')
-          .ilike('subject', `%${module.name}%`)
-          .ilike('grade', `%${selectedGrade}%`);
+          .or(pairs);
         if (!dbLessons || dbLessons.length === 0) return;
         const toAdd = [];
         for (const les of dbLessons) {
