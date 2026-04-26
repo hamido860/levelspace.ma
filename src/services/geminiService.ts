@@ -61,12 +61,16 @@ export const markKeyInvalid = (key: string) => {
   }
 };
 
+// Browser-side AI availability:
+// - Gemini key present & not flagged invalid & at least one Gemini model not quota-exhausted
+// - NVIDIA from browser is structurally CORS-blocked, so it is NOT a valid client provider
+//   (admin/server-side flows can still use NVIDIA_API_KEY through a proxy)
 export const checkAIProvider = (): boolean => {
   const gKey = getEffectiveApiKey();
-  const nKey = getNvidiaApiKey();
-  const gValid = !!gKey && !isKeyInvalid(gKey);
-  const nValid = !!nKey && !isKeyInvalid(nKey);
-  return gValid || nValid;
+  if (!gKey) return false;
+  if (isKeyInvalid(gKey)) return false;
+  if (modelQuotaTracker.allGeminiExhausted()) return false;
+  return true;
 };
 
 export const setNvidiaApiKey = (key: string) => {
@@ -172,22 +176,22 @@ export const modelQuotaTracker = {
     localStorage.setItem(QUOTA_STORAGE_KEY, JSON.stringify(hits));
     console.warn(`[QuotaTracker] ${model} marked exhausted for ${QUOTA_COOLDOWN_MS / 60000}min`);
   },
-  getBestModel(preferred: string, fallbacks: string[] = []): string {
-    const hits = this._load(); // single read for the entire selection
+  getBestModel(preferred: string, fallbacks: string[] = []): string | null {
+    const hits = this._load();
     const now = Date.now();
     const isExhausted = (m: string) => !!hits[m] && now - hits[m] < QUOTA_COOLDOWN_MS;
     for (const m of [preferred, ...fallbacks]) {
       if (!isExhausted(m)) return m;
     }
-    // All exhausted — reset preferred and return it
-    console.warn("[QuotaTracker] All models exhausted, resetting preferred:", preferred);
-    delete hits[preferred];
-    localStorage.setItem(QUOTA_STORAGE_KEY, JSON.stringify(hits));
-    return preferred;
+    // All exhausted — return null. Caller should bail; do NOT reset and retry.
+    return null;
   },
   isExhausted(model: string): boolean {
     const hits = this._load();
     return !!hits[model] && Date.now() - hits[model] < QUOTA_COOLDOWN_MS;
+  },
+  allGeminiExhausted(): boolean {
+    return GEMINI_FALLBACKS.every((m) => this.isExhausted(m));
   },
 };
 
@@ -691,26 +695,15 @@ export async function generateAIContent(
   params: any,
   context: string,
 ): Promise<any> {
-  if (!currentApiKey) {
-    // No Gemini key — skip straight to NVIDIA if available
-    if (getNvidiaApiKey()) {
-      let promptText = "";
-      if (typeof params.contents === "string") promptText = params.contents;
-      else if (Array.isArray(params.contents)) promptText = params.contents.map((p: any) => p.text || JSON.stringify(p)).join("\n");
-      else promptText = JSON.stringify(params.contents);
-      const isJson = params.config?.responseMimeType === "application/json";
-      try {
-        const nvidiaText = await callNvidiaAPI({ prompt: promptText, isJson, maxTokens: Math.min(params.config?.maxOutputTokens || 4096, 4096) });
-        if (nvidiaText) {
-          updateAIStatus({ lastModel: "Gemma 3 (NVIDIA NIM)", isLocal: false, lastError: null });
-          return { text: nvidiaText, candidates: [{ content: { parts: [{ text: nvidiaText }] } }] };
-        }
-      } catch (e) { console.warn("[generateAIContent] NVIDIA-only path failed:", e); }
-    }
-    const errorMsg = "No AI API key configured. Add a key in Settings → AI Provider.";
+  // Centralized provider-availability gate: covers no key, leaked key, all models exhausted.
+  if (!checkAIProvider()) {
+    const errorMsg = modelQuotaTracker.allGeminiExhausted()
+      ? "All Gemini models are quota-exhausted. Try again later."
+      : "No AI API key configured. Add a key in Settings → AI Provider.";
     updateAIStatus({ lastError: errorMsg });
-    throw new Error(errorMsg);
+    throw new QuotaExceededError(errorMsg);
   }
+  // If getBestModel returned null upstream, fall back to a sane default and let the API decide.
   const primaryModel = params.model || "gemini-2.5-flash";
   try {
     const config = params.config || {};
@@ -766,47 +759,12 @@ export async function generateAIContent(
         }
       }
 
-      // Fallback 2: NVIDIA NIM (Gemma 3 27B) — cloud, no local setup needed
-      try {
-        const nvidiaText = await callNvidiaAPI({
-          prompt: promptText,
-          isJson,
-          temperature: params.config?.temperature || 0.7,
-          maxTokens: Math.min(params.config?.maxOutputTokens || 4096, 4096),
-        });
-        if (nvidiaText) {
-          updateAIStatus({ lastModel: `Gemma 3 (NVIDIA NIM)`, isLocal: false, lastError: null });
-          toast.info("Using Gemma via NVIDIA", { description: "Switched to NVIDIA NIM for this request.", duration: 2000 });
-          return { text: nvidiaText, candidates: [{ content: { parts: [{ text: nvidiaText }] } }] };
-        }
-      } catch (nvidiaError) {
-        console.warn("NVIDIA fallback failed:", nvidiaError);
-      }
-
-      // Fallback 3: Ollama (local Gemma)
-      try {
-        const ollamaResponse = await fetch('http://localhost:11434/api/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: 'gemma',
-            prompt: promptText,
-            stream: false,
-            format: isJson ? 'json' : undefined,
-            options: { temperature: params.config?.temperature || 0.7 }
-          })
-        });
-
-        if (!ollamaResponse.ok) throw new Error(`Ollama failed with status ${ollamaResponse.status}`);
-
-        const ollamaData = await ollamaResponse.json();
-        updateAIStatus({ lastModel: "Gemma (local Ollama)", isLocal: true, lastError: null });
-        toast.info("Using local Gemma", { description: "All cloud models quota-exceeded. Using local Ollama.", duration: 3000 });
-        return { text: ollamaData.response, candidates: [{ content: { parts: [{ text: ollamaData.response }] } }] };
-      } catch (localError) {
-        console.warn("Local Ollama fallback failed:", localError);
-        updateAIStatus({ lastError: "All models quota-exceeded", isLocal: false });
-      }
+      // Browser-side NVIDIA / Ollama fallbacks intentionally removed:
+      // - NVIDIA NIM is CORS-blocked from the browser (must go through a server proxy)
+      // - Ollama on localhost:11434 is rarely present in production users' environments
+      // Both produced noisy console errors and never recovered the request. Admin/server-side
+      // flows still call NVIDIA via the backend proxy, not from this client path.
+      updateAIStatus({ lastError: "All Gemini models quota-exceeded" });
     }
 
     updateAIStatus({ lastError: errorMessage });
