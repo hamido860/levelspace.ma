@@ -33,6 +33,44 @@ export const ClassroomView: React.FC = () => {
   const allLessons = useLiveQuery(() => id ? db.lessons.where('moduleId').equals(id).sortBy('createdAt') : [], [id]);
   const lessons = allLessons?.filter(l => l.status !== 'suggested') || [];
 
+  // Auto-seed from Supabase when local lessons are empty — no AI needed
+  useEffect(() => {
+    if (!module || !id || allLessons === undefined) return;
+    if (allLessons.filter(l => l.status !== 'suggested').length > 0) return;
+    (async () => {
+      try {
+        const { data: dbLessons } = await supabase
+          .from('lessons')
+          .select('id, lesson_title, content, blocks, subtitle, status')
+          .ilike('subject', `%${module.name}%`)
+          .ilike('grade', `%${selectedGrade}%`);
+        if (!dbLessons || dbLessons.length === 0) return;
+        const toAdd = [];
+        for (const les of dbLessons) {
+          const existing = await db.lessons
+            .where('title').equals(les.lesson_title)
+            .and(l => l.moduleId === module.id)
+            .first();
+          if (!existing) {
+            toAdd.push({
+              id: les.id,
+              moduleId: module.id,
+              title: les.lesson_title,
+              content: les.content || '',
+              blocks: les.blocks,
+              subtitle: les.subtitle,
+              status: (les.status === 'published' || les.status === 'done') ? 'done' as const : 'pending' as const,
+              createdAt: Date.now()
+            });
+          }
+        }
+        if (toAdd.length > 0) await db.lessons.bulkAdd(toAdd);
+      } catch (err) {
+        console.warn('[ClassroomView] Auto-seed from Supabase failed:', err);
+      }
+    })();
+  }, [module?.id, allLessons?.length]);
+
   const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
   const settingsMap = Object.fromEntries(dbSettings.map(s => [s.key, s.value]));
 
