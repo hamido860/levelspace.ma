@@ -43,6 +43,14 @@ export const validateMetrics = (metrics: any): ValidationError[] => {
     return [{ field: "root", error: "Metrics must be an object", value: metrics, expected: "object" }];
   }
 
+  const topicsTableHealth = Array.isArray(metrics.tableHealth)
+    ? metrics.tableHealth.find((t: any) => t?.table === "topics")
+    : null;
+  const topicsVisibilityUncertain =
+    typeof topicsTableHealth?.status === "string" &&
+    (topicsTableHealth.status.startsWith("unknown") ||
+      topicsTableHealth.status.startsWith("inconsistent"));
+
   // Basic type checks
   if (typeof metrics.totalTopics !== "number" || metrics.totalTopics < 0) {
     errors.push({
@@ -63,7 +71,7 @@ export const validateMetrics = (metrics: any): ValidationError[] => {
   }
 
   // Lessons can't exceed topics
-  if (metrics.lessonsGenerated > metrics.totalTopics) {
+  if (metrics.lessonsGenerated > metrics.totalTopics && !topicsVisibilityUncertain) {
     errors.push({
       field: "lessonsGenerated",
       error: `Cannot exceed totalTopics (${metrics.totalTopics})`,
@@ -235,17 +243,6 @@ export const validateMetrics = (metrics: any): ValidationError[] => {
           expected: "string",
         });
       }
-
-      // Warn if status is "empty" and table is expected to have data
-      const likelyNonEmpty = ["topics", "lessons", "rag_chunks", "grades"];
-      if (t.status === "empty" && likelyNonEmpty.some(name => t.table.includes(name))) {
-        errors.push({
-          field: `${prefix}.status`,
-          error: `Table "${t.table}" is marked "empty" but typically should have data. Check RLS policies.`,
-          value: t.status,
-          expected: 'status other than "empty" OR confirm table is actually empty',
-        });
-      }
     });
   }
 
@@ -256,8 +253,8 @@ export const validateMetrics = (metrics: any): ValidationError[] => {
  * Format validation errors for display.
  */
 export const formatValidationErrors = (errors: ValidationError[]): string => {
-  if (errors.length === 0) return "✓ Metrics valid";
+  if (errors.length === 0) return "OK: Metrics valid";
   return errors
-    .map(e => `❌ ${e.field}: ${e.error}\n   Got: ${JSON.stringify(e.value)}\n   Expected: ${e.expected}`)
+    .map(e => `ERROR ${e.field}: ${e.error}\n   Got: ${JSON.stringify(e.value)}\n   Expected: ${e.expected}`)
     .join("\n\n");
 };

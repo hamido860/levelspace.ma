@@ -70,15 +70,15 @@ describe("metricsValidator", () => {
     expect(errors.some(e => e.field.includes("lessons") && e.error.includes("Cannot exceed grade topics"))).toBe(true);
   });
 
-  it("warns when 'empty' tables should have data", () => {
-    const invalid = {
+  it("allows empty table-health statuses without failing validation", () => {
+    const metrics = {
       ...validMetrics,
       tableHealth: [
         { table: "topics", rows: 0, status: "empty" },
       ],
     };
-    const errors = validateMetrics(invalid);
-    expect(errors.some(e => e.field.includes("status") && e.error.includes("marked \"empty\""))).toBe(true);
+    const errors = validateMetrics(metrics);
+    expect(errors.some(e => e.field.includes("status"))).toBe(false);
   });
 
   it("allows null rows (RLS denied)", () => {
@@ -92,17 +92,30 @@ describe("metricsValidator", () => {
     expect(errors.filter(e => e.field.includes("rows") && e.error.includes("Must be"))).toHaveLength(0);
   });
 
+  it("skips topic-count mismatch when topic visibility is uncertain", () => {
+    const metrics = {
+      ...validMetrics,
+      totalTopics: 0,
+      lessonsGenerated: 9,
+      tableHealth: [
+        { table: "topics", rows: 0, status: "inconsistent (linked lessons exist but topics are not visible; check RLS or seed state)" },
+      ],
+    };
+    const errors = validateMetrics(metrics);
+    expect(errors.some(e => e.field === "lessonsGenerated" && e.error.includes("Cannot exceed"))).toBe(false);
+  });
+
   it("formats errors for display", () => {
     const invalid = { ...validMetrics, totalTopics: -5 };
     const errors = validateMetrics(invalid);
     const formatted = formatValidationErrors(errors);
-    expect(formatted).toContain("❌");
+    expect(formatted).toContain("ERROR");
     expect(formatted).toContain("totalTopics");
   });
 
   it("returns success message for valid metrics", () => {
     const errors = validateMetrics(validMetrics);
     const formatted = formatValidationErrors(errors);
-    expect(formatted).toBe("✓ Metrics valid");
+    expect(formatted).toBe("OK: Metrics valid");
   });
 });

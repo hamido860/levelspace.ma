@@ -46,6 +46,9 @@ interface BrowseRow { [key: string]: any; }
 
 type Tab = "overview" | "grades" | "queue" | "rag" | "browser" | "ai";
 
+const countDistinctIds = (rows: Array<{ topic_id?: string | null }> | null | undefined) =>
+  new Set((rows || []).map((row) => row.topic_id).filter((value): value is string => Boolean(value))).size;
+
 // ─── AI Analyst Types ────────────────────────────────────────────────────────
 type AIAction = "insights" | "tasks" | "strategy" | "retry_failed";
 interface AIHighlight { type: "warning" | "success" | "info"; title: string; detail: string; }
@@ -258,7 +261,7 @@ export const Admin: React.FC = () => {
   const loadOverview = useCallback(async () => {
     const [
       { count: topicsCount },
-      { count: lessonsCount },
+      { data: lessonTopicLinks },
       { count: pendingCount },
       { count: failedCount },
       { count: ragTotal },
@@ -266,16 +269,17 @@ export const Admin: React.FC = () => {
       { count: usersCount },
     ] = await Promise.all([
       supabase.from("topics").select("*", { count: "exact", head: true }),
-      supabase.from("lessons").select("*", { count: "exact", head: true }),
+      supabase.from("lessons").select("topic_id"),
       supabase.from("lesson_gen_queue").select("*", { count: "exact", head: true }).eq("status", "pending"),
       supabase.from("lesson_gen_queue").select("*", { count: "exact", head: true }).eq("status", "failed"),
       supabase.from("rag_chunks").select("*", { count: "exact", head: true }),
       supabase.from("rag_chunks").select("*", { count: "exact", head: true }).eq("embedding_status", "done"),
       supabase.from("profiles").select("*", { count: "exact", head: true }),
     ]);
+    const coveredTopicsCount = countDistinctIds(lessonTopicLinks as Array<{ topic_id?: string | null }> | null);
     setKpis({
       topics: topicsCount ?? 0,
-      lessons: lessonsCount ?? 0,
+      lessons: coveredTopicsCount,
       pending: pendingCount ?? 0,
       failed: failedCount ?? 0,
       ragTotal: ragTotal ?? 0,
@@ -327,7 +331,11 @@ export const Admin: React.FC = () => {
     const rows: GradeRow[] = grades.map((g: any) => {
       const gradeTopics = (topics || []).filter((t: any) => t.grade_id === g.id);
       const topicIds = new Set(gradeTopics.map((t: any) => t.id));
-      const gradeLessons = (lessons || []).filter((l: any) => topicIds.has(l.topic_id));
+      const coveredTopicIds = new Set(
+        (lessons || [])
+          .map((l: any) => l.topic_id)
+          .filter((topicId: string | null | undefined): topicId is string => Boolean(topicId) && topicIds.has(topicId))
+      );
       const gradeQueue = (queue || []).filter((q: any) => topicIds.has(q.topic_id));
       const cycle: any = g.cycles;
       return {
@@ -337,7 +345,7 @@ export const Admin: React.FC = () => {
         grade: g.name,
         grade_order: g.grade_order,
         total_topics: gradeTopics.length,
-        lessons_generated: gradeLessons.length,
+        lessons_generated: coveredTopicIds.size,
         q_done: gradeQueue.filter((q: any) => q.status === "done").length,
         q_pending: gradeQueue.filter((q: any) => q.status === "pending").length,
         q_failed: gradeQueue.filter((q: any) => q.status === "failed").length,
@@ -422,6 +430,9 @@ export const Admin: React.FC = () => {
         table: t.table_name,
         rows: t.row_count,
         status:
+          t.table_name === "topics" && t.row_count === 0 && kpis.lessons > 0
+            ? "inconsistent (linked lessons exist but topics are not visible; check RLS or seed state)"
+          :
           t.row_count === null ? "unknown (no read access — do NOT generate tasks for this table)"
           : t.row_count > 100 ? "populated"
           : t.row_count > 0 ? "partial"
@@ -701,7 +712,7 @@ export const Admin: React.FC = () => {
         <div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
             <KPI label="Total Topics"      value={kpis.topics ?? "—"} sub="across all grades" />
-            <KPI label="Lessons Generated" value={kpis.lessons ?? "—"} sub={`${pct(kpis.lessons, kpis.topics)}% of topics`} />
+            <KPI label="Lessons Generated" value={kpis.lessons ?? "—"} sub={`${pct(kpis.lessons, kpis.topics)}% of topics covered`} />
             <KPI label="Queue Pending"     value={kpis.pending ?? "—"} sub="need generation"    variant="warn" />
             <KPI label="Queue Failed"      value={kpis.failed ?? "—"}  sub="need retry"          variant="danger" />
             <KPI label="RAG Chunks"        value={kpis.ragTotal ?? "—"} sub={`${pct(kpis.ragDone, kpis.ragTotal)}% embedded`} variant="success" />
