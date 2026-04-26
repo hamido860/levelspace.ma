@@ -15,6 +15,9 @@ export const getEffectiveApiKey = () => getCustomApiKey() || import.meta.env.VIT
 export const getNvidiaApiKey = () =>
   localStorage.getItem("CUSTOM_NVIDIA_API_KEY") || import.meta.env.VITE_NVIDIA_API_KEY || "";
 
+export const checkAIProvider = (): boolean =>
+  !!(getEffectiveApiKey() || getNvidiaApiKey());
+
 export const setNvidiaApiKey = (key: string) => {
   if (key) {
     localStorage.setItem("CUSTOM_NVIDIA_API_KEY", key);
@@ -2047,6 +2050,8 @@ export const generateLessonTags = async (
 export const generateProactiveGreeting = async (
   lessonContent: string,
   userLanguage?: string,
+  subject?: string,
+  grade?: string,
 ): Promise<string> => {
   try {
     // 1. Check Cache
@@ -2054,6 +2059,8 @@ export const generateProactiveGreeting = async (
       "generateProactiveGreeting",
       lessonContent,
       userLanguage,
+      subject,
+      grade,
     );
     const cachedResponse = await responseCache.get(cacheKey);
     if (cachedResponse) {
@@ -2071,9 +2078,11 @@ export const generateProactiveGreeting = async (
       {
         model: modelToUse,
         contents: `Analyze the following lesson content. If the concepts appear particularly complex, advanced, or dense, generate a friendly, proactive message offering to break down the complex parts step-by-step or provide simpler examples. If the content is straightforward, offer to help with any questions, summarize it, or quiz the student on the material. Keep the message brief (1-3 sentences), encouraging, and conversational. Respond in the same language as the lesson content, unless the user's preferred language (${userLanguage || "unknown"}) is different and you think it would help them understand better.
-      
-      LESSON CONTENT:
-      ${lessonContent.substring(0, 4000)}`,
+${subject ? `SUBJECT: ${subject}` : ""}
+${grade ? `STUDENT LEVEL: ${grade}` : ""}
+
+LESSON CONTENT:
+${lessonContent.substring(0, 4000)}`,
         config: {
         },
       },
@@ -2105,7 +2114,9 @@ export const chatWithTutor = async (
   history: ChatMessage[],
   userLanguage?: string,
   userId?: string,
-  strictRAG?: boolean
+  strictRAG?: boolean,
+  subject?: string,
+  grade?: string,
 ): Promise<string> => {
   try {
     // 1. Check Cache
@@ -2116,7 +2127,9 @@ export const chatWithTutor = async (
       history,
       userLanguage,
       userId,
-      strictRAG
+      strictRAG,
+      subject,
+      grade,
     );
     const cachedResponse = await responseCache.get(cacheKey);
     if (cachedResponse) {
@@ -2158,9 +2171,11 @@ export const chatWithTutor = async (
       ai.chats.create({
         model: model,
         config: {
-          systemInstruction: `You are an AI tutor helping a student understand a specific lesson. 
+          systemInstruction: `You are an AI tutor helping a student understand a specific lesson.
 PRIMARY RULE: You should first try to answer questions, explain concepts, extend ideas, or generate practice questions using ONLY the provided LESSON CONTENT and ADDITIONAL RELEVANT CONTEXT.
 ${strictRagInstruction}
+${subject ? `SUBJECT: ${subject}` : ""}
+${grade ? `STUDENT LEVEL: ${grade}` : ""}
 ${userLanguage ? `\nThe user's preferred interface language is '${userLanguage}'. If they ask for explanations in another language, or if it helps them understand better, feel free to use their preferred language or any other language they request.` : ""}
 
 LESSON CONTENT:
@@ -2187,11 +2202,7 @@ ${augmentedContext}`,
         console.warn(
           `Pipeline: Quota exceeded for ${modelToUse}. Falling back to gemini-2.5-flash-lite for chat.`,
         );
-        toast.info("Switching AI Model", {
-          description:
-            "Primary model quota reached. Switching to a lighter model for this chat.",
-          duration: 3000,
-        });
+        toast.info("Adjusting response quality...", { duration: 2000 });
         chat = createChat("gemini-2.5-flash-lite");
         response = await chat.sendMessage({ message });
       } else {

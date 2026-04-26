@@ -42,13 +42,14 @@ import Markdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import { toast } from 'sonner';
-import { 
-  auditLessonLanguage, 
-  AuditResult, 
-  explainText, 
+import {
+  auditLessonLanguage,
+  AuditResult,
+  explainText,
   generateLessonTags,
   generateInteractiveContent,
-  generateAnotherExample
+  generateAnotherExample,
+  checkAIProvider
 } from '../services/geminiService';
 import { getQuizzesByLesson } from '../services/quizService';
 import { getExercisesByLesson } from '../services/exerciseService';
@@ -129,10 +130,10 @@ const Timer = () => {
 };
 
 const PENDING_STAGES = [
-  'Gemini Pro: investigating curriculum + RAG...',
+  'Analyzing curriculum...',
   'Building generation plan...',
-  'Gemma 4: generating lesson...',
-  'Validating + saving...',
+  'Generating lesson content...',
+  'Validating and saving...',
 ];
 
 // Shown when AI Crew is generating a lesson on-demand (status === 'pending')
@@ -192,6 +193,7 @@ export const LessonView: React.FC = () => {
   const { settings } = useAppSettings();
   const askAiAccess = settings.ask_ai_access || 'admin';
   const hasAiAccess = askAiAccess === 'all' || (askAiAccess === 'admin' && isAdmin);
+  const aiAvailable = checkAIProvider();
 
   const [openBlocks, setOpenBlocks] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'content' | 'quizzes' | 'exercises'>('content');
@@ -326,7 +328,7 @@ export const LessonView: React.FC = () => {
   };
 
   const handleExplain = async () => {
-    if (!selectedText || !lesson || !hasAiAccess) return;
+    if (!selectedText || !lesson || !hasAiAccess || !aiAvailable) return;
     setIsExplaining(true);
     setExplanation(null);
     try {
@@ -481,7 +483,7 @@ export const LessonView: React.FC = () => {
   };
 
   const handleAudit = async () => {
-    if (!effectiveLesson || !module || !hasAiAccess) return;
+    if (!effectiveLesson || !module || !hasAiAccess || !aiAvailable) return;
     setIsAuditing(true);
     setAuditResult(null);
     try {
@@ -501,7 +503,7 @@ export const LessonView: React.FC = () => {
   };
 
   const handleGenerateTags = async () => {
-    if (!effectiveLesson || !hasAiAccess) return;
+    if (!effectiveLesson || !hasAiAccess || !aiAvailable) return;
     setIsGeneratingTags(true);
     try {
       const content = effectiveLesson.blocks?.map(b => b.content || '').join('\n') || effectiveLesson.content || '';
@@ -585,7 +587,7 @@ export const LessonView: React.FC = () => {
   };
 
   const handleGenerateInteractive = async (type: 'hard_questions' | 'more_examples' | 'exam_questions') => {
-    if (!effectiveLesson || !hasAiAccess) return;
+    if (!effectiveLesson || !hasAiAccess || !aiAvailable) return;
     setIsGeneratingInteractive(true);
     setActiveInteractiveType(type);
     setInteractiveContent(null);
@@ -738,9 +740,11 @@ export const LessonView: React.FC = () => {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleExplain();
+                    if (aiAvailable) handleExplain();
                   }}
-                  className="explain-btn shrink-0 bg-accent text-paper px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-accent-hover transition-colors"
+                  disabled={!aiAvailable}
+                  title={!aiAvailable ? "AI help requires API key" : undefined}
+                  className="explain-btn shrink-0 bg-accent text-paper px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-accent"
                 >
                   <Brain size={14} />
                   Explain
@@ -766,7 +770,7 @@ export const LessonView: React.FC = () => {
               </div>
               <div>
                 <h3 className="text-sm font-bold uppercase tracking-widest text-ink">AI Contextual Explanation</h3>
-                <p className="text-[10px] text-muted font-medium">Deep learning support powered by Gemini</p>
+                <p className="text-[10px] text-muted font-medium">Grounded in this lesson's content</p>
               </div>
             </div>
           }
@@ -1002,10 +1006,11 @@ export const LessonView: React.FC = () => {
                 <Sparkles className="w-3 h-3" />
                 Workspace
               </button>
-              <button 
+              <button
                 onClick={handleGenerateTags}
-                disabled={isGeneratingTags || !hasAiAccess}
-                className="flex items-center gap-2 px-3 py-1.5 bg-accent/5 text-accent rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-accent/10 transition-all disabled:opacity-50"
+                disabled={isGeneratingTags || !hasAiAccess || !aiAvailable}
+                title={!aiAvailable ? "AI features need an API key — configure one in Settings to enable." : ""}
+                className="flex items-center gap-2 px-3 py-1.5 bg-accent/5 text-accent rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-accent/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isGeneratingTags ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
                 {isGeneratingTags ? 'Generating...' : 'Auto Tags'}
@@ -2010,9 +2015,12 @@ export const LessonView: React.FC = () => {
         }}
       />
 
-      <AIAssistant 
+      <AIAssistant
         lessonContent={effectiveLesson?.blocks?.map((b: any) => b.content || '').join('\n') || effectiveLesson?.content || ''}
         strictRAG={module?.strictRAG}
+        subject={module?.name}
+        grade={selectedGrade}
+        aiAvailable={aiAvailable}
       />
     </Layout>
   );

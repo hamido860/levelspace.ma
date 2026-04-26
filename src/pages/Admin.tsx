@@ -94,6 +94,30 @@ const Pill: React.FC<{ status: "done" | "pending" | "failed" | "empty" | "partia
   );
 };
 
+const ValidationPill: React.FC<{ value?: string | null }> = ({ value }) => {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  let classes = "bg-gray-100 text-gray-600";
+  if (["passed", "valid", "approved", "success"].includes(normalized)) {
+    classes = "bg-emerald-100 text-emerald-800";
+  } else if (["failed", "invalid", "rejected", "error"].includes(normalized)) {
+    classes = "bg-red-100 text-red-800";
+  } else if (["pending", "queued", "processing", "review"].includes(normalized)) {
+    classes = "bg-amber-100 text-amber-800";
+  }
+
+  return (
+    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${classes}`}>
+      {value ?? "—"}
+    </span>
+  );
+};
+
+const formatQualityScore = (value: unknown) => {
+  if (value === null || value === undefined || value === "") return "—";
+  const num = Number(value);
+  return Number.isFinite(num) ? num.toFixed(2) : String(value);
+};
+
 const CopyButton: React.FC<{ getText: () => string; label?: string; className?: string; iconClass?: string }> = ({
   getText, label, className = "", iconClass = "w-3 h-3",
 }) => {
@@ -331,7 +355,7 @@ export const Admin: React.FC = () => {
 
     const { data: failed } = await supabase
       .from("lesson_gen_queue")
-      .select("id, topic_id, attempts, last_error, created_at, topics(title)")
+      .select("id, topic_id, track_id, attempts, last_error, created_at, validation_status, quality_score, topics(title)")
       .eq("status", "failed")
       .order("created_at", { ascending: false })
       .limit(10);
@@ -488,7 +512,7 @@ export const Admin: React.FC = () => {
     const topicTitle = (job.topics as any)?.title ?? job.topic_id;
     setJobLoading(p => ({ ...p, [job.id]: "generate" }));
     try {
-      await adminPost("/api/admin/generate-lesson", { topicId: job.topic_id, topicTitle });
+      await adminPost("/api/admin/generate-lesson", { topicId: job.topic_id, topicTitle, trackId: job.track_id });
       setJobMsg(p => ({ ...p, [job.id]: "Lesson generated" }));
       setFailedJobs(prev => prev.filter(j => j.id !== job.id));
       await Promise.all([loadQueue(), loadGrades()]);
@@ -874,7 +898,10 @@ export const Admin: React.FC = () => {
                   <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
                     <tr>
                       <th className="px-4 py-2 text-left">Topic</th>
+                      <th className="px-4 py-2 text-left">Track ID</th>
                       <th className="px-4 py-2 text-left">Attempts</th>
+                      <th className="px-4 py-2 text-left">Validation</th>
+                      <th className="px-4 py-2 text-left">Quality</th>
                       <th className="px-4 py-2 text-left">Error</th>
                       <th className="px-4 py-2 text-left">Date</th>
                       <th className="px-4 py-2 text-left">Actions</th>
@@ -886,7 +913,10 @@ export const Admin: React.FC = () => {
                       return (
                         <tr key={j.id} className="border-t border-gray-50 hover:bg-gray-50/40">
                           <td className="px-4 py-2">{(j.topics as any)?.title ?? j.topic_id}</td>
+                          <td className="px-4 py-2 font-mono text-xs text-gray-500">{j.track_id ?? "—"}</td>
                           <td className="px-4 py-2">{j.attempts}</td>
+                          <td className="px-4 py-2"><ValidationPill value={j.validation_status} /></td>
+                          <td className="px-4 py-2 font-medium">{formatQualityScore(j.quality_score)}</td>
                           <td className="px-4 py-2 text-red-500 text-xs max-w-xs truncate">{(j.last_error ?? "").substring(0, 100)}</td>
                           <td className="px-4 py-2 text-xs text-gray-400">{new Date(j.created_at).toLocaleDateString()}</td>
                           <td className="px-4 py-2">

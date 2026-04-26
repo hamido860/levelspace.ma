@@ -7,7 +7,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 import { supabase } from '../db/supabase';
 import { TagsManager } from '../components/TagsManager';
-import { generateSeedLesson, generateLessonSuggestions, LessonSuggestion } from '../services/geminiService';
+import { generateSeedLesson, generateLessonSuggestions, LessonSuggestion, checkAIProvider } from '../services/geminiService';
 import { aiCrew } from '../services/aiCrewService';
 import { getQuizzesByLesson } from '../services/quizService';
 import { getExercisesByLesson } from '../services/exerciseService';
@@ -27,6 +27,7 @@ export const ClassroomView: React.FC = () => {
   const [quizzes, setQuizzes] = useState<any[]>([]);
   const [exercises, setExercises] = useState<any[]>([]);
   const [isLoadingExtra, setIsLoadingExtra] = useState(false);
+  const aiAvailable = checkAIProvider();
 
   const module = useLiveQuery(() => id ? db.modules.get(id) : undefined, [id]);
   const allLessons = useLiveQuery(() => id ? db.lessons.where('moduleId').equals(id).sortBy('createdAt') : [], [id]);
@@ -125,12 +126,6 @@ export const ClassroomView: React.FC = () => {
     }
   };
 
-  React.useEffect(() => {
-    // Auto-fetch gallery if there are no lessons and no suggestions yet
-    if (module && allLessons !== undefined && allLessons.length === 0 && suggestions.length === 0 && !isFetchingGallery) {
-      fetchGallery();
-    }
-  }, [module, allLessons]);
 
   const buildChainContext = async (maxChars = 8000): Promise<string> => {
     if (!module) return '';
@@ -400,17 +395,19 @@ export const ClassroomView: React.FC = () => {
           </div>
 
             <div className="flex items-center gap-3">
-            <button 
+            <button
               onClick={handleAuditClassroom}
-              className="flex items-center gap-2 bg-surface-low text-muted hover:text-accent px-4 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all border border-ink/5"
-              title="Audit Classroom Content"
+              disabled={!aiAvailable}
+              title={!aiAvailable ? "AI features need an API key, but your classroom content is available." : "Audit Classroom Content"}
+              className="flex items-center gap-2 bg-surface-low text-muted hover:text-accent px-4 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all border border-ink/5 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ShieldCheck size={14} />
               Audit
             </button>
-            <button 
+            <button
               onClick={() => handleGenerateLesson()}
-              disabled={!!generatingTitle}
+              disabled={!aiAvailable || !!generatingTitle}
+              title={!aiAvailable ? "AI features need an API key, but your classroom content is available." : ""}
               className="flex items-center gap-2 bg-ink text-paper px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-accent transition-all shadow-lg shadow-ink/10 disabled:opacity-50"
             >
               {generatingTitle === module.name ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
@@ -543,10 +540,11 @@ export const ClassroomView: React.FC = () => {
                 Curriculum Units
               </h3>
               {lessons.length > 0 && suggestions.length === 0 && (
-                <button 
+                <button
                   onClick={fetchGallery}
-                  disabled={isFetchingGallery}
-                  className="text-[10px] font-bold text-accent uppercase tracking-widest hover:underline flex items-center gap-1"
+                  disabled={isFetchingGallery || !aiAvailable}
+                  title={!aiAvailable ? "AI features need an API key, but your classroom content is available." : ""}
+                  className="text-[10px] font-bold text-accent uppercase tracking-widest hover:underline flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isFetchingGallery ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />}
                   Fetch Lesson Gallery
@@ -600,22 +598,38 @@ export const ClassroomView: React.FC = () => {
                   </motion.div>
                 ))
               ) : (
-                <div className="bg-surface-low/50 border border-dashed border-ink/10 rounded-3xl p-16 flex flex-col items-center justify-center text-center space-y-4">
+                <div className="bg-surface-low/50 border border-dashed border-ink/10 rounded-3xl p-16 flex flex-col items-center justify-center text-center space-y-6">
                   <div className="w-16 h-16 bg-paper rounded-full flex items-center justify-center shadow-sm">
-                    <Sparkles size={24} className="text-accent" />
+                    <BookOpen size={24} className="text-accent" />
                   </div>
-                  <div className="space-y-1">
+                  <div className="space-y-2">
                     <p className="text-sm font-bold text-ink">No units curated yet</p>
-                    <p className="text-xs text-muted max-w-xs">Click "Fetch Lesson Gallery" to see suggested curriculum units for this classroom.</p>
+                    <p className="text-xs text-muted max-w-xs">Load existing curriculum units from Supabase or generate new ones with AI.</p>
                   </div>
-                  <button 
-                    onClick={fetchGallery}
-                    disabled={isFetchingGallery}
-                    className="text-xs font-bold text-accent uppercase tracking-widest hover:underline disabled:opacity-50 flex items-center gap-2"
-                  >
-                    {isFetchingGallery ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-                    {isFetchingGallery ? "Fetching Gallery..." : "Fetch Lesson Gallery"}
-                  </button>
+                  {!aiAvailable && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 w-full max-w-sm">
+                      <p className="text-xs text-amber-800 font-medium">AI features need an API key, but your classroom content is available.</p>
+                    </div>
+                  )}
+                  <div className="flex flex-col sm:flex-row gap-3 w-full max-w-sm">
+                    <button
+                      onClick={handleSeedFromSupabase}
+                      disabled={isSeeding}
+                      className="flex-1 flex items-center justify-center gap-2 bg-ink text-paper px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-accent transition-all disabled:opacity-50"
+                    >
+                      {isSeeding ? <Loader2 size={14} className="animate-spin" /> : <Database size={14} />}
+                      {isSeeding ? "Loading..." : "Load from Supabase"}
+                    </button>
+                    <button
+                      onClick={fetchGallery}
+                      disabled={isFetchingGallery || !aiAvailable}
+                      title={!aiAvailable ? "AI features need an API key, but your classroom content is available." : ""}
+                      className="flex-1 flex items-center justify-center gap-2 bg-surface-low text-ink px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-accent/10 transition-all disabled:opacity-50"
+                    >
+                      {isFetchingGallery ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                      {isFetchingGallery ? "Generating..." : "Generate with AI"}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

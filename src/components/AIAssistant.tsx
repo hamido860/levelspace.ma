@@ -24,9 +24,12 @@ declare global {
 interface AIAssistantProps {
   lessonContent: string;
   strictRAG?: boolean;
+  subject?: string;
+  grade?: string;
+  aiAvailable?: boolean;
 }
 
-export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictRAG }) => {
+export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictRAG, subject, grade, aiAvailable = true }) => {
   const { language } = useLanguage();
   const { user, isAdmin } = useAuth();
   const { settings } = useAppSettings();
@@ -34,6 +37,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
   const hasAccess = askAiAccess === 'all' || (askAiAccess === 'admin' && isAdmin);
 
   const [isOpen, setIsOpen] = useState(false);
+  const [greetingFetched, setGreetingFetched] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -53,7 +57,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
 
   useEffect(() => {
     setMounted(true);
-    
+
     const handleOpenAIAssistant = (e: CustomEvent<{ initialInput?: string }>) => {
       setIsOpen(true);
       if (e.detail?.initialInput) {
@@ -69,30 +73,22 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
     return () => window.removeEventListener('open-ai-assistant' as any, handleOpenAIAssistant);
   }, []);
 
+  // Lazy greeting: only fetch when the panel is first opened
   useEffect(() => {
+    if (!isOpen || greetingFetched || !lessonContent || !aiAvailable) return;
     let isMounted = true;
-    const fetchGreeting = async () => {
-      if (!lessonContent || messages.length > 0) return;
-      setIsLoading(true);
-      try {
-        const greeting = await generateProactiveGreeting(lessonContent, language);
-        if (isMounted) {
-          setMessages([{ role: 'model', parts: [{ text: greeting }] }]);
-        }
-      } catch (e) {
-        if (isMounted) {
-          setMessages([{ role: 'model', parts: [{ text: "How can I help you with this lesson? I can answer questions, explain concepts, or test your knowledge." }] }]);
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    };
-    
-    fetchGreeting();
+    setGreetingFetched(true);
+    setIsLoading(true);
+    generateProactiveGreeting(lessonContent, language, subject, grade)
+      .then(greeting => {
+        if (isMounted) setMessages([{ role: 'model', parts: [{ text: greeting }] }]);
+      })
+      .catch(() => {
+        if (isMounted) setMessages([{ role: 'model', parts: [{ text: "How can I help you with this lesson? I can answer questions, explain concepts, or test your knowledge." }] }]);
+      })
+      .finally(() => { if (isMounted) setIsLoading(false); });
     return () => { isMounted = false; };
-  }, [lessonContent]);
+  }, [isOpen]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -146,7 +142,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
            context += "\n\nAdditional Context from Database:\n" + results.map(r => `Title: ${r.lesson_title}\nContent: ${r.content}`).join('\n\n');
         }
 
-        const responseText = await chatWithTutor(text, context, messages, language, user?.id, !!strictRAG);
+        const responseText = await chatWithTutor(text, context, messages, language, user?.id, !!strictRAG, subject, grade);
         const modelMessage: ChatMessage = { role: 'model', parts: [{ text: responseText }] };
         setMessages(prev => [...prev, modelMessage]);
       }
@@ -170,6 +166,23 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
   ];
 
   if (!mounted || !hasAccess) return null;
+
+  if (!aiAvailable) {
+    return createPortal(
+      <div className="fixed bottom-6 right-6 z-50 group">
+        <button
+          disabled
+          className="w-14 h-14 bg-surface-mid text-muted rounded-full shadow-xl flex items-center justify-center cursor-not-allowed opacity-60"
+        >
+          <MessageCircle size={24} />
+        </button>
+        <div className="absolute bottom-16 right-0 bg-ink text-paper text-xs px-3 py-2 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-lg">
+          AI help requires API key
+        </div>
+      </div>,
+      document.body
+    );
+  }
 
   return createPortal(
     <>
