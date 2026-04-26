@@ -3,6 +3,7 @@ import { Layout } from "../components/Layout";
 import { SEO } from "../components/SEO";
 import { supabase } from "../db/supabase";
 import { useAuth } from "../context/AuthContext";
+import { validateMetrics, formatValidationErrors } from "../services/metricsValidator";
 import {
   RefreshCw, Database, BarChart2, BookOpen, Cpu, Table2,
   AlertTriangle, CheckCircle, Clock, Layers, Sparkles,
@@ -374,7 +375,7 @@ export const Admin: React.FC = () => {
     setAiRetryMsg("");
 
     // Build a compact metrics snapshot from live state
-    const metricsSnapshot = {
+    const metricsSnapshot: any = {
       totalTopics: kpis.topics,
       lessonsGenerated: kpis.lessons,
       lessonCoverage: `${pct(kpis.lessons, kpis.topics)}%`,
@@ -403,6 +404,14 @@ export const Admin: React.FC = () => {
           : "empty",
       })),
     };
+
+    // Validate metrics before sending to AI
+    const validationErrors = validateMetrics(metricsSnapshot);
+    if (validationErrors.length > 0) {
+      setAiError(`⚠️ Metrics validation failed:\n${formatValidationErrors(validationErrors)}`);
+      setAiLoading(false);
+      return;
+    }
 
     try {
       const res = await fetch("/api/ai-analyst", {
