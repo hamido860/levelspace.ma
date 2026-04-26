@@ -67,7 +67,7 @@ export const ClassroomView: React.FC = () => {
   }, [activeTab, lessons]);
 
   const fetchGallery = async () => {
-    if (!module) return;
+    if (!module || !aiAvailable) return;
     setIsFetchingGallery(true);
     try {
       // Fetch existing topics from Supabase if they exist
@@ -159,7 +159,7 @@ export const ClassroomView: React.FC = () => {
   };
 
   const handleGenerateLesson = async (title?: string, autoNavigate = false) => {
-    if (!module) return;
+    if (!module || !aiAvailable) return;
     const lessonTitle = title || module.name;
     setGeneratingTitle(lessonTitle);
     try {
@@ -206,7 +206,7 @@ export const ClassroomView: React.FC = () => {
   };
 
   const handleCurateSelected = async () => {
-    if (!module || selectedSuggestions.length === 0) return;
+    if (!module || selectedSuggestions.length === 0 || !aiAvailable) return;
     setGeneratingTitle('selected');
     try {
       const existingContext = await buildChainContext();
@@ -245,7 +245,7 @@ export const ClassroomView: React.FC = () => {
   };
 
   const handleCurateAll = async () => {
-    if (!module || suggestions.length === 0) return;
+    if (!module || suggestions.length === 0 || !aiAvailable) return;
     setGeneratingTitle('all');
     try {
       const existingContext = await buildChainContext();

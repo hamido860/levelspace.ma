@@ -10,10 +10,25 @@ import { mcpClient } from "./mcpClient";
 export const getCustomApiKey = () =>
   localStorage.getItem("CUSTOM_GEMINI_API_KEY") || "";
 
-export const getEffectiveApiKey = () => getCustomApiKey() || import.meta.env.VITE_GEMINI_API_KEY || "";
+// Flexible provider keys — users configure these instead of provider-specific ones
+export const getAiApiKey = () =>
+  localStorage.getItem("AI_API_KEY") || import.meta.env.VITE_AI_API_KEY || "";
 
+export const getAiProvider = () =>
+  localStorage.getItem("AI_PROVIDER") || import.meta.env.VITE_AI_PROVIDER || "gemini";
+
+export const getAiModel = () =>
+  localStorage.getItem("AI_MODEL") || import.meta.env.VITE_AI_MODEL || "";
+
+export const getAiBaseUrl = () =>
+  localStorage.getItem("AI_BASE_URL") || import.meta.env.VITE_AI_BASE_URL || "";
+
+export const getEffectiveApiKey = () =>
+  getCustomApiKey() || getAiApiKey() || import.meta.env.VITE_GEMINI_API_KEY || "";
+
+// NVIDIA: localStorage only — VITE_NVIDIA_API_KEY removed (browser→NVIDIA is CORS-blocked)
 export const getNvidiaApiKey = () =>
-  localStorage.getItem("CUSTOM_NVIDIA_API_KEY") || import.meta.env.VITE_NVIDIA_API_KEY || "";
+  localStorage.getItem("CUSTOM_NVIDIA_API_KEY") || "";
 
 export const checkAIProvider = (): boolean =>
   !!(getEffectiveApiKey() || getNvidiaApiKey());
@@ -80,8 +95,10 @@ export let ai = new GoogleGenAI({ apiKey: currentApiKey || "missing_api_key" });
 export const setCustomApiKey = (key: string) => {
   if (key) {
     localStorage.setItem("CUSTOM_GEMINI_API_KEY", key);
+    localStorage.setItem("AI_API_KEY", key);
   } else {
     localStorage.removeItem("CUSTOM_GEMINI_API_KEY");
+    localStorage.removeItem("AI_API_KEY");
   }
   currentApiKey = getEffectiveApiKey();
   ai = new GoogleGenAI({ apiKey: currentApiKey || "missing_api_key" });
@@ -636,10 +653,8 @@ export async function generateAIContent(
         }
       } catch (e) { console.warn("[generateAIContent] NVIDIA-only path failed:", e); }
     }
-    const errorMsg = "No AI API key configured. Add a Gemini or NVIDIA key in Settings.";
-    console.error(errorMsg);
+    const errorMsg = "No AI API key configured. Add a key in Settings → AI Provider.";
     updateAIStatus({ lastError: errorMsg });
-    toast.error("AI Configuration Error", { description: errorMsg, duration: 5000 });
     throw new Error(errorMsg);
   }
   const primaryModel = params.model || "gemini-2.5-flash";
@@ -1346,6 +1361,7 @@ export const generateCurriculum = async (
   isAdmin: boolean = false,
   retries = 2,
 ): Promise<AICuratedModule[]> => {
+  if (!checkAIProvider()) return [];
   try {
     // 1. Check Cache
     const cacheKey = getCacheKey("generateCurriculum", country, grade, isAdmin);
@@ -1440,6 +1456,7 @@ export const generateSeedLesson = async (
   strictRAG?: boolean,
   existingContext?: string
 ): Promise<AILesson | null> => {
+  if (!checkAIProvider()) return null;
   try {
     // 1. Check Cache
     const cacheKey = getCacheKey(
@@ -1714,6 +1731,7 @@ export const generateLessonSuggestions = async (
   retries = 2,
   existingTopics?: string[]
 ): Promise<LessonSuggestion[]> => {
+  if (!checkAIProvider()) return [];
   try {
     // 1. Check Cache
     const cacheKey = getCacheKey(

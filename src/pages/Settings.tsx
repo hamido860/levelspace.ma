@@ -842,36 +842,37 @@ export const Settings: React.FC = () => {
               </div>
             </section>
 
-            {/* API Key Settings */}
+            {/* AI Provider API Key */}
             <section className="p-5 bg-paper border border-ink/5 rounded-3xl space-y-5 shadow-sm flex flex-col">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 bg-accent/5 rounded-lg flex items-center justify-center text-accent">
                   <Key className="w-4 h-4" />
                 </div>
                 <div className="space-y-0.5">
-                  <h2 className="text-base font-medium text-ink leading-tight">Google AI Studio API Key</h2>
-                  <p className="text-[10px] text-muted/60 leading-tight">Use your own Gemini API key</p>
+                  <h2 className="text-base font-medium text-ink leading-tight">AI Provider API Key</h2>
+                  <p className="text-[10px] text-muted/60 leading-tight">Configure your AI key — classroom content works without one</p>
                 </div>
               </div>
-              
+
               <div className="space-y-4 flex-grow">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted">API Key</label>
-                  <input 
-                    type="password" 
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted">AI_API_KEY</label>
+                  <input
+                    type="password"
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
-                    placeholder="AIzaSy..."
+                    placeholder="AIzaSy... or sk-... or nvapi-..."
                     className="w-full p-3 bg-background border border-ink/5 rounded-xl text-sm outline-none focus:ring-1 focus:ring-accent/20 font-mono"
                   />
                 </div>
-                <div className="text-xs text-muted leading-relaxed">
-                  Your key is stored locally in your browser and is never sent to our servers.
+                <div className="text-xs text-muted leading-relaxed space-y-1">
+                  <p>Stored locally in your browser — never sent to our servers.</p>
+                  <p className="text-[10px] font-mono text-muted/60">AI_PROVIDER · AI_API_KEY · AI_MODEL · AI_BASE_URL</p>
                 </div>
               </div>
-              
+
               <div className="pt-4 border-t border-ink/5 flex justify-end">
-                <button 
+                <button
                   onClick={handleSaveApiKey}
                   className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all flex items-center gap-2 ${
                     isApiKeySaved ? 'bg-emerald-500 text-paper' : 'bg-ink text-paper hover:bg-accent'
@@ -883,7 +884,7 @@ export const Settings: React.FC = () => {
               </div>
             </section>
 
-            {/* NVIDIA API Key */}
+            {/* NVIDIA NIM API Key — Admin AI Features */}
             <section className="p-5 bg-paper border border-ink/5 rounded-3xl space-y-5 shadow-sm flex flex-col">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 bg-success/10 rounded-lg flex items-center justify-center text-success">
@@ -891,13 +892,13 @@ export const Settings: React.FC = () => {
                 </div>
                 <div className="space-y-0.5">
                   <h2 className="text-base font-medium text-ink leading-tight">NVIDIA NIM API Key</h2>
-                  <p className="text-[10px] text-muted/60 leading-tight">Enables Gemma 3 27B as AI fallback — free credits</p>
+                  <p className="text-[10px] text-muted/60 leading-tight">Admin AI features only — Gemma 3 27B via server proxy</p>
                 </div>
               </div>
 
               <div className="space-y-4 flex-grow">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted">API Key</label>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted">NVIDIA_API_KEY</label>
                   <input
                     type="password"
                     value={nvidiaKey}
@@ -907,7 +908,7 @@ export const Settings: React.FC = () => {
                   />
                 </div>
                 <div className="text-xs text-muted leading-relaxed">
-                  Used for lesson generation when Gemini quota is exceeded. Model: <span className="font-mono text-accent">google/gemma-3-27b-it</span>. Get a free key at <span className="font-mono">build.nvidia.com</span>.
+                  Used for admin bulk generation. Model: <span className="font-mono text-accent">google/gemma-3-27b-it</span>. Get a free key at <span className="font-mono">build.nvidia.com</span>.
                 </div>
               </div>
 

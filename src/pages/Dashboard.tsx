@@ -48,7 +48,7 @@ import { SEO } from '../components/SEO';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 import { supabase, checkSupabaseConnection } from '../db/supabase';
-import { generateLessonSuggestions, LessonSuggestion } from '../services/geminiService';
+import { generateLessonSuggestions, LessonSuggestion, checkAIProvider } from '../services/geminiService';
 import { lessonService } from '../services/lessonService';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
@@ -114,12 +114,17 @@ export const Dashboard: React.FC = () => {
   const handleModuleClick = (moduleId: string, moduleName: string) => {
     console.log("Module clicked:", moduleName, moduleId);
     setSelectedModule({ id: moduleId, name: moduleName });
-    setIsFetchingGallery(true);
     setSuggestions([]);
-    
+
+    if (!checkAIProvider()) {
+      setIsFetchingGallery(false);
+      return;
+    }
+
+    setIsFetchingGallery(true);
     const grade = selectedGrade;
     const country = selectedCountry;
-    
+
     // Fetch in background
     generateLessonSuggestions(moduleName, grade, country)
       .then(gallery => {
