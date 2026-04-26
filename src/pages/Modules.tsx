@@ -84,7 +84,10 @@ export const Modules: React.FC = () => {
         } else {
           setBacTrackName(selectedBacTrackId);
         }
+      } else {
+        setBacTrackName("");
       }
+
       if (selectedBacIntOptionId) {
         const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(selectedBacIntOptionId);
         if (isUUID) {
@@ -93,12 +96,14 @@ export const Modules: React.FC = () => {
         } else {
           setBacIntOptionName(selectedBacIntOptionId);
         }
+      } else {
+        setBacIntOptionName("");
       }
     };
     fetchBacDetails();
-  }, [selectedBacTrackId, selectedBacIntOptionId]);
+  }, [selectedBacTrackId, selectedBacIntOptionId, grade]);
 
-  const fetchCurriculum = async () => {
+  const fetchCurriculum = async (bypassCache = false) => {
     setIsLoading(true);
     try {
       let fullGrade = grade;
@@ -108,7 +113,7 @@ export const Modules: React.FC = () => {
       if (bacIntOptionName) {
         fullGrade += ` (${bacIntOptionName})`;
       }
-      const aiModules = await generateCurriculum(country, fullGrade);
+      const aiModules = await generateCurriculum(country, fullGrade, false, 2, bypassCache);
       if (aiModules && aiModules.length > 0) {
         const formattedModules = aiModules.map(m => ({
           id: m.id,
@@ -168,7 +173,7 @@ export const Modules: React.FC = () => {
           
           <div className="flex items-center gap-4 shrink-0">
             <button 
-              onClick={fetchCurriculum}
+              onClick={() => fetchCurriculum(true)}
               disabled={isLoading}
               className="flex items-center gap-2 px-4 py-2 bg-accent/5 text-accent rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-accent/10 transition-all disabled:opacity-50"
             >
@@ -321,7 +326,7 @@ export const Modules: React.FC = () => {
                   </p>
                 </div>
                 <button 
-                  onClick={fetchCurriculum}
+                  onClick={() => fetchCurriculum(false)}
                   className="px-10 py-4 bg-accent text-paper rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-accent-hover transition-all shadow-xl shadow-accent/20 flex items-center gap-3"
                 >
                   <Sparkles className="w-4 h-4" />

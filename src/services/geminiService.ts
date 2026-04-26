@@ -1340,24 +1340,42 @@ export const generateFullLesson = async (
   }
 };
 
+const CURRICULUM_CACHE_VERSION = "v2";
+
 export const generateCurriculum = async (
   country: string,
   grade: string,
   isAdmin: boolean = false,
   retries = 2,
+  bypassCache = false
 ): Promise<AICuratedModule[]> => {
   try {
     // 1. Check Cache
-    const cacheKey = getCacheKey("generateCurriculum", country, grade, isAdmin);
-    const cachedResponse = await responseCache.get(cacheKey);
-    if (cachedResponse) {
-      console.log("Pipeline: Cache hit for generateCurriculum");
-      return safeJsonParse(cachedResponse);
+    const cacheKey = getCacheKey("generateCurriculum", country, grade, isAdmin, CURRICULUM_CACHE_VERSION);
+    if (!bypassCache) {
+      const cachedResponse = await responseCache.get(cacheKey);
+      if (cachedResponse) {
+        console.log("Pipeline: Cache hit for generateCurriculum");
+        return safeJsonParse(cachedResponse);
+      }
     }
 
     let extraContext = "";
     if (country === "MA" || country === "Morocco") {
-      extraContext = `\n\nUse the following Moroccan academic structure as a reference for the curriculum:\n${JSON.stringify(moroccanAcademicDb, null, 2)}\nEnsure the modules match the specific grade level provided.`;
+      extraContext = `\n\nUse the following Moroccan academic structure as a reference for the curriculum:\n${JSON.stringify(moroccanAcademicDb, null, 2)}\n
+      CRITICAL HIERARCHY RULES FOR MOROCCO:
+      1. Primary Education (1ère - 6ème année primaire) is for children aged 6-12. Subjects are basic.
+      2. Lower Secondary (Collège) is for ages 12-15.
+      3. Upper Secondary (Lycée: Tronc Commun, 1ère Bac, 2ème Bac) is for ages 15-18.
+
+      If the grade is "Tronc Commun", "1ère année Bac", or "2ème année Bac", you MUST generate high-school level subjects.
+      DO NOT generate primary school topics like "Reading and Writing" (القراءة والكتابة) for high school students.
+
+      STRICT TRACK FILTERING:
+      If a specific track is provided (e.g., "Scientifique", "Littéraire", "Technique"), you MUST ONLY generate subjects that belong to that track.
+      For example, "Tronc Commun Scientifique" should NOT have "Art Education" or "Arabic Reading and Writing" as primary modules. It should have "Mathematics", "Physics-Chemistry", "SVT", "French", "Arabic (advanced)", etc.
+
+      Ensure the modules match the specific grade level and track provided strictly.`;
     }
 
     const adminContext = isAdmin ? `
@@ -2579,7 +2597,8 @@ export const auditClassroomContent = async (
     
     Your Audit Process:
     1. Compare the existing content against the standard national curriculum for ${country} at the ${grade} level for ${subject}.
-    2. Identify critical gaps in:
+    2. Determine the exact "GAPE" (Gap) between what we have (Existing Lessons) and what we need (Full National Curriculum).
+    3. Identify critical gaps in:
        - LESSONS: Are there missing core topics?
        - QUIZZES: Does every major topic have a corresponding assessment?
        - EXERCISES: Is there enough practice material for complex concepts?
