@@ -86,7 +86,10 @@ export const Modules: React.FC = () => {
         } else {
           setBacTrackName(selectedBacTrackId);
         }
+      } else {
+        setBacTrackName("");
       }
+
       if (selectedBacIntOptionId) {
         const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(selectedBacIntOptionId);
         if (isUUID) {
@@ -95,12 +98,14 @@ export const Modules: React.FC = () => {
         } else {
           setBacIntOptionName(selectedBacIntOptionId);
         }
+      } else {
+        setBacIntOptionName("");
       }
     };
     fetchBacDetails();
-  }, [selectedBacTrackId, selectedBacIntOptionId]);
+  }, [selectedBacTrackId, selectedBacIntOptionId, grade]);
 
-  const fetchCurriculum = async () => {
+  const fetchCurriculum = async (bypassCache = false) => {
     if (!checkAIProvider()) return;
     setIsLoading(true);
     try {
@@ -111,7 +116,7 @@ export const Modules: React.FC = () => {
       if (bacIntOptionName) {
         fullGrade += ` (${bacIntOptionName})`;
       }
-      const aiModules = await generateCurriculum(country, fullGrade);
+      const aiModules = await generateCurriculum(country, fullGrade, false, 2, bypassCache);
       if (aiModules && aiModules.length > 0) {
         const formattedModules = aiModules.map(m => ({
           id: m.id,
@@ -171,7 +176,7 @@ export const Modules: React.FC = () => {
           
           <div className="flex items-center gap-4 shrink-0">
             <button
-              onClick={fetchCurriculum}
+              onClick={() => fetchCurriculum(true)}
               disabled={isLoading || !aiAvailable}
               title={!aiAvailable ? aiUnavailableMsg : undefined}
               className="flex items-center gap-2 px-4 py-2 bg-accent/5 text-accent rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-accent/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
@@ -330,7 +335,7 @@ export const Modules: React.FC = () => {
                   </div>
                 )}
                 <button
-                  onClick={fetchCurriculum}
+                  onClick={() => fetchCurriculum(false)}
                   disabled={!aiAvailable}
                   title={!aiAvailable ? aiUnavailableMsg : undefined}
                   className="px-10 py-4 bg-accent text-paper rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-accent-hover transition-all shadow-xl shadow-accent/20 flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
