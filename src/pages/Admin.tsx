@@ -7,7 +7,7 @@ import { validateMetrics, formatValidationErrors } from "../services/metricsVali
 import {
   RefreshCw, Database, BarChart2, BookOpen, Cpu, Table2,
   AlertTriangle, CheckCircle, Clock, Layers, Sparkles,
-  Lightbulb, ListChecks, Map, RotateCcw, ChevronRight,
+  Lightbulb, ListChecks, Map as MapIcon, RotateCcw, ChevronRight,
   TrendingUp, TrendingDown, Info, Zap,
   Trash2, Wrench, Play, Pencil, ChevronDown,
   Copy, Check
@@ -363,11 +363,28 @@ export const Admin: React.FC = () => {
 
     const { data: failed } = await supabase
       .from("lesson_gen_queue")
-      .select("id, topic_id, track_id, attempts, last_error, created_at, validation_status, quality_score")
+      .select("id, topic_id, track_id, attempts, last_error, created_at")
       .eq("status", "failed")
       .order("created_at", { ascending: false })
       .limit(10);
-    setFailedJobs(failed || []);
+    const topicIds = Array.from(
+      new Set((failed || []).map((job: any) => job.topic_id).filter((topicId: string | null | undefined): topicId is string => Boolean(topicId)))
+    );
+
+    let topicsById = new Map<string, string>();
+    if (topicIds.length > 0) {
+      const { data: topicRows } = await supabase
+        .from("topics")
+        .select("id, title")
+        .in("id", topicIds);
+
+      topicsById = new Map((topicRows || []).map((topic: any) => [topic.id, topic.title]));
+    }
+
+    setFailedJobs((failed || []).map((job: any) => ({
+      ...job,
+      topics: job.topic_id ? { title: topicsById.get(job.topic_id) ?? null } : null,
+    })));
   }, []);
 
   const loadRag = useCallback(async () => {
@@ -911,8 +928,6 @@ export const Admin: React.FC = () => {
                       <th className="px-4 py-2 text-left">Topic</th>
                       <th className="px-4 py-2 text-left">Track ID</th>
                       <th className="px-4 py-2 text-left">Attempts</th>
-                      <th className="px-4 py-2 text-left">Validation</th>
-                      <th className="px-4 py-2 text-left">Quality</th>
                       <th className="px-4 py-2 text-left">Error</th>
                       <th className="px-4 py-2 text-left">Date</th>
                       <th className="px-4 py-2 text-left">Actions</th>
@@ -926,8 +941,6 @@ export const Admin: React.FC = () => {
                           <td className="px-4 py-2">{(j.topics as any)?.title ?? j.topic_id}</td>
                           <td className="px-4 py-2 font-mono text-xs text-gray-500">{j.track_id ?? "—"}</td>
                           <td className="px-4 py-2">{j.attempts}</td>
-                          <td className="px-4 py-2"><ValidationPill value={j.validation_status} /></td>
-                          <td className="px-4 py-2 font-medium">{formatQualityScore(j.quality_score)}</td>
                           <td className="px-4 py-2 text-red-500 text-xs max-w-xs truncate">{(j.last_error ?? "").substring(0, 100)}</td>
                           <td className="px-4 py-2 text-xs text-gray-400">{new Date(j.created_at).toLocaleDateString()}</td>
                           <td className="px-4 py-2">
@@ -1240,7 +1253,7 @@ export const Admin: React.FC = () => {
             {([
               { id: "insights"     as AIAction, label: "Insights",       icon: <Lightbulb className="w-4 h-4" />, desc: "Interpret what the metrics mean" },
               { id: "tasks"        as AIAction, label: "Task List",      icon: <ListChecks className="w-4 h-4" />, desc: "Prioritized action items" },
-              { id: "strategy"     as AIAction, label: "Strategy Plan",  icon: <Map className="w-4 h-4" />,       desc: "Phased roadmap to fix gaps" },
+              { id: "strategy"     as AIAction, label: "Strategy Plan",  icon: <MapIcon className="w-4 h-4" />,       desc: "Phased roadmap to fix gaps" },
               { id: "retry_failed" as AIAction, label: "Retry Failed",   icon: <RotateCcw className="w-4 h-4" />, desc: "Reset all failed queue jobs" },
             ] as { id: AIAction; label: string; icon: React.ReactNode; desc: string }[]).map((a) => (
               <button
