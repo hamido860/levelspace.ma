@@ -363,7 +363,7 @@ export const Admin: React.FC = () => {
 
     const { data: failed } = await supabase
       .from("lesson_gen_queue")
-      .select("id, topic_id, track_id, attempts, last_error, created_at, validation_status, quality_score, topics(title)")
+      .select("id, topic_id, track_id, attempts, last_error, created_at, validation_status, quality_score")
       .eq("status", "failed")
       .order("created_at", { ascending: false })
       .limit(10);
