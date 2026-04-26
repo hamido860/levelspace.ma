@@ -21,7 +21,7 @@ import {
   Loader2,
   PlusCircle
 } from 'lucide-react';
-import { generateCurriculum } from '../services/geminiService';
+import { generateCurriculum, checkAIProvider } from '../services/geminiService';
 import { useSearch } from '../context/SearchContext';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
@@ -47,6 +47,8 @@ export const Modules: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { searchQuery } = useSearch();
   const navigate = useNavigate();
+  const aiAvailable = checkAIProvider();
+  const aiUnavailableMsg = "AI features need an API key, but your classroom content is available.";
 
   const [showCustomModal, setShowCustomModal] = useState(false);
   const [customModule, setCustomModule] = useState({
@@ -99,6 +101,7 @@ export const Modules: React.FC = () => {
   }, [selectedBacTrackId, selectedBacIntOptionId]);
 
   const fetchCurriculum = async () => {
+    if (!checkAIProvider()) return;
     setIsLoading(true);
     try {
       let fullGrade = grade;
@@ -167,10 +170,11 @@ export const Modules: React.FC = () => {
           </div>
           
           <div className="flex items-center gap-4 shrink-0">
-            <button 
+            <button
               onClick={fetchCurriculum}
-              disabled={isLoading}
-              className="flex items-center gap-2 px-4 py-2 bg-accent/5 text-accent rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-accent/10 transition-all disabled:opacity-50"
+              disabled={isLoading || !aiAvailable}
+              title={!aiAvailable ? aiUnavailableMsg : undefined}
+              className="flex items-center gap-2 px-4 py-2 bg-accent/5 text-accent rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-accent/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
               Regenerate
@@ -320,9 +324,16 @@ export const Modules: React.FC = () => {
                     Click 'Create' to generate a personalized curriculum based on your {grade}{bacTrackName ? ` - ${bacTrackName}` : ''}{bacIntOptionName ? ` (${bacIntOptionName})` : ''} settings in {country}.
                   </p>
                 </div>
-                <button 
+                {!aiAvailable && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 max-w-sm">
+                    <p className="text-xs text-amber-800 font-medium">{aiUnavailableMsg}</p>
+                  </div>
+                )}
+                <button
                   onClick={fetchCurriculum}
-                  className="px-10 py-4 bg-accent text-paper rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-accent-hover transition-all shadow-xl shadow-accent/20 flex items-center gap-3"
+                  disabled={!aiAvailable}
+                  title={!aiAvailable ? aiUnavailableMsg : undefined}
+                  className="px-10 py-4 bg-accent text-paper rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-accent-hover transition-all shadow-xl shadow-accent/20 flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Sparkles className="w-4 h-4" />
                   Create My Classroom

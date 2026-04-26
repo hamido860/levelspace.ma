@@ -30,8 +30,44 @@ export const getEffectiveApiKey = () =>
 export const getNvidiaApiKey = () =>
   localStorage.getItem("CUSTOM_NVIDIA_API_KEY") || "";
 
-export const checkAIProvider = (): boolean =>
-  !!(getEffectiveApiKey() || getNvidiaApiKey());
+// Once a key fails with 403/PERMISSION_DENIED (e.g. leaked/revoked), record its
+// fingerprint so subsequent checks treat the app as having no AI provider.
+const INVALID_KEYS_STORAGE = "ai_invalid_keys";
+
+const fingerprintKey = (key: string): string => {
+  if (!key) return "";
+  return key.length > 12 ? `${key.slice(0, 6)}…${key.slice(-4)}` : key;
+};
+
+const loadInvalidKeys = (): string[] => {
+  try {
+    return JSON.parse(localStorage.getItem(INVALID_KEYS_STORAGE) || "[]");
+  } catch {
+    return [];
+  }
+};
+
+export const isKeyInvalid = (key: string): boolean =>
+  !!key && loadInvalidKeys().includes(fingerprintKey(key));
+
+export const markKeyInvalid = (key: string) => {
+  if (!key) return;
+  const fp = fingerprintKey(key);
+  const list = loadInvalidKeys();
+  if (!list.includes(fp)) {
+    list.push(fp);
+    localStorage.setItem(INVALID_KEYS_STORAGE, JSON.stringify(list));
+    console.warn(`[AI] Key ${fp} marked invalid — will be skipped.`);
+  }
+};
+
+export const checkAIProvider = (): boolean => {
+  const gKey = getEffectiveApiKey();
+  const nKey = getNvidiaApiKey();
+  const gValid = !!gKey && !isKeyInvalid(gKey);
+  const nValid = !!nKey && !isKeyInvalid(nKey);
+  return gValid || nValid;
+};
 
 export const setNvidiaApiKey = (key: string) => {
   if (key) {
@@ -243,9 +279,27 @@ Respond strictly in JSON format with the following schema:
   }
 }
 
+export class InvalidKeyError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "InvalidKeyError";
+  }
+}
+
 export const handleApiError = (error: any, context: string) => {
   console.error(`Error in ${context}:`, error);
   const errorMessage = error?.message || String(error);
+
+  // 403 / PERMISSION_DENIED — leaked or revoked key. Mark invalid and stop retry loop.
+  if (
+    errorMessage.includes("403") ||
+    errorMessage.includes("PERMISSION_DENIED") ||
+    errorMessage.includes("API key") && errorMessage.includes("leaked")
+  ) {
+    const key = getEffectiveApiKey();
+    if (key) markKeyInvalid(key);
+    throw new InvalidKeyError("AI key invalid or leaked — disabled for this session.");
+  }
 
   if (
     errorMessage.includes("429") ||
@@ -1440,7 +1494,13 @@ export const generateCurriculum = async (
       throw parseError;
     }
   } catch (error) {
-    handleApiError(error, "generateCurriculum");
+    try {
+      handleApiError(error, "generateCurriculum");
+    } catch (handled) {
+      if (handled instanceof InvalidKeyError) return [];
+      // QuotaExceededError, ServiceUnavailableError — non-retryable
+      return [];
+    }
     if (retries > 0 && !(error instanceof SyntaxError)) {
       return generateCurriculum(country, grade, isAdmin, retries - 1);
     }
@@ -1657,7 +1717,12 @@ Return ONLY valid JSON (no markdown fences) matching this exact structure:
       throw parseError;
     }
   } catch (error) {
-    handleApiError(error, "generateSeedLesson");
+    try {
+      handleApiError(error, "generateSeedLesson");
+    } catch (handled) {
+      if (handled instanceof InvalidKeyError) return null;
+      return null;
+    }
     if (retries > 0 && !(error instanceof SyntaxError)) {
       return generateSeedLesson(moduleName, grade, country, retries - 1);
     }
@@ -1824,7 +1889,12 @@ Return ONLY valid JSON array (no markdown fences):
       throw parseError;
     }
   } catch (error) {
-    handleApiError(error, "generateLessonSuggestions");
+    try {
+      handleApiError(error, "generateLessonSuggestions");
+    } catch (handled) {
+      if (handled instanceof InvalidKeyError) return [];
+      return [];
+    }
     if (retries > 0 && !(error instanceof SyntaxError)) {
       return generateLessonSuggestions(moduleName, grade, country, retries - 1, existingTopics);
     }
