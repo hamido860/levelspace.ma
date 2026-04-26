@@ -1848,7 +1848,8 @@ export const explainText = async (
     const response = await generateContentWithFallback(
       {
         model: modelToUse,
-        contents: `Explain the following highlighted text from an academic lesson.
+        contents: `You are an expert tutor applying the Feynman Technique to explain concepts simply and deeply.
+      Explain the following highlighted text from an academic lesson context.
       
       Highlighted Text: "${text}"
       
@@ -1857,7 +1858,19 @@ export const explainText = async (
       Target Audience: A student in ${country} at the ${grade} level.
       ${ragInstruction}
       
-      Provide a clear, concise, and academic explanation. If the text is in a specific language (like Arabic or French), provide the explanation in that same language. ${userLanguage ? `The user's preferred language is ${userLanguage}. If it helps their understanding, you may provide the explanation or a summary in ${userLanguage}.` : ""}`,
+      YOUR TASK:
+      1. Use the Feynman Technique: Explain it as if you were teaching a peer who is slightly less familiar with the topic. Use simple analogies and avoid unnecessary jargon.
+      2. Keep it Contextual: Use the provided Lesson Context to ensure the explanation aligns with what the student is currently learning.
+      3. Structure the response using Markdown with the following sections for clarity and visual appeal:
+         - > **💡 The Big Idea**: A one-sentence, super-simple intuition.
+         - **🔍 Breaking it Down**: A clear, step-by-step explanation.
+         - > **🌟 Real-world Analogy**: A relatable example from daily life.
+         - **✅ In Short**: A punchy summary.
+
+      LANGUAGE:
+      - If the highlighted text is in a specific language (like Arabic or French), provide the explanation primarily in that same language.
+      ${userLanguage ? `- The user's preferred interface language is ${userLanguage}. You may provide a brief summary or key terms in ${userLanguage} if it differs from the lesson language to aid comprehension.` : ""}
+      - Do NOT use conversational filler like "Sure, I can explain that". Start directly with the content.`,
         config: {
           maxOutputTokens: 2048,
         },

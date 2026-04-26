@@ -29,11 +29,7 @@ import {
   Dumbbell,
   Type,
   Globe,
-  ListMusic,
-  List,
-  FileText,
-  FlaskConical,
-  GraduationCap,
+
 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { supabase } from '../db/supabase';
@@ -51,6 +47,7 @@ import {
   generateAnotherExample,
   checkAIProvider
 } from '../services/geminiService';
+import { fetchDefinition, DictionaryEntry } from '../services/dictionaryService';
 import { getQuizzesByLesson } from '../services/quizService';
 import { getExercisesByLesson } from '../services/exerciseService';
 import { TagsManager } from '../components/TagsManager';
@@ -261,6 +258,12 @@ export const LessonView: React.FC = () => {
   const [selectedText, setSelectedText] = useState<string | null>(null);
   const [explanation, setExplanation] = useState<string | null>(null);
   const [isExplaining, setIsExplaining] = useState(false);
+  const [dictionaryData, setDictionaryData] = useState<DictionaryEntry | null>(null);
+
+  const playAudio = (url: string) => {
+    const audio = new Audio(url);
+    audio.play().catch(e => console.error("Audio playback failed", e));
+  };
 
 
   // --- Audio Reading Logic ---
@@ -331,6 +334,14 @@ export const LessonView: React.FC = () => {
     if (!selectedText || !lesson || !hasAiAccess || !aiAvailable) return;
     setIsExplaining(true);
     setExplanation(null);
+    setDictionaryData(null);
+
+    // Try to fetch dictionary data if it's a single word
+    const cleanWord = selectedText.trim().toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()]/g, "");
+    if (cleanWord.split(/\s+/).length === 1) {
+      fetchDefinition(cleanWord).then(setDictionaryData).catch(console.error);
+    }
+
     try {
       const context = effectiveLesson.blocks?.map(b => b.content || '').join('\n') || effectiveLesson.content || '';
       const result = await explainText(selectedText, context, selectedGrade, selectedCountry, language, module?.strictRAG);
@@ -760,35 +771,89 @@ export const LessonView: React.FC = () => {
             if (!isExplaining) {
               setExplanation(null);
               setSelectedText(null);
+              setDictionaryData(null);
             }
           }}
-          maxWidth="4xl"
+          maxWidth="5xl"
           title={
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center text-accent shadow-sm">
                 <Brain size={22} />
               </div>
               <div>
-                <h3 className="text-sm font-bold uppercase tracking-widest text-ink">AI Contextual Explanation</h3>
-                <p className="text-[10px] text-muted font-medium">Grounded in this lesson's content</p>
+
               </div>
             </div>
           }
         >
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            <div className="lg:col-span-4 space-y-4">
-              <div className="p-4 bg-surface-low rounded-2xl border border-ink/5 space-y-3">
+            <div className="lg:col-span-4 space-y-6">
+              {/* Selected Context */}
+              <div className="p-5 bg-surface-low rounded-3xl border border-ink/5 space-y-3 relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
+                  <BookOpen size={48} />
+                </div>
                 <div className="flex items-center gap-2 text-accent">
                   <Sparkles size={14} />
-                  <span className="text-[10px] font-bold uppercase tracking-widest">Source Context</span>
+                  <span className="text-[10px] font-bold uppercase tracking-widest">Selected Context</span>
                 </div>
-                <p className="text-sm font-medium text-ink italic leading-relaxed border-l-2 border-accent/30 pl-4 py-1">
+                <p className="text-sm font-bold text-ink italic leading-relaxed border-l-4 border-accent pl-4 py-1">
                   "{selectedText}"
                 </p>
               </div>
-              <div className="p-4 bg-accent/5 rounded-2xl border border-accent/10">
+
+              {/* Dictionary At-a-Glance */}
+              <AnimatePresence>
+                {dictionaryData && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="p-5 bg-paper rounded-3xl border border-ink/5 shadow-sm space-y-4"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-emerald-600">
+                        <Type size={14} />
+                        <span className="text-[10px] font-bold uppercase tracking-widest">Dictionary At-a-Glance</span>
+                      </div>
+                      {dictionaryData.phonetics.find(p => p.audio) && (
+                        <button
+                          onClick={() => playAudio(dictionaryData.phonetics.find(p => p.audio)!.audio!)}
+                          className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-100 transition-colors"
+                        >
+                          <Volume2 size={14} />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="space-y-1">
+                      <h4 className="text-lg font-bold text-ink capitalize">{dictionaryData.word}</h4>
+                      {dictionaryData.phonetic && (
+                        <p className="text-xs font-mono text-muted">{dictionaryData.phonetic}</p>
+                      )}
+                    </div>
+
+                    <div className="space-y-3">
+                      {dictionaryData.meanings.slice(0, 2).map((meaning, idx) => (
+                        <div key={idx} className="space-y-1">
+                          <span className="text-[9px] font-bold uppercase tracking-tighter text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
+                            {meaning.partOfSpeech}
+                          </span>
+                          <p className="text-xs text-ink-secondary leading-snug">
+                            {meaning.definitions[0].definition}
+                          </p>
+                          {meaning.definitions[0].example && (
+                            <p className="text-[10px] text-muted italic">"{meaning.definitions[0].example}"</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <div className="p-5 bg-accent/5 rounded-3xl border border-accent/10">
                 <p className="text-[10px] text-accent font-medium leading-relaxed">
-                  The AI analyzes this specific snippet within the context of the entire lesson to provide the most relevant explanation.
+                  The AI applies the <strong>Feynman Technique</strong> to simplify this concept specifically for your grade level and lesson context.
                 </p>
               </div>
             </div>
@@ -796,25 +861,31 @@ export const LessonView: React.FC = () => {
             <div className="lg:col-span-8 space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-muted">
-                  <BookOpen size={14} />
-                  <span className="text-[10px] font-bold uppercase tracking-widest">AI Analysis</span>
+                  <Brain size={14} />
+                  <span className="text-[10px] font-bold uppercase tracking-widest">AI Feynman Explanation</span>
                 </div>
                 {!isExplaining && (
-                  <span className="text-[9px] font-mono text-muted/40 uppercase">v3.1-FLASH-LITE</span>
+                  <span className="text-[9px] font-mono text-muted/40 uppercase">v4.0-PRO-ANALYTICS</span>
                 )}
               </div>
-              <div className="bg-paper p-6 rounded-2xl border border-ink/5 shadow-sm min-h-[200px]">
-                <div className="text-sm text-ink leading-relaxed prose prose-sm max-w-none">
+              <div className="bg-paper p-8 rounded-[2rem] border border-ink/5 shadow-xl min-h-[350px] relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-accent/5 rounded-full -mr-16 -mt-16 blur-3xl" />
+                <div className="absolute bottom-0 left-0 w-24 h-24 bg-emerald-500/5 rounded-full -ml-12 -mb-12 blur-2xl" />
+
+                <div className="text-sm text-ink leading-relaxed relative z-10">
                   {isExplaining ? (
-                    <div className="flex flex-col items-center justify-center py-12 space-y-4">
-                      <Loader2 size={32} className="animate-spin text-accent" />
-                      <div className="space-y-1 text-center">
-                        <p className="text-xs font-bold text-ink">Synthesizing Explanation...</p>
-                        <p className="text-[10px] text-muted italic">Connecting concepts and examples</p>
+                    <div className="flex flex-col items-center justify-center py-24 space-y-6">
+                      <div className="relative">
+                        <div className="absolute inset-0 bg-accent/20 blur-xl rounded-full animate-pulse" />
+                        <Loader2 size={48} className="animate-spin text-accent relative z-10" />
+                      </div>
+                      <div className="space-y-2 text-center">
+                        <p className="text-sm font-bold text-ink">Applying Feynman Technique...</p>
+                        <p className="text-[10px] text-muted italic animate-pulse">Simplifying concepts for your grade level</p>
                       </div>
                     </div>
                   ) : (
-                    <div className="markdown-body">
+                    <div className="markdown-body prose-sm prose-p:leading-relaxed prose-headings:mb-3 prose-headings:mt-6 first:prose-headings:mt-0">
                       <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{explanation || ''}</Markdown>
                     </div>
                   )}
@@ -829,10 +900,11 @@ export const LessonView: React.FC = () => {
                 onClick={() => {
                   setExplanation(null);
                   setSelectedText(null);
+                  setDictionaryData(null);
                 }}
-                className="px-8 py-2.5 bg-ink text-paper rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-accent transition-all shadow-lg shadow-ink/10"
+                className="px-10 py-3 bg-ink text-paper rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-accent transition-all shadow-xl shadow-ink/10 hover:-translate-y-0.5 active:translate-y-0"
               >
-                Understood
+                Got it!
               </button>
             </div>
           )}
