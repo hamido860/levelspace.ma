@@ -443,12 +443,92 @@ Return 3 phases.`
     try {
       // Whitelist of safe, deterministic handlers. No LLM-generated SQL.
       const handlers: Record<string, () => Promise<{ preview: string; executed: boolean; rows_affected?: number; error?: string }>> = {
-        // Placeholder: "generate" requires more context
-        // (what to generate? topics? lessons? depends on metric analysis)
+        // Bulk generate lessons for the grade with lowest coverage
         generate: async () => {
+          // Find grade with lowest lesson coverage (missing most lessons)
+          const { data: grades, error: gradesErr } = await supabase.from("grades").select("id, name");
+          if (gradesErr) throw gradesErr;
+          if (!grades || grades.length === 0) {
+            return { preview: "No grades found", executed: false };
+          }
+
+          // Get topic and lesson counts per grade to find lowest coverage
+          const { data: topicsByGrade, error: topicsErr } = await supabase
+            .from("topics")
+            .select("grade_id");
+          if (topicsErr) throw topicsErr;
+
+          const { data: lessonsByGrade, error: lessonsErr } = await supabase
+            .from("lessons")
+            .select("id, topic_id");
+          if (lessonsErr) throw lessonsErr;
+
+          const topicCountByGrade = new Map<string, number>();
+          const lessonTopicIds = new Set((lessonsByGrade || []).map((l: any) => l.topic_id));
+
+          (topicsByGrade || []).forEach((t: any) => {
+            topicCountByGrade.set(t.grade_id, (topicCountByGrade.get(t.grade_id) || 0) + 1);
+          });
+
+          // Find grade with most missing lessons
+          let lowestGradeId: string | null = null;
+          let maxMissing = 0;
+
+          topicCountByGrade.forEach((topicCount, gradeId) => {
+            // Estimate: topics without lessons are "missing"
+            const estimatedMissing = topicCount - (lessonsByGrade || []).filter(
+              (l: any) => topicsByGrade?.find((t: any) => t.id === l.topic_id && t.grade_id === gradeId)
+            ).length;
+            if (estimatedMissing > maxMissing) {
+              maxMissing = estimatedMissing;
+              lowestGradeId = gradeId;
+            }
+          });
+
+          if (!lowestGradeId) {
+            return { preview: "All grades have full lesson coverage", executed: false };
+          }
+
+          // Get topics for that grade that don't have lessons yet
+          const { data: gradeTopics, error: topicsErr2 } = await supabase
+            .from("topics")
+            .select("id")
+            .eq("grade_id", lowestGradeId);
+          if (topicsErr2) throw topicsErr2;
+
+          const topicIds = (gradeTopics || []).map((t: any) => t.id);
+          if (!topicIds.length) {
+            return { preview: `Grade ${lowestGradeId} has no topics`, executed: false };
+          }
+
+          // Filter out topics that already have lessons or are in queue
+          const { data: existingLessons } = await supabase
+            .from("lessons")
+            .select("topic_id")
+            .in("topic_id", topicIds);
+          const { data: existingQueue } = await supabase
+            .from("lesson_gen_queue")
+            .select("topic_id")
+            .in("topic_id", topicIds);
+
+          const hasLesson = new Set((existingLessons || []).map((l: any) => l.topic_id));
+          const inQueue = new Set((existingQueue || []).map((q: any) => q.topic_id));
+          const missing = topicIds.filter((id: string) => !hasLesson.has(id) && !inQueue.has(id));
+
+          if (!missing.length) {
+            return { preview: `All topics in grade ${lowestGradeId} already have lessons or are queued`, executed: false };
+          }
+
+          // Queue the missing topics for generation
+          const { error: insertErr } = await supabase
+            .from("lesson_gen_queue")
+            .insert(missing.map((id: string) => ({ topic_id: id, status: "pending", attempts: 0 })));
+          if (insertErr) throw insertErr;
+
           return {
-            preview: "generate action requires specific context (not yet mapped to a safe handler)",
-            executed: false,
+            preview: `Queue ${missing.length} missing lessons for grade with lowest coverage`,
+            executed: true,
+            rows_affected: missing.length,
           };
         },
 
