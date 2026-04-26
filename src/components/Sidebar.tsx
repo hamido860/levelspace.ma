@@ -11,7 +11,8 @@ import {
   ChevronLeft,
   ChevronRight,
   LogOut,
-  Sparkles
+  Sparkles,
+  ShieldCheck
 } from 'lucide-react';
 
 import { useLanguage } from '../context/LanguageContext';
@@ -42,6 +43,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
 
   const toolNavItems = isAdmin ? [
     { label: 'Admin', icon: <Sparkles size={20} />, path: '/admin' },
+    { label: 'AI Ops', icon: <ShieldCheck size={20} />, path: '/admin/ai-command-center' },
   ] : [];
 
   return (

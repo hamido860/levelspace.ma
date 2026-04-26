@@ -16,6 +16,7 @@ import { BlueprintHub } from './pages/BlueprintHub';
 import { ClassroomView } from './pages/ClassroomView';
 import { Library } from './pages/Library';
 import { Admin } from './pages/Admin';
+import { AiCommandCenter } from './pages/AiCommandCenter';
 import { Profile } from './pages/Profile';
 import { SearchProvider } from './context/SearchContext';
 import { LanguageProvider } from './context/LanguageContext';
@@ -48,6 +49,7 @@ export default function App() {
                 <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                 <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                 <Route path="/admin" element={<ProtectedRoute requireAdmin><Admin /></ProtectedRoute>} />
+                <Route path="/admin/ai-command-center" element={<ProtectedRoute requireAdmin><AiCommandCenter /></ProtectedRoute>} />
               </Routes>
             </Router>
             <Toaster position="bottom-right" richColors />

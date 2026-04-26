@@ -1397,7 +1397,7 @@ export const LessonView: React.FC = () => {
                                   return (
                                     <button
                                       key={i}
-                                      onClick={() => handleQuizSubmit(index, opt, block.correctAnswer!)}
+                                      onClick={() => handleQuizAnswer(index, opt, block.correctAnswer!)}
                                       disabled={!!showResult}
                                       className={`w-full text-left p-4 rounded-xl border-2 transition-all ${bgClass} flex items-center justify-between group`}
                                     >
