@@ -75,9 +75,22 @@ export const Modules: React.FC = () => {
 
   const [bacTrackName, setBacTrackName] = useState<string>('');
   const [bacIntOptionName, setBacIntOptionName] = useState<string>('');
+  const [gradeName, setGradeName] = useState<string>('');
 
-  useEffect(() => {
+    useEffect(() => {
     const fetchBacDetails = async () => {
+      // Grade
+      if (grade) {
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(grade);
+        if (isUUID) {
+          const { data } = await supabase.from('grades').select('name').eq('id', grade).single();
+          if (data) setGradeName(data.name);
+        } else {
+          setGradeName(grade);
+        }
+      }
+
+      // Track
       if (selectedBacTrackId) {
         const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(selectedBacTrackId);
         if (isUUID) {
@@ -90,6 +103,7 @@ export const Modules: React.FC = () => {
         setBacTrackName("");
       }
 
+      // Option
       if (selectedBacIntOptionId) {
         const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(selectedBacIntOptionId);
         if (isUUID) {
@@ -105,15 +119,23 @@ export const Modules: React.FC = () => {
     fetchBacDetails();
   }, [selectedBacTrackId, selectedBacIntOptionId, grade]);
 
-    const fetchCurriculum = async (bypassCache = false) => {
+        const fetchCurriculum = async (bypassCache = false) => {
     setIsLoading(true);
     try {
-      // 1. Fetch Grade ID
-      const { data: gradesData } = await supabase.from('grades').select('id').eq('name', grade).limit(1);
-      const gradeId = gradesData?.[0]?.id;
+      // 1. Check if grade is UUID or Name
+      let gradeId = grade;
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(grade);
+
+      if (!isUUID && grade) {
+        const { data: gradesData } = await supabase.from('grades').select('id').eq('name', grade).limit(1);
+        gradeId = gradesData?.[0]?.id;
+      }
 
       if (!gradeId) {
-        throw new Error('Grade not found in database');
+        console.warn('Grade ID not found or empty, clearing modules.');
+        await db.modules.clear();
+        setIsLoading(false);
+        return;
       }
 
       // 2. Fetch all subjects for this grade
@@ -182,7 +204,7 @@ export const Modules: React.FC = () => {
           <div className="space-y-1 flex-1">
             <div className="flex items-start md:items-center gap-2 text-accent">
               <Sparkles className="w-4 h-4 shrink-0 mt-0.5 md:mt-0" />
-              <span className="text-[10px] font-bold uppercase tracking-[0.3em] leading-relaxed">AI-Curated for {grade}{bacTrackName ? ` - ${bacTrackName}` : ''}{bacIntOptionName ? ` (${bacIntOptionName})` : ''} in {country}</span>
+              <span className="text-[10px] font-bold uppercase tracking-[0.3em] leading-relaxed">AI-Curated for {gradeName}{bacTrackName ? ` - ${bacTrackName}` : ''}{bacIntOptionName ? ` (${bacIntOptionName})` : ''} in {country}</span>
             </div>
             <h2 className="text-2xl md:text-3xl font-bold text-ink font-sans">{t('actions_create_classroom')}</h2>
           </div>
@@ -339,7 +361,7 @@ export const Modules: React.FC = () => {
                 <div className="space-y-2">
                   <h3 className="text-2xl font-serif">Your classroom is ready to be built.</h3>
                   <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted/40 max-w-md mx-auto leading-relaxed">
-                    Click 'Create' to generate a personalized curriculum based on your {grade}{bacTrackName ? ` - ${bacTrackName}` : ''}{bacIntOptionName ? ` (${bacIntOptionName})` : ''} settings in {country}.
+                    Click 'Create' to generate a personalized curriculum based on your {gradeName}{bacTrackName ? ` - ${bacTrackName}` : ''}{bacIntOptionName ? ` (${bacIntOptionName})` : ''} settings in {country}.
                   </p>
                 </div>
                 {/* Removed AI Unavailable Warning */}

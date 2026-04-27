@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { aiCommandCenterService } from "./aiCommandCenterService";
+import aiCommandCenterService from "./aiCommandCenterService";
 import { jsonrepair } from "jsonrepair";
 import { moroccanAcademicDb } from "../data/moroccan_academic_db";
 import { toast } from "sonner";

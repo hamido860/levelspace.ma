@@ -362,14 +362,18 @@ export const ClassroomView: React.FC = () => {
     }
   };
 
-    const handleSeedFromSupabase = async () => {
+        const handleSeedFromSupabase = async () => {
     if (!module) return;
     setIsSeeding(true);
     try {
       console.log('[ClassroomView] Seeding classroom from Supabase for module:', module.name);
 
-      const { data: grades } = await supabase.from('grades').select('id').eq('name', selectedGrade).limit(1);
-      const gradeId = grades?.[0]?.id;
+      let gradeId = selectedGrade;
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(selectedGrade);
+      if (!isUUID && selectedGrade) {
+        const { data: grades } = await supabase.from('grades').select('id').eq('name', selectedGrade).limit(1);
+        gradeId = grades?.[0]?.id;
+      }
 
       const { data: subjects } = await supabase.from('subjects').select('id').eq('name', module.name).limit(1);
       const subjectId = subjects?.[0]?.id;
