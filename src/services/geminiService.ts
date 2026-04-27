@@ -110,7 +110,9 @@ export async function callNvidiaAPI(params: {
     body.messages[0].content = prompt + "\n\nRespond with valid JSON only.";
   }
 
-  const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+  // Use our local proxy to avoid CORS errors when called from browser
+  const endpoint = typeof window !== 'undefined' ? '/api/nvidia-proxy' : 'https://integrate.api.nvidia.com/v1/chat/completions';
+  const response = await fetch(endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
