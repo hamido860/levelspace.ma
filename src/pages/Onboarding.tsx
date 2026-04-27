@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db } from '../db/db';
+import { supabase } from '../db/supabase';
 
 const grades: Grade[] = [
   'Grade 9',
@@ -34,10 +35,17 @@ export const Onboarding: React.FC = () => {
     }
   }, [selectedGrade]);
 
-  const handleContinue = async () => {
+    const handleContinue = async () => {
     if (selectedGrade) {
-      localStorage.setItem('selected_grade', selectedGrade);
-      await db.settings.put({ key: 'selected_grade', value: selectedGrade });
+      let dbGradeId = selectedGrade;
+      try {
+        const { data } = await supabase.from('grades').select('id').eq('name', selectedGrade).limit(1);
+        if (data?.[0]?.id) dbGradeId = data[0].id;
+      } catch (err) {
+        console.error('Failed to get grade UUID:', err);
+      }
+      localStorage.setItem('selected_grade', dbGradeId);
+      await db.settings.put({ key: 'selected_grade', value: dbGradeId });
       navigate('/modules');
     }
   };

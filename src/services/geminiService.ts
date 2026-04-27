@@ -1,4 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
+import aiCommandCenterService from "./aiCommandCenterService";
 import { jsonrepair } from "jsonrepair";
 import { moroccanAcademicDb } from "../data/moroccan_academic_db";
 import { toast } from "sonner";
@@ -261,6 +262,7 @@ Respond strictly in JSON format with the following schema:
       }
     };
 
+    console.log("[AI_CALL] Initiating ai.models.generateContent");
     const response = await ai.models.generateContent({
       model: modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]),
       contents: prompt,
@@ -710,6 +712,7 @@ export async function generateAIContent(
     const isJsonMode = config.responseMimeType === "application/json";
     const tools = params.tools !== undefined ? params.tools : (isJsonMode ? [] : [{ googleSearch: {} }]);
 
+    console.log("[AI_CALL] Initiating ai.models.generateContent");
     const result = await ai.models.generateContent({
       ...params,
       model: primaryModel,
@@ -735,7 +738,8 @@ export async function generateAIContent(
         if (fallbackModel === primaryModel || modelQuotaTracker.isExhausted(fallbackModel)) continue;
         try {
           console.warn(`[Quota] Falling back to ${fallbackModel}`);
-          const result = await ai.models.generateContent({ ...params, model: fallbackModel });
+          console.log("[AI_CALL] Initiating ai.models.generateContent");
+    const result = await ai.models.generateContent({ ...params, model: fallbackModel });
           updateAIStatus({ lastModel: fallbackModel, isLocal: false, lastError: null });
           toast.info(`Using ${fallbackModel}`, { description: "Switched model due to quota.", duration: 2000 });
           return result;

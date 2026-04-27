@@ -1,4 +1,6 @@
-import React from 'react';
+const fs = require('fs');
+
+const backupContent = `import React from 'react';
 import { Layout } from '../components/Layout';
 import { SEO } from '../components/SEO';
 
@@ -12,3 +14,6 @@ export const StudyPlanner: React.FC = () => {
     </Layout>
   );
 };
+`;
+
+fs.writeFileSync('src/pages/StudyPlanner.tsx', backupContent);

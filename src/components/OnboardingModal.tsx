@@ -7,6 +7,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { updateProfile } from '../db/supabase';
 import { db } from '../db/db';
+import { supabase } from '../db/supabase';
 
 interface OnboardingModalProps {
   isOpen: boolean;
@@ -59,18 +60,35 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
   const handleNext = () => setStep(s => Math.min(s + 1, totalSteps));
   const handleBack = () => setStep(s => Math.max(s - 1, 0));
 
-  const handleComplete = async () => {
+    const handleComplete = async () => {
     localStorage.setItem('selected_country', 'Morocco');
     localStorage.setItem('selected_cycle', selectedCycle);
-    localStorage.setItem('selected_grade', selectedGrade);
-    if (selectedTrack) localStorage.setItem('selected_bac_track', selectedTrack);
+
+    let dbGradeId = selectedGrade;
+    let dbTrackId = selectedTrack;
+
+    // Fetch the actual UUIDs from Supabase for this grade/track combination
+    try {
+      const { data: gradeData } = await supabase.from('grades').select('id').eq('name', selectedGrade).limit(1);
+      if (gradeData?.[0]?.id) dbGradeId = gradeData[0].id;
+
+      if (selectedTrack) {
+        const { data: trackData } = await supabase.from('bac_tracks').select('id').eq('name', selectedTrack).limit(1);
+        if (trackData?.[0]?.id) dbTrackId = trackData[0].id;
+      }
+    } catch(e) {
+      console.error("Failed fetching ids in onboarding:", e);
+    }
+
+    localStorage.setItem('selected_grade', dbGradeId || selectedGrade);
+    if (dbTrackId) localStorage.setItem('selected_bac_track', dbTrackId);
     if (selectedOption) localStorage.setItem('selected_option', selectedOption);
     localStorage.setItem('has_completed_onboarding', 'true');
 
     await db.settings.put({ key: 'selected_country', value: 'Morocco' });
     await db.settings.put({ key: 'selected_cycle', value: selectedCycle });
-    await db.settings.put({ key: 'selected_grade', value: selectedGrade });
-    if (selectedTrack) await db.settings.put({ key: 'selected_bac_track', value: selectedTrack });
+    await db.settings.put({ key: 'selected_grade', value: dbGradeId || selectedGrade });
+    if (dbTrackId) await db.settings.put({ key: 'selected_bac_track', value: dbTrackId });
     if (selectedOption) await db.settings.put({ key: 'selected_option', value: selectedOption });
     await db.settings.put({ key: 'has_completed_onboarding', value: 'true' });
 
@@ -79,8 +97,8 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
       try {
         await updateProfile(user.id, {
           onboarding_completed: true,
-          selected_grade: selectedGrade,
-          selected_bac_track: selectedTrack || null,
+          selected_grade: dbGradeId || selectedGrade,
+          selected_bac_track: dbTrackId || null,
         });
       } catch (err: any) {
         console.error('Failed to persist onboarding to database:', err.message);

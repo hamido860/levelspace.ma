@@ -75,9 +75,22 @@ export const Modules: React.FC = () => {
 
   const [bacTrackName, setBacTrackName] = useState<string>('');
   const [bacIntOptionName, setBacIntOptionName] = useState<string>('');
+  const [gradeName, setGradeName] = useState<string>('');
 
-  useEffect(() => {
+    useEffect(() => {
     const fetchBacDetails = async () => {
+      // Grade
+      if (grade) {
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(grade);
+        if (isUUID) {
+          const { data } = await supabase.from('grades').select('name').eq('id', grade).single();
+          if (data) setGradeName(data.name);
+        } else {
+          setGradeName(grade);
+        }
+      }
+
+      // Track
       if (selectedBacTrackId) {
         const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(selectedBacTrackId);
         if (isUUID) {
@@ -90,6 +103,7 @@ export const Modules: React.FC = () => {
         setBacTrackName("");
       }
 
+      // Option
       if (selectedBacIntOptionId) {
         const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(selectedBacIntOptionId);
         if (isUUID) {
@@ -105,34 +119,55 @@ export const Modules: React.FC = () => {
     fetchBacDetails();
   }, [selectedBacTrackId, selectedBacIntOptionId, grade]);
 
-  const fetchCurriculum = async (bypassCache = false) => {
-    if (!checkAIProvider()) return;
+        const fetchCurriculum = async (bypassCache = false) => {
     setIsLoading(true);
     try {
-      let fullGrade = grade;
-      if (bacTrackName) {
-        fullGrade += ` - ${bacTrackName}`;
+      // 1. Check if grade is UUID or Name
+      let gradeId = grade;
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(grade);
+
+      if (!isUUID && grade) {
+        const { data: gradesData } = await supabase.from('grades').select('id').eq('name', grade).limit(1);
+        gradeId = gradesData?.[0]?.id;
       }
-      if (bacIntOptionName) {
-        fullGrade += ` (${bacIntOptionName})`;
+
+      if (!gradeId) {
+        console.warn('Grade ID not found or empty, clearing modules.');
+        await db.modules.clear();
+        setIsLoading(false);
+        return;
       }
-      const aiModules = await generateCurriculum(country, fullGrade, false, 2, bypassCache);
-      if (aiModules && aiModules.length > 0) {
-        const formattedModules = aiModules.map(m => ({
-          id: m.id,
-          name: m.name,
-          code: m.code,
-          description: m.description,
-          category: m.category,
-          progress: 0,
-          selected: false,
-          createdAt: Date.now()
-        }));
+
+      // 2. Fetch all subjects for this grade
+      const { data: gradeSubjects, error: gsError } = await supabase
+        .from('grade_subjects')
+        .select('subject_id, subjects(*)')
+        .eq('grade_id', gradeId);
+
+      if (gsError) throw gsError;
+
+      if (gradeSubjects && gradeSubjects.length > 0) {
+        const formattedModules = gradeSubjects.map(gs => {
+          const s = gs.subjects;
+          return {
+            id: s.id,
+            name: s.name,
+            code: s.code || s.name.substring(0, 3).toUpperCase(),
+            description: s.description || `Course for ${s.name}`,
+            category: s.category || 'General',
+            progress: 0,
+            selected: false,
+            createdAt: Date.now()
+          };
+        });
+
         await db.modules.clear();
         await db.modules.bulkPut(formattedModules);
+      } else {
+        await db.modules.clear();
       }
     } catch (error) {
-      console.error("Failed to fetch curriculum:", error);
+      console.error("Failed to fetch curriculum from Supabase:", error);
     } finally {
       setIsLoading(false);
     }
@@ -169,7 +204,7 @@ export const Modules: React.FC = () => {
           <div className="space-y-1 flex-1">
             <div className="flex items-start md:items-center gap-2 text-accent">
               <Sparkles className="w-4 h-4 shrink-0 mt-0.5 md:mt-0" />
-              <span className="text-[10px] font-bold uppercase tracking-[0.3em] leading-relaxed">AI-Curated for {grade}{bacTrackName ? ` - ${bacTrackName}` : ''}{bacIntOptionName ? ` (${bacIntOptionName})` : ''} in {country}</span>
+              <span className="text-[10px] font-bold uppercase tracking-[0.3em] leading-relaxed">AI-Curated for {gradeName}{bacTrackName ? ` - ${bacTrackName}` : ''}{bacIntOptionName ? ` (${bacIntOptionName})` : ''} in {country}</span>
             </div>
             <h2 className="text-2xl md:text-3xl font-bold text-ink font-sans">{t('actions_create_classroom')}</h2>
           </div>
@@ -177,8 +212,8 @@ export const Modules: React.FC = () => {
           <div className="flex items-center gap-4 shrink-0">
             <button
               onClick={() => fetchCurriculum(true)}
-              disabled={isLoading || !aiAvailable}
-              title={!aiAvailable ? aiUnavailableMsg : undefined}
+              disabled={isLoading}
+              title={undefined}
               className="flex items-center gap-2 px-4 py-2 bg-accent/5 text-accent rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-accent/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
@@ -326,18 +361,14 @@ export const Modules: React.FC = () => {
                 <div className="space-y-2">
                   <h3 className="text-2xl font-serif">Your classroom is ready to be built.</h3>
                   <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted/40 max-w-md mx-auto leading-relaxed">
-                    Click 'Create' to generate a personalized curriculum based on your {grade}{bacTrackName ? ` - ${bacTrackName}` : ''}{bacIntOptionName ? ` (${bacIntOptionName})` : ''} settings in {country}.
+                    Click 'Create' to generate a personalized curriculum based on your {gradeName}{bacTrackName ? ` - ${bacTrackName}` : ''}{bacIntOptionName ? ` (${bacIntOptionName})` : ''} settings in {country}.
                   </p>
                 </div>
-                {!aiAvailable && (
-                  <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 max-w-sm">
-                    <p className="text-xs text-amber-800 font-medium">{aiUnavailableMsg}</p>
-                  </div>
-                )}
+                {/* Removed AI Unavailable Warning */}
                 <button
                   onClick={() => fetchCurriculum(false)}
-                  disabled={!aiAvailable}
-                  title={!aiAvailable ? aiUnavailableMsg : undefined}
+                  disabled={false}
+                  title={undefined}
                   className="px-10 py-4 bg-accent text-paper rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-accent-hover transition-all shadow-xl shadow-accent/20 flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Sparkles className="w-4 h-4" />
