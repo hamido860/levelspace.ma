@@ -94,48 +94,22 @@ export const ClassroomView: React.FC = () => {
   const allLessons = useLiveQuery(() => id ? db.lessons.where('moduleId').equals(id).sortBy('createdAt') : [], [id]);
   const lessons = allLessons?.filter(l => l.status !== 'suggested') || [];
 
-  // Auto-seed from Supabase when local lessons are empty — no AI needed
+  // Auto-seed from Supabase when local lessons are empty
   useEffect(() => {
-    if (!module || !id || allLessons === undefined) return;
+    if (!module || !id || allLessons === undefined || isSeeding) return;
     if (allLessons.filter(l => l.status !== 'suggested').length > 0) return;
-    (async () => {
-      try {
-        const subjectTerms = getSubjectSearchTerms(module.name);
-        const gradeTerms = getGradeSearchTerms(selectedGrade);
-        // Build OR of (subject AND grade) pairs to handle bilingual name mismatches
-        const pairs = subjectTerms.flatMap(st =>
-          gradeTerms.map(gt => `and(subject.ilike.%${st}%,grade.ilike.%${gt}%)`)
-        ).join(',');
-        const { data: dbLessons } = await supabase
-          .from('lessons')
-          .select('id, lesson_title, content, blocks, subtitle, status')
-          .or(pairs);
-        if (!dbLessons || dbLessons.length === 0) return;
-        const toAdd = [];
-        for (const les of dbLessons) {
-          const existing = await db.lessons
-            .where('title').equals(les.lesson_title)
-            .and(l => l.moduleId === module.id)
-            .first();
-          if (!existing) {
-            toAdd.push({
-              id: les.id,
-              moduleId: module.id,
-              title: les.lesson_title,
-              content: les.content || '',
-              blocks: les.blocks,
-              subtitle: les.subtitle,
-              status: (les.status === 'published' || les.status === 'done') ? 'done' as const : 'pending' as const,
-              createdAt: Date.now()
-            });
-          }
-        }
-        if (toAdd.length > 0) await db.lessons.bulkAdd(toAdd);
-      } catch (err) {
-        console.warn('[ClassroomView] Auto-seed from Supabase failed:', err);
-      }
-    })();
+
+    // Check if we've already tried to seed this session to avoid infinite loops
+    const hasTriedSeeding = sessionStorage.getItem(`seeded_${module.id}`);
+    if (!hasTriedSeeding) {
+      sessionStorage.setItem(`seeded_${module.id}`, 'true');
+      console.log('[ClassroomView] Triggering automatic Supabase seed');
+      handleSeedFromSupabase();
+    }
   }, [module?.id, allLessons?.length]);
+
+
+
 
   const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
   const settingsMap = Object.fromEntries(dbSettings.map(s => [s.key, s.value]));
@@ -388,47 +362,99 @@ export const ClassroomView: React.FC = () => {
     }
   };
 
-  const handleSeedFromSupabase = async () => {
+    const handleSeedFromSupabase = async () => {
     if (!module) return;
     setIsSeeding(true);
     try {
-      // Find matching curriculum metadata
-      const { data: dbLessons, error } = await supabase
-        .from('lessons')
-        .select('*')
-        .eq('subject', module.category)
-        .eq('grade', selectedGrade)
-        .eq('country', country);
+      console.log('[ClassroomView] Seeding classroom from Supabase for module:', module.name);
 
-      if (error) throw error;
-      
-      if (!dbLessons || dbLessons.length === 0) {
-        toast.info("No existing lessons found in Supabase for this curriculum.");
+      const { data: grades } = await supabase.from('grades').select('id').eq('name', selectedGrade).limit(1);
+      const gradeId = grades?.[0]?.id;
+
+      const { data: subjects } = await supabase.from('subjects').select('id').eq('name', module.name).limit(1);
+      const subjectId = subjects?.[0]?.id;
+
+      if (!gradeId || !subjectId) {
+        toast.error("Could not find matching grade or subject in database.");
+        setIsSeeding(false);
         return;
       }
 
-      // Add to dexie db
-      for (const les of dbLessons) {
+      const { data: topics, error: topicsError } = await supabase
+        .from('topics')
+        .select('*')
+        .eq('grade_id', gradeId)
+        .eq('subject_id', subjectId);
+
+      if (topicsError) throw topicsError;
+
+      if (!topics || topics.length === 0) {
+        toast.info("No lessons available in database for this subject.");
+        setIsSeeding(false);
+        return;
+      }
+
+      // Fetch lessons for these topics
+      const topicIds = topics.map(t => t.id);
+      
+      let allDbLessons = [];
+      if (topicIds.length > 0) {
+        const { data: dbLessons, error: lessonsError } = await supabase
+          .from('lessons')
+          .select('*')
+          .in('topic_id', topicIds);
+
+        if (lessonsError) throw lessonsError;
+        allDbLessons = dbLessons || [];
+      } else {
+        // Fallback to old subject mapping if topics don't have lessons
+        const subjectTerms = getSubjectSearchTerms(module.name);
+        const gradeTerms = getGradeSearchTerms(selectedGrade);
+        const pairs = subjectTerms.flatMap(st =>
+          gradeTerms.map(gt => `and(subject.ilike.%${st}%,grade.ilike.%${gt}%)`)
+        ).join(',');
+
+        const { data: fallbackLessons } = await supabase
+          .from('lessons')
+          .select('*')
+          .or(pairs);
+
+        allDbLessons = fallbackLessons || [];
+      }
+
+      if (!allDbLessons || allDbLessons.length === 0) {
+        toast.info("No lessons available in database.");
+        setIsSeeding(false);
+        return;
+      }
+
+      const toAdd = [];
+      for (const les of allDbLessons) {
         const existing = await db.lessons.where('title').equals(les.lesson_title).and(l => l.moduleId === module.id).first();
         if (!existing) {
-          await db.lessons.add({
-            id: les.id || crypto.randomUUID(),
+          toAdd.push({
+            id: les.id,
             moduleId: module.id,
             title: les.lesson_title,
-            content: les.content,
-            status: 'done',
+            content: les.content || '',
+            blocks: les.blocks,
+            subtitle: les.subtitle,
+            status: (les.status === 'published' || les.status === 'done') ? 'done' : 'pending',
             createdAt: Date.now()
           });
         }
       }
 
-      // Enforce strict RAG mode for this module by default as requested
+      if (toAdd.length > 0) {
+        await db.lessons.bulkAdd(toAdd);
+      }
+
       await db.modules.update(module.id, { strictRAG: true });
       
-      toast.success(`Seeded ${dbLessons.length} lessons from Supabase. Strict RAG mode enabled.`);
+      toast.success(`Loaded ${toAdd.length} new units from database.`);
     } catch (err: any) {
       console.error(err);
-      toast.error('Failed to seed from Supabase: ' + err.message);
+      toast.error('Failed to load from database: ' + err.message);
     } finally {
       setIsSeeding(false);
     }
@@ -707,8 +733,17 @@ export const ClassroomView: React.FC = () => {
                     <BookOpen size={24} className="text-accent" />
                   </div>
                   <div className="space-y-2">
-                    <p className="text-sm font-bold text-ink">No units curated yet</p>
-                    <p className="text-xs text-muted max-w-xs">Load existing curriculum units from Supabase or generate new ones with AI.</p>
+                    {aiAvailable ? (
+                      <>
+                        <p className="text-sm font-bold text-ink">No units curated yet</p>
+                        <p className="text-xs text-muted max-w-xs">Load existing curriculum units from Supabase or generate new ones with AI.</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-sm font-bold text-ink">Lessons are being prepared</p>
+                        <p className="text-xs text-muted max-w-xs">Our educators are preparing units for this classroom.</p>
+                      </>
+                    )}
                   </div>
                   {!aiAvailable && (
                     <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 w-full max-w-sm">
