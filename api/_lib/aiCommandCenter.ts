@@ -1,6 +1,29 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import type { User } from "@supabase/supabase-js";
+import type { VercelRequest } from "@vercel/node";
 
 type JsonRecord = Record<string, any>;
+
+type AdminProfileRow = {
+  id: string;
+  role: string | null;
+};
+
+type ApprovalRow = {
+  id: string;
+  task_id: string;
+  status: string;
+  created_at: string;
+};
+
+export class AiCommandCenterHttpError extends Error {
+  status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
 
 export const COMMAND_CENTER_AGENTS = {
   planner: "Planner Agent",
@@ -70,6 +93,65 @@ export function getServerSupabase(): SupabaseClient {
   return createClient(url, serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
+}
+
+function getPublicSupabaseForAuth(): SupabaseClient {
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const authKey =
+    process.env.SUPABASE_ANON_KEY ||
+    process.env.VITE_SUPABASE_ANON_KEY ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !authKey) {
+    throw new Error("Supabase auth credentials are not configured.");
+  }
+
+  return createClient(url, authKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
+
+function getBearerToken(req: VercelRequest) {
+  const header = req.headers.authorization || req.headers.Authorization;
+  if (!header || typeof header !== "string") return null;
+  const match = header.match(/^Bearer\s+(.+)$/i);
+  return match?.[1] || null;
+}
+
+async function getAuthenticatedUser(req: VercelRequest): Promise<User> {
+  const token = getBearerToken(req);
+  if (!token) {
+    throw new AiCommandCenterHttpError(401, "Authentication required.");
+  }
+
+  const authSupabase = getPublicSupabaseForAuth();
+  const { data, error } = await authSupabase.auth.getUser(token);
+
+  if (error || !data.user) {
+    throw new AiCommandCenterHttpError(401, "Invalid or expired authentication token.");
+  }
+
+  return data.user;
+}
+
+export async function requireAiAdmin(req: VercelRequest) {
+  const user = await getAuthenticatedUser(req);
+  const supabase = getServerSupabase();
+  const { data: profile, error } = await supabase
+    .from("profiles")
+    .select("id, role")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (error) {
+    throw new AiCommandCenterHttpError(500, error.message);
+  }
+
+  if (!profile || String((profile as AdminProfileRow).role || "").toLowerCase() !== "admin") {
+    throw new AiCommandCenterHttpError(403, "Admin access is required for AI Command Center operations.");
+  }
+
+  return { user, profile: profile as AdminProfileRow };
 }
 
 export function nowIso() {
@@ -181,6 +263,23 @@ export async function fetchTaskBundle(supabase: SupabaseClient, taskId: string) 
     approvals: approvals || [],
     latestApproval: approvals?.[0] || null,
   };
+}
+
+export async function fetchLatestPendingApproval(supabase: SupabaseClient, taskId: string) {
+  const { data: approval, error } = await supabase
+    .from("ai_task_approvals")
+    .select("*")
+    .eq("task_id", taskId)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return approval as ApprovalRow | null;
 }
 
 export function inferSqlPreview(task: TaskRow, issue: IssueRow) {

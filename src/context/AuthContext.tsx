@@ -159,7 +159,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 
   const isPro = profile?.plan === 'pro';
-  const isAdmin = profile?.role === 'admin' || profile?.plan === 'pro';
+  const isAdmin = profile?.role === 'admin';
 
   useEffect(() => {
     const initSettings = async () => {

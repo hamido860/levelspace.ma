@@ -52,10 +52,23 @@ const normalizeError = async (response) => {
   }
 };
 
+const getApiHeaders = async () => {
+  const headers = { ...API_HEADERS };
+  const { data } = await supabase.auth.getSession();
+  const accessToken = data?.session?.access_token;
+
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
+
+  return headers;
+};
+
 const postJson = async (url, body) => {
+  const headers = await getApiHeaders();
   const response = await fetch(url, {
     method: "POST",
-    headers: API_HEADERS,
+    headers,
     body: JSON.stringify(body),
   });
 
@@ -64,11 +77,6 @@ const postJson = async (url, body) => {
   }
 
   return response.json();
-};
-
-const getCurrentUserId = async () => {
-  const { data } = await supabase.auth.getUser();
-  return data?.user?.id || null;
 };
 
 const normalizeTaskInput = (task) => {
@@ -92,6 +100,35 @@ const normalizeTaskInput = (task) => {
     status: task.status || "pending",
     progress: task.progress ?? 0,
   };
+};
+
+const inferTargetAreaFromAnalystTask = (task) => {
+  const content = `${task?.title || ""} ${task?.description || ""} ${task?.metric_basis || ""}`.toLowerCase();
+
+  if (content.includes("rag") || content.includes("chunk") || content.includes("embedding")) {
+    return "rag_chunks";
+  }
+  if (content.includes("topic")) {
+    return "topics";
+  }
+  if (content.includes("lesson")) {
+    return "lessons";
+  }
+  if (content.includes("profile") || content.includes("user")) {
+    return "profiles";
+  }
+  if (content.includes("onboarding")) {
+    return "onboarding";
+  }
+
+  return "supabase_schema";
+};
+
+const inferIssueTypeFromActionType = (actionType) => {
+  if (actionType === "generate") return "generation";
+  if (actionType === "review") return "audit";
+  if (actionType === "optimize") return "validation";
+  return "fix";
 };
 
 export const getIssues = async () => {
@@ -197,6 +234,57 @@ export const createTask = async (task) => {
   return { task: data, plan, approval };
 };
 
+export const createCommandCenterTaskFromAnalystTask = async (analystTask, context = {}) => {
+  const priority = analystTask.priority || "medium";
+  const targetArea = inferTargetAreaFromAnalystTask(analystTask);
+  const issueType = inferIssueTypeFromActionType(analystTask.action_type);
+  const instructions = [
+    analystTask.description,
+    analystTask.metric_basis ? `Metric basis: ${analystTask.metric_basis}` : null,
+    analystTask.estimated_impact ? `Expected impact: ${analystTask.estimated_impact}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+
+  const issue = await createIssue({
+    title: analystTask.title,
+    severity: priority,
+    issue_type: issueType,
+    affected_area: targetArea,
+    evidence: {
+      source: "ai_analyst",
+      analyst_task_id: analystTask.id,
+      metric_basis: analystTask.metric_basis || null,
+      action_type: analystTask.action_type || null,
+      context,
+    },
+    impact: analystTask.estimated_impact || analystTask.description || "",
+    suggested_action: analystTask.description || "",
+    status: "open",
+  });
+
+  const taskResult = await createTask({
+    issue_id: issue.id,
+    title: analystTask.title,
+    task_name: analystTask.title,
+    task_type: issueType,
+    priority,
+    assigned_agent: "Planner Agent",
+    execution_mode: "execute_with_approval",
+    safety_level: "destructive_blocked",
+    target_area: targetArea,
+    instructions,
+    requires_approval: true,
+    progress: 0,
+    status: "pending",
+  });
+
+  return {
+    issue,
+    ...taskResult,
+  };
+};
+
 export const runAudit = async (taskId) => {
   return postJson("/api/ai-run-audit", { task_id: taskId });
 };
@@ -222,92 +310,20 @@ export const requestApproval = async (taskId, proposedAction) => {
             "Restore from the latest execution snapshot before retrying.",
         };
 
-  const { data, error } = await supabase
-    .from("ai_task_approvals")
-    .insert({ task_id: taskId, ...approvalPayload, status: "pending" })
-    .select("*")
-    .single();
-
-  if (error) throw error;
-
-  await updateTaskStatus(taskId, "waiting_approval", 55);
-  await supabase.from("ai_task_logs").insert({
+  return postJson("/api/ai-request-approval", {
     task_id: taskId,
-    agent_name: "SQL Agent",
-    log_type: "approval",
-    message: "Approval request created for the proposed write action.",
-    metadata: approvalPayload,
+    ...approvalPayload,
   });
-
-  return data;
 };
 
 export const approveTask = async (taskId) => {
-  const userId = await getCurrentUserId();
-  const { data: approval, error: fetchError } = await supabase
-    .from("ai_task_approvals")
-    .select("*")
-    .eq("task_id", taskId)
-    .eq("status", "pending")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (fetchError) throw fetchError;
-  if (!approval) throw new Error("No pending approval request found for this task.");
-
-  const { data, error } = await supabase
-    .from("ai_task_approvals")
-    .update({
-      status: "approved",
-      approved_by: userId,
-      approved_at: new Date().toISOString(),
-    })
-    .eq("id", approval.id)
-    .select("*")
-    .single();
-
-  if (error) throw error;
-
-  await updateTaskStatus(taskId, "pending", 60);
-  await supabase.from("ai_task_logs").insert({
-    task_id: taskId,
-    agent_name: "Reporter Agent",
-    log_type: "approval",
-    message: "Human approval granted. Worker can execute the write action.",
-    metadata: { approval_id: approval.id, approved_by: userId },
-  });
-
-  return data;
+  return postJson("/api/ai-approve-task", { task_id: taskId });
 };
 
 export const rejectTask = async (taskId, reason = "Approval rejected by reviewer.") => {
-  const { data: approval, error: fetchError } = await supabase
-    .from("ai_task_approvals")
-    .select("*")
-    .eq("task_id", taskId)
-    .eq("status", "pending")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (fetchError) throw fetchError;
-
-  if (approval) {
-    const { error } = await supabase
-      .from("ai_task_approvals")
-      .update({ status: "rejected" })
-      .eq("id", approval.id);
-    if (error) throw error;
-  }
-
-  await updateTaskStatus(taskId, "blocked", 58);
-  await supabase.from("ai_task_logs").insert({
+  return postJson("/api/ai-reject-task", {
     task_id: taskId,
-    agent_name: "Reporter Agent",
-    log_type: "approval",
-    message: reason,
-    metadata: { approval_id: approval?.id || null },
+    reason,
   });
 };
 
@@ -415,6 +431,7 @@ export default {
   getTaskById,
   createIssue,
   createTask,
+  createCommandCenterTaskFromAnalystTask,
   runAudit,
   requestApproval,
   approveTask,

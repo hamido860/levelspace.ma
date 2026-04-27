@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { Layout } from "../components/Layout";
 import { SEO } from "../components/SEO";
 import { supabase } from "../db/supabase";
 import { useAuth } from "../context/AuthContext";
 import { validateMetrics, formatValidationErrors } from "../services/metricsValidator";
+import { createCommandCenterTaskFromAnalystTask } from "../services/aiCommandCenterService";
 import {
   RefreshCw, Database, BarChart2, BookOpen, Cpu, Table2,
   AlertTriangle, CheckCircle, Clock, Layers, Sparkles,
@@ -195,6 +197,7 @@ const KPI: React.FC<{ label: string; value: number | string; sub?: string; varia
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export const Admin: React.FC = () => {
+  const navigate = useNavigate();
   const { loading: authLoading } = useAuth();
   const [tab, setTab] = useState<Tab>("overview");
   const [loading, setLoading] = useState(true);
@@ -560,20 +563,22 @@ export const Admin: React.FC = () => {
   };
 
   // ── Task executor (gated: preview + confirm) ──────────────────────────────
-  const executeTask = async (task: any) => {
+  const sendTaskToCommandCenter = async (task: any) => {
     setExecLoading(true);
     setExecResult(null);
     try {
-      const res = await adminPost("/api/admin/exec-task", {
-        action_type: task.action_type,
-        task_id: task.id,
+      const result = await createCommandCenterTaskFromAnalystTask(task, {
+        source_tab: "admin_ai_analyst",
+        active_action: activeAITab,
       });
-      setExecResult(res);
-      if (res.ok) {
-        setExecModal(null);
-        // Refresh relevant data
-        await Promise.all([loadOverview(), loadTableHealth(), loadQueue()]);
-      }
+      setExecResult({
+        created: true,
+        issue_id: result.issue.id,
+        task_id: result.task.id,
+        approval_required: result.plan?.approvalRequired ?? true,
+        preview: result.plan?.sqlPreview || "Planner created a guarded execution plan.",
+      });
+      await Promise.all([loadOverview(), loadTableHealth(), loadQueue()]);
     } catch (e: any) {
       setExecResult({ error: e.message });
     }
@@ -1408,12 +1413,12 @@ export const Admin: React.FC = () => {
                         </div>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
-                        <button
-                          onClick={() => setExecModal({ task: t, open: true })}
-                          className="px-2.5 py-1 rounded text-xs font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
-                        >
-                          Execute
-                        </button>
+                          <button
+                            onClick={() => setExecModal({ task: t, open: true })}
+                            className="px-2.5 py-1 rounded text-xs font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
+                          >
+                            Send to Command Center
+                          </button>
                         <CopyButton
                           getText={() => formatTaskForCopy(t)}
                           className="text-gray-400 hover:text-gray-700 p-1.5 rounded hover:bg-gray-100"
@@ -1518,7 +1523,7 @@ export const Admin: React.FC = () => {
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
             <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
               <Zap className="w-5 h-5 text-amber-600" />
-              <h3 className="font-bold text-lg">Confirm Task Execution</h3>
+              <h3 className="font-bold text-lg">Queue in Command Center</h3>
             </div>
 
             <div className="px-6 py-4 space-y-4">
@@ -1542,7 +1547,7 @@ export const Admin: React.FC = () => {
                 <div className={`rounded-lg p-3 text-sm ${
                   execResult.error
                     ? "bg-red-50 text-red-700"
-                    : execResult.executed
+                    : execResult.created
                     ? "bg-emerald-50 text-emerald-700"
                     : "bg-blue-50 text-blue-700"
                 }`}>
@@ -1551,13 +1556,15 @@ export const Admin: React.FC = () => {
                       <div className="font-semibold mb-1">Error</div>
                       <p>{execResult.error}</p>
                     </>
-                  ) : execResult.executed ? (
+                  ) : execResult.created ? (
                     <>
-                      <div className="font-semibold mb-1">✓ Executed Successfully</div>
+                      <div className="font-semibold mb-1">Queued Successfully</div>
                       <p>{execResult.preview}</p>
-                      {execResult.rows_affected !== undefined && (
-                        <div className="mt-1 text-xs font-semibold">{execResult.rows_affected} row(s) affected</div>
-                      )}
+                      <div className="mt-2 space-y-1 text-xs font-semibold">
+                        <div>Issue ID: {execResult.issue_id}</div>
+                        <div>Task ID: {execResult.task_id}</div>
+                        <div>Approval required: {execResult.approval_required ? "Yes" : "No"}</div>
+                      </div>
                     </>
                   ) : (
                     <>
@@ -1575,23 +1582,30 @@ export const Admin: React.FC = () => {
                   disabled={execLoading}
                   className="flex-1 px-4 py-2 rounded-lg border border-gray-200 text-gray-700 font-semibold hover:bg-gray-50 disabled:opacity-40 transition-colors"
                 >
-                  {execResult?.executed ? "Close" : "Cancel"}
+                  {execResult?.created ? "Close" : "Cancel"}
                 </button>
-                {!execResult && (
+                {execResult?.created ? (
                   <button
-                    onClick={() => executeTask(execModal.task)}
+                    onClick={() => navigate("/admin/ai-command-center")}
+                    className="flex-1 px-4 py-2 rounded-lg bg-gray-900 text-white font-semibold hover:bg-black transition-colors"
+                  >
+                    Open Command Center
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => sendTaskToCommandCenter(execModal.task)}
                     disabled={execLoading}
                     className="flex-1 px-4 py-2 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700 disabled:opacity-40 transition-colors flex items-center justify-center gap-2"
                   >
                     {execLoading ? (
                       <>
                         <RefreshCw className="w-4 h-4 animate-spin" />
-                        Executing...
+                        Creating...
                       </>
                     ) : (
                       <>
                         <Play className="w-4 h-4" />
-                        Execute Now
+                        Create Workflow
                       </>
                     )}
                   </button>
