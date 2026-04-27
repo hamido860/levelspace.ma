@@ -11,3 +11,15 @@
 **Prevention:**
 - Always check `sessionData.session` before running operations that require authentication on mount.
 - Add UUID format validation in components when local storage variables are prone to storing mixed data types (name or UUID).
+
+## 2026-04-27 - [MEDIUM] Removed dead API endpoints in Admin view
+
+**Issue:**
+- Operations in the Admin Dashboard (retry job, delete row, edit task) were failing with a `405 Method Not Allowed` because `src/pages/Admin.tsx` was calling `adminPost('/api/admin/...')`. These backend Express routes or Vercel serverless functions never existed.
+
+**Learning:**
+- **Serverless Migration:** During a migration to Vercel Serverless Functions, some local frontend API wrapper functions (`adminPost`) were left pointing to non-existent custom backend routes instead of directly executing client-side Supabase operations.
+- **Frontend Fallbacks:** For administrative dashboard panels, prefer using the authenticated Supabase client (`supabase.from(..).update(...)`) directly rather than building pass-through serverless functions for standard CRUD operations.
+
+**Prevention:**
+- Rely on Supabase's built-in Row Level Security (RLS) and the Javascript client for basic CRUD and admin operations rather than maintaining redundant API proxy endpoints.

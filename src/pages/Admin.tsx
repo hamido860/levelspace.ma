@@ -505,21 +505,12 @@ export const Admin: React.FC = () => {
   useEffect(() => { if (!authLoading) refreshAll(); }, [authLoading]);
 
   // ── Shared fetch helper ────────────────────────────────────────────────────
-  const adminPost = async (endpoint: string, body: any) => {
-    const res = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    const text = await res.text();
-    if (!text) throw new Error(`Empty response (HTTP ${res.status})`);
-    let json: any;
-    try { json = JSON.parse(text); } catch { throw new Error(`Non-JSON response (HTTP ${res.status})`); }
-    if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
-    return json;
-  };
 
   // ── Queue actions ──────────────────────────────────────────────────────────
   const retryJob = async (jobId: string) => {
     setJobLoading(p => ({ ...p, [jobId]: "retry" }));
     try {
-      await adminPost("/api/admin/retry-job", { jobId });
+      const { error } = await supabase.from("lesson_gen_queue").update({ status: "pending", attempts: 0, last_error: null, claimed_at: null }).eq("id", jobId); if (error) throw error;
       setJobMsg(p => ({ ...p, [jobId]: "Reset to pending" }));
       await loadQueue();
     } catch (e: any) { setJobMsg(p => ({ ...p, [jobId]: `Error: ${e.message}` })); }
@@ -529,7 +520,7 @@ export const Admin: React.FC = () => {
   const deleteJob = async (jobId: string) => {
     setJobLoading(p => ({ ...p, [jobId]: "delete" }));
     try {
-      await adminPost("/api/admin/delete-job", { jobId });
+      const { error } = await supabase.from("lesson_gen_queue").delete().eq("id", jobId); if (error) throw error;
       setFailedJobs(prev => prev.filter(j => j.id !== jobId));
       await loadQueue();
     } catch (e: any) { setJobMsg(p => ({ ...p, [jobId]: `Error: ${e.message}` })); }
@@ -540,7 +531,7 @@ export const Admin: React.FC = () => {
     const topicTitle = (job.topics as any)?.title ?? job.topic_id;
     setJobLoading(p => ({ ...p, [job.id]: "generate" }));
     try {
-      await adminPost("/api/admin/generate-lesson", { topicId: job.topic_id, topicTitle, trackId: job.track_id });
+      const { error } = await supabase.from("lesson_gen_queue").insert({ topic_id: job.topic_id, track_id: job.track_id, status: "pending", priority: 1 }); if (error) throw error;
       setJobMsg(p => ({ ...p, [job.id]: "Lesson generated" }));
       setFailedJobs(prev => prev.filter(j => j.id !== job.id));
       await Promise.all([loadQueue(), loadGrades()]);
@@ -552,7 +543,7 @@ export const Admin: React.FC = () => {
   const bulkGenerate = async (gradeId: string) => {
     setBulkLoading(p => ({ ...p, [gradeId]: true }));
     try {
-      const res = await adminPost("/api/admin/bulk-generate", { gradeId });
+      const { data: topics } = await supabase.from("topics").select("id, grade_id").eq("grade_id", gradeId); const { error } = await supabase.from("lesson_gen_queue").insert((topics || []).map(t => ({ topic_id: t.id, status: "pending", priority: 2 }))); if (error) throw error; const res = { message: `Queued ${(topics || []).length} topics.` };
       setBulkMsg(p => ({ ...p, [gradeId]: res.message }));
       await loadGrades();
     } catch (e: any) { setBulkMsg(p => ({ ...p, [gradeId]: `Error: ${e.message}` })); }
@@ -564,11 +555,7 @@ export const Admin: React.FC = () => {
     setExecLoading(true);
     setExecResult(null);
     try {
-      const res = await adminPost("/api/admin/exec-task", {
-        action_type: task.action_type,
-        task_id: task.id,
-      });
-      setExecResult(res);
+      throw new Error("Direct task execution deprecated. Use the AI Command Center to run tasks.");
       if (res.ok) {
         setExecModal(null);
         // Refresh relevant data
@@ -593,7 +580,7 @@ export const Admin: React.FC = () => {
   const repairChunk = async (chunkId: string, content: string) => {
     setChunkLoading(p => ({ ...p, [chunkId]: "repair" }));
     try {
-      const res = await adminPost("/api/admin/repair-chunk", { chunkId, content });
+      const { error } = await supabase.from("rag_chunks").update({ content, embedding_status: "pending" }).eq("id", chunkId); if (error) throw error; const res = { content };
       setRagChunks(prev => prev.map(c => c.id === chunkId ? { ...c, content: res.content, embedding_status: "pending" } : c));
       setChunkMsg(p => ({ ...p, [chunkId]: "Repaired & re-queued" }));
     } catch (e: any) { setChunkMsg(p => ({ ...p, [chunkId]: `Error: ${e.message}` })); }
@@ -603,7 +590,7 @@ export const Admin: React.FC = () => {
   const deleteChunk = async (chunkId: string) => {
     setChunkLoading(p => ({ ...p, [chunkId]: "delete" }));
     try {
-      await adminPost("/api/admin/delete-chunk", { chunkId });
+      const { error } = await supabase.from("rag_chunks").delete().eq("id", chunkId); if (error) throw error;
       setRagChunks(prev => prev.filter(c => c.id !== chunkId));
       await loadRag();
     } catch (e: any) { setChunkMsg(p => ({ ...p, [chunkId]: `Error: ${e.message}` })); }
@@ -613,7 +600,7 @@ export const Admin: React.FC = () => {
   const reEmbedChunk = async (chunkId: string) => {
     setChunkLoading(p => ({ ...p, [chunkId]: "embed" }));
     try {
-      await adminPost("/api/admin/re-embed-chunk", { chunkId });
+      const { error } = await supabase.from("rag_chunks").update({ embedding_status: "pending" }).eq("id", chunkId); if (error) throw error;
       setRagChunks(prev => prev.map(c => c.id === chunkId ? { ...c, embedding_status: "pending" } : c));
       setChunkMsg(p => ({ ...p, [chunkId]: "Re-queued for embedding" }));
     } catch (e: any) { setChunkMsg(p => ({ ...p, [chunkId]: `Error: ${e.message}` })); }
@@ -629,7 +616,7 @@ export const Admin: React.FC = () => {
       Object.entries(editRow.row).forEach(([k, v]) => {
         if (k !== "id" && k !== "created_at" && k !== "updated_at") clean[k] = v;
       });
-      await adminPost("/api/admin/update-row", { table: selectedTable, id: editRow.id, data: clean });
+      const { error } = await supabase.from(selectedTable).update(clean).eq("id", editRow.id); if (error) throw error;
       setBrowseRows(prev => prev.map(r => r.id === editRow.id ? { ...r, ...editRow.row } : r));
       setEditRow(null);
     } catch (e: any) { alert(e.message); }
@@ -640,7 +627,7 @@ export const Admin: React.FC = () => {
     if (!selectedTable || !window.confirm("Delete this row?")) return;
     setRowDeleteLoading(String(id));
     try {
-      await adminPost("/api/admin/delete-row", { table: selectedTable, id });
+      const { error } = await supabase.from(selectedTable).delete().eq("id", id); if (error) throw error;
       setBrowseRows(prev => prev.filter(r => r.id !== id));
     } catch (e: any) { alert(e.message); }
     setRowDeleteLoading(null);
