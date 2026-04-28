@@ -9,16 +9,23 @@ import { ExecuteTaskModal } from "../components/ai/ExecuteTaskModal";
 import { TaskStatusBoard } from "../components/ai/TaskStatusBoard";
 import { TaskLogViewer } from "../components/ai/TaskLogViewer";
 import { ApprovalPanel } from "../components/ai/ApprovalPanel";
+import { MonitoringRunPanel } from "../components/ai/MonitoringRunPanel";
+import { IssuePatternPanel } from "../components/ai/IssuePatternPanel";
+import { RagHealthReportPanel } from "../components/ai/RagHealthReportPanel";
 import {
   approveTask,
   createTask,
   getIssues,
+  getIssuePatterns,
+  getMonitoringRuns,
+  getRagHealthReports,
   getTaskApproval,
   getTaskById,
   getTaskLogs,
   getTasks,
   rejectTask,
   runAudit,
+  runMonitoring,
   runTask,
 } from "../services/aiCommandCenterService";
 
@@ -36,6 +43,9 @@ export const AiCommandCenter = () => {
   const [selectedTask, setSelectedTask] = useState(null);
   const [selectedTaskLogs, setSelectedTaskLogs] = useState([]);
   const [selectedApproval, setSelectedApproval] = useState(null);
+  const [monitoringRuns, setMonitoringRuns] = useState([]);
+  const [issuePatterns, setIssuePatterns] = useState([]);
+  const [ragHealthReports, setRagHealthReports] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -43,7 +53,13 @@ export const AiCommandCenter = () => {
   const loadBoard = async ({ keepSelection = true } = {}) => {
     setLoading(true);
     try {
-      const [issuesData, tasksData] = await Promise.all([getIssues(), getTasks()]);
+      const [issuesData, tasksData, monitoringRunsData, issuePatternsData, ragHealthReportsData] = await Promise.all([
+        getIssues(),
+        getTasks(),
+        getMonitoringRuns(),
+        getIssuePatterns(),
+        getRagHealthReports(),
+      ]);
       const enrichedTasks = await Promise.all(
         tasksData.map(async (task) => {
           const logs = selectedTask?.id === task.id ? selectedTaskLogs : [];
@@ -56,6 +72,9 @@ export const AiCommandCenter = () => {
 
       setIssues(issuesData);
       setTasks(enrichedTasks);
+      setMonitoringRuns(monitoringRunsData);
+      setIssuePatterns(issuePatternsData);
+      setRagHealthReports(ragHealthReportsData);
 
       if (keepSelection && selectedTask?.id) {
         const refreshedTask = enrichedTasks.find((task) => task.id === selectedTask.id);
@@ -168,6 +187,23 @@ export const AiCommandCenter = () => {
     await hydrateTaskSelection(task.id, task);
   };
 
+  const handleRunMonitoring = async () => {
+    setBusy(true);
+    try {
+      const result = await runMonitoring();
+      toast.success("Monitoring run completed.", {
+        description: `${result?.run?.issues_detected ?? 0} grouped issue(s) detected and synced to the Command Center.`,
+      });
+      await loadBoard({ keepSelection: false });
+    } catch (error) {
+      toast.error("Unable to run monitoring.", {
+        description: error.message,
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleRunTask = async (task) => {
     setBusy(true);
     try {
@@ -250,6 +286,14 @@ export const AiCommandCenter = () => {
               </div>
 
               <div className="flex flex-wrap gap-3">
+                <button
+                  onClick={handleRunMonitoring}
+                  disabled={busy}
+                  className="inline-flex items-center gap-2 rounded-full border border-white/15 px-5 py-2.5 text-sm font-semibold text-white/90 transition-colors hover:bg-white/10 disabled:opacity-50"
+                >
+                  <Bot className="h-4 w-4" />
+                  Run monitoring
+                </button>
                 <button
                   onClick={() => loadBoard()}
                   className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-100"
@@ -358,6 +402,12 @@ export const AiCommandCenter = () => {
             onSelectTask={handleSelectTask}
             onRunTask={handleRunTask}
           />
+        </section>
+
+        <section className="grid gap-6 xl:grid-cols-3">
+          <MonitoringRunPanel runs={monitoringRuns} />
+          <IssuePatternPanel patterns={issuePatterns} />
+          <RagHealthReportPanel reports={ragHealthReports} />
         </section>
 
         <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">

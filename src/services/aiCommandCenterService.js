@@ -156,6 +156,39 @@ export const getTasks = async () => {
   }));
 };
 
+export const getMonitoringRuns = async () => {
+  const { data, error } = await supabase
+    .from("ai_monitoring_runs")
+    .select("*")
+    .order("started_at", { ascending: false })
+    .limit(8);
+
+  if (error) throw error;
+  return data || [];
+};
+
+export const getIssuePatterns = async () => {
+  const { data, error } = await supabase
+    .from("ai_issue_patterns")
+    .select("*")
+    .order("last_seen_at", { ascending: false })
+    .limit(8);
+
+  if (error) throw error;
+  return data || [];
+};
+
+export const getRagHealthReports = async () => {
+  const { data, error } = await supabase
+    .from("ai_rag_health_reports")
+    .select("*, ai_issues(title)")
+    .order("created_at", { ascending: false })
+    .limit(8);
+
+  if (error) throw error;
+  return data || [];
+};
+
 export const getTaskById = async (taskId) => {
   const { data, error } = await supabase
     .from("ai_tasks")
@@ -287,6 +320,10 @@ export const createCommandCenterTaskFromAnalystTask = async (analystTask, contex
 
 export const runAudit = async (taskId) => {
   return postJson("/api/ai-run-audit", { task_id: taskId });
+};
+
+export const runMonitoring = async () => {
+  return postJson("/api/ai-run-monitoring", { run_type: "manual" });
 };
 
 export const requestApproval = async (taskId, proposedAction) => {
@@ -428,10 +465,14 @@ export const updateTaskStatus = async (taskId, status, progress) => {
 export default {
   getIssues,
   getTasks,
+  getMonitoringRuns,
+  getIssuePatterns,
+  getRagHealthReports,
   getTaskById,
   createIssue,
   createTask,
   createCommandCenterTaskFromAnalystTask,
+  runMonitoring,
   runAudit,
   requestApproval,
   approveTask,

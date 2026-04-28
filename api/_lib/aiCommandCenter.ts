@@ -16,6 +16,17 @@ type ApprovalRow = {
   created_at: string;
 };
 
+type MonitoringIssueInput = {
+  title: string;
+  severity: string;
+  issue_type: string;
+  affected_area: string;
+  error_signature: string;
+  evidence: JsonRecord;
+  impact: string;
+  suggested_action: string;
+};
+
 export class AiCommandCenterHttpError extends Error {
   status: number;
 
@@ -763,4 +774,332 @@ export async function validateTaskExecution(
       },
     ],
   };
+}
+
+function slugifySignature(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function inferPatternRiskLevel(severity: string) {
+  if (severity === "critical") return "critical";
+  if (severity === "high") return "high";
+  if (severity === "low") return "low";
+  return "medium";
+}
+
+async function upsertIssuePattern(supabase: SupabaseClient, issue: MonitoringIssueInput) {
+  const now = nowIso();
+  const { data: existing, error: fetchError } = await supabase
+    .from("ai_issue_patterns")
+    .select("*")
+    .eq("error_signature", issue.error_signature)
+    .maybeSingle();
+
+  if (fetchError) throw fetchError;
+
+  const patternPayload = {
+    issue_type: issue.issue_type,
+    affected_area: issue.affected_area,
+    known_fix: issue.suggested_action,
+    auto_fixable: false,
+    risk_level: inferPatternRiskLevel(issue.severity),
+    metadata: {
+      title: issue.title,
+      evidence: issue.evidence,
+    },
+    last_seen_at: now,
+  };
+
+  if (existing) {
+    const { error } = await supabase
+      .from("ai_issue_patterns")
+      .update({
+        ...patternPayload,
+        frequency: Number(existing.frequency || 0) + 1,
+        updated_at: now,
+      })
+      .eq("id", existing.id);
+    if (error) throw error;
+    return existing.id;
+  }
+
+  const { data, error } = await supabase
+    .from("ai_issue_patterns")
+    .insert({
+      error_signature: issue.error_signature,
+      frequency: 1,
+      success_rate: 0,
+      first_seen_at: now,
+      created_at: now,
+      updated_at: now,
+      ...patternPayload,
+    })
+    .select("id")
+    .single();
+
+  if (error) throw error;
+  return data?.id || null;
+}
+
+async function upsertMonitoringIssue(supabase: SupabaseClient, issue: MonitoringIssueInput) {
+  const now = nowIso();
+  const activeStatuses = ["open", "planning", "auditing", "waiting_approval", "running", "blocked"];
+  const { data: existing, error: fetchError } = await supabase
+    .from("ai_issues")
+    .select("*")
+    .eq("error_signature", issue.error_signature)
+    .in("status", activeStatuses)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (fetchError) throw fetchError;
+
+  const issuePayload = {
+    title: issue.title,
+    severity: issue.severity,
+    issue_type: issue.issue_type,
+    affected_area: issue.affected_area,
+    evidence: issue.evidence,
+    impact: issue.impact,
+    suggested_action: issue.suggested_action,
+    error_signature: issue.error_signature,
+    status: "open",
+    updated_at: now,
+  };
+
+  if (existing) {
+    const { data, error } = await supabase
+      .from("ai_issues")
+      .update(issuePayload)
+      .eq("id", existing.id)
+      .select("*")
+      .single();
+    if (error) throw error;
+    return data;
+  }
+
+  const { data, error } = await supabase
+    .from("ai_issues")
+    .insert({
+      ...issuePayload,
+      created_at: now,
+    })
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+async function persistRagHealthReport(
+  supabase: SupabaseClient,
+  issueId: string | null,
+  ragDiagnostic: Awaited<ReturnType<typeof runRagDiagnostic>>,
+  input: {
+    grade_id?: string | null;
+    subject_id?: string | null;
+    topic_id?: string | null;
+    lesson_id?: string | null;
+  } = {},
+) {
+  const status = ragDiagnostic.blocking_reason ? "blocked" : "completed";
+  const payload = {
+    task_id: null,
+    issue_id: issueId,
+    grade_id: input.grade_id || null,
+    subject_id: input.subject_id || null,
+    topic_id: input.topic_id || null,
+    lesson_id: input.lesson_id || null,
+    status,
+    chunk_count: Number(ragDiagnostic.chunks_found || 0),
+    valid_chunk_count: Number(ragDiagnostic.chunks_found || 0),
+    minimum_chunk_count: 1,
+    average_chunk_length: Number(ragDiagnostic.average_chunk_length || 0),
+    relevance_score: Number(ragDiagnostic.relevance_score || 0),
+    blocking_reason: ragDiagnostic.blocking_reason || null,
+    report_data: ragDiagnostic,
+    updated_at: nowIso(),
+  };
+
+  const { error } = await supabase.from("ai_rag_health_reports").insert(payload);
+  if (error) throw error;
+}
+
+export async function runMonitoringSweep(
+  supabase: SupabaseClient,
+  runType = "manual",
+) {
+  const startedAt = nowIso();
+  const { data: run, error: runError } = await supabase
+    .from("ai_monitoring_runs")
+    .insert({
+      run_type: runType,
+      status: "running",
+      issues_detected: 0,
+      grouped_issues: 0,
+      started_at: startedAt,
+      metadata: {},
+      created_at: startedAt,
+    })
+    .select("*")
+    .single();
+
+  if (runError || !run) {
+    throw new Error(runError?.message || "Unable to create monitoring run.");
+  }
+
+  try {
+    const failedJobsResult = await safeSelect(
+      supabase,
+      "lesson_gen_queue",
+      "id, topic_id, status, attempts, last_error, updated_at",
+      (query) => query.limit(500).order("updated_at", { ascending: false }),
+    );
+    const lessonsResult = await safeSelect(
+      supabase,
+      "lessons",
+      "id, topic_id, slug, lesson_order, title, lesson_title",
+      (query) => query.limit(500),
+    );
+
+    const queueRows = failedJobsResult.data || [];
+    const failedJobs = queueRows.filter((job: JsonRecord) =>
+      ["failed", "retryable_failed", "permanent_failed"].includes(job.status),
+    );
+    const jobsMissingTopic = queueRows.filter((job: JsonRecord) => !job.topic_id);
+    const permanentFailed = failedJobs.filter((job: JsonRecord) => Number(job.attempts || 0) >= MAX_AUTOMATIC_RETRIES);
+
+    const lessons = lessonsResult.data || [];
+    const duplicateLessonsMap = new Map<string, number>();
+    lessons.forEach((lesson: JsonRecord) => {
+      const key = `${lesson.topic_id || "none"}::${lesson.slug || lesson.lesson_title || lesson.title || "untitled"}::${lesson.lesson_order || "none"}`;
+      duplicateLessonsMap.set(key, (duplicateLessonsMap.get(key) || 0) + 1);
+    });
+    const duplicateLessons = [...duplicateLessonsMap.entries()]
+      .filter(([, count]) => count > 1)
+      .map(([key, count]) => ({ key, count }));
+
+    const ragDiagnostic = await runRagDiagnostic(supabase, {});
+
+    const monitoringIssues: MonitoringIssueInput[] = [];
+
+    if (failedJobs.length > 0) {
+      monitoringIssues.push({
+        title: "Failed lesson generation jobs detected",
+        severity: permanentFailed.length > 0 ? "critical" : failedJobs.length >= 10 ? "high" : "medium",
+        issue_type: "generation",
+        affected_area: "lessons",
+        error_signature: slugifySignature("lesson_gen_queue_failed_jobs"),
+        evidence: {
+          failed_jobs: failedJobs.length,
+          permanent_failed_jobs: permanentFailed.length,
+          sample_job_ids: failedJobs.slice(0, 10).map((job: JsonRecord) => job.id),
+        },
+        impact: `${failedJobs.length} lesson generation job(s) are failing and blocking fresh curriculum output.`,
+        suggested_action: "Audit the failed queue entries, retry safe jobs, and isolate permanent failures before generation resumes.",
+      });
+    }
+
+    if (jobsMissingTopic.length > 0) {
+      monitoringIssues.push({
+        title: "Lesson generation jobs are missing topic_id",
+        severity: "high",
+        issue_type: "validation",
+        affected_area: "topics",
+        error_signature: slugifySignature("lesson_gen_queue_missing_topic_id"),
+        evidence: {
+          missing_topic_jobs: jobsMissingTopic.length,
+          sample_job_ids: jobsMissingTopic.slice(0, 10).map((job: JsonRecord) => job.id),
+        },
+        impact: "Jobs without topic_id cannot be safely mapped to lessons and must remain blocked.",
+        suggested_action: "Restore exact topic mappings from database relations before retrying generation.",
+      });
+    }
+
+    if (duplicateLessons.length > 0) {
+      monitoringIssues.push({
+        title: "Duplicate lesson groups detected",
+        severity: duplicateLessons.length >= 5 ? "high" : "medium",
+        issue_type: "audit",
+        affected_area: "lessons",
+        error_signature: slugifySignature("lessons_duplicate_groups"),
+        evidence: {
+          duplicate_groups: duplicateLessons.length,
+          sample_groups: duplicateLessons.slice(0, 10),
+        },
+        impact: "Duplicate lessons create curriculum ambiguity and complicate retries, edits, and reporting.",
+        suggested_action: "Review duplicate groups and decide whether to skip, update, or version them explicitly.",
+      });
+    }
+
+    if (ragDiagnostic.blocking_reason || ragDiagnostic.chunks_found === 0) {
+      monitoringIssues.push({
+        title: "RAG health is blocking safe generation",
+        severity: ragDiagnostic.chunks_found === 0 ? "critical" : "high",
+        issue_type: "audit",
+        affected_area: "rag_chunks",
+        error_signature: slugifySignature("rag_chunks_global_health"),
+        evidence: ragDiagnostic,
+        impact: ragDiagnostic.blocking_reason || "RAG data is insufficient for safe lesson generation.",
+        suggested_action: "Repair chunk coverage, validate relevance, and re-run RAG diagnostics before generation resumes.",
+      });
+    }
+
+    const createdIssues = [];
+    for (const issue of monitoringIssues) {
+      await upsertIssuePattern(supabase, issue);
+      const storedIssue = await upsertMonitoringIssue(supabase, issue);
+      createdIssues.push(storedIssue);
+
+      if (issue.affected_area === "rag_chunks") {
+        await persistRagHealthReport(supabase, storedIssue.id, ragDiagnostic);
+      }
+    }
+
+    const completedAt = nowIso();
+    const metadata = {
+      failed_jobs: failedJobs.length,
+      missing_topic_jobs: jobsMissingTopic.length,
+      duplicate_lesson_groups: duplicateLessons.length,
+      rag: ragDiagnostic,
+      issue_signatures: monitoringIssues.map((issue) => issue.error_signature),
+    };
+
+    const { data: finalRun, error: finalRunError } = await supabase
+      .from("ai_monitoring_runs")
+      .update({
+        status: "completed",
+        issues_detected: monitoringIssues.length,
+        grouped_issues: monitoringIssues.length,
+        completed_at: completedAt,
+        metadata,
+      })
+      .eq("id", run.id)
+      .select("*")
+      .single();
+
+    if (finalRunError || !finalRun) {
+      throw new Error(finalRunError?.message || "Unable to finalize monitoring run.");
+    }
+
+    return {
+      run: finalRun,
+      issues: createdIssues,
+      summary: metadata,
+    };
+  } catch (error) {
+    await supabase
+      .from("ai_monitoring_runs")
+      .update({
+        status: "failed",
+        completed_at: nowIso(),
+        metadata: { error: normalizeError(error) },
+      })
+      .eq("id", run.id);
+    throw error;
+  }
 }
