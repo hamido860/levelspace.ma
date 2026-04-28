@@ -1,0 +1,3 @@
+## 2024-05-18 - Icon-Only Button Accessibility in Topbar
+**Learning:** The Topbar component relies heavily on icon-only buttons for core actions (theme toggle, language switch, settings, notifications, refresh connection) which lacked proper `aria-label`s and clear keyboard focus states. This creates a significant barrier for screen reader and keyboard-only users.
+**Action:** Always ensure icon-only buttons have descriptive `aria-label` attributes and visible focus rings. Applied standard Tailwind focus utilities (`focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1`) for consistent keyboard navigation feedback.
