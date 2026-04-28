@@ -27,6 +27,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../db/supabase';
+import { loadClassroomModulesSupabaseFirst } from '../services/classroomService';
 
 import { TagsManager } from '../components/TagsManager';
 import { Modal } from '../components/Modal';
@@ -105,31 +106,35 @@ export const Modules: React.FC = () => {
     fetchBacDetails();
   }, [selectedBacTrackId, selectedBacIntOptionId, grade]);
 
-  const fetchCurriculum = async (bypassCache = false) => {
-    if (!checkAIProvider()) return;
+  const fetchCurriculum = async (includeAiSuggestions = false, bypassCache = false) => {
     setIsLoading(true);
     try {
-      let fullGrade = grade;
-      if (bacTrackName) {
-        fullGrade += ` - ${bacTrackName}`;
-      }
-      if (bacIntOptionName) {
-        fullGrade += ` (${bacIntOptionName})`;
-      }
-      const aiModules = await generateCurriculum(country, fullGrade, false, 2, bypassCache);
-      if (aiModules && aiModules.length > 0) {
-        const formattedModules = aiModules.map(m => ({
-          id: m.id,
-          name: m.name,
-          code: m.code,
-          description: m.description,
-          category: m.category,
-          progress: 0,
-          selected: false,
-          createdAt: Date.now()
-        }));
+      const supabaseFirst = await loadClassroomModulesSupabaseFirst({
+        gradeName: grade,
+        bacTrackId: selectedBacTrackId || undefined,
+        includeAiSuggestions,
+        loadAiSuggestions: async () => {
+          if (!aiAvailable) return [];
+          let fullGrade = grade;
+          if (bacTrackName) fullGrade += ` - ${bacTrackName}`;
+          if (bacIntOptionName) fullGrade += ` (${bacIntOptionName})`;
+          const aiModules = await generateCurriculum(country, fullGrade, false, 2, bypassCache);
+          return aiModules.map(m => ({
+            id: m.id,
+            name: m.name,
+            code: m.code,
+            description: `${m.description} (AI suggestion)`,
+            category: m.category,
+            progress: 0,
+            selected: false,
+            createdAt: Date.now()
+          }));
+        }
+      });
+
+      if (supabaseFirst.length > 0) {
         await db.modules.clear();
-        await db.modules.bulkPut(formattedModules);
+        await db.modules.bulkPut(supabaseFirst);
       }
     } catch (error) {
       console.error("Failed to fetch curriculum:", error);
@@ -176,13 +181,13 @@ export const Modules: React.FC = () => {
           
           <div className="flex items-center gap-4 shrink-0">
             <button
-              onClick={() => fetchCurriculum(true)}
+              onClick={() => fetchCurriculum(true, true)}
               disabled={isLoading || !aiAvailable}
               title={!aiAvailable ? aiUnavailableMsg : undefined}
               className="flex items-center gap-2 px-4 py-2 bg-accent/5 text-accent rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-accent/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-              Regenerate
+              AI Suggestions
             </button>
             <div className="group relative inline-block">
               <button className="w-10 h-10 rounded-full bg-surface-low flex items-center justify-center text-muted hover:text-accent hover:bg-accent/10 transition-colors">
@@ -336,9 +341,7 @@ export const Modules: React.FC = () => {
                 )}
                 <button
                   onClick={() => fetchCurriculum(false)}
-                  disabled={!aiAvailable}
-                  title={!aiAvailable ? aiUnavailableMsg : undefined}
-                  className="px-10 py-4 bg-accent text-paper rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-accent-hover transition-all shadow-xl shadow-accent/20 flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-10 py-4 bg-accent text-paper rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-accent-hover transition-all shadow-xl shadow-accent/20 flex items-center gap-3"
                 >
                   <Sparkles className="w-4 h-4" />
                   Create My Classroom
@@ -391,4 +394,3 @@ export const Modules: React.FC = () => {
     </Layout>
   );
 };
-

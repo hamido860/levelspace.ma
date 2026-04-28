@@ -1,8 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '../types/supabase';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const runtimeEnv = (typeof import.meta !== 'undefined' ? (import.meta as any).env : undefined) ?? {};
+const supabaseUrl = runtimeEnv.VITE_SUPABASE_URL;
+const supabaseAnonKey = runtimeEnv.VITE_SUPABASE_ANON_KEY;
 
 // Validate URL format
 const isValidUrl = (url: string | undefined): url is string => {
