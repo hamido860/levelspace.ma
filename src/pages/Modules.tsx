@@ -106,7 +106,22 @@ export const Modules: React.FC = () => {
     fetchBacDetails();
   }, [selectedBacTrackId, selectedBacIntOptionId, grade]);
 
-  const fetchCurriculum = async (bypassCache = false) => {
+  const createMyClassroom = async () => {
+    setIsLoading(true);
+    try {
+      await createClassroomCatalogSupabaseFirst({
+        grade,
+        selectedBacTrackId,
+      });
+    } catch (error) {
+      console.error("Failed to create classroom from Supabase:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchCurriculumSuggestions = async (bypassCache = false) => {
+    if (!aiAvailable) return;
     setIsLoading(true);
     try {
       let fullGrade = grade;
@@ -142,7 +157,7 @@ export const Modules: React.FC = () => {
         await db.modules.bulkPut(aiSuggestions);
       }
     } catch (error) {
-      console.error("Failed to fetch curriculum:", error);
+      console.error("Failed to fetch curriculum suggestions:", error);
     } finally {
       setIsLoading(false);
     }
@@ -186,7 +201,7 @@ export const Modules: React.FC = () => {
           
           <div className="flex items-center gap-4 shrink-0">
             <button
-              onClick={() => fetchCurriculum(true)}
+              onClick={() => fetchCurriculumSuggestions(true)}
               disabled={isLoading || !aiAvailable}
               title="Optional AI suggestions only"
               className="flex items-center gap-2 px-4 py-2 bg-accent/5 text-accent rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-accent/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
@@ -344,7 +359,7 @@ export const Modules: React.FC = () => {
                   </div>
                 )}
                 <button
-                  onClick={() => fetchCurriculum(false)}
+                  onClick={createMyClassroom}
                   disabled={isLoading}
                   title="Load classroom from Supabase"
                   className="px-10 py-4 bg-accent text-paper rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-accent-hover transition-all shadow-xl shadow-accent/20 flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"

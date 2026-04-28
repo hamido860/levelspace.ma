@@ -60,3 +60,30 @@ test('does not require AI for free users to load classroom catalog', async () =>
   assert.strictEqual(cleared, 1);
   assert.strictEqual(saved, 1);
 });
+
+test('does not call AI suggestions callback when none is provided', async () => {
+  let cleared = 0;
+  let saved = 0;
+
+  const result = await createClassroomCatalogSupabaseFirstWithDeps(
+    {
+      loadFromSupabase: async () => [
+        { id: 'sub-1', name: 'Chemistry', code: 'CHEM', description: 'd', category: 'Chemistry', progress: 0, selected: false, createdAt: Date.now() },
+      ],
+      clearModules: async () => {
+        cleared += 1;
+      },
+      saveModules: async () => {
+        saved += 1;
+      },
+    },
+    {
+      grade: 'Grade 10',
+    }
+  );
+
+  assert.strictEqual(result.supabaseModules.length, 1);
+  assert.strictEqual(result.aiSuggestions.length, 0);
+  assert.strictEqual(cleared, 1);
+  assert.strictEqual(saved, 1);
+});
