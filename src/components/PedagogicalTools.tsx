@@ -331,7 +331,7 @@ const CauseEffect: React.FC<{ lessonId: string }> = ({ lessonId }) => {
             className="flex items-center gap-2 px-3 py-1.5 bg-accent/10 text-accent rounded-lg text-xs font-bold hover:bg-accent hover:text-white transition-colors disabled:opacity-50"
           >
             {isGenerating ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-            {isGenerating ? 'Analyzing...' : 'AI Analyze'}
+            {isGenerating ? 'Checking...' : 'Quality check'}
           </button>
         )}
       </div>
@@ -450,7 +450,7 @@ const Flashcards: React.FC<{ lessonId: string }> = ({ lessonId }) => {
             className="flex items-center gap-2 px-3 py-1.5 bg-accent/10 text-accent rounded-lg text-xs font-bold hover:bg-accent hover:text-white transition-colors disabled:opacity-50"
           >
             {isGenerating ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-            {isGenerating ? 'Generating...' : 'AI Generate'}
+            {isGenerating ? 'Preparing...' : 'Create'}
           </button>
         )}
       </div>

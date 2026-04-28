@@ -44,7 +44,7 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson }) => {
           {lesson.is_ai_generated && (
             <span className="px-3 py-1 rounded-full bg-accent/10 text-[10px] font-bold text-accent uppercase tracking-widest flex items-center gap-1">
               <Sparkles size={10} />
-              AI Generated
+              Lesson draft
             </span>
           )}
         </div>

@@ -64,7 +64,7 @@ export const AiCommandCenter = () => {
         }
       }
     } catch (error) {
-      toast.error("Unable to load AI Command Center.", {
+      toast.error("Unable to load command center.", {
         description: error.message,
       });
     } finally {
@@ -226,8 +226,8 @@ export const AiCommandCenter = () => {
   return (
     <Layout fullWidth>
       <SEO
-        title="AI Task Command Center"
-        description="Human-controlled AI operations dashboard for issue remediation, audits, approvals, execution, and validation."
+        title="Content Review Command Center"
+        description="Human-controlled operations dashboard for issue remediation, audits, approvals, execution, and validation."
       />
 
       <div className="space-y-8 p-4 md:p-6">
@@ -236,16 +236,16 @@ export const AiCommandCenter = () => {
             <div className="space-y-5">
               <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.2em] text-white/80">
                 <Sparkles className="h-4 w-4" />
-                AI Task Command Center
+                Content Review Center
               </div>
 
               <div className="space-y-3">
                 <h1 className="max-w-3xl text-3xl font-bold md:text-5xl">
-                  Turn AI issue analysis into controlled execution with approvals, validation, and a permanent log trail.
+                  Turn issue analysis into controlled execution with approvals, validation, and a permanent log trail.
                 </h1>
                 <p className="max-w-2xl text-sm leading-7 text-white/72 md:text-base">
                   This is the operations layer for your education SaaS. The analyzer finds broken mappings, failed jobs,
-                  RAG gaps, curriculum holes, and relation mismatches. The command center converts each issue into a guarded AI crew workflow with human sign-off before any write happens.
+                  RAG gaps, curriculum holes, and relation mismatches. The command center converts each issue into a guarded review workflow with human sign-off before any write happens.
                 </p>
               </div>
 
@@ -289,7 +289,7 @@ export const AiCommandCenter = () => {
               <div className="rounded-[28px] border border-white/10 bg-white/8 p-5 backdrop-blur-sm">
                 <div className="flex items-center gap-3">
                   <Bot className="h-5 w-5 text-sky-300" />
-                  <p className="text-sm font-semibold text-white/90">AI crew tasks</p>
+                  <p className="text-sm font-semibold text-white/90">Pipeline tasks</p>
                 </div>
                 <p className="mt-4 text-4xl font-bold">{tasks.length}</p>
                 <p className="mt-2 text-xs uppercase tracking-[0.18em] text-white/45">Planner → Auditor → Worker → Validator</p>
@@ -311,7 +311,7 @@ export const AiCommandCenter = () => {
           <div className="mb-5 flex items-center justify-between gap-3">
             <div>
               <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-ink-muted">Issue Dashboard</p>
-              <h2 className="mt-2 text-2xl font-bold text-ink">Detected AI issues ready for controlled execution</h2>
+              <h2 className="mt-2 text-2xl font-bold text-ink">Detected issues ready for controlled execution</h2>
             </div>
             <div className="rounded-full bg-surface-low px-3 py-1 text-xs font-semibold text-ink-secondary">
               {issues.length} issue{issues.length === 1 ? "" : "s"}
@@ -324,7 +324,7 @@ export const AiCommandCenter = () => {
             </div>
           ) : issues.length === 0 ? (
             <div className="rounded-3xl border border-dashed border-surface-mid p-8 text-sm text-ink-muted">
-              No AI issues have been recorded yet. Once the analyzer flags lesson generation, RAG, or profile-state problems, they will appear here as executable issue cards.
+              No issues have been recorded yet. Once the analyzer flags lesson generation, RAG, or profile-state problems, they will appear here as executable issue cards.
             </div>
           ) : (
             <div className="grid gap-5 2xl:grid-cols-2">
@@ -345,7 +345,7 @@ export const AiCommandCenter = () => {
           <div className="mb-5 flex items-center justify-between gap-3">
             <div>
               <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-ink-muted">Task Status Board</p>
-              <h2 className="mt-2 text-2xl font-bold text-ink">AI crew execution pipeline</h2>
+              <h2 className="mt-2 text-2xl font-bold text-ink">Content pipeline execution</h2>
             </div>
             <div className="text-sm text-ink-muted">
               Visible states include pending, auditing, approval waits, validation, failures, and blocks.

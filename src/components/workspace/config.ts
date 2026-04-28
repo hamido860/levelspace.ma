@@ -24,7 +24,7 @@ export const WORKSPACE_CONFIG: Record<string, SubjectConfig> = {
     tools: [
       { id: 'math-editor', type: 'input', label: 'Math Editor', icon: 'Calculator', library: 'MathLive' },
       { id: 'math-validator', type: 'logic', label: 'Validator', icon: 'CheckCircle', library: 'Math.js' },
-      { id: 'ai-assistant', type: 'ai', label: 'AI Tutor', icon: 'Brain' }
+      { id: 'ai-assistant', type: 'ai', label: 'Guided Tutor', icon: 'Brain' }
     ]
   },
   physics: {
@@ -33,7 +33,7 @@ export const WORKSPACE_CONFIG: Record<string, SubjectConfig> = {
     tools: [
       { id: 'math-editor', type: 'input', label: 'Formula Editor', icon: 'Calculator', library: 'MathLive' },
       { id: 'unit-validator', type: 'logic', label: 'Unit Checker', icon: 'Ruler', library: 'Math.js' },
-      { id: 'ai-assistant', type: 'ai', label: 'AI Tutor', icon: 'Brain' }
+      { id: 'ai-assistant', type: 'ai', label: 'Guided Tutor', icon: 'Brain' }
     ]
   },
   biology: {
@@ -42,7 +42,7 @@ export const WORKSPACE_CONFIG: Record<string, SubjectConfig> = {
     tools: [
       { id: 'text-input', type: 'input', label: 'Notes', icon: 'FileText' },
       { id: 'image-fetcher', type: 'api', label: 'Diagrams', icon: 'Image', providers: ['Wikimedia'] },
-      { id: 'ai-explainer', type: 'ai', label: 'AI Explainer', icon: 'Sparkles' }
+      { id: 'ai-explainer', type: 'ai', label: 'Guided Explainer', icon: 'Sparkles' }
     ]
   },
   geology: {
@@ -59,7 +59,7 @@ export const WORKSPACE_CONFIG: Record<string, SubjectConfig> = {
     tools: [
       { id: 'dictionary', type: 'api', label: 'Dictionary', icon: 'Book', providers: ['DictionaryAPI'] },
       { id: 'timeline', type: 'visual', label: 'Timeline', icon: 'Calendar' },
-      { id: 'notes-generator', type: 'ai', label: 'AI Summary', icon: 'Zap' }
+      { id: 'notes-generator', type: 'ai', label: 'Lesson Summary', icon: 'Zap' }
     ]
   },
   language: {
@@ -67,7 +67,7 @@ export const WORKSPACE_CONFIG: Record<string, SubjectConfig> = {
     label: 'Language',
     tools: [
       { id: 'dictionary', type: 'api', label: 'Dictionary', icon: 'Book', providers: ['DictionaryAPI'] },
-      { id: 'writing-assistant', type: 'ai', label: 'AI Writing', icon: 'PenTool' }
+      { id: 'writing-assistant', type: 'ai', label: 'Writing Support', icon: 'PenTool' }
     ]
   },
   philosophy: {
@@ -75,12 +75,12 @@ export const WORKSPACE_CONFIG: Record<string, SubjectConfig> = {
     label: 'Philosophy',
     tools: [
       { id: 'dictionary', type: 'api', label: 'Dictionary', icon: 'Book', providers: ['DictionaryAPI'] },
-      { id: 'argument-builder', type: 'ai', label: 'AI Argument', icon: 'MessageSquare' },
-      { id: 'writing-assistant', type: 'ai', label: 'AI Writing', icon: 'PenTool' }
+      { id: 'argument-builder', type: 'ai', label: 'Argument Builder', icon: 'MessageSquare' },
+      { id: 'writing-assistant', type: 'ai', label: 'Writing Support', icon: 'PenTool' }
     ]
   }
 };
 
 export const GLOBAL_TOOLS: ToolConfig[] = [
-  { id: 'ai-assistant', type: 'ai', label: 'AI Assistant', icon: 'Brain' }
+  { id: 'ai-assistant', type: 'ai', label: 'Learning Assistant', icon: 'Brain' }
 ];

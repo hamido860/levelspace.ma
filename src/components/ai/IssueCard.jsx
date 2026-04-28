@@ -75,7 +75,7 @@ export const IssueCard = ({ issue, latestTask, onExecute, onViewLogs }) => {
                   </div>
                   <AgentBadge agent={latestTask.assigned_agent} compact />
                 </div>
-                <p className="text-xs text-ink-secondary">{latestTask.instructions || "Task created from AI issue analyzer."}</p>
+                <p className="text-xs text-ink-secondary">{latestTask.instructions || "Task created from issue analyzer."}</p>
               </div>
             ) : (
               <div className="mt-3 flex items-center gap-2 text-sm text-ink-muted">

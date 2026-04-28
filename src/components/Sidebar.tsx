@@ -43,7 +43,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
 
   const toolNavItems = isAdmin ? [
     { label: 'Admin', icon: <Sparkles size={20} />, path: '/admin' },
-    { label: 'AI Ops', icon: <ShieldCheck size={20} />, path: '/admin/ai-command-center' },
+    { label: 'Review Ops', icon: <ShieldCheck size={20} />, path: '/admin/ai-command-center' },
   ] : [];
 
   return (

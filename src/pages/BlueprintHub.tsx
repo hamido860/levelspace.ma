@@ -126,8 +126,8 @@ export const BlueprintHub: React.FC = () => {
         <section className="max-w-3xl space-y-4">
           <p className="text-lg text-muted leading-relaxed font-light">
             Discover, fork, and evolve pedagogical structures. When you fork a blueprint, 
-            you inherit its pedagogical judgment—what to learn and in what order—while the AI 
-            fills in the content.
+            you inherit its pedagogical judgment—what to learn and in what order—while the content
+            pipeline fills in the lesson draft.
           </p>
           <div className="flex items-center gap-3">
             <span className="text-xs font-bold uppercase tracking-widest text-muted">Net Grounding Resources:</span>

@@ -680,7 +680,7 @@ export const Admin: React.FC = () => {
     { id: "queue",    label: "Gen Queue",        icon: <Cpu className="w-4 h-4" /> },
     { id: "rag",      label: "RAG / Embeddings", icon: <Layers className="w-4 h-4" /> },
     { id: "browser",  label: "Table Browser",   icon: <Table2 className="w-4 h-4" /> },
-    { id: "ai",       label: "AI Analyst",       icon: <Sparkles className="w-4 h-4" /> },
+    { id: "ai",       label: "Curriculum Analyst",       icon: <Sparkles className="w-4 h-4" /> },
   ];
 
   // ── RENDER ────────────────────────────────────────────────────────────────
@@ -1240,7 +1240,7 @@ export const Admin: React.FC = () => {
               <Sparkles className="w-5 h-5" />
             </div>
             <div className="flex-1">
-              <h2 className="font-bold text-base">AI Analyst Agent</h2>
+              <h2 className="font-bold text-base">Curriculum Analyst</h2>
               <p className="text-gray-400 text-sm mt-0.5">
                 Powered by <span className="text-white font-medium">qwen/qwen3-coder-480b-a35b-instruct</span> via NVIDIA NIM.
                 Reads your live database metrics and returns insights, tasks, and strategy.
@@ -1505,7 +1505,7 @@ export const Admin: React.FC = () => {
           {!aiLoading && !aiError && !aiInsights && !aiTaskList && !aiStrategy && !aiRetryMsg && (
             <div className="bg-white rounded-xl border border-dashed border-gray-200 p-10 flex flex-col items-center gap-3 text-center">
               <Sparkles className="w-8 h-8 text-gray-300" />
-              <p className="text-gray-500 text-sm">Click an action above to run the AI Analyst against your live metrics.</p>
+              <p className="text-gray-500 text-sm">Click an action above to run the curriculum review against your live metrics.</p>
               <p className="text-gray-400 text-xs">The agent reads all grade coverage, queue status, and RAG data before responding.</p>
             </div>
           )}

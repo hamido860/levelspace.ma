@@ -13,6 +13,7 @@ import { getQuizzesByLesson } from '../services/quizService';
 import { getExercisesByLesson } from '../services/exerciseService';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 
 // Moroccan bilingual system — map English ↔ French subject/grade names
 const SUBJECT_ALIASES: Record<string, string[]> = {
@@ -79,6 +80,7 @@ export const ClassroomView: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
+  const { t } = useLanguage();
   const [generatingTitle, setGeneratingTitle] = useState<string | null>(null);
   const [isFetchingGallery, setIsFetchingGallery] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
@@ -90,11 +92,16 @@ export const ClassroomView: React.FC = () => {
   const [isLoadingExtra, setIsLoadingExtra] = useState(false);
   const aiAvailable = checkAIProvider();
 
+  const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
+  const settingsMap = Object.fromEntries(dbSettings.map(s => [s.key, s.value]));
+
+  const selectedGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
+  const country = settingsMap['selected_country'] || localStorage.getItem('selected_country') || '';
   const module = useLiveQuery(() => id ? db.modules.get(id) : undefined, [id]);
   const allLessons = useLiveQuery(() => id ? db.lessons.where('moduleId').equals(id).sortBy('createdAt') : [], [id]);
   const lessons = allLessons?.filter(l => l.status !== 'suggested') || [];
 
-  // Auto-seed from Supabase when local lessons are empty — no AI needed
+  // Supabase-first classroom loading, no AI dependency.
   useEffect(() => {
     if (!module || !id || allLessons === undefined) return;
     if (allLessons.filter(l => l.status !== 'suggested').length > 0) return;
@@ -102,7 +109,6 @@ export const ClassroomView: React.FC = () => {
       try {
         const subjectTerms = getSubjectSearchTerms(module.name);
         const gradeTerms = getGradeSearchTerms(selectedGrade);
-        // Build OR of (subject AND grade) pairs to handle bilingual name mismatches
         const pairs = subjectTerms.flatMap(st =>
           gradeTerms.map(gt => `and(subject.ilike.%${st}%,grade.ilike.%${gt}%)`)
         ).join(',');
@@ -132,16 +138,10 @@ export const ClassroomView: React.FC = () => {
         }
         if (toAdd.length > 0) await db.lessons.bulkAdd(toAdd);
       } catch (err) {
-        console.warn('[ClassroomView] Auto-seed from Supabase failed:', err);
+        console.warn('[ClassroomView] Supabase-first load failed:', err);
       }
     })();
-  }, [module?.id, allLessons?.length]);
-
-  const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
-  const settingsMap = Object.fromEntries(dbSettings.map(s => [s.key, s.value]));
-
-  const selectedGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
-  const country = settingsMap['selected_country'] || localStorage.getItem('selected_country') || '';
+  }, [module?.id, allLessons?.length, selectedGrade]);
 
   useEffect(() => {
     const fetchExtraData = async () => {
@@ -396,7 +396,7 @@ export const ClassroomView: React.FC = () => {
       const { data: dbLessons, error } = await supabase
         .from('lessons')
         .select('*')
-        .eq('subject', module.category)
+        .or(`subject.ilike.%${module.category}%,subject.ilike.%${module.name}%`)
         .eq('grade', selectedGrade)
         .eq('country', country);
 
@@ -446,7 +446,7 @@ export const ClassroomView: React.FC = () => {
         existingLessons: lessons.map(l => ({ title: l.title, content: l.content }))
       }),
       {
-        loading: 'Delegating audit to AI Crew...',
+        loading: 'Starting quality check...',
         success: 'Audit task added to queue!',
         error: 'Failed to delegate audit.'
       }
@@ -468,7 +468,7 @@ export const ClassroomView: React.FC = () => {
       <Layout>
         <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
           <BookOpen className="w-12 h-12 text-muted/20" />
-          <p className="text-ink font-medium">Classroom not found.</p>
+          <p className="text-ink font-medium">{t('classroom_not_found')}</p>
           <button onClick={() => navigate('/dashboard')} className="text-accent hover:underline">Return to Dashboard</button>
         </div>
       </Layout>
@@ -502,7 +502,7 @@ export const ClassroomView: React.FC = () => {
             <button
               onClick={handleAuditClassroom}
               disabled={!aiAvailable}
-              title={!aiAvailable ? "AI features need an API key, but your classroom content is available." : "Audit Classroom Content"}
+              title={!aiAvailable ? "Quality checks need an API key, but classroom content is still available." : "Audit classroom content"}
               className="flex items-center gap-2 bg-surface-low text-muted hover:text-accent px-4 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all border border-ink/5 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ShieldCheck size={14} />
@@ -511,11 +511,11 @@ export const ClassroomView: React.FC = () => {
             <button
               onClick={() => handleGenerateLesson()}
               disabled={!aiAvailable || !!generatingTitle}
-              title={!aiAvailable ? "AI features need an API key, but your classroom content is available." : ""}
+              title={!aiAvailable ? "Lesson drafting needs an API key, but classroom content is still available." : ""}
               className="flex items-center gap-2 bg-ink text-paper px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-accent transition-all shadow-lg shadow-ink/10 disabled:opacity-50"
             >
               {generatingTitle === module.name ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-              Generate Lesson
+              Create lesson
             </button>
             <button className="w-12 h-12 bg-surface-low rounded-xl flex items-center justify-center text-muted hover:text-ink transition-colors">
               <MoreHorizontal size={20} />
@@ -547,7 +547,7 @@ export const ClassroomView: React.FC = () => {
                  <div className="flex items-center justify-between p-3 bg-surface-low rounded-xl">
                    <div>
                      <p className="text-sm font-bold text-ink">Strict RAG Mode</p>
-                     <p className="text-[10px] text-muted">Restrict AI generation to lesson context only</p>
+                     <p className="text-[10px] text-muted">Restrict lesson drafting to lesson context only</p>
                    </div>
                    <button
                      onClick={async () => {
@@ -647,7 +647,7 @@ export const ClassroomView: React.FC = () => {
                 <button
                   onClick={fetchGallery}
                   disabled={isFetchingGallery || !aiAvailable}
-                  title={!aiAvailable ? "AI features need an API key, but your classroom content is available." : ""}
+                  title={!aiAvailable ? "Guided suggestions need an API key, but classroom content is still available." : ""}
                   className="text-[10px] font-bold text-accent uppercase tracking-widest hover:underline flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isFetchingGallery ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />}
@@ -708,11 +708,11 @@ export const ClassroomView: React.FC = () => {
                   </div>
                   <div className="space-y-2">
                     <p className="text-sm font-bold text-ink">No units curated yet</p>
-                    <p className="text-xs text-muted max-w-xs">Load existing curriculum units from Supabase or generate new ones with AI.</p>
+                <p className="text-xs text-muted max-w-xs">{t('classroom_empty_description')}</p>
                   </div>
                   {!aiAvailable && (
                     <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 w-full max-w-sm">
-                      <p className="text-xs text-amber-800 font-medium">AI features need an API key, but your classroom content is available.</p>
+                      <p className="text-xs text-amber-800 font-medium">Guided suggestions need an API key, but classroom content is still available.</p>
                     </div>
                   )}
                   <div className="flex flex-col sm:flex-row gap-3 w-full max-w-sm">
@@ -727,11 +727,11 @@ export const ClassroomView: React.FC = () => {
                     <button
                       onClick={fetchGallery}
                       disabled={isFetchingGallery || !aiAvailable}
-                      title={!aiAvailable ? "AI features need an API key, but your classroom content is available." : ""}
+                      title={!aiAvailable ? "Guided suggestions need an API key, but classroom content is still available." : ""}
                       className="flex-1 flex items-center justify-center gap-2 bg-surface-low text-ink px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-accent/10 transition-all disabled:opacity-50"
                     >
                       {isFetchingGallery ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-                      {isFetchingGallery ? "Generating..." : "Generate with AI"}
+                      {isFetchingGallery ? t('loading') : t('classroom_ai_suggestions')}
                     </button>
                   </div>
                 </div>
@@ -873,7 +873,7 @@ export const ClassroomView: React.FC = () => {
                         </div>
                       )}
                       <div className="space-y-1">
-                        <h4 className={`text-base font-bold transition-colors ${isSelected ? 'text-accent' : 'text-ink group-hover:text-accent'}`}>
+                    <h4 className={`text-base font-bold transition-colors line-clamp-2 ${isSelected ? 'text-accent' : 'text-ink group-hover:text-accent'}`}>
                           {suggestion.title}
                         </h4>
                         <p className="text-xs text-muted leading-relaxed">{suggestion.description}</p>

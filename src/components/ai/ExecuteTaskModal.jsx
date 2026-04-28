@@ -32,7 +32,7 @@ const buildDefaults = (issue) => {
   const targetArea = areaFromIssue(issue);
   const readOnlyAudit = issue?.issue_type === "audit";
   return {
-    task_name: issue ? `Resolve: ${issue.title}` : "Resolve AI issue",
+    task_name: issue ? `Resolve: ${issue.title}` : "Resolve issue",
     task_type: defaultTaskType(issue),
     priority,
     assigned_agent: "Planner Agent",
@@ -103,7 +103,7 @@ export const ExecuteTaskModal = ({
   };
 
   return (
-    <Modal isOpen={open} onClose={onClose} title="Execute AI Task" maxWidth="4xl">
+    <Modal isOpen={open} onClose={onClose} title="Execute Task" maxWidth="4xl">
       <div className="space-y-6">
         <div className="rounded-[28px] bg-gradient-to-br from-gray-950 via-gray-900 to-slate-800 p-5 text-white">
           <div className="flex flex-wrap items-start justify-between gap-4">

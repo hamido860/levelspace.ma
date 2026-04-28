@@ -842,15 +842,15 @@ export const Settings: React.FC = () => {
               </div>
             </section>
 
-            {/* AI Provider API Key */}
+            {/* Content Provider API Key */}
             <section className="p-5 bg-paper border border-ink/5 rounded-3xl space-y-5 shadow-sm flex flex-col">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 bg-accent/5 rounded-lg flex items-center justify-center text-accent">
                   <Key className="w-4 h-4" />
                 </div>
                 <div className="space-y-0.5">
-                  <h2 className="text-base font-medium text-ink leading-tight">AI Provider API Key</h2>
-                  <p className="text-[10px] text-muted/60 leading-tight">Configure your AI key — classroom content works without one</p>
+                  <h2 className="text-base font-medium text-ink leading-tight">Content Provider API Key</h2>
+                  <p className="text-[10px] text-muted/60 leading-tight">Configure your key for guided tools — classroom content works without one</p>
                 </div>
               </div>
 
@@ -884,7 +884,7 @@ export const Settings: React.FC = () => {
               </div>
             </section>
 
-            {/* NVIDIA NIM API Key — Admin AI Features */}
+            {/* NVIDIA NIM API Key — Admin Guided Features */}
             <section className="p-5 bg-paper border border-ink/5 rounded-3xl space-y-5 shadow-sm flex flex-col">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 bg-success/10 rounded-lg flex items-center justify-center text-success">
@@ -892,7 +892,7 @@ export const Settings: React.FC = () => {
                 </div>
                 <div className="space-y-0.5">
                   <h2 className="text-base font-medium text-ink leading-tight">NVIDIA NIM API Key</h2>
-                  <p className="text-[10px] text-muted/60 leading-tight">Admin AI features only — Gemma 3 27B via server proxy</p>
+                  <p className="text-[10px] text-muted/60 leading-tight">Admin guided features only — Gemma 3 27B via server proxy</p>
                 </div>
               </div>
 
@@ -1037,4 +1037,3 @@ export const Settings: React.FC = () => {
     </Layout>
   );
 };
-
