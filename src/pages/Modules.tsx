@@ -3,33 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Layout } from '../components/Layout';
 import { SEO } from '../components/SEO';
-import { 
-  Search, 
-  Filter, 
-  ArrowUpDown, 
-  Check, 
-  Plus, 
-  BookOpen, 
-  Globe, 
-  FlaskConical, 
-  Library, 
-  Brain,
-  ArrowRight,
-  X,
-  Info,
-  Sparkles,
-  Loader2,
-  PlusCircle
-} from 'lucide-react';
-import { generateCurriculum, checkAIProvider } from '../services/geminiService';
+import { Filter, ArrowUpDown, Check, BookOpen, Globe, FlaskConical, Library, Brain, Info, Loader2 } from 'lucide-react';
+import { supabase } from '../db/supabase';
 import { useSearch } from '../context/SearchContext';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../db/supabase';
-
 import { TagsManager } from '../components/TagsManager';
-import { Modal } from '../components/Modal';
 import { useLanguage } from '../context/LanguageContext';
 
 const getIconForCategory = (category: string) => {
@@ -47,16 +27,6 @@ export const Modules: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { searchQuery } = useSearch();
   const navigate = useNavigate();
-  const aiAvailable = checkAIProvider();
-  const aiUnavailableMsg = "AI features need an API key, but your classroom content is available.";
-
-  const [showCustomModal, setShowCustomModal] = useState(false);
-  const [customModule, setCustomModule] = useState({
-    name: '',
-    code: '',
-    description: '',
-    category: 'General'
-  });
 
   const dbModules = useLiveQuery(() => db.modules.toArray());
   const modules = (dbModules || []).map(m => ({
