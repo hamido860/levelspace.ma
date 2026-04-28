@@ -187,7 +187,7 @@ export const Progress: React.FC = () => {
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <Target size={14} className="text-accent" />
-                  <span className="text-[9px] font-bold uppercase tracking-widest text-white/40">AI Insight</span>
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-white/40">Progress insight</span>
                 </div>
                 <h4 className="text-xl font-bold leading-tight">Your cognitive peak occurs between 10 AM and 12 PM.</h4>
               </div>

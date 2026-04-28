@@ -74,10 +74,10 @@ export const MathEditor: React.FC<MathEditorProps> = ({ state, onChange }) => {
               onClick={handleSendToAI}
               disabled={!state.latex}
               className="flex items-center gap-2 px-3 py-1.5 bg-accent/10 text-accent rounded-lg hover:bg-accent/20 transition-colors disabled:opacity-50 disabled:hover:bg-accent/10 text-xs font-medium"
-              title="Ask AI about this formula"
+              title="Get help with this formula"
             >
               <Send size={14} />
-              Ask AI
+              Get help
             </button>
           )}
           {canAskAi && <div className="w-px h-4 bg-ink/10 mx-1"></div>}

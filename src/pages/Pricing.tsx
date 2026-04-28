@@ -33,7 +33,7 @@ export const Pricing: React.FC = () => {
       description: 'Perfect for getting started with your studies.',
       features: [
         'Up to 3 active modules',
-        'Basic AI assistance',
+        'Guided support tools',
         'Standard flashcards',
         'Community support',
       ],
@@ -45,10 +45,10 @@ export const Pricing: React.FC = () => {
       name: 'Pro',
       price: '$9.99',
       period: '/month',
-      description: 'Unlock full potential with advanced AI tools.',
+      description: 'Unlock full potential with advanced learning tools.',
       features: [
         'Unlimited modules',
-        'Advanced AI Tutor (Gemini 3.1 Pro)',
+        'Advanced Tutor Support (Gemini 3.1 Pro)',
         'Unlimited Flashcard generation',
         'Theme Tracker & Lit Devices',
         'Priority Support',

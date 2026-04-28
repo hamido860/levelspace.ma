@@ -58,7 +58,7 @@ export const AICrewStatus: React.FC = () => {
                   <Users size={16} />
                 </div>
                 <div>
-                  <h2 className="text-[10px] font-bold uppercase tracking-widest text-ink">AI Crew</h2>
+                  <h2 className="text-[10px] font-bold uppercase tracking-widest text-ink">Content Pipeline</h2>
                   <p className="text-[8px] text-ink-muted uppercase tracking-wider">Task Queue</p>
                 </div>
               </div>
@@ -140,7 +140,7 @@ export const AICrewStatus: React.FC = () => {
                                     topic: item.payload.topic || item.task
                                   }
                                 );
-                                toast.success("Task delegated to AI Crew!");
+                                toast.success("Task added to content pipeline.");
                               }}
                               className="p-1 bg-accent/10 text-accent rounded hover:bg-accent hover:text-paper transition-colors"
                               title="Delegate to Crew"
@@ -209,7 +209,7 @@ export const AICrewStatus: React.FC = () => {
         
         <div className="flex flex-col items-start">
           <span className="text-[10px] font-bold uppercase tracking-widest leading-none">
-            {activeTasks.length > 0 ? 'AI Crew Active' : 'AI Crew'}
+            {activeTasks.length > 0 ? 'Pipeline Active' : 'Content Pipeline'}
           </span>
           <div className="flex items-center gap-1.5 mt-1">
             <span className="text-[8px] opacity-80 uppercase tracking-wider">

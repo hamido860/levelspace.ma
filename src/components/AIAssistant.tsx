@@ -119,7 +119,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
         const country = localStorage.getItem('selected_country') || '';
         const grade = localStorage.getItem('selected_grade') || 'Grade 10';
         const subject = "General";
-        const moduleName = "AI Generated";
+        const moduleName = "Lesson Draft";
 
         const lesson = await generateFullLesson(text, country, grade, subject, moduleName);
         
@@ -158,10 +158,10 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
   };
 
   const quickActions = [
-    { label: "Generate lesson content", icon: <PenTool size={14} />, prompt: "Can you generate more detailed content for this lesson, including examples and deeper explanations?" },
+    { label: "Create lesson draft", icon: <PenTool size={14} />, prompt: "Can you create more detailed content for this lesson, including examples and deeper explanations?" },
     { label: "Explain a concept", icon: <HelpCircle size={14} />, prompt: "Can you explain the main concept of this lesson in simpler terms?" },
     { label: "Extend an idea", icon: <Sparkles size={14} />, prompt: "Can you extend on the ideas presented here and give me a real-world application?" },
-    { label: "Generate a question", icon: <BookOpen size={14} />, prompt: "Can you generate a practice question based on this lesson to test my understanding?" },
+    { label: "Create a question", icon: <BookOpen size={14} />, prompt: "Can you create a practice question based on this lesson to test my understanding?" },
     { label: "Explain in another language", icon: <Globe size={14} />, prompt: `Can you explain the main concepts of this lesson in another language (like French, Arabic, or Spanish) to help me understand better? My preferred interface language is ${language}.` }
   ];
 
@@ -177,7 +177,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
           <MessageCircle size={24} />
         </button>
         <div className="absolute bottom-16 right-0 bg-ink text-paper text-xs px-3 py-2 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-lg">
-          AI help requires API key
+          Guided help requires API key
         </div>
       </div>,
       document.body
@@ -216,7 +216,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
                   <Bot size={18} />
                 </div>
                 <div>
-                  <h3 className="font-bold text-sm">AI Tutor</h3>
+                  <h3 className="font-bold text-sm">Guided Tutor</h3>
                   <p className="text-[10px] text-paper/60 uppercase tracking-widest">Grounded in this lesson</p>
                 </div>
               </div>
@@ -236,7 +236,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
                     <Loader2 size={32} className="animate-spin" />
                   </div>
                   <div className="space-y-2">
-                    <h4 className="font-bold text-ink">Analyzing Lesson...</h4>
+                    <h4 className="font-bold text-ink">Reviewing lesson...</h4>
                     <p className="text-xs text-muted max-w-[250px]">
                       I'm reading the material to see how I can best help you.
                     </p>
@@ -301,7 +301,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
                       </div>
                       <div className="p-4 bg-paper border border-ink/5 rounded-2xl rounded-tl-sm shadow-sm flex items-center gap-2">
                         <Loader2 size={14} className="animate-spin text-accent" />
-                        <span className="text-xs text-muted">Thinking...</span>
+                        <span className="text-xs text-muted">Preparing help...</span>
                       </div>
                     </div>
                   )}
@@ -378,7 +378,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
                           handleSend(input);
                         }
                       }}
-                      placeholder="Ask about this lesson..."
+                      placeholder="Get help with this lesson..."
                       className="flex-1 max-h-32 min-h-[44px] p-3 bg-surface-low border border-ink/10 rounded-2xl text-sm focus:outline-none focus:border-accent/50 resize-none custom-scrollbar"
                       rows={1}
                     />

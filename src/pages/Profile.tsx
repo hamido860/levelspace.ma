@@ -248,7 +248,7 @@ export const Profile: React.FC = () => {
             <div className="p-8 bg-ink text-paper rounded-[2rem] shadow-xl space-y-6">
               <h3 className="text-lg font-serif font-medium">Pro Membership</h3>
               <p className="text-sm text-paper/60 leading-relaxed">
-                Unlock unlimited classrooms, advanced AI tutoring, and detailed progress mapping.
+                Unlock unlimited classrooms, advanced tutoring support, and detailed progress mapping.
               </p>
               <button className="w-full py-4 bg-accent text-white rounded-2xl text-xs font-bold uppercase tracking-widest hover:bg-accent/90 transition-colors">
                 Upgrade to Pro

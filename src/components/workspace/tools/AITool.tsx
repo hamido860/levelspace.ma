@@ -94,9 +94,9 @@ export const AITool: React.FC<AIToolProps> = ({ tool, state, onChange, lessonCon
           <Brain className="w-8 h-8" />
         </div>
         <div className="space-y-2">
-          <h3 className="text-lg font-bold text-ink">AI Access Restricted</h3>
+          <h3 className="text-lg font-bold text-ink">Access Restricted</h3>
           <p className="text-sm text-muted max-w-xs mx-auto">
-            This AI tool is currently restricted to administrators. Please contact your teacher or administrator for access.
+            This tool is currently restricted to administrators. Please contact your teacher or administrator for access.
           </p>
         </div>
       </div>
@@ -154,7 +154,7 @@ export const AITool: React.FC<AIToolProps> = ({ tool, state, onChange, lessonCon
                 <div className="absolute inset-0 bg-accent/20 blur-xl rounded-full animate-pulse" />
                 <Brain className="w-12 h-12 text-accent relative z-10 animate-bounce" />
               </div>
-              <p className="text-xs font-bold uppercase tracking-widest animate-pulse">AI is thinking...</p>
+              <p className="text-xs font-bold uppercase tracking-widest animate-pulse">Processing...</p>
             </div>
           ) : response ? (
             <div className="prose prose-sm dark:prose-invert max-w-none text-ink prose-headings:text-ink prose-strong:text-accent prose-code:text-accent prose-code:bg-accent/5 dark:prose-code:bg-accent/15 prose-code:px-1 prose-code:rounded">
@@ -166,7 +166,7 @@ export const AITool: React.FC<AIToolProps> = ({ tool, state, onChange, lessonCon
               <div className="space-y-1">
                 <p className="text-sm font-bold text-ink">Ready to assist</p>
                 <p className="text-[10px] text-muted uppercase tracking-widest">
-                  {tool.id === 'notes-generator' ? "Click below to generate lesson summary" : "Enter your query above to begin"}
+                  {tool.id === 'notes-generator' ? "Click below to create a lesson summary" : "Enter your request above to begin"}
                 </p>
               </div>
               {tool.id === 'notes-generator' && (
@@ -174,7 +174,7 @@ export const AITool: React.FC<AIToolProps> = ({ tool, state, onChange, lessonCon
                   onClick={generateAIResponse}
                   className="px-6 py-3 bg-accent text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-ink transition-all shadow-lg shadow-accent/20"
                 >
-                  Generate Summary
+                  Create summary
                 </button>
               )}
             </div>
@@ -186,9 +186,9 @@ export const AITool: React.FC<AIToolProps> = ({ tool, state, onChange, lessonCon
             <Sparkles className="w-4 h-4" />
           </div>
           <div className="space-y-1">
-            <p className="text-xs font-bold text-ink">AI Tutor</p>
+            <p className="text-xs font-bold text-ink">Guided Tutor</p>
             <p className="text-[10px] text-muted leading-relaxed">
-              Our AI is trained on educational content to provide accurate and helpful support. Always verify critical facts.
+              This assistant is grounded in educational content to provide helpful support. Always verify critical facts.
             </p>
           </div>
         </div>

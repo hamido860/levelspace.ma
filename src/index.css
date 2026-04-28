@@ -4,7 +4,7 @@
 @plugin "@tailwindcss/typography";
 
 @theme {
-  --font-sans: "DM Sans", "Inter", "Noto Sans Arabic", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-display: "Syne", "Noto Sans Arabic", sans-serif;
   --font-serif: "Cormorant Garamond", "Noto Sans Arabic", serif;
   --font-mono: "JetBrains Mono", "Noto Sans Arabic", monospace;
@@ -99,7 +99,7 @@
     @apply bg-background text-ink font-sans antialiased selection:bg-accent/10 selection:text-accent;
   }
   [lang="ar"] body {
-    font-family: "Noto Sans Arabic", "DM Sans", "Inter", sans-serif;
+    font-family: "Noto Sans Arabic", "Inter", system-ui, sans-serif;
   }
   h1, h2, h3, .display {
     @apply font-display tracking-tight;
@@ -365,4 +365,3 @@
 .katex .mop                { color: var(--math-function); } /* functions: sin cos log */
 .katex .mopen,
 .katex .mclose             { color: var(--math-bracket);  } /* delimiters: ( ) [ ] */
-

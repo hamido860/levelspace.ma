@@ -170,7 +170,7 @@ const PendingLessonView: React.FC<{ title: string; lessonId: string; onReady: ()
         <div className="text-center space-y-2 max-w-md">
           <p className="text-ink font-semibold text-lg">"{title}"</p>
           <p className="text-accent font-medium text-sm">{PENDING_STAGES[stageIdx]}{dots}</p>
-          <p className="text-muted text-xs">AI Crew is building this lesson. This usually takes 30–90 seconds.</p>
+          <p className="text-muted text-xs">Content pipeline is preparing this lesson. This usually takes 30–90 seconds.</p>
         </div>
         <div className="flex gap-1.5">
           {PENDING_STAGES.map((_, i) => (
@@ -743,7 +743,7 @@ export const LessonView: React.FC = () => {
                     if (aiAvailable) handleExplain();
                   }}
                   disabled={!aiAvailable}
-                  title={!aiAvailable ? "AI help requires API key" : undefined}
+                  title={!aiAvailable ? "Guided help requires API key" : undefined}
                   className="explain-btn shrink-0 bg-accent text-paper px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-accent"
                 >
                   <Brain size={14} />
@@ -769,7 +769,7 @@ export const LessonView: React.FC = () => {
                 <Brain size={22} />
               </div>
               <div>
-                <h3 className="text-sm font-bold uppercase tracking-widest text-ink">AI Contextual Explanation</h3>
+                <h3 className="text-sm font-bold uppercase tracking-widest text-ink">Guided explanation</h3>
                 <p className="text-[10px] text-muted font-medium">Grounded in this lesson's content</p>
               </div>
             </div>
@@ -788,7 +788,7 @@ export const LessonView: React.FC = () => {
               </div>
               <div className="p-4 bg-accent/5 rounded-2xl border border-accent/10">
                 <p className="text-[10px] text-accent font-medium leading-relaxed">
-                  The AI analyzes this specific snippet within the context of the entire lesson to provide the most relevant explanation.
+                  This explanation reviews the selected snippet in the context of the full lesson.
                 </p>
               </div>
             </div>
@@ -797,7 +797,7 @@ export const LessonView: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-muted">
                   <BookOpen size={14} />
-                  <span className="text-[10px] font-bold uppercase tracking-widest">AI Analysis</span>
+                  <span className="text-[10px] font-bold uppercase tracking-widest">Quality check</span>
                 </div>
                 {!isExplaining && (
                   <span className="text-[9px] font-mono text-muted/40 uppercase">v3.1-FLASH-LITE</span>
@@ -978,7 +978,7 @@ export const LessonView: React.FC = () => {
           </h1>
 
           <p className="lesson-header__sub">
-            {effectiveLesson.subtitle || `${totalBlocks} blocks · ~15 min · AI Generated`}
+            {effectiveLesson.subtitle || `${totalBlocks} blocks · ~15 min · Lesson draft`}
           </p>
 
           <div className="mt-4 mb-6 flex items-center gap-4">
@@ -1009,7 +1009,7 @@ export const LessonView: React.FC = () => {
               <button
                 onClick={handleGenerateTags}
                 disabled={isGeneratingTags || !hasAiAccess || !aiAvailable}
-                title={!aiAvailable ? "AI features need an API key — configure one in Settings to enable." : ""}
+                title={!aiAvailable ? "Guided tools need an API key — configure one in Settings to enable." : ""}
                 className="flex items-center gap-2 px-3 py-1.5 bg-accent/5 text-accent rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-accent/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isGeneratingTags ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
@@ -1038,8 +1038,8 @@ export const LessonView: React.FC = () => {
             </div>
           </div>
           <div className="config-strip__author">
-            <div className="avatar">AI</div>
-            <span className="text-xs text-ink-secondary">LevelSpace AI</span>
+            <div className="avatar">LS</div>
+            <span className="text-xs text-ink-secondary">LevelSpace Guide</span>
             <div className="flex items-center gap-2">
               <div className="relative">
                 <button 
@@ -1370,7 +1370,7 @@ export const LessonView: React.FC = () => {
                                       Generating...
                                     </span>
                                   ) : (
-                                    "Generate another example ↗"
+                                    "Create another example ↗"
                                   )}
                                 </button>
                               </div>
