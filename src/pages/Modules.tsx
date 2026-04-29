@@ -22,7 +22,7 @@ import {
   PlusCircle
 } from 'lucide-react';
 import { generateCurriculum, checkAIProvider } from '../services/geminiService';
-import { mapSubjectsToModules, mergeModulesWithAiSuggestions } from '../services/classroomLoader';
+import { mapSubjectsToModules, mergeModulesWithAiSuggestions, shouldIncludeAiSuggestions, type CurriculumLoadIntent } from '../services/classroomLoader';
 import { useSearch } from '../context/SearchContext';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
@@ -106,7 +106,8 @@ export const Modules: React.FC = () => {
     fetchBacDetails();
   }, [selectedBacTrackId, selectedBacIntOptionId, grade]);
 
-  const fetchCurriculum = async (includeAiSuggestions = false, bypassAiCache = false) => {
+  const fetchCurriculum = async (intent: CurriculumLoadIntent = 'create_classroom', bypassAiCache = false) => {
+    const includeAiSuggestions = shouldIncludeAiSuggestions(intent, aiAvailable);
     setIsLoading(true);
     try {
       const { data: subjectRows, error: subjectError } = await supabase.from('subjects').select('*').limit(500);
@@ -193,7 +194,7 @@ export const Modules: React.FC = () => {
           
           <div className="flex items-center gap-4 shrink-0">
             <button
-              onClick={() => fetchCurriculum(true, true)}
+              onClick={() => fetchCurriculum('regenerate_suggestions', true)}
               disabled={isLoading || !aiAvailable}
               title={!aiAvailable ? aiUnavailableMsg : undefined}
               className="flex items-center gap-2 px-4 py-2 bg-accent/5 text-accent rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-accent/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
@@ -351,7 +352,7 @@ export const Modules: React.FC = () => {
                   </div>
                 )}
                 <button
-                  onClick={() => fetchCurriculum(false)}
+                  onClick={() => fetchCurriculum('create_classroom')}
                   className="px-10 py-4 bg-accent text-paper rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-accent-hover transition-all shadow-xl shadow-accent/20 flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <PlusCircle className="w-4 h-4" />
