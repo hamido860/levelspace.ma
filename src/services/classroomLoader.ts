@@ -58,3 +58,11 @@ export const mergeModulesWithAiSuggestions = (base: Module[], ai: Module[]): Mod
 
   return Array.from(byKey.values());
 };
+
+
+export type CurriculumLoadIntent = 'create_classroom' | 'regenerate_suggestions';
+
+export const shouldIncludeAiSuggestions = (intent: CurriculumLoadIntent, aiAvailable: boolean): boolean => {
+  if (!aiAvailable) return false;
+  return intent === 'regenerate_suggestions';
+};

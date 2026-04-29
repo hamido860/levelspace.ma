@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert';
 
-import { mapSubjectsToModules, mergeModulesWithAiSuggestions } from '../classroomLoader.ts';
+import { mapSubjectsToModules, mergeModulesWithAiSuggestions, shouldIncludeAiSuggestions } from '../classroomLoader.ts';
 
 test('mapSubjectsToModules keeps UUID ids and does not require AI services', () => {
   const modules = mapSubjectsToModules([
@@ -74,4 +74,15 @@ test('mergeModulesWithAiSuggestions keeps Supabase modules and appends unique AI
   assert.strictEqual(merged.length, 2);
   assert.strictEqual(merged[0].id, 'supabase-1');
   assert.strictEqual(merged[1].id, 'ai-2');
+});
+
+
+test('free users can create classroom without AI calls', () => {
+  assert.strictEqual(shouldIncludeAiSuggestions('create_classroom', true), false);
+  assert.strictEqual(shouldIncludeAiSuggestions('create_classroom', false), false);
+});
+
+test('AI suggestions are optional and only used for regenerate flow', () => {
+  assert.strictEqual(shouldIncludeAiSuggestions('regenerate_suggestions', true), true);
+  assert.strictEqual(shouldIncludeAiSuggestions('regenerate_suggestions', false), false);
 });
