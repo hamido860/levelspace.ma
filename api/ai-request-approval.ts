@@ -5,7 +5,7 @@ import {
   createTaskLog,
   fetchTaskBundle,
   getServerSupabase,
-  requireAiAdmin,
+  requireAdminUser,
   updateTaskStatus,
 } from "./_lib/aiCommandCenter";
 
@@ -24,7 +24,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    await requireAiAdmin(req);
+    await requireAdminUser(req);
     const { task_id, proposed_action, risk_level, sql_preview, affected_records, rollback_plan } =
       req.body as ApprovalRequestBody;
 

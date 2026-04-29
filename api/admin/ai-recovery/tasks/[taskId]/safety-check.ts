@@ -3,8 +3,13 @@ import {
   AiCommandCenterHttpError,
   getServerSupabase,
   requireAdminUser,
-  runMonitoringSweep,
-} from "./_lib/aiCommandCenter";
+  runAiRecoverySafetyCheck,
+} from "../../../../_lib/aiCommandCenter";
+
+function readTaskId(req: VercelRequest) {
+  const value = req.query.taskId;
+  return Array.isArray(value) ? value[0] : value;
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
@@ -13,14 +18,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     await requireAdminUser(req);
-    const { run_type } = req.body as { run_type?: string };
+    const taskId = readTaskId(req);
+
+    if (!taskId) {
+      return res.status(400).json({ error: "taskId is required" });
+    }
+
     const supabase = getServerSupabase();
-    const result = await runMonitoringSweep(supabase, run_type || "manual");
+    const result = await runAiRecoverySafetyCheck(supabase, taskId);
     return res.status(200).json(result);
   } catch (error) {
     if (error instanceof AiCommandCenterHttpError) {
       return res.status(error.status).json({ error: error.message });
     }
-    return res.status(500).json({ error: error instanceof Error ? error.message : "Unable to run monitoring." });
+
+    return res.status(500).json({
+      error: error instanceof Error ? error.message : "Unable to run AI recovery safety check.",
+    });
   }
 }

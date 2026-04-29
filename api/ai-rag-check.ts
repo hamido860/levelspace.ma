@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { AiCommandCenterHttpError, getServerSupabase, requireAiAdmin, runRagDiagnostic } from "./_lib/aiCommandCenter";
+import { AiCommandCenterHttpError, getServerSupabase, requireAdminUser, runRagDiagnostic } from "./_lib/aiCommandCenter";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
@@ -7,7 +7,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    await requireAiAdmin(req);
+    await requireAdminUser(req);
     const body = req.body as {
       grade_id?: string | null;
       subject_id?: string | null;

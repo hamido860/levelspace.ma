@@ -169,3 +169,20 @@
 - Align `supabase-schema.sql` and connection-help text with the newer migration-based schema.
 - Remove heuristic status labels like `>100 => populated` unless they are clearly marked as UI-only heuristics.
 - Audit old admin copy so it does not imply "live system truth" where the code is only showing sampled or derived state.
+
+## 8. Fix Notes (2026-04-28)
+
+- Fixed admin overview KPIs to use canonical Supabase sources for completed jobs, failed jobs, pending jobs, recovered lessons needing review, and student-publish-ready recovered lessons.
+- Fixed recovered lesson review logic to use `public.lessons where teaching_contract->>'status' = 'needs_review'`.
+- Fixed student publish readiness logic to use `teaching_contract->>'student_publish_allowed' = 'true'`.
+- Added reusable admin dashboard query helpers so the page no longer hand-builds queue, grade, and RAG metrics inline.
+- Removed the misleading `Lessons Generated` overview card and replaced it with `Completed Jobs` backed by `public.lesson_gen_queue where status = 'done'`.
+- Removed the unsupported `rag_questions` KPI from the admin dashboard and replaced it with real `rag_chunks` status totals.
+- Updated queue KPIs to surface non-canonical statuses and missing `topic_id` rows instead of silently dropping them.
+- Relabeled the failed-job table as a recent sample from `public.lesson_gen_queue` and kept it read-only.
+- Removed broken admin mutation controls from the main dashboard UI for queue, RAG chunk, and analyst workflow actions so the page stays focused on read-only accuracy.
+- Updated table health to use a curated set of confirmed admin tables and to distinguish `missing table` from `restricted`.
+- Added explicit dashboard error handling for missing / invalid Supabase configuration so the admin page does not rely on dummy fallback behavior for its metrics.
+- Kept the admin dashboard read-only by isolating dormant write/modification flows and surfacing Supabase-backed inspection only.
+- Updated student-facing lesson reads to keep recovered lessons blocked unless `student_publish_allowed` is true.
+- Normalized lesson block type presentation in the UI to the allowed set: `text`, `example`, `formula`, `summary`.

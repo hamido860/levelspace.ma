@@ -10,7 +10,6 @@ interface AuthContextType {
   profile: any | null;
   loading: boolean;
   signOut: () => Promise<void>;
-  signInAsDemoAdmin: () => Promise<void>;
   isPro: boolean;
   isAdmin: boolean;
   dbConnected: boolean | null;
@@ -27,34 +26,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [dbConnected, setDbConnected] = useState<boolean | null>(null);
 
-  // Demo Admin details for dev mode
-  const dummyAdminUser = {
-    id: 'demo-admin-id',
-    email: 'admin@demo.com',
-    app_metadata: {},
-    user_metadata: {
-      full_name: 'Demo Admin',
-      avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Admin'
-    },
-    aud: 'authenticated',
-    created_at: new Date().toISOString()
-  } as unknown as User;
-
-  const dummyAdminProfile = {
-    id: 'demo-admin-id',
-    plan: 'pro',
-    role: 'admin',
-    created_at: new Date().toISOString()
-  };
-
   const refreshDbConnection = async () => {
     const connected = await checkSupabaseConnection();
     setDbConnected(connected);
   };
 
   const syncData = async () => {
-    if (!dbConnected || !user || user.id === 'demo-admin-id') {
-      return { errors: ['Not connected to cloud or user acting as demo admin'] };
+    if (!dbConnected || !user) {
+      return { errors: ['Not connected to cloud or user is not authenticated'] };
     }
     // Pull cloud → local first (restores lessons on new devices / fresh sessions),
     // then push local → cloud so any offline changes are not lost.
@@ -90,13 +69,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           await db.settings.put({ key: `profile_${session.user.id}`, value: userProfile });
         }
       } else {
-        if (localStorage.getItem('demo_admin_logged_in') === 'true') {
-          setUser(dummyAdminUser);
-          setProfile(dummyAdminProfile);
-        } else {
-          setUser(null);
-          setProfile(null);
-        }
+        localStorage.removeItem('demo_admin_logged_in');
+        setUser(null);
+        setProfile(null);
       }
       setLoading(false);
     });
@@ -121,13 +96,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           await db.settings.put({ key: `profile_${session.user.id}`, value: userProfile });
         }
       } else {
-        if (localStorage.getItem('demo_admin_logged_in') === 'true') {
-          setUser(dummyAdminUser);
-          setProfile(dummyAdminProfile);
-        } else {
-          setUser(null);
-          setProfile(null);
-        }
+        localStorage.removeItem('demo_admin_logged_in');
+        setUser(null);
+        setProfile(null);
       }
       setLoading(false);
     };
@@ -148,15 +119,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setProfile(null);
     setLoading(false);
   };
-
-  const signInAsDemoAdmin = async () => {
-    setLoading(true);
-    localStorage.setItem('demo_admin_logged_in', 'true');
-    setUser(dummyAdminUser);
-    setProfile(dummyAdminProfile);
-    setLoading(false);
-  };
-
 
   const isPro = profile?.plan === 'pro';
   const isAdmin = profile?.role === 'admin';
@@ -206,7 +168,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       profile, 
       loading, 
       signOut, 
-      signInAsDemoAdmin,
       isPro, 
       isAdmin,
       dbConnected,

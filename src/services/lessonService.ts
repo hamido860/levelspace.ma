@@ -3,6 +3,7 @@ import { supabase } from "../db/supabase";
 import { generateFullLesson, LessonTemplate, AILesson, AILessonBlock, flatLessonToBlocks } from "./geminiService";
 import { saveLesson, searchLessons } from "./ragService";
 import { aiCrew } from "./aiCrewService";
+import { isStudentVisibleLesson } from "./lessonRecovery";
 
 export const lessonService = {
   fetchOrGenerate: async (
@@ -50,13 +51,24 @@ export const lessonService = {
         .eq("country", country)
         .maybeSingle();
 
-      let lessonData: LessonTemplate | null = exactMatch as LessonTemplate | null;
+      let lessonData: LessonTemplate | null =
+        exactMatch && isStudentVisibleLesson(exactMatch)
+          ? (exactMatch as LessonTemplate | null)
+          : null;
 
       if (!lessonData) {
         // 3. Similarity search with tighter threshold
         const similarLessons = await searchLessons(title, 1);
         if (similarLessons.length > 0 && (similarLessons[0].similarity || 0) > 0.82) {
-          lessonData = similarLessons[0];
+          const { data: matchedLesson } = await supabase
+            .from("lessons")
+            .select("*")
+            .eq("id", similarLessons[0].id)
+            .maybeSingle();
+
+          if (matchedLesson && isStudentVisibleLesson(matchedLesson)) {
+            lessonData = matchedLesson as LessonTemplate;
+          }
         }
       }
 

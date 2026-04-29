@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { SEO } from '../components/SEO';
 import { supabase } from '../db/supabase';
-import { useAuth } from '../context/AuthContext';
 import { 
   ArrowRight, 
   LogIn, 
@@ -19,7 +18,6 @@ import { motion } from 'motion/react';
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
-  const { signInAsDemoAdmin } = useAuth() as any;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -49,18 +47,6 @@ export const Login: React.FC = () => {
         if (error) throw error;
         alert('Check your email for the confirmation link!');
       }
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDemoAdmin = async () => {
-    setLoading(true);
-    try {
-      await signInAsDemoAdmin();
-      navigate('/admin');
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -205,16 +191,6 @@ export const Login: React.FC = () => {
                 <ArrowRight className="w-3 h-3" />
               </button>
             </p>
-
-            <div className="pt-4 border-t border-ink/5 flex justify-center">
-               <button
-                 onClick={handleDemoAdmin}
-                 disabled={loading}
-                 className="text-[9px] uppercase tracking-widest font-mono font-bold text-accent/60 hover:text-accent transition-colors"
-               >
-                 Sign In As Demo Admin
-               </button>
-            </div>
           </div>
         </motion.div>
       </div>

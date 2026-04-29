@@ -17,6 +17,8 @@ import { ClassroomView } from './pages/ClassroomView';
 import { Library } from './pages/Library';
 import { Admin } from './pages/Admin';
 import { AiCommandCenter } from './pages/AiCommandCenter';
+import { AdminAiRecovery } from './pages/AdminAiRecovery';
+import { AdminAiRecoveryTaskDetail } from './pages/AdminAiRecoveryTaskDetail';
 import { Profile } from './pages/Profile';
 import { SearchProvider } from './context/SearchContext';
 import { LanguageProvider } from './context/LanguageContext';
@@ -50,6 +52,12 @@ export default function App() {
                 <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                 <Route path="/admin" element={<ProtectedRoute requireAdmin><Admin /></ProtectedRoute>} />
                 <Route path="/admin/ai-command-center" element={<ProtectedRoute requireAdmin><AiCommandCenter /></ProtectedRoute>} />
+                <Route path="/admin/ai-recovery" element={<ProtectedRoute requireAdmin><AdminAiRecovery /></ProtectedRoute>} />
+                <Route path="/admin/ai-recovery/failed-jobs" element={<ProtectedRoute requireAdmin><AdminAiRecovery /></ProtectedRoute>} />
+                <Route path="/admin/ai-recovery/ai-tasks" element={<ProtectedRoute requireAdmin><AdminAiRecovery /></ProtectedRoute>} />
+                <Route path="/admin/ai-recovery/ai-tasks/:taskId" element={<ProtectedRoute requireAdmin><AdminAiRecoveryTaskDetail /></ProtectedRoute>} />
+                <Route path="/admin/ai-recovery/recovered-lessons" element={<ProtectedRoute requireAdmin><AdminAiRecovery /></ProtectedRoute>} />
+                <Route path="/admin/ai-recovery/logs" element={<ProtectedRoute requireAdmin><AdminAiRecovery /></ProtectedRoute>} />
               </Routes>
             </Router>
             <Toaster position="bottom-right" richColors />

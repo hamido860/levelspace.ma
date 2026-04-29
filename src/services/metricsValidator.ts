@@ -6,6 +6,7 @@
 export interface MetricsSnapshot {
   totalTopics: number;
   lessonsGenerated: number;
+  completedJobs?: number;
   lessonCoverage: string;
   queuePending: number;
   failedJobs: number;
@@ -18,6 +19,7 @@ export interface MetricsSnapshot {
     cycle: string;
     topics: number;
     lessons: number;
+    completedJobs?: number;
     coverage: string;
     queueFailed: number;
     queuePending: number;
@@ -43,14 +45,6 @@ export const validateMetrics = (metrics: any): ValidationError[] => {
     return [{ field: "root", error: "Metrics must be an object", value: metrics, expected: "object" }];
   }
 
-  const topicsTableHealth = Array.isArray(metrics.tableHealth)
-    ? metrics.tableHealth.find((t: any) => t?.table === "topics")
-    : null;
-  const topicsVisibilityUncertain =
-    typeof topicsTableHealth?.status === "string" &&
-    (topicsTableHealth.status.startsWith("unknown") ||
-      topicsTableHealth.status.startsWith("inconsistent"));
-
   // Basic type checks
   if (typeof metrics.totalTopics !== "number" || metrics.totalTopics < 0) {
     errors.push({
@@ -67,16 +61,6 @@ export const validateMetrics = (metrics: any): ValidationError[] => {
       error: "Must be a non-negative number",
       value: metrics.lessonsGenerated,
       expected: "number >= 0",
-    });
-  }
-
-  // Lessons can't exceed topics
-  if (metrics.lessonsGenerated > metrics.totalTopics && !topicsVisibilityUncertain) {
-    errors.push({
-      field: "lessonsGenerated",
-      error: `Cannot exceed totalTopics (${metrics.totalTopics})`,
-      value: metrics.lessonsGenerated,
-      expected: `<= ${metrics.totalTopics}`,
     });
   }
 
@@ -174,16 +158,6 @@ export const validateMetrics = (metrics: any): ValidationError[] => {
         });
       }
 
-      // Lessons can't exceed topics per grade
-      if (g.lessons > g.topics) {
-        errors.push({
-          field: `${prefix}.lessons`,
-          error: `Cannot exceed grade topics (${g.topics})`,
-          value: g.lessons,
-          expected: `<= ${g.topics}`,
-        });
-      }
-
       if (typeof g.queueFailed !== "number" || g.queueFailed < 0) {
         errors.push({
           field: `${prefix}.queueFailed`,
@@ -198,6 +172,15 @@ export const validateMetrics = (metrics: any): ValidationError[] => {
           field: `${prefix}.queuePending`,
           error: "Must be a non-negative number",
           value: g.queuePending,
+          expected: "number >= 0",
+        });
+      }
+
+      if (g.completedJobs !== undefined && (typeof g.completedJobs !== "number" || g.completedJobs < 0)) {
+        errors.push({
+          field: `${prefix}.completedJobs`,
+          error: "Must be a non-negative number when provided",
+          value: g.completedJobs,
           expected: "number >= 0",
         });
       }

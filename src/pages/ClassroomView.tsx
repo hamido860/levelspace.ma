@@ -11,6 +11,7 @@ import { generateSeedLesson, generateLessonSuggestions, LessonSuggestion, checkA
 import { aiCrew } from '../services/aiCrewService';
 import { getQuizzesByLesson } from '../services/quizService';
 import { getExercisesByLesson } from '../services/exerciseService';
+import { filterStudentVisibleLessons } from '../services/lessonRecovery';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 
@@ -75,6 +76,16 @@ const getGradeSearchTerms = (grade: string): string[] => {
   return [grade, ...aliases];
 };
 
+type ClassroomSupabaseLesson = {
+  id?: string;
+  lesson_title?: string;
+  content?: string | null;
+  blocks?: any[] | null;
+  subtitle?: string | null;
+  status?: string | null;
+  teaching_contract?: unknown;
+};
+
 export const ClassroomView: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -108,11 +119,14 @@ export const ClassroomView: React.FC = () => {
         ).join(',');
         const { data: dbLessons } = await supabase
           .from('lessons')
-          .select('id, lesson_title, content, blocks, subtitle, status')
+          .select('id, lesson_title, content, blocks, subtitle, status, teaching_contract')
           .or(pairs);
-        if (!dbLessons || dbLessons.length === 0) return;
+        const visibleLessons = filterStudentVisibleLessons<ClassroomSupabaseLesson>(
+          (dbLessons as ClassroomSupabaseLesson[] | null | undefined) ?? []
+        );
+        if (visibleLessons.length === 0) return;
         const toAdd = [];
-        for (const les of dbLessons) {
+        for (const les of visibleLessons) {
           const existing = await db.lessons
             .where('title').equals(les.lesson_title)
             .and(l => l.moduleId === module.id)
@@ -245,13 +259,16 @@ export const ClassroomView: React.FC = () => {
     try {
       const { data: dbLessons } = await supabase
         .from('lessons')
-        .select('lesson_title, content')
+        .select('lesson_title, content, teaching_contract')
         .eq('subject', module.category || module.name)
         .eq('grade', selectedGrade)
         .eq('country', country)
         .limit(5);
-      if (dbLessons) {
-        for (const l of dbLessons) {
+      const visibleLessons = filterStudentVisibleLessons<ClassroomSupabaseLesson>(
+        (dbLessons as ClassroomSupabaseLesson[] | null | undefined) ?? []
+      );
+      if (visibleLessons.length > 0) {
+        for (const l of visibleLessons) {
           const entry = `Title: ${l.lesson_title}\nContent: ${l.content?.substring(0, 600) ?? ''}`;
           if (!parts.some(p => p.includes(l.lesson_title))) parts.push(entry);
         }
@@ -401,14 +418,17 @@ export const ClassroomView: React.FC = () => {
         .eq('country', country);
 
       if (error) throw error;
+      const visibleLessons = filterStudentVisibleLessons<ClassroomSupabaseLesson>(
+        (dbLessons as ClassroomSupabaseLesson[] | null | undefined) ?? []
+      );
       
-      if (!dbLessons || dbLessons.length === 0) {
+      if (visibleLessons.length === 0) {
         toast.info("No existing lessons found in Supabase for this curriculum.");
         return;
       }
 
       // Add to dexie db
-      for (const les of dbLessons) {
+      for (const les of visibleLessons) {
         const existing = await db.lessons.where('title').equals(les.lesson_title).and(l => l.moduleId === module.id).first();
         if (!existing) {
           await db.lessons.add({

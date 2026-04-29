@@ -6,7 +6,7 @@ import {
   fetchLatestPendingApproval,
   fetchTaskBundle,
   getServerSupabase,
-  requireAiAdmin,
+  requireAdminUser,
   updateTaskStatus,
 } from "./_lib/aiCommandCenter";
 
@@ -16,7 +16,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { user } = await requireAiAdmin(req);
+    const { user } = await requireAdminUser(req);
     const { task_id } = req.body as { task_id?: string };
     if (!task_id) {
       return res.status(400).json({ error: "task_id is required" });

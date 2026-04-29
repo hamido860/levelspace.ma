@@ -9,7 +9,7 @@ import {
   getServerSupabase,
   isWriteMode,
   MAX_AUTOMATIC_RETRIES,
-  requireAiAdmin,
+  requireAdminUser,
   updateTaskStatus,
 } from "./_lib/aiCommandCenter";
 
@@ -25,7 +25,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    await requireAiAdmin(req);
+    await requireAdminUser(req);
     const { task_id } = req.body as { task_id?: string };
     if (!task_id) {
       return res.status(400).json({ error: "task_id is required" });
