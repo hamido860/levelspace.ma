@@ -1,0 +1,3 @@
+## 2024-04-29 - useLiveQuery cascading re-render bottleneck
+**Learning:** In React components, generating un-memoized derived state directly from Dexie `useLiveQuery` results (e.g., `Object.fromEntries(dbSettings.map(...))` or `dbData.filter(...)`) causes a new object/array reference to be created on every render. Because `useLiveQuery` inherently triggers a re-render on *any* database update, these constant new references cause severe and unnecessary cascading re-renders across the component tree, acting as a massive performance bottleneck.
+**Action:** Always wrap data derived from `useLiveQuery` (like `.map`, `.filter`, or `Object.fromEntries`) in a `useMemo` hook, with the raw query result as the dependency, to ensure referential equality between renders.

@@ -598,3 +598,4 @@ export const StudyPlanner: React.FC = () => {
     </Layout>
   );
 };
+export default StudyPlanner;
