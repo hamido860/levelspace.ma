@@ -1,0 +1,3 @@
+## 2024-05-18 - Memoize derived data from useLiveQuery
+**Learning:** In Dexie's `useLiveQuery`, failing to memoize derived data (like `.map`, `.filter`, or `Object.fromEntries`) creates new object references on every render. Because `useLiveQuery` triggers a re-render on any database update, this causes severe performance bottlenecks through cascading re-renders in React components. This is a critical codebase-specific performance anti-pattern.
+**Action:** Always wrap derived objects and arrays dependent on `useLiveQuery` results in a `useMemo` hook with the raw query result as the dependency to preserve referential equality.
