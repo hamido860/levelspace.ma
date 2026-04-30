@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import {
   AiCommandCenterHttpError,
-  generateAiRecoveryRepairSql,
+  executeAiRecoveryTaskSql,
   getServerSupabase,
   requireAdminUser,
 } from "../../../../_lib/aiCommandCenter";
@@ -25,7 +25,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const supabase = getServerSupabase();
-    const result = await generateAiRecoveryRepairSql(supabase, taskId, user.id);
+    const result = await executeAiRecoveryTaskSql(supabase, taskId, user.id);
     return res.status(200).json(result);
   } catch (error) {
     if (error instanceof AiCommandCenterHttpError) {
@@ -33,7 +33,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     return res.status(500).json({
-      error: error instanceof Error ? error.message : "Unable to generate AI recovery SQL preview.",
+      error: error instanceof Error ? error.message : "Unable to execute approved recovery SQL.",
     });
   }
 }

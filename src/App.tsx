@@ -19,6 +19,7 @@ import { Admin } from './pages/Admin';
 import { AiCommandCenter } from './pages/AiCommandCenter';
 import { AdminAiRecovery } from './pages/AdminAiRecovery';
 import { AdminAiRecoveryTaskDetail } from './pages/AdminAiRecoveryTaskDetail';
+import { AdminRecoveredLessonReview } from './pages/AdminRecoveredLessonReview';
 import { Profile } from './pages/Profile';
 import { SearchProvider } from './context/SearchContext';
 import { LanguageProvider } from './context/LanguageContext';
@@ -57,6 +58,7 @@ export default function App() {
                 <Route path="/admin/ai-recovery/ai-tasks" element={<ProtectedRoute requireAdmin><AdminAiRecovery /></ProtectedRoute>} />
                 <Route path="/admin/ai-recovery/ai-tasks/:taskId" element={<ProtectedRoute requireAdmin><AdminAiRecoveryTaskDetail /></ProtectedRoute>} />
                 <Route path="/admin/ai-recovery/recovered-lessons" element={<ProtectedRoute requireAdmin><AdminAiRecovery /></ProtectedRoute>} />
+                <Route path="/admin/ai-recovery/recovered-lessons/:lessonId" element={<ProtectedRoute requireAdmin><AdminRecoveredLessonReview /></ProtectedRoute>} />
                 <Route path="/admin/ai-recovery/logs" element={<ProtectedRoute requireAdmin><AdminAiRecovery /></ProtectedRoute>} />
               </Routes>
             </Router>

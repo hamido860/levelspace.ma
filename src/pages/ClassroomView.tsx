@@ -103,7 +103,9 @@ export const ClassroomView: React.FC = () => {
 
   const module = useLiveQuery(() => id ? db.modules.get(id) : undefined, [id]);
   const allLessons = useLiveQuery(() => id ? db.lessons.where('moduleId').equals(id).sortBy('createdAt') : [], [id]);
-  const lessons = allLessons?.filter(l => l.status !== 'suggested') || [];
+  const lessons = filterStudentVisibleLessons(
+    allLessons?.filter(l => l.status !== 'suggested') || []
+  );
 
   // Auto-seed from Supabase when local lessons are empty — no AI needed
   useEffect(() => {
@@ -138,6 +140,7 @@ export const ClassroomView: React.FC = () => {
               title: les.lesson_title,
               content: les.content || '',
               blocks: les.blocks,
+              teaching_contract: les.teaching_contract,
               subtitle: les.subtitle,
               status: (les.status === 'published' || les.status === 'done') ? 'done' as const : 'pending' as const,
               createdAt: Date.now()
@@ -436,6 +439,7 @@ export const ClassroomView: React.FC = () => {
             moduleId: module.id,
             title: les.lesson_title,
             content: les.content,
+            teaching_contract: les.teaching_contract,
             status: 'done',
             createdAt: Date.now()
           });

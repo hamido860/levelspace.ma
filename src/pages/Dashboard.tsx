@@ -50,6 +50,7 @@ import { db } from '../db/db';
 import { supabase, checkSupabaseConnection } from '../db/supabase';
 import { generateLessonSuggestions, LessonSuggestion, checkAIProvider } from '../services/geminiService';
 import { lessonService } from '../services/lessonService';
+import { isStudentVisibleLesson } from '../services/lessonRecovery';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { ConnectionStatusModal } from '../components/ConnectionStatusModal';
@@ -92,6 +93,7 @@ export const Dashboard: React.FC = () => {
     return setting?.value;
   });
   const lastLesson = useLiveQuery(() => lastViewedLessonId ? db.lessons.get(lastViewedLessonId) : undefined, [lastViewedLessonId]);
+  const visibleLastLesson = lastLesson && isStudentVisibleLesson(lastLesson) ? lastLesson : undefined;
 
   const activeModules = allModules.filter(m => m.selected);
   const reminders = useLiveQuery(() => db.tasks.toArray()) || [];
@@ -378,11 +380,11 @@ export const Dashboard: React.FC = () => {
           {/* Main Content - Classrooms */}
           <div className="lg:col-span-8 space-y-8">
             {/* Last Lesson Quick Action */}
-            {lastLesson && (
+            {visibleLastLesson && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                onClick={() => navigate(`/lesson/${lastLesson.id}`)}
+                onClick={() => navigate(`/lesson/${visibleLastLesson.id}`)}
                 className="bg-accent/5 border border-accent/20 rounded-2xl p-4 flex items-center justify-between group cursor-pointer hover:bg-accent/10 transition-all"
               >
                 <div className="flex items-center gap-4">
@@ -391,7 +393,7 @@ export const Dashboard: React.FC = () => {
                   </div>
                   <div>
                     <p className="text-[10px] font-bold text-accent uppercase tracking-widest">Continue Learning</p>
-                    <h3 className="text-sm font-bold text-ink">{lastLesson.title}</h3>
+                    <h3 className="text-sm font-bold text-ink">{visibleLastLesson.title}</h3>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 text-accent">

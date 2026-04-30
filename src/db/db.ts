@@ -42,6 +42,7 @@ export interface Lesson {
   blocks?: any[];
   subtitle?: string;
   tags?: string[];
+  teaching_contract?: unknown;
 }
 
 export interface Note {

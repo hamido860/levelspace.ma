@@ -1,13 +1,13 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import {
   AiCommandCenterHttpError,
-  generateAiRecoveryRepairSql,
   getServerSupabase,
   requireAdminUser,
+  sendRecoveredLessonToAi,
 } from "../../../../_lib/aiCommandCenter";
 
-function readTaskId(req: VercelRequest) {
-  const value = req.query.taskId;
+function readLessonId(req: VercelRequest) {
+  const value = req.query.lessonId;
   return Array.isArray(value) ? value[0] : value;
 }
 
@@ -18,14 +18,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const { user } = await requireAdminUser(req);
-    const taskId = readTaskId(req);
+    const lessonId = readLessonId(req);
 
-    if (!taskId) {
-      return res.status(400).json({ error: "taskId is required" });
+    if (!lessonId) {
+      return res.status(400).json({ error: "lessonId is required" });
     }
 
-    const supabase = getServerSupabase();
-    const result = await generateAiRecoveryRepairSql(supabase, taskId, user.id);
+    const result = await sendRecoveredLessonToAi(getServerSupabase(), lessonId, user.id);
     return res.status(200).json(result);
   } catch (error) {
     if (error instanceof AiCommandCenterHttpError) {
@@ -33,7 +32,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     return res.status(500).json({
-      error: error instanceof Error ? error.message : "Unable to generate AI recovery SQL preview.",
+      error: error instanceof Error ? error.message : "Unable to send recovered lesson back to AI.",
     });
   }
 }

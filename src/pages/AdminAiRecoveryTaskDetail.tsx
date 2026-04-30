@@ -18,6 +18,7 @@ import {
   AiRecoveryTaskDetail,
   approveAiRecoveryExecution,
   copyAiRecoverySql,
+  executeAiRecoverySql,
   generateAiRecoverySql,
   getAiRecoveryTaskDetail,
   rejectAiRecoverySql,
@@ -128,6 +129,8 @@ export const AdminAiRecoveryTaskDetail: React.FC = () => {
   const safetyWarnings = Array.isArray(detail?.safety_check?.warnings)
     ? detail?.safety_check?.warnings.map((value) => String(value))
     : [];
+  const latestApprovalStatus = String(detail?.latest_approval?.status || "").toLowerCase();
+  const executeAllowed = safetyAllowed && latestApprovalStatus === "approved" && Boolean(detail?.generated_sql);
 
   const lessonBlocksByLessonId = useMemo(() => {
     const grouped = new Map<string, Array<Record<string, unknown>>>();
@@ -196,6 +199,14 @@ export const AdminAiRecoveryTaskDetail: React.FC = () => {
     await runAction("approve-execute", async () => {
       const response = await approveAiRecoveryExecution(taskId!);
       toast.success("Execution approved.");
+      return response.detail;
+    });
+  }, [runAction, taskId]);
+
+  const handleExecuteSql = useCallback(async () => {
+    await runAction("execute", async () => {
+      const response = await executeAiRecoverySql(taskId!);
+      toast.success("Approved recovery SQL executed on the server.");
       return response.detail;
     });
   }, [runAction, taskId]);
@@ -285,6 +296,14 @@ export const AdminAiRecoveryTaskDetail: React.FC = () => {
                 Approve Execute
               </button>
               <button
+                onClick={() => void handleExecuteSql()}
+                disabled={busyAction !== null || !executeAllowed}
+                className="inline-flex items-center gap-2 rounded-full bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <TerminalSquare className="h-4 w-4" />
+                Execute Approved SQL
+              </button>
+              <button
                 onClick={() => void handleRejectSql()}
                 disabled={busyAction !== null}
                 className="inline-flex items-center gap-2 rounded-full bg-destructive px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
@@ -339,6 +358,12 @@ export const AdminAiRecoveryTaskDetail: React.FC = () => {
         {!loading && !error && detail && !safetyAllowed ? (
           <div className="rounded-3xl border border-destructive/20 bg-destructive/5 px-5 py-4 text-sm text-destructive shadow-sm">
             Approve Execute stays disabled until the latest stored safety check returns <span className="font-semibold">allowed = true</span>.
+          </div>
+        ) : null}
+
+        {!loading && !error && detail && safetyAllowed && latestApprovalStatus !== "approved" ? (
+          <div className="rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800 shadow-sm">
+            Execute Approved SQL stays disabled until a human approval record reaches <span className="font-semibold">approved</span>.
           </div>
         ) : null}
 
@@ -550,16 +575,16 @@ export const AdminAiRecoveryTaskDetail: React.FC = () => {
                 <div className="space-y-4">
                   <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                     <div className="rounded-3xl border border-ink/10 bg-surface-low p-4">
-                      <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Risk level</div>
-                      <div className="mt-2 text-sm text-ink">{formatText(String(detail.safety_check.riskLevel || "—"))}</div>
+                      <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Allowed</div>
+                      <div className="mt-2 text-sm text-ink">{String(Boolean(detail.safety_check.allowed))}</div>
                     </div>
                     <div className="rounded-3xl border border-ink/10 bg-surface-low p-4">
-                      <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Write SQL</div>
-                      <div className="mt-2 text-sm text-ink">{String(Boolean(detail.safety_check.isWrite))}</div>
+                      <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Errors</div>
+                      <div className="mt-2 text-sm text-ink">{safetyErrors.length}</div>
                     </div>
                     <div className="rounded-3xl border border-ink/10 bg-surface-low p-4">
-                      <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Blocked</div>
-                      <div className="mt-2 text-sm text-ink">{String(Boolean(detail.safety_check.isBlocked))}</div>
+                      <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Warnings</div>
+                      <div className="mt-2 text-sm text-ink">{safetyWarnings.length}</div>
                     </div>
                     <div className="rounded-3xl border border-ink/10 bg-surface-low p-4">
                       <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Checked at</div>
@@ -570,6 +595,26 @@ export const AdminAiRecoveryTaskDetail: React.FC = () => {
                     <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Summary</div>
                     <p className="mt-3 text-sm leading-6 text-ink">{formatText(String(detail.safety_check.summary || "—"))}</p>
                   </div>
+                  {safetyErrors.length > 0 ? (
+                    <div className="rounded-3xl border border-destructive/20 bg-destructive/5 p-4">
+                      <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-destructive">Errors</div>
+                      <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-destructive">
+                        {safetyErrors.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                  {safetyWarnings.length > 0 ? (
+                    <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4">
+                      <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-amber-800">Warnings</div>
+                      <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-amber-800">
+                        {safetyWarnings.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
                   <JsonPreview value={detail.safety_check} />
                 </div>
               ) : (

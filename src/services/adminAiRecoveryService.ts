@@ -112,6 +112,58 @@ export interface AiRecoveryTaskDetail {
   latest_approval: Record<string, unknown> | null;
 }
 
+export type AiRecoveryEventType =
+  | "task_created"
+  | "sql_generated"
+  | "safety_check_passed"
+  | "safety_check_failed"
+  | "execution_started"
+  | "execution_success"
+  | "execution_failed"
+  | "lesson_approved"
+  | "lesson_rejected";
+
+export interface AiRecoveryLogEntry {
+  id: string;
+  source: "ai_task_logs" | "ai_tasks.logs" | "error_recovery_log";
+  timestamp: string | null;
+  actor_user_id: string | null;
+  task_id: string | null;
+  job_id: string | null;
+  lesson_id: string | null;
+  event_type: AiRecoveryEventType | string;
+  message: string;
+  details: Record<string, unknown>;
+}
+
+export type RecoveredLessonStatus = "needs_review" | "approved" | "rejected";
+
+export interface AiRecoveryRecoveredLessonSummary {
+  id: string;
+  lesson_title: string | null;
+  subtitle: string | null;
+  grade: string | null;
+  subject: string | null;
+  topic_id: string | null;
+  topic_title: string | null;
+  teaching_contract: Record<string, unknown>;
+  blocks_count: number;
+  source_type: string | null;
+  repair_reason: string | null;
+  student_publish_allowed: boolean;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface AiRecoveryRecoveredLessonDetail {
+  lesson: AiRecoveryRecoveredLessonSummary;
+  blocks: Record<string, unknown>[];
+  blocks_status: "available" | "missing_table";
+  lesson_row?: Record<string, unknown>;
+  source_job?: Record<string, unknown> | null;
+  source_task?: Record<string, unknown> | null;
+}
+
 async function getAdminApiHeaders() {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -147,9 +199,13 @@ async function getJson<T>(url: string): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-async function postJson<T>(url: string): Promise<T> {
+async function postJson<T>(url: string, body?: unknown): Promise<T> {
   const headers = await getAdminApiHeaders();
-  const response = await fetch(url, { method: "POST", headers });
+  const response = await fetch(url, {
+    method: "POST",
+    headers,
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
 
   if (!response.ok) {
     throw new Error(await parseError(response));
@@ -161,6 +217,52 @@ async function postJson<T>(url: string): Promise<T> {
 export async function getAiRecoveryFailedJobs() {
   const payload = await getJson<{ jobs: AiRecoveryFailedJobSummary[] }>("/api/admin/ai-recovery/failed-jobs");
   return payload.jobs || [];
+}
+
+export async function getAiRecoveryRecoveredLessons(status: RecoveredLessonStatus = "needs_review") {
+  const payload = await getJson<{ lessons: AiRecoveryRecoveredLessonSummary[] }>(
+    `/api/admin/ai-recovery/recovered-lessons?status=${encodeURIComponent(status)}`,
+  );
+  return payload.lessons || [];
+}
+
+export async function getAiRecoveryRecoveredLessonDetail(lessonId: string) {
+  const payload = await getJson<{ detail: AiRecoveryRecoveredLessonDetail }>(
+    `/api/admin/ai-recovery/recovered-lessons/${encodeURIComponent(lessonId)}/detail`,
+  );
+  return payload.detail;
+}
+
+export async function saveRecoveredLessonEdits(
+  lessonId: string,
+  payload: {
+    lesson_title: string;
+    subtitle: string;
+    blocks: Array<Record<string, unknown>>;
+  },
+) {
+  return postJson<{ detail: AiRecoveryRecoveredLessonDetail }>(
+    `/api/admin/ai-recovery/recovered-lessons/${encodeURIComponent(lessonId)}/save`,
+    payload,
+  );
+}
+
+export async function approveRecoveredLesson(lessonId: string) {
+  return postJson<{ lesson: AiRecoveryRecoveredLessonSummary }>(
+    `/api/admin/ai-recovery/recovered-lessons/${encodeURIComponent(lessonId)}/approve`,
+  );
+}
+
+export async function rejectRecoveredLesson(lessonId: string) {
+  return postJson<{ lesson: AiRecoveryRecoveredLessonSummary }>(
+    `/api/admin/ai-recovery/recovered-lessons/${encodeURIComponent(lessonId)}/reject`,
+  );
+}
+
+export async function sendRecoveredLessonBackToAi(lessonId: string) {
+  return postJson<{ task: AiRecoveryTaskRef; detail: AiRecoveryRecoveredLessonDetail }>(
+    `/api/admin/ai-recovery/recovered-lessons/${encodeURIComponent(lessonId)}/send-back`,
+  );
 }
 
 export async function getAiRecoveryJobDiagnostics(jobId: string) {
@@ -183,6 +285,27 @@ export async function getAiRecoveryTaskDetail(taskId: string) {
   return payload.detail;
 }
 
+export async function getAiRecoveryLogs(filters: {
+  event_type?: string;
+  job_id?: string;
+  task_id?: string;
+  lesson_id?: string;
+  date?: string;
+} = {}) {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => {
+    if (typeof value === "string" && value.trim()) {
+      params.set(key, value);
+    }
+  });
+
+  const query = params.toString();
+  const payload = await getJson<{ logs: AiRecoveryLogEntry[] }>(
+    `/api/admin/ai-recovery/logs${query ? `?${query}` : ""}`,
+  );
+  return payload.logs || [];
+}
+
 export async function generateAiRecoverySql(taskId: string) {
   return postJson<{ generated_sql: string; detail: AiRecoveryTaskDetail }>(
     `/api/admin/ai-recovery/tasks/${encodeURIComponent(taskId)}/generate-sql`,
@@ -198,6 +321,12 @@ export async function runAiRecoverySafetyCheck(taskId: string) {
 export async function approveAiRecoveryExecution(taskId: string) {
   return postJson<{ approval: Record<string, unknown>; detail: AiRecoveryTaskDetail }>(
     `/api/admin/ai-recovery/tasks/${encodeURIComponent(taskId)}/approve-execute`,
+  );
+}
+
+export async function executeAiRecoverySql(taskId: string) {
+  return postJson<{ execution: Record<string, unknown>; detail: AiRecoveryTaskDetail }>(
+    `/api/admin/ai-recovery/tasks/${encodeURIComponent(taskId)}/execute`,
   );
 }
 

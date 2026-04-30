@@ -336,10 +336,11 @@ export const LessonView: React.FC = () => {
 
   const lesson = useLiveQuery(() => id ? db.lessons.get(id) : undefined, [id]);
   const [supabaseLesson, setSupabaseLesson] = useState<any>(null);
+  const visibleLocalLesson = lesson && isStudentVisibleLesson(lesson) ? lesson : undefined;
 
   useEffect(() => {
     // If not found in IndexedDB, try Supabase by topic_id
-    if (lesson === undefined && id) {
+    if (visibleLocalLesson === undefined && id) {
       supabase
         .from('lessons')
         .select('*')
@@ -349,10 +350,10 @@ export const LessonView: React.FC = () => {
           if (data && isStudentVisibleLesson(data)) setSupabaseLesson(data);
         });
     }
-  }, [lesson, id]);
+  }, [visibleLocalLesson, id]);
 
   // Merge: prefer IndexedDB lesson, fall back to Supabase
-  const effectiveLesson = lesson || (supabaseLesson ? {
+  const effectiveLesson = visibleLocalLesson || (supabaseLesson ? {
     id: supabaseLesson.id,
     moduleId: supabaseLesson.topic_id,
     title: supabaseLesson.lesson_title,
@@ -393,11 +394,11 @@ export const LessonView: React.FC = () => {
       setOpenBlocks(['content']);
     }
 
-    if (lesson) {
+    if (visibleLocalLesson) {
       // Save last viewed lesson
       db.settings.put({ key: 'last_viewed_lesson_id', value: effectiveLesson.id });
     }
-  }, [lesson]);
+  }, [visibleLocalLesson]);
 
   useEffect(() => {
     const fetchExtraData = async () => {

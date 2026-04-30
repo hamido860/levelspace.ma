@@ -1,6 +1,7 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import type { User } from "@supabase/supabase-js";
 import type { VercelRequest } from "@vercel/node";
+import postgres from "postgres";
 
 type JsonRecord = Record<string, any>;
 
@@ -14,6 +15,11 @@ type ApprovalRow = {
   task_id: string;
   status: string;
   created_at: string;
+};
+
+type ApprovalRecordRow = ApprovalRow & {
+  approved_by?: string | null;
+  approved_at?: string | null;
 };
 
 type MonitoringIssueInput = {
@@ -122,6 +128,34 @@ export type AiRecoveryJobDiagnostics = {
   existing_task: AiRecoveryTaskRef | null;
 };
 
+export type AiRecoveryRecoveredLessonStatus = "needs_review" | "approved" | "rejected";
+
+export type AiRecoveryRecoveredLessonSummary = {
+  id: string;
+  lesson_title: string | null;
+  subtitle: string | null;
+  grade: string | null;
+  subject: string | null;
+  topic_id: string | null;
+  topic_title: string | null;
+  teaching_contract: JsonRecord;
+  blocks_count: number;
+  source_type: string | null;
+  repair_reason: string | null;
+  student_publish_allowed: boolean;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type AiRecoveryRecoveredLessonDetail = {
+  lesson: AiRecoveryRecoveredLessonSummary;
+  blocks: JsonRecord[];
+  blocks_status: "available" | "missing_table";
+  lesson_row?: JsonRecord;
+  source_job?: JsonRecord | null;
+  source_task?: JsonRecord | null;
+};
+
 export type CreateAiRecoveryTaskResult = {
   task: AiRecoveryTaskRef;
   issue_id: string;
@@ -188,6 +222,14 @@ export type AiRecoveryTaskDetail = {
   latest_approval: JsonRecord | null;
 };
 
+export type AiRecoveryLogFilters = {
+  event_type?: string | null;
+  job_id?: string | null;
+  task_id?: string | null;
+  lesson_id?: string | null;
+  date?: string | null;
+};
+
 export type AiRecoverySafetyCheck = {
   executed_at: string;
   allowed: boolean;
@@ -201,6 +243,37 @@ export type AiRecoverySafetyCheck = {
   isBlocked: boolean;
   riskLevel: string;
   summary: string;
+};
+
+export type AiRecoveryExecutionResponse = {
+  success: boolean;
+  executed_at: string;
+  command: string | null;
+  count: number | null;
+};
+
+export type AiRecoveryEventType =
+  | "task_created"
+  | "sql_generated"
+  | "safety_check_passed"
+  | "safety_check_failed"
+  | "execution_started"
+  | "execution_success"
+  | "execution_failed"
+  | "lesson_approved"
+  | "lesson_rejected";
+
+export type AiRecoveryLogEntry = {
+  id: string;
+  source: "ai_task_logs" | "ai_tasks.logs" | "error_recovery_log";
+  timestamp: string | null;
+  actor_user_id: string | null;
+  task_id: string | null;
+  job_id: string | null;
+  lesson_id: string | null;
+  event_type: AiRecoveryEventType | string;
+  message: string;
+  details: JsonRecord;
 };
 
 export class AiCommandCenterHttpError extends Error {
@@ -285,6 +358,46 @@ export function getServerSupabase(): SupabaseClient {
   return createClient(url, serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
+}
+
+function getRecoveryExecutionDatabaseUrl() {
+  const value =
+    process.env.SUPABASE_DB_URL ||
+    process.env.DATABASE_URL ||
+    process.env.POSTGRES_URL ||
+    process.env.POSTGRES_PRISMA_URL;
+
+  if (!value) {
+    throw new AiCommandCenterHttpError(
+      503,
+      "Recovery SQL execution is not configured. Set SUPABASE_DB_URL, DATABASE_URL, or POSTGRES_URL on the server.",
+    );
+  }
+
+  return value;
+}
+
+async function executeRecoverySqlServerSide(sqlPreview: string): Promise<AiRecoveryExecutionResponse> {
+  const databaseUrl = getRecoveryExecutionDatabaseUrl();
+  const client = postgres(databaseUrl, {
+    max: 1,
+    prepare: false,
+    idle_timeout: 5,
+    connect_timeout: 30,
+    ssl: "require",
+  });
+
+  try {
+    const result = await client.unsafe(sqlPreview);
+    return {
+      success: true,
+      executed_at: nowIso(),
+      command: typeof result.command === "string" ? result.command : null,
+      count: typeof result.count === "number" ? result.count : null,
+    };
+  } finally {
+    await client.end();
+  }
 }
 
 function getPublicSupabaseForAuth(): SupabaseClient {
@@ -394,6 +507,29 @@ function isMissingTableError(error: { code?: string; message?: string } | null) 
   );
 }
 
+function isMissingColumnError(error: { code?: string; message?: string } | null) {
+  const message = String(error?.message || "");
+  return (
+    error?.code === "42703" ||
+    /column .* does not exist/i.test(message) ||
+    /Could not find the '.*' column/i.test(message)
+  );
+}
+
+function extractRecoveryActorUserId(metadata: JsonRecord) {
+  const candidates = [
+    metadata.actor_user_id,
+    metadata.requested_by,
+    metadata.executed_by,
+    metadata.approved_by,
+    metadata.reviewed_by,
+    metadata.reset_by,
+  ];
+
+  const match = candidates.find((value) => typeof value === "string" && value.trim());
+  return typeof match === "string" ? match : null;
+}
+
 export function buildSqlRisk(sqlPreview?: string | null) {
   const preview = sqlPreview || "";
   const upperPreview = preview.toUpperCase();
@@ -426,6 +562,115 @@ export async function createTaskLog(
   };
   await supabase.from("ai_task_logs").insert(payload);
   return payload;
+}
+
+async function appendAiTaskJsonLogIfAvailable(
+  supabase: SupabaseClient,
+  taskId: string | null,
+  entry: AiRecoveryLogEntry,
+) {
+  if (!taskId) {
+    return;
+  }
+
+  const task = await fetchAiRecoveryTaskRecord(supabase, taskId).catch(() => null);
+  if (!task || !Object.prototype.hasOwnProperty.call(task, "logs")) {
+    return;
+  }
+
+  const existingLogs = Array.isArray((task as JsonRecord).logs)
+    ? ((task as JsonRecord).logs as unknown[])
+        .filter((value) => value && typeof value === "object" && !Array.isArray(value))
+        .map((value) => value as JsonRecord)
+    : [];
+
+  const { error } = await supabase
+    .from("ai_tasks")
+    .update({
+      logs: [...existingLogs, entry],
+      updated_at: nowIso(),
+    })
+    .eq("id", taskId);
+
+  if (error && !isMissingColumnError(error)) {
+    throw error;
+  }
+}
+
+async function insertErrorRecoveryLogIfAvailable(
+  supabase: SupabaseClient,
+  entry: AiRecoveryLogEntry,
+) {
+  const { error } = await supabase
+    .from("error_recovery_log")
+    .insert({
+      timestamp: entry.timestamp,
+      actor_user_id: entry.actor_user_id,
+      task_id: entry.task_id,
+      job_id: entry.job_id,
+      lesson_id: entry.lesson_id,
+      event_type: entry.event_type,
+      message: entry.message,
+      details: entry.details,
+    });
+
+  if (error && !isMissingTableError(error) && !isMissingColumnError(error)) {
+    throw error;
+  }
+}
+
+async function recordAiRecoveryEvent(
+  supabase: SupabaseClient,
+  input: {
+    event_type: AiRecoveryEventType;
+    message: string;
+    actor_user_id?: string | null;
+    task_id?: string | null;
+    job_id?: string | null;
+    lesson_id?: string | null;
+    details?: JsonRecord;
+    agent_name?: string;
+    log_type?: string;
+  },
+) {
+  const timestamp = nowIso();
+  const details = parseJsonRecord(input.details);
+  const entry: AiRecoveryLogEntry = {
+    id: `${input.task_id || input.job_id || input.lesson_id || "recovery"}:${input.event_type}:${timestamp}`,
+    source: "ai_task_logs",
+    timestamp,
+    actor_user_id: input.actor_user_id ?? null,
+    task_id: input.task_id ?? null,
+    job_id: input.job_id ?? null,
+    lesson_id: input.lesson_id ?? null,
+    event_type: input.event_type,
+    message: input.message,
+    details,
+  };
+
+  if (entry.task_id) {
+    await createTaskLog(
+      supabase,
+      entry.task_id,
+      input.agent_name || COMMAND_CENTER_AGENTS.reporter,
+      input.log_type || "info",
+      input.message,
+      {
+        ...details,
+        actor_user_id: entry.actor_user_id,
+        task_id: entry.task_id,
+        job_id: entry.job_id,
+        lesson_id: entry.lesson_id,
+        event_type: entry.event_type,
+        timestamp: entry.timestamp,
+      },
+    );
+
+    await appendAiTaskJsonLogIfAvailable(supabase, entry.task_id, entry);
+  }
+
+  await insertErrorRecoveryLogIfAvailable(supabase, entry);
+  return entry;
 }
 
 export async function updateTaskStatus(
@@ -815,6 +1060,112 @@ function sortTopicOutlines(outlines: JsonRecord[]) {
   });
 }
 
+function parseBooleanLike(value: unknown) {
+  return value === true || value === "true";
+}
+
+function normalizeLessonBlockType(value: unknown) {
+  const type = String(value || "").trim().toLowerCase();
+  if (type === "example" || type === "examples") return "example";
+  if (type === "formula") return "formula";
+  if (type === "summary") return "summary";
+  return "text";
+}
+
+function sortLessonBlocks(blocks: JsonRecord[]) {
+  const numericOrderFields = ["order_index", "order", "position", "block_order", "index"];
+  const textOrderFields = ["created_at", "updated_at"];
+
+  return [...blocks].sort((left, right) => {
+    for (const field of numericOrderFields) {
+      const leftValue = Number(left[field]);
+      const rightValue = Number(right[field]);
+      const leftValid = Number.isFinite(leftValue);
+      const rightValid = Number.isFinite(rightValue);
+
+      if (leftValid && rightValid && leftValue !== rightValue) {
+        return leftValue - rightValue;
+      }
+
+      if (leftValid !== rightValid) {
+        return leftValid ? -1 : 1;
+      }
+    }
+
+    for (const field of textOrderFields) {
+      const leftValue = left[field] ? new Date(String(left[field])).getTime() : 0;
+      const rightValue = right[field] ? new Date(String(right[field])).getTime() : 0;
+      if (leftValue !== rightValue) {
+        return leftValue - rightValue;
+      }
+    }
+
+    const leftKey = String(left.id || left.title || left.name || "");
+    const rightKey = String(right.id || right.title || right.name || "");
+    return leftKey.localeCompare(rightKey);
+  });
+}
+
+function coerceRecoveredLessonBlocks(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [] as JsonRecord[];
+  }
+
+  return value
+    .filter((block) => block && typeof block === "object" && !Array.isArray(block))
+    .map((block, index) => {
+      const source = block as JsonRecord;
+      return {
+        ...source,
+        type: normalizeLessonBlockType(source.type),
+        title: typeof source.title === "string" ? source.title : "",
+        content: typeof source.content === "string" ? source.content : "",
+        order_index: Number.isFinite(Number(source.order_index))
+          ? Number(source.order_index)
+          : Number.isFinite(Number(source.order))
+            ? Number(source.order)
+            : index,
+      } satisfies JsonRecord;
+    });
+}
+
+function buildRecoveredLessonSummary(
+  lesson: JsonRecord,
+  blocksCount: number,
+  topicTitle: string | null,
+): AiRecoveryRecoveredLessonSummary {
+  const teachingContract = parseJsonRecord(lesson.teaching_contract);
+
+  return {
+    id: String(lesson.id),
+    lesson_title:
+      typeof lesson.lesson_title === "string"
+        ? lesson.lesson_title
+        : typeof lesson.title === "string"
+          ? lesson.title
+          : null,
+    subtitle: typeof lesson.subtitle === "string" ? lesson.subtitle : null,
+    grade: typeof lesson.grade === "string" ? lesson.grade : null,
+    subject: typeof lesson.subject === "string" ? lesson.subject : null,
+    topic_id: typeof lesson.topic_id === "string" ? lesson.topic_id : null,
+    topic_title: topicTitle,
+    teaching_contract: teachingContract,
+    blocks_count: blocksCount,
+    source_type: typeof teachingContract.source_type === "string" ? teachingContract.source_type : null,
+    repair_reason:
+      typeof teachingContract.repair_reason === "string"
+        ? teachingContract.repair_reason
+        : typeof teachingContract.reason === "string"
+          ? teachingContract.reason
+          : typeof teachingContract.last_error === "string"
+            ? teachingContract.last_error
+            : null,
+    student_publish_allowed: parseBooleanLike(teachingContract.student_publish_allowed),
+    created_at: typeof lesson.created_at === "string" ? lesson.created_at : null,
+    updated_at: typeof lesson.updated_at === "string" ? lesson.updated_at : null,
+  };
+}
+
 async function fetchAiRecoveryTaskForJob(
   supabase: SupabaseClient,
   jobId: string,
@@ -1101,9 +1452,430 @@ export async function loadAiRecoveryJobDiagnostics(
   };
 }
 
+export async function loadAiRecoveryRecoveredLessons(
+  supabase: SupabaseClient,
+  status: AiRecoveryRecoveredLessonStatus = "needs_review",
+): Promise<AiRecoveryRecoveredLessonSummary[]> {
+  if (!["needs_review", "approved", "rejected"].includes(status)) {
+    throw new AiCommandCenterHttpError(400, "Unsupported recovered lesson status filter.");
+  }
+
+  const { data: lessons, error } = await supabase
+    .from("lessons")
+    .select("id, lesson_title, title, subtitle, grade, subject, topic_id, teaching_contract, created_at, updated_at")
+    .eq("teaching_contract->>status", status)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw error;
+  }
+
+  const lessonRows = (lessons || []) as JsonRecord[];
+  const lessonIds = lessonRows.map((lesson) => String(lesson.id)).filter(Boolean);
+  const topicIds = Array.from(
+    new Set(
+      lessonRows
+        .map((lesson) => (typeof lesson.topic_id === "string" ? lesson.topic_id : null))
+        .filter(Boolean),
+    ),
+  ) as string[];
+
+  const topicContext = await fetchTopicContext(supabase, topicIds);
+  const blocksByLessonId = new Map<string, number>();
+
+  if (lessonIds.length > 0) {
+    const { data: blocks, error: blocksError } = await supabase
+      .from("lesson_blocks")
+      .select("lesson_id")
+      .in("lesson_id", lessonIds);
+
+    if (blocksError) {
+      if (!isMissingTableError(blocksError)) {
+        throw blocksError;
+      }
+    } else {
+      ((blocks || []) as JsonRecord[]).forEach((block) => {
+        const lessonId = typeof block.lesson_id === "string" ? block.lesson_id : "";
+        if (!lessonId) return;
+        blocksByLessonId.set(lessonId, (blocksByLessonId.get(lessonId) || 0) + 1);
+      });
+    }
+  }
+
+  return lessonRows.map((lesson) =>
+    buildRecoveredLessonSummary(
+      lesson,
+      blocksByLessonId.get(String(lesson.id)) || 0,
+      typeof lesson.topic_id === "string"
+        ? topicContext.topicsById.get(lesson.topic_id)?.title || null
+        : null,
+    ),
+  );
+}
+
+export async function loadAiRecoveryRecoveredLessonDetail(
+  supabase: SupabaseClient,
+  lessonId: string,
+): Promise<AiRecoveryRecoveredLessonDetail> {
+  const { data: lesson, error } = await supabase
+    .from("lessons")
+    .select("id, lesson_title, title, subtitle, grade, subject, topic_id, content, blocks, teaching_contract, created_at, updated_at")
+    .eq("id", lessonId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!lesson) {
+    throw new AiCommandCenterHttpError(404, "Recovered lesson not found.");
+  }
+
+  let blocks: JsonRecord[] = [];
+  let blocksStatus: "available" | "missing_table" = "available";
+
+  const { data: lessonBlocks, error: blocksError } = await supabase
+    .from("lesson_blocks")
+    .select("*")
+    .eq("lesson_id", lessonId);
+
+  if (blocksError) {
+    if (isMissingTableError(blocksError)) {
+      blocksStatus = "missing_table";
+    } else {
+      throw blocksError;
+    }
+  } else {
+    blocks = sortLessonBlocks((lessonBlocks || []) as JsonRecord[]);
+  }
+
+  const topicId = typeof lesson.topic_id === "string" ? lesson.topic_id : null;
+  const topicContext = await fetchTopicContext(supabase, topicId ? [topicId] : []);
+  const topicTitle = topicId ? topicContext.topicsById.get(topicId)?.title || null : null;
+  const teachingContract = parseJsonRecord((lesson as JsonRecord).teaching_contract);
+  const sourceJobId = typeof teachingContract.source_job_id === "string" ? teachingContract.source_job_id : null;
+  const sourceTaskId = typeof teachingContract.source_task_id === "string" ? teachingContract.source_task_id : null;
+
+  const [sourceJobResult, sourceTaskResult] = await Promise.all([
+    sourceJobId
+      ? supabase
+          .from("lesson_gen_queue")
+          .select("id, topic_id, status, attempts, last_error, created_at, claimed_at, completed_at")
+          .eq("id", sourceJobId)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    sourceTaskId
+      ? supabase
+          .from("ai_tasks")
+          .select("id, issue_id, job_id, title, task_name, status, priority, target_area, progress, requires_approval, instructions, metadata, result, created_at, updated_at, started_at, completed_at")
+          .eq("id", sourceTaskId)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+  ]);
+
+  if (sourceJobResult.error) {
+    throw sourceJobResult.error;
+  }
+
+  if (sourceTaskResult.error) {
+    throw sourceTaskResult.error;
+  }
+
+  return {
+    lesson: buildRecoveredLessonSummary(lesson as JsonRecord, blocks.length, topicTitle),
+    blocks,
+    blocks_status: blocksStatus,
+    lesson_row: lesson as JsonRecord,
+    source_job: (sourceJobResult.data as JsonRecord | null) ?? null,
+    source_task: sourceTaskResult.data
+      ? ({
+          ...(sourceTaskResult.data as JsonRecord),
+          metadata: parseJsonRecord((sourceTaskResult.data as JsonRecord).metadata),
+          result: parseJsonRecord((sourceTaskResult.data as JsonRecord).result),
+        } satisfies JsonRecord)
+      : null,
+  };
+}
+
+async function updateSourceTaskReviewStatus(
+  supabase: SupabaseClient,
+  sourceTaskId: string | null,
+  reviewStatus: AiRecoveryRecoveredLessonStatus,
+  extras: JsonRecord = {},
+) {
+  if (!sourceTaskId) {
+    return;
+  }
+
+  const task = await fetchAiRecoveryTaskRecord(supabase, sourceTaskId);
+  const nextResult = {
+    ...parseJsonRecord(task.result),
+    review_status: reviewStatus,
+    ...extras,
+  };
+
+  await updateAiRecoveryTaskColumns(supabase, sourceTaskId, {
+    result: nextResult,
+  });
+}
+
+export async function updateRecoveredLessonReviewStatus(
+  supabase: SupabaseClient,
+  lessonId: string,
+  status: Exclude<AiRecoveryRecoveredLessonStatus, "needs_review">,
+  actorUserId?: string | null,
+) {
+  if (!["approved", "rejected"].includes(status)) {
+    throw new AiCommandCenterHttpError(400, "Unsupported recovered lesson review status.");
+  }
+
+  const detail = await loadAiRecoveryRecoveredLessonDetail(supabase, lessonId);
+  const nextTeachingContract = {
+    ...detail.lesson.teaching_contract,
+    status,
+    student_publish_allowed: status === "approved",
+  };
+
+  const { error } = await supabase
+    .from("lessons")
+    .update({
+      teaching_contract: nextTeachingContract,
+      updated_at: nowIso(),
+    })
+    .eq("id", lessonId);
+
+  if (error) {
+    throw error;
+  }
+
+  const sourceTaskId = typeof detail.lesson.teaching_contract.source_task_id === "string"
+    ? detail.lesson.teaching_contract.source_task_id
+    : null;
+
+  await updateSourceTaskReviewStatus(supabase, sourceTaskId, status, {
+    reviewed_at: nowIso(),
+  });
+
+  await recordAiRecoveryEvent(supabase, {
+    event_type: status === "approved" ? "lesson_approved" : "lesson_rejected",
+    message:
+      status === "approved"
+        ? "Recovered lesson was approved for students."
+        : "Recovered lesson was rejected and remains blocked from students.",
+    actor_user_id: actorUserId ?? null,
+    task_id: sourceTaskId,
+    job_id:
+      typeof detail.lesson.teaching_contract.source_job_id === "string"
+        ? detail.lesson.teaching_contract.source_job_id
+        : null,
+    lesson_id: lessonId,
+    details: {
+      review_status: status,
+      student_publish_allowed: status === "approved",
+    },
+    agent_name: COMMAND_CENTER_AGENTS.reporter,
+    log_type: status === "approved" ? "approval" : "warning",
+  });
+
+  const refreshed = await loadAiRecoveryRecoveredLessonDetail(supabase, lessonId);
+  return refreshed.lesson;
+}
+
+export async function saveRecoveredLessonReviewEdits(
+  supabase: SupabaseClient,
+  lessonId: string,
+  payload: {
+    lesson_title: string;
+    subtitle: string;
+    blocks: JsonRecord[];
+  },
+) {
+  const detail = await loadAiRecoveryRecoveredLessonDetail(supabase, lessonId);
+  const normalizedBlocks = coerceRecoveredLessonBlocks(payload.blocks);
+  const lessonTitle = String(payload.lesson_title || "").trim();
+  const subtitle = String(payload.subtitle || "").trim();
+
+  if (!lessonTitle) {
+    throw new AiCommandCenterHttpError(400, "lesson_title is required.");
+  }
+
+  if (normalizedBlocks.length === 0) {
+    throw new AiCommandCenterHttpError(400, "At least one lesson block is required.");
+  }
+
+  const nextTeachingContract = {
+    ...detail.lesson.teaching_contract,
+    status: "needs_review",
+    student_publish_allowed: false,
+  };
+
+  const { error: lessonUpdateError } = await supabase
+    .from("lessons")
+    .update({
+      lesson_title: lessonTitle,
+      title: lessonTitle,
+      subtitle: subtitle || null,
+      blocks: normalizedBlocks,
+      teaching_contract: nextTeachingContract,
+      updated_at: nowIso(),
+    })
+    .eq("id", lessonId);
+
+  if (lessonUpdateError) {
+    throw lessonUpdateError;
+  }
+
+  if (detail.blocks_status === "available") {
+    const existingBlocks = sortLessonBlocks(detail.blocks);
+    if (existingBlocks.length !== normalizedBlocks.length) {
+      throw new AiCommandCenterHttpError(
+        400,
+        "This review page only supports editing the existing block set. Add or remove blocks directly in SQL if the lesson shape must change.",
+      );
+    }
+
+    for (let index = 0; index < normalizedBlocks.length; index += 1) {
+      const existingBlock = existingBlocks[index];
+      const incomingBlock = normalizedBlocks[index];
+      const blockId = typeof existingBlock.id === "string" ? existingBlock.id : null;
+
+      if (!blockId) {
+        throw new AiCommandCenterHttpError(400, "A lesson block row is missing its id and cannot be safely updated.");
+      }
+
+      const nextBlockPayload: JsonRecord = {
+        lesson_id: lessonId,
+        updated_at: nowIso(),
+      };
+
+      if ("order_index" in existingBlock || "order_index" in incomingBlock) {
+        nextBlockPayload.order_index = index;
+      }
+      if ("order" in existingBlock || "order" in incomingBlock) {
+        nextBlockPayload.order = index;
+      }
+      if ("position" in existingBlock || "position" in incomingBlock) {
+        nextBlockPayload.position = index;
+      }
+      if ("block_order" in existingBlock || "block_order" in incomingBlock) {
+        nextBlockPayload.block_order = index;
+      }
+      if ("title" in existingBlock || "title" in incomingBlock) {
+        nextBlockPayload.title = typeof incomingBlock.title === "string" ? incomingBlock.title : "";
+      }
+      if ("type" in existingBlock || "type" in incomingBlock) {
+        nextBlockPayload.type = normalizeLessonBlockType(incomingBlock.type);
+      }
+      if ("content" in existingBlock || "content" in incomingBlock) {
+        nextBlockPayload.content = typeof incomingBlock.content === "string" ? incomingBlock.content : "";
+      }
+
+      const { error: blockUpdateError } = await supabase
+        .from("lesson_blocks")
+        .update(nextBlockPayload)
+        .eq("id", blockId);
+
+      if (blockUpdateError) {
+        throw blockUpdateError;
+      }
+    }
+  }
+
+  const sourceTaskId = typeof detail.lesson.teaching_contract.source_task_id === "string"
+    ? detail.lesson.teaching_contract.source_task_id
+    : null;
+
+  await updateSourceTaskReviewStatus(supabase, sourceTaskId, "needs_review", {
+    lesson_review_saved_at: nowIso(),
+  });
+
+  return await loadAiRecoveryRecoveredLessonDetail(supabase, lessonId);
+}
+
+export async function sendRecoveredLessonToAi(
+  supabase: SupabaseClient,
+  lessonId: string,
+  requestedBy: string,
+) {
+  const detail = await loadAiRecoveryRecoveredLessonDetail(supabase, lessonId);
+  const teachingContract = detail.lesson.teaching_contract;
+  const sourceTaskId = typeof teachingContract.source_task_id === "string" ? teachingContract.source_task_id : null;
+  const sourceJobId = typeof teachingContract.source_job_id === "string" ? teachingContract.source_job_id : null;
+
+  let taskRef: AiRecoveryTaskRef | null = null;
+
+  if (sourceTaskId) {
+    const existingTask = await fetchAiRecoveryTaskRecord(supabase, sourceTaskId);
+    const nextMetadata = {
+      ...parseJsonRecord(existingTask.metadata),
+      send_back_requested_at: nowIso(),
+      send_back_requested_by: requestedBy,
+      send_back_lesson_id: lessonId,
+    };
+    const nextResult = {
+      ...parseJsonRecord(existingTask.result),
+      review_status: "needs_review",
+      send_back_requested_at: nowIso(),
+    };
+
+    await updateAiRecoveryTaskColumns(supabase, sourceTaskId, {
+      metadata: nextMetadata,
+      result: nextResult,
+      status: "pending",
+      progress: 0,
+      started_at: null,
+      completed_at: null,
+    });
+
+    await createTaskLog(
+      supabase,
+      sourceTaskId,
+      COMMAND_CENTER_AGENTS.reporter,
+      "info",
+      "Recovered lesson was sent back to AI for another pass.",
+      {
+        lesson_id: lessonId,
+        requested_by: requestedBy,
+      },
+    );
+
+    taskRef = {
+      id: existingTask.id,
+      issue_id: existingTask.issue_id,
+      job_id: existingTask.job_id ?? null,
+      title: existingTask.title ?? existingTask.task_name ?? null,
+      status: "pending",
+      created_at: existingTask.created_at,
+    };
+  } else if (sourceJobId) {
+    const created = await createAiRecoveryTaskForJob(supabase, sourceJobId);
+    taskRef = created.task;
+
+    await createTaskLog(
+      supabase,
+      taskRef.id,
+      COMMAND_CENTER_AGENTS.reporter,
+      "info",
+      "Recovered lesson was sent back to AI and linked to a recovery task.",
+      {
+        lesson_id: lessonId,
+        requested_by: requestedBy,
+      },
+    );
+  } else {
+    throw new AiCommandCenterHttpError(409, "This recovered lesson is not linked to a source job or AI task.");
+  }
+
+  return {
+    task: taskRef,
+    detail: await loadAiRecoveryRecoveredLessonDetail(supabase, lessonId),
+  };
+}
+
 export async function createAiRecoveryTaskForJob(
   supabase: SupabaseClient,
   jobId: string,
+  requestedBy?: string | null,
 ): Promise<CreateAiRecoveryTaskResult> {
   const diagnostics = await loadAiRecoveryJobDiagnostics(supabase, jobId);
 
@@ -1193,21 +1965,25 @@ export async function createAiRecoveryTaskForJob(
     created_at: task.created_at,
   };
 
-  await createTaskLog(
-    supabase,
-    taskRef.id,
-    COMMAND_CENTER_AGENTS.planner,
-    "info",
-    "AI Recovery task created from a failed lesson generation job.",
-    {
-      recovery_job_id: diagnostics.job_id,
+  await recordAiRecoveryEvent(supabase, {
+    event_type: "task_created",
+    message: "AI recovery task created from a failed lesson generation job.",
+    actor_user_id: requestedBy ?? null,
+    task_id: taskRef.id,
+    job_id: diagnostics.job_id,
+    details: {
       topic_id: diagnostics.topic_id,
       topic_title: diagnostics.topic_title,
       outlines_count: diagnostics.ordered_topic_outlines.length,
       existing_lessons_count: diagnostics.existing_lessons_count,
       existing_lesson_blocks_count: diagnostics.existing_lesson_blocks_count,
+      grade_name: diagnostics.grade_name,
+      subject_name: diagnostics.subject_name,
+      last_error: diagnostics.last_error,
     },
-  );
+    agent_name: COMMAND_CENTER_AGENTS.planner,
+    log_type: "info",
+  });
 
   return {
     task: taskRef,
@@ -1893,9 +2669,269 @@ export async function loadAiRecoveryTaskDetail(
   };
 }
 
+function dateMatchesFilter(value: string | null, dateFilter: string | null | undefined) {
+  if (!dateFilter) {
+    return true;
+  }
+
+  if (!value) {
+    return false;
+  }
+
+  if (value.startsWith(dateFilter)) {
+    return true;
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return false;
+  }
+
+  return parsed.toISOString().slice(0, 10) === dateFilter;
+}
+
+function normalizeAiTaskLogEvent(row: JsonRecord, taskRowsById: Map<string, JsonRecord>): AiRecoveryLogEntry {
+  const metadata = parseJsonRecord(row.metadata);
+  const taskId = typeof row.task_id === "string" ? row.task_id : null;
+  const taskRow = taskId ? taskRowsById.get(taskId) || null : null;
+  const eventType =
+    typeof metadata.event_type === "string"
+      ? metadata.event_type
+      : typeof row.log_type === "string" && row.log_type.trim()
+        ? row.log_type
+        : "info";
+
+  return {
+    id: `ai_task_logs:${String(row.id || crypto.randomUUID())}`,
+    source: "ai_task_logs",
+    timestamp: typeof row.created_at === "string" ? row.created_at : null,
+    actor_user_id: extractRecoveryActorUserId(metadata),
+    task_id: taskId,
+    job_id:
+      typeof metadata.job_id === "string"
+        ? metadata.job_id
+        : typeof metadata.recovery_job_id === "string"
+          ? metadata.recovery_job_id
+          : typeof taskRow?.job_id === "string"
+            ? String(taskRow.job_id)
+            : null,
+    lesson_id: typeof metadata.lesson_id === "string" ? metadata.lesson_id : null,
+    event_type: eventType,
+    message: String(row.message || ""),
+    details: metadata,
+  };
+}
+
+function normalizeAiTaskJsonLogEvents(taskRows: JsonRecord[]): AiRecoveryLogEntry[] {
+  const entries: AiRecoveryLogEntry[] = [];
+
+  taskRows.forEach((taskRow) => {
+    const rawLogs = Array.isArray(taskRow.logs) ? taskRow.logs : [];
+    rawLogs.forEach((rawLog, index) => {
+      if (!rawLog || typeof rawLog !== "object" || Array.isArray(rawLog)) {
+        return;
+      }
+
+      const log = rawLog as JsonRecord;
+      entries.push({
+        id: `ai_tasks.logs:${String(taskRow.id)}:${String(log.id || index)}`,
+        source: "ai_tasks.logs",
+        timestamp: typeof log.timestamp === "string" ? log.timestamp : typeof log.created_at === "string" ? log.created_at : null,
+        actor_user_id: typeof log.actor_user_id === "string" ? log.actor_user_id : null,
+        task_id: typeof log.task_id === "string" ? log.task_id : typeof taskRow.id === "string" ? taskRow.id : null,
+        job_id: typeof log.job_id === "string" ? log.job_id : typeof taskRow.job_id === "string" ? taskRow.job_id : null,
+        lesson_id: typeof log.lesson_id === "string" ? log.lesson_id : null,
+        event_type: typeof log.event_type === "string" ? log.event_type : "info",
+        message: typeof log.message === "string" ? log.message : "AI Recovery event",
+        details: parseJsonRecord(log.details),
+      });
+    });
+  });
+
+  return entries;
+}
+
+function normalizeErrorRecoveryLogEvent(row: JsonRecord): AiRecoveryLogEntry {
+  const details = parseJsonRecord(row.details);
+
+  return {
+    id: `error_recovery_log:${String(row.id || crypto.randomUUID())}`,
+    source: "error_recovery_log",
+    timestamp:
+      typeof row.timestamp === "string"
+        ? row.timestamp
+        : typeof row.created_at === "string"
+          ? row.created_at
+          : null,
+    actor_user_id:
+      typeof row.actor_user_id === "string"
+        ? row.actor_user_id
+        : typeof row.user_id === "string"
+          ? row.user_id
+          : extractRecoveryActorUserId(details),
+    task_id: typeof row.task_id === "string" ? row.task_id : typeof details.task_id === "string" ? details.task_id : null,
+    job_id: typeof row.job_id === "string" ? row.job_id : typeof details.job_id === "string" ? details.job_id : null,
+    lesson_id:
+      typeof row.lesson_id === "string"
+        ? row.lesson_id
+        : typeof details.lesson_id === "string"
+          ? details.lesson_id
+          : null,
+    event_type:
+      typeof row.event_type === "string"
+        ? row.event_type
+        : typeof details.event_type === "string"
+          ? details.event_type
+          : "info",
+    message: typeof row.message === "string" ? row.message : "AI Recovery event",
+    details,
+  };
+}
+
+function recoveryLogMatchesFilters(entry: AiRecoveryLogEntry, filters: AiRecoveryLogFilters) {
+  if (filters.event_type && entry.event_type !== filters.event_type) {
+    return false;
+  }
+  if (filters.job_id && entry.job_id !== filters.job_id) {
+    return false;
+  }
+  if (filters.task_id && entry.task_id !== filters.task_id) {
+    return false;
+  }
+  if (filters.lesson_id && entry.lesson_id !== filters.lesson_id) {
+    return false;
+  }
+  if (!dateMatchesFilter(entry.timestamp, filters.date)) {
+    return false;
+  }
+  return true;
+}
+
+function recoveryLogSourcePriority(source: AiRecoveryLogEntry["source"]) {
+  if (source === "error_recovery_log") return 3;
+  if (source === "ai_tasks.logs") return 2;
+  return 1;
+}
+
+function dedupeRecoveryLogs(entries: AiRecoveryLogEntry[]) {
+  const byKey = new Map<string, AiRecoveryLogEntry>();
+
+  entries.forEach((entry) => {
+    const key = [
+      entry.timestamp || "",
+      entry.task_id || "",
+      entry.job_id || "",
+      entry.lesson_id || "",
+      entry.event_type || "",
+      entry.message || "",
+    ].join("::");
+
+    const current = byKey.get(key);
+    if (!current) {
+      byKey.set(key, {
+        ...entry,
+        details: {
+          ...entry.details,
+          sources: [entry.source],
+        },
+      });
+      return;
+    }
+
+    const sources = Array.isArray(current.details.sources)
+      ? current.details.sources.map((value) => String(value))
+      : [current.source];
+
+    const nextSources = Array.from(new Set([...sources, entry.source]));
+    const preferred =
+      recoveryLogSourcePriority(entry.source) > recoveryLogSourcePriority(current.source)
+        ? entry
+        : current;
+
+    byKey.set(key, {
+      ...preferred,
+      details: {
+        ...preferred.details,
+        sources: nextSources,
+      },
+    });
+  });
+
+  return [...byKey.values()].sort((left, right) => {
+    const leftValue = left.timestamp ? new Date(left.timestamp).getTime() : 0;
+    const rightValue = right.timestamp ? new Date(right.timestamp).getTime() : 0;
+    return rightValue - leftValue;
+  });
+}
+
+export async function loadAiRecoveryLogs(
+  supabase: SupabaseClient,
+  filters: AiRecoveryLogFilters = {},
+) {
+  const taskRowsResult = await safeSelect(
+    supabase,
+    "ai_tasks",
+    "*",
+    (query) => {
+      let nextQuery = query.eq("target_area", "lesson_generation").order("updated_at", { ascending: false }).limit(500);
+      if (filters.task_id) nextQuery = nextQuery.eq("id", filters.task_id);
+      if (filters.job_id) nextQuery = nextQuery.eq("job_id", filters.job_id);
+      return nextQuery;
+    },
+  );
+
+  const taskRows = (taskRowsResult.data || []) as JsonRecord[];
+  const taskRowsById = new Map(
+    taskRows
+      .filter((row) => typeof row.id === "string")
+      .map((row) => [String(row.id), row] as const),
+  );
+
+  const taskIds = [...taskRowsById.keys()];
+  const aiTaskLogResult = await safeSelect(
+    supabase,
+    "ai_task_logs",
+    "*",
+    (query) => {
+      let nextQuery = query.order("created_at", { ascending: false }).limit(1000);
+      if (filters.task_id) {
+        nextQuery = nextQuery.eq("task_id", filters.task_id);
+      } else if (taskIds.length > 0) {
+        nextQuery = nextQuery.in("task_id", taskIds);
+      }
+      return nextQuery;
+    },
+  );
+
+  const errorRecoveryLogResult = await safeSelect(
+    supabase,
+    "error_recovery_log",
+    "*",
+    (query) => query.order("timestamp", { ascending: false }).limit(1000),
+  );
+
+  const normalizedAiTaskLogs = ((aiTaskLogResult.data || []) as JsonRecord[]).map((row) =>
+    normalizeAiTaskLogEvent(row, taskRowsById),
+  );
+  const normalizedAiTaskJsonLogs = normalizeAiTaskJsonLogEvents(taskRows);
+  const normalizedErrorRecoveryLogs =
+    errorRecoveryLogResult.error && isMissingTableError(errorRecoveryLogResult.error as { code?: string; message?: string })
+      ? []
+      : ((errorRecoveryLogResult.data || []) as JsonRecord[]).map(normalizeErrorRecoveryLogEvent);
+
+  const filtered = [
+    ...normalizedAiTaskLogs,
+    ...normalizedAiTaskJsonLogs,
+    ...normalizedErrorRecoveryLogs,
+  ].filter((entry) => recoveryLogMatchesFilters(entry, filters));
+
+  return dedupeRecoveryLogs(filtered);
+}
+
 export async function generateAiRecoveryRepairSql(
   supabase: SupabaseClient,
   taskId: string,
+  requestedBy?: string | null,
 ) {
   const detail = await loadAiRecoveryTaskDetail(supabase, taskId);
   const topicId = detail.queue_job?.topic_id || detail.topic?.id || null;
@@ -1918,20 +2954,21 @@ export async function generateAiRecoveryRepairSql(
     progress: Math.max(Number(detail.task.progress || 0), 20),
   });
 
-  await createTaskLog(
-    supabase,
-    taskId,
-    COMMAND_CENTER_AGENTS.sql,
-    "sql",
-    "Generated AI recovery SQL preview for human review.",
-    {
-      job_id: detail.task.job_id,
-      topic_id: detail.queue_job?.topic_id || detail.topic?.id || null,
+  await recordAiRecoveryEvent(supabase, {
+    event_type: "sql_generated",
+    message: "AI recovery SQL preview was generated and stored for review.",
+    actor_user_id: requestedBy ?? null,
+    task_id: taskId,
+    job_id: detail.task.job_id,
+    details: {
       provider: generation.provider,
       model: generation.model,
       generated_sql_at: generatedAt,
+      topic_id: detail.queue_job?.topic_id || detail.topic?.id || null,
     },
-  );
+    agent_name: COMMAND_CENTER_AGENTS.sql,
+    log_type: "sql",
+  });
 
   return {
     generated_sql: generation.sql,
@@ -1942,6 +2979,7 @@ export async function generateAiRecoveryRepairSql(
 export async function runAiRecoverySafetyCheck(
   supabase: SupabaseClient,
   taskId: string,
+  requestedBy?: string | null,
 ) {
   const detail = await loadAiRecoveryTaskDetail(supabase, taskId);
   const sqlPreview = detail.generated_sql || "";
@@ -1957,14 +2995,18 @@ export async function runAiRecoverySafetyCheck(
     progress: Math.max(Number(detail.task.progress || 0), 35),
   });
 
-  await createTaskLog(
-    supabase,
-    taskId,
-    COMMAND_CENTER_AGENTS.auditor,
-    safetyCheck.allowed ? "validation" : "warning",
-    "Ran AI recovery safety check.",
-    safetyCheck,
-  );
+  await recordAiRecoveryEvent(supabase, {
+    event_type: safetyCheck.allowed ? "safety_check_passed" : "safety_check_failed",
+    message: safetyCheck.allowed
+      ? "AI recovery safety check passed."
+      : "AI recovery safety check failed.",
+    actor_user_id: requestedBy ?? null,
+    task_id: taskId,
+    job_id: detail.task.job_id,
+    details: safetyCheck,
+    agent_name: COMMAND_CENTER_AGENTS.auditor,
+    log_type: safetyCheck.allowed ? "validation" : "warning",
+  });
 
   return {
     safety_check: safetyCheck,
@@ -2056,6 +3098,96 @@ export async function approveAiRecoveryTaskExecution(
     approval: approvedRecord,
     detail: await loadAiRecoveryTaskDetail(supabase, taskId),
   };
+}
+
+export async function executeAiRecoveryTaskSql(
+  supabase: SupabaseClient,
+  taskId: string,
+  executedBy: string,
+) {
+  const detail = await loadAiRecoveryTaskDetail(supabase, taskId);
+  const generatedSql = detail.generated_sql;
+  const safetyCheck = parseJsonRecord(detail.safety_check);
+  const latestApproval = parseJsonRecord(detail.latest_approval);
+
+  if (!detail.task.requires_approval) {
+    throw new AiCommandCenterHttpError(409, "This recovery task is not marked as approval-required.");
+  }
+
+  if (!generatedSql) {
+    throw new AiCommandCenterHttpError(409, "No generated SQL preview is stored for this task.");
+  }
+
+  if (typeof safetyCheck.allowed !== "boolean") {
+    throw new AiCommandCenterHttpError(409, "Run the safety check before executing the recovery SQL.");
+  }
+
+  if (!safetyCheck.allowed) {
+    const firstError =
+      Array.isArray(safetyCheck.errors) && typeof safetyCheck.errors[0] === "string"
+        ? safetyCheck.errors[0]
+        : "Stored safety check did not approve this SQL preview.";
+    throw new AiCommandCenterHttpError(409, firstError);
+  }
+
+  if (String(latestApproval.status || "").toLowerCase() !== "approved") {
+    throw new AiCommandCenterHttpError(409, "Human approval is required before executing recovery SQL.");
+  }
+
+  await recordAiRecoveryEvent(supabase, {
+    event_type: "execution_started",
+    message: "Approved recovery SQL execution started on the server.",
+    actor_user_id: executedBy,
+    task_id: taskId,
+    job_id: detail.task.job_id,
+    details: {
+      approval_id: typeof latestApproval.id === "string" ? latestApproval.id : null,
+      topic_id: detail.queue_job?.topic_id || detail.topic?.id || null,
+    },
+    agent_name: COMMAND_CENTER_AGENTS.worker,
+    log_type: "execution",
+  });
+
+  try {
+    const execution = await executeRecoverySqlServerSide(generatedSql);
+
+    await recordAiRecoveryEvent(supabase, {
+      event_type: "execution_success",
+      message: "Approved recovery SQL executed successfully on the server.",
+      actor_user_id: executedBy,
+      task_id: taskId,
+      job_id: detail.task.job_id,
+      details: {
+        executed_at: execution.executed_at,
+        command: execution.command,
+        count: execution.count,
+      },
+      agent_name: COMMAND_CENTER_AGENTS.worker,
+      log_type: "execution",
+    });
+
+    return {
+      execution,
+      detail: await loadAiRecoveryTaskDetail(supabase, taskId),
+    };
+  } catch (error) {
+    const message = normalizeError(error);
+
+    await recordAiRecoveryEvent(supabase, {
+      event_type: "execution_failed",
+      message: "Approved recovery SQL execution failed on the server.",
+      actor_user_id: executedBy,
+      task_id: taskId,
+      job_id: detail.task.job_id,
+      details: {
+        error: message,
+      },
+      agent_name: COMMAND_CENTER_AGENTS.worker,
+      log_type: "error",
+    });
+
+    throw new AiCommandCenterHttpError(500, `Recovery SQL execution failed: ${message}`);
+  }
 }
 
 export async function rejectAiRecoveryTaskSql(

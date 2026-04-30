@@ -17,7 +17,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    await requireAdminUser(req);
+    const { user } = await requireAdminUser(req);
     const jobId = readJobId(req);
 
     if (!jobId) {
@@ -25,7 +25,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const supabase = getServerSupabase();
-    const result = await createAiRecoveryTaskForJob(supabase, jobId);
+    const result = await createAiRecoveryTaskForJob(supabase, jobId, user.id);
     return res.status(200).json(result);
   } catch (error) {
     if (error instanceof AiCommandCenterHttpError) {

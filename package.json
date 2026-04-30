@@ -36,6 +36,7 @@
     "mathlive": "^0.109.0",
     "motion": "^12.23.24",
     "onnxruntime-web": "^1.24.3",
+    "postgres": "^3.4.9",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-helmet-async": "^3.0.0",
