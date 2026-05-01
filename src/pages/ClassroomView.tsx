@@ -403,6 +403,38 @@ export const ClassroomView: React.FC = () => {
       if (error) throw error;
       
       if (!dbLessons || dbLessons.length === 0) {
+        // Fallback: load lesson titles from curriculum topics outline
+        const { data: grades } = await supabase.from('grades').select('id').eq('name', selectedGrade).limit(1);
+        const gradeId = grades?.[0]?.id;
+        const { data: subjects } = await supabase.from('subjects').select('id').eq('name', module.name).limit(1);
+        const subjectId = subjects?.[0]?.id;
+
+        if (gradeId && subjectId) {
+          const { data: topics } = await supabase
+            .from('topics').select('id, title')
+            .eq('grade_id', gradeId).eq('subject_id', subjectId);
+
+          if (topics && topics.length > 0) {
+            for (const topic of topics) {
+              const existing = await db.lessons
+                .where('title').equals(topic.title)
+                .and(l => l.moduleId === module.id).first();
+              if (!existing) {
+                await db.lessons.add({
+                  id: crypto.randomUUID(),
+                  moduleId: module.id,
+                  title: topic.title,
+                  content: '',
+                  status: 'pending',
+                  createdAt: Date.now()
+                });
+              }
+            }
+            toast.success(`Loaded ${topics.length} lesson titles from curriculum outline.`);
+            return;
+          }
+        }
+
         toast.info("No existing lessons found in Supabase for this curriculum.");
         return;
       }
