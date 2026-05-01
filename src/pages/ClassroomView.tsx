@@ -75,6 +75,21 @@ const getGradeSearchTerms = (grade: string): string[] => {
   return [grade, ...aliases];
 };
 
+const normalizeLessonTitle = (title: string | null | undefined) =>
+  String(title || '').trim().toLocaleLowerCase();
+
+const resolveCurriculumIds = async (grade: string, subject: string) => {
+  const [{ data: grades }, { data: subjects }] = await Promise.all([
+    supabase.from('grades').select('id').eq('name', grade).limit(1),
+    supabase.from('subjects').select('id').eq('name', subject).limit(1),
+  ]);
+
+  return {
+    gradeId: grades?.[0]?.id ?? null,
+    subjectId: subjects?.[0]?.id ?? null,
+  };
+};
+
 export const ClassroomView: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -93,6 +108,11 @@ export const ClassroomView: React.FC = () => {
   const module = useLiveQuery(() => id ? db.modules.get(id) : undefined, [id]);
   const allLessons = useLiveQuery(() => id ? db.lessons.where('moduleId').equals(id).sortBy('createdAt') : [], [id]);
   const lessons = allLessons?.filter(l => l.status !== 'suggested') || [];
+  const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
+  const settingsMap = Object.fromEntries(dbSettings.map(s => [s.key, s.value]));
+
+  const selectedGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
+  const country = settingsMap['selected_country'] || localStorage.getItem('selected_country') || '';
 
   // Auto-seed from Supabase when local lessons are empty — no AI needed
   useEffect(() => {
@@ -111,53 +131,47 @@ export const ClassroomView: React.FC = () => {
           .select('id, lesson_title, content, blocks, subtitle, status')
           .or(pairs);
         if (!dbLessons || dbLessons.length === 0) return;
-        const toAdd = [];
-        for (const les of dbLessons) {
-          const existing = await db.lessons
-            .where('title').equals(les.lesson_title)
-            .and(l => l.moduleId === module.id)
-            .first();
-          if (!existing) {
-            toAdd.push({
-              id: les.id,
-              moduleId: module.id,
-              title: les.lesson_title,
-              content: les.content || '',
-              blocks: les.blocks,
-              subtitle: les.subtitle,
-              status: (les.status === 'published' || les.status === 'done') ? 'done' as const : 'pending' as const,
-              createdAt: Date.now()
-            });
-          }
-        }
+        const existingTitles = new Set(allLessons.map((lesson) => normalizeLessonTitle(lesson.title)));
+        const toAdd = dbLessons
+          .filter((lesson) => !existingTitles.has(normalizeLessonTitle(lesson.lesson_title)))
+          .map((lesson) => ({
+            id: lesson.id,
+            moduleId: module.id,
+            title: lesson.lesson_title,
+            content: lesson.content || '',
+            blocks: lesson.blocks,
+            subtitle: lesson.subtitle,
+            status: (lesson.status === 'published' || lesson.status === 'done') ? 'done' as const : 'pending' as const,
+            createdAt: Date.now(),
+          }));
         if (toAdd.length > 0) await db.lessons.bulkAdd(toAdd);
       } catch (err) {
         console.warn('[ClassroomView] Auto-seed from Supabase failed:', err);
       }
     })();
-  }, [module?.id, allLessons?.length]);
-
-  const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
-  const settingsMap = Object.fromEntries(dbSettings.map(s => [s.key, s.value]));
-
-  const selectedGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
-  const country = settingsMap['selected_country'] || localStorage.getItem('selected_country') || '';
+  }, [allLessons, id, module, selectedGrade]);
 
   useEffect(() => {
     const fetchExtraData = async () => {
       if (!lessons.length) return;
       setIsLoadingExtra(true);
       try {
-        const allQuizzes = [];
-        const allExercises = [];
-        for (const lesson of lessons) {
-          const lessonQuizzes = await getQuizzesByLesson(lesson.id);
-          const lessonExercises = await getExercisesByLesson(lesson.id);
-          allQuizzes.push(...(lessonQuizzes || []));
-          allExercises.push(...(lessonExercises || []));
-        }
-        setQuizzes(allQuizzes);
-        setExercises(allExercises);
+        const lessonExtras = await Promise.all(
+          lessons.map(async (lesson) => {
+            const [lessonQuizzes, lessonExercises] = await Promise.all([
+              getQuizzesByLesson(lesson.id),
+              getExercisesByLesson(lesson.id),
+            ]);
+
+            return {
+              quizzes: lessonQuizzes || [],
+              exercises: lessonExercises || [],
+            };
+          })
+        );
+
+        setQuizzes(lessonExtras.flatMap((entry) => entry.quizzes));
+        setExercises(lessonExtras.flatMap((entry) => entry.exercises));
       } catch (error) {
         console.error("Failed to fetch extra data:", error);
       } finally {
@@ -177,11 +191,7 @@ export const ClassroomView: React.FC = () => {
       // Fetch existing topics from Supabase if they exist
       let existingTopics: string[] = [];
       try {
-        const { data: grades } = await supabase.from('grades').select('id').eq('name', selectedGrade).limit(1);
-        const gradeId = grades?.[0]?.id;
-
-        const { data: subjects } = await supabase.from('subjects').select('id').eq('name', module.name).limit(1);
-        const subjectId = subjects?.[0]?.id;
+        const { gradeId, subjectId } = await resolveCurriculumIds(selectedGrade, module.name);
 
         if (gradeId && subjectId) {
           const { data: topics } = await supabase
@@ -198,10 +208,7 @@ export const ClassroomView: React.FC = () => {
       }
 
       // Check database first
-      const existingSuggestions = await db.lessons
-        .where('moduleId').equals(module.id)
-        .filter(l => l.status === 'suggested')
-        .toArray();
+      const existingSuggestions = allLessons?.filter((lesson) => lesson.status === 'suggested') || [];
         
       if (existingSuggestions.length > 0) {
         setSuggestions(existingSuggestions.map(s => ({ title: s.title, description: s.content })));
@@ -234,10 +241,12 @@ export const ClassroomView: React.FC = () => {
   const buildChainContext = async (maxChars = 8000): Promise<string> => {
     if (!module) return '';
     const parts: string[] = [];
+    const includedTitles = new Set<string>();
 
     // 1. Local lessons (IndexedDB)
     const localLessons = allLessons?.filter(l => l.status !== 'suggested') || [];
     for (const l of localLessons) {
+      includedTitles.add(normalizeLessonTitle(l.title));
       parts.push(`Title: ${l.title}\nContent: ${l.content || (l.blocks ? l.blocks.map((b: any) => b.content).join('\n') : '')}`);
     }
 
@@ -252,8 +261,11 @@ export const ClassroomView: React.FC = () => {
         .limit(5);
       if (dbLessons) {
         for (const l of dbLessons) {
+          const normalizedTitle = normalizeLessonTitle(l.lesson_title);
+          if (includedTitles.has(normalizedTitle)) continue;
           const entry = `Title: ${l.lesson_title}\nContent: ${l.content?.substring(0, 600) ?? ''}`;
-          if (!parts.some(p => p.includes(l.lesson_title))) parts.push(entry);
+          parts.push(entry);
+          includedTitles.add(normalizedTitle);
         }
       }
     } catch { /* non-critical */ }
@@ -392,11 +404,13 @@ export const ClassroomView: React.FC = () => {
     if (!module) return;
     setIsSeeding(true);
     try {
+      const existingTitles = new Set((allLessons || []).map((lesson) => normalizeLessonTitle(lesson.title)));
+
       // Find matching curriculum metadata
       const { data: dbLessons, error } = await supabase
         .from('lessons')
         .select('*')
-        .eq('subject', module.category)
+        .eq('subject', module.category || module.name)
         .eq('grade', selectedGrade)
         .eq('country', country);
 
@@ -404,10 +418,7 @@ export const ClassroomView: React.FC = () => {
       
       if (!dbLessons || dbLessons.length === 0) {
         // Fallback: load lesson titles from curriculum topics outline
-        const { data: grades } = await supabase.from('grades').select('id').eq('name', selectedGrade).limit(1);
-        const gradeId = grades?.[0]?.id;
-        const { data: subjects } = await supabase.from('subjects').select('id').eq('name', module.name).limit(1);
-        const subjectId = subjects?.[0]?.id;
+        const { gradeId, subjectId } = await resolveCurriculumIds(selectedGrade, module.name);
 
         if (gradeId && subjectId) {
           const { data: topics } = await supabase
@@ -415,20 +426,19 @@ export const ClassroomView: React.FC = () => {
             .eq('grade_id', gradeId).eq('subject_id', subjectId);
 
           if (topics && topics.length > 0) {
-            for (const topic of topics) {
-              const existing = await db.lessons
-                .where('title').equals(topic.title)
-                .and(l => l.moduleId === module.id).first();
-              if (!existing) {
-                await db.lessons.add({
-                  id: crypto.randomUUID(),
-                  moduleId: module.id,
-                  title: topic.title,
-                  content: '',
-                  status: 'pending',
-                  createdAt: Date.now()
-                });
-              }
+            const toAdd = topics
+              .filter((topic) => !existingTitles.has(normalizeLessonTitle(topic.title)))
+              .map((topic) => ({
+                id: crypto.randomUUID(),
+                moduleId: module.id,
+                title: topic.title,
+                content: '',
+                status: 'pending' as const,
+                createdAt: Date.now(),
+              }));
+
+            if (toAdd.length > 0) {
+              await db.lessons.bulkAdd(toAdd);
             }
             toast.success(`Loaded ${topics.length} lesson titles from curriculum outline.`);
             return;
@@ -440,18 +450,19 @@ export const ClassroomView: React.FC = () => {
       }
 
       // Add to dexie db
-      for (const les of dbLessons) {
-        const existing = await db.lessons.where('title').equals(les.lesson_title).and(l => l.moduleId === module.id).first();
-        if (!existing) {
-          await db.lessons.add({
-            id: les.id || crypto.randomUUID(),
-            moduleId: module.id,
-            title: les.lesson_title,
-            content: les.content,
-            status: 'done',
-            createdAt: Date.now()
-          });
-        }
+      const toAdd = dbLessons
+        .filter((lesson) => !existingTitles.has(normalizeLessonTitle(lesson.lesson_title)))
+        .map((lesson) => ({
+          id: lesson.id || crypto.randomUUID(),
+          moduleId: module.id,
+          title: lesson.lesson_title,
+          content: lesson.content,
+          status: 'done' as const,
+          createdAt: Date.now(),
+        }));
+
+      if (toAdd.length > 0) {
+        await db.lessons.bulkAdd(toAdd);
       }
 
       // Enforce strict RAG mode for this module by default as requested

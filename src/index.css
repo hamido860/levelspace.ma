@@ -2,6 +2,7 @@
 @import "katex/dist/katex.min.css";
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
   --font-sans: "DM Sans", "Inter", "Noto Sans Arabic", ui-sans-serif, system-ui, sans-serif;
@@ -365,4 +366,60 @@
 .katex .mop                { color: var(--math-function); } /* functions: sin cos log */
 .katex .mopen,
 .katex .mclose             { color: var(--math-bracket);  } /* delimiters: ( ) [ ] */
+
+/* Scoped admin-page palette remap so legacy light-only utility classes inherit theme tokens */
+.dark .admin-theme-scope .bg-white {
+  background-color: var(--paper) !important;
+}
+
+.dark .admin-theme-scope .bg-gray-50,
+.dark .admin-theme-scope .bg-gray-50\/40,
+.dark .admin-theme-scope .bg-gray-50\/50,
+.dark .admin-theme-scope .bg-gray-50\/60,
+.dark .admin-theme-scope .bg-gray-100 {
+  background-color: var(--surface-low) !important;
+}
+
+.dark .admin-theme-scope .border-gray-50,
+.dark .admin-theme-scope .border-gray-100,
+.dark .admin-theme-scope .border-gray-200 {
+  border-color: color-mix(in srgb, var(--ink) 12%, transparent) !important;
+}
+
+.dark .admin-theme-scope .text-gray-900,
+.dark .admin-theme-scope .text-gray-800,
+.dark .admin-theme-scope .text-black {
+  color: var(--ink) !important;
+}
+
+.dark .admin-theme-scope .text-gray-700,
+.dark .admin-theme-scope .text-gray-600,
+.dark .admin-theme-scope .text-gray-500 {
+  color: var(--ink-secondary) !important;
+}
+
+.dark .admin-theme-scope .text-gray-400,
+.dark .admin-theme-scope .text-gray-300 {
+  color: var(--ink-muted) !important;
+}
+
+.dark .admin-theme-scope .hover\:bg-gray-50:hover,
+.dark .admin-theme-scope .hover\:bg-gray-50\/40:hover,
+.dark .admin-theme-scope .hover\:bg-gray-50\/50:hover,
+.dark .admin-theme-scope .hover\:bg-gray-50\/60:hover,
+.dark .admin-theme-scope .hover\:bg-gray-100:hover,
+.dark .admin-theme-scope .hover\:bg-gray-200:hover {
+  background-color: var(--surface-mid) !important;
+}
+
+.dark .admin-theme-scope .hover\:text-gray-700:hover,
+.dark .admin-theme-scope .hover\:text-gray-900:hover,
+.dark .admin-theme-scope .hover\:text-gray-800:hover {
+  color: var(--ink) !important;
+}
+
+.dark .admin-theme-scope .hover\:border-gray-300:hover,
+.dark .admin-theme-scope .hover\:border-gray-900:hover {
+  border-color: color-mix(in srgb, var(--ink) 18%, transparent) !important;
+}
 

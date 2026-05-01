@@ -262,26 +262,34 @@ export const Admin: React.FC = () => {
     const [
       { count: topicsCount },
       { data: lessonTopicLinks },
-      { count: pendingCount },
-      { count: failedCount },
+      { data: queueRows },
       { count: ragTotal },
       { count: ragDone },
       { count: usersCount },
     ] = await Promise.all([
       supabase.from("topics").select("*", { count: "exact", head: true }),
       supabase.from("lessons").select("topic_id"),
-      supabase.from("lesson_gen_queue").select("*", { count: "exact", head: true }).eq("status", "pending"),
-      supabase.from("lesson_gen_queue").select("*", { count: "exact", head: true }).eq("status", "failed"),
+      supabase.from("lesson_gen_queue").select("topic_id, status"),
       supabase.from("rag_chunks").select("*", { count: "exact", head: true }),
       supabase.from("rag_chunks").select("*", { count: "exact", head: true }).eq("embedding_status", "done"),
       supabase.from("profiles").select("*", { count: "exact", head: true }),
     ]);
+
     const coveredTopicsCount = countDistinctIds(lessonTopicLinks as Array<{ topic_id?: string | null }> | null);
+    const queueTopicCount = countDistinctIds(queueRows as Array<{ topic_id?: string | null }> | null);
+    const normalizedTopicsCount = Math.max(topicsCount ?? 0, coveredTopicsCount, queueTopicCount);
+    const topicSource =
+      (topicsCount ?? 0) > 0 ? "topics" : queueTopicCount > 0 ? "queue" : coveredTopicsCount > 0 ? "lessons" : "topics";
+    const normalizedQueueRows = (queueRows || []) as Array<{ status?: string | null }>;
+    const pendingCount = normalizedQueueRows.filter((row) => row.status === "pending").length;
+    const failedCount = normalizedQueueRows.filter((row) => row.status === "failed").length;
+
     setKpis({
-      topics: topicsCount ?? 0,
+      topics: normalizedTopicsCount,
+      topicSource,
       lessons: coveredTopicsCount,
-      pending: pendingCount ?? 0,
-      failed: failedCount ?? 0,
+      pending: pendingCount,
+      failed: failedCount,
       ragTotal: ragTotal ?? 0,
       ragDone: ragDone ?? 0,
       users: usersCount ?? 0,
@@ -687,6 +695,7 @@ export const Admin: React.FC = () => {
   return (
     <Layout>
       <SEO title="Admin Panel" />
+      <div className="admin-theme-scope">
 
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
@@ -728,7 +737,11 @@ export const Admin: React.FC = () => {
       {tab === "overview" && (
         <div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
-            <KPI label="Total Topics"      value={kpis.topics ?? "—"} sub="across all grades" />
+            <KPI
+              label="Total Topics"
+              value={kpis.topics ?? "—"}
+              sub={kpis.topicSource === "topics" ? "across all grades" : "derived from linked queue / lessons"}
+            />
             <KPI label="Lessons Generated" value={kpis.lessons ?? "—"} sub={`${pct(kpis.lessons, kpis.topics)}% of topics covered`} />
             <KPI label="Queue Pending"     value={kpis.pending ?? "—"} sub="need generation"    variant="warn" />
             <KPI label="Queue Failed"      value={kpis.failed ?? "—"}  sub="need retry"          variant="danger" />
@@ -1601,6 +1614,7 @@ export const Admin: React.FC = () => {
           </div>
         </div>
       )}
+      </div>
 
     </Layout>
   );
