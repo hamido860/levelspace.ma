@@ -5,6 +5,82 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const normalizeValue = (value: string | null | undefined) =>
+  String(value || "").trim().replace(/\s+/g, " ");
+
+const getCanonicalTopicTitle = (topic: string, lessonTitle?: string | null) => {
+  const requestedTopic = normalizeValue(topic);
+  if (requestedTopic) return requestedTopic;
+
+  const generatedTitle = normalizeValue(lessonTitle);
+  return generatedTitle || null;
+};
+
+async function resolveTopicContext(
+  supabaseAdmin: any,
+  lessonContext: { grade: string; subject: string; topic: string; lessonTitle?: string | null }
+) {
+  const gradeName = normalizeValue(lessonContext.grade);
+  const subjectName = normalizeValue(lessonContext.subject);
+  const topicTitle = getCanonicalTopicTitle(lessonContext.topic, lessonContext.lessonTitle);
+
+  if (!gradeName || !subjectName || !topicTitle) {
+    return null;
+  }
+
+  const [{ data: grades, error: gradeError }, { data: subjects, error: subjectError }] = await Promise.all([
+    supabaseAdmin.from("grades").select("id, name").ilike("name", gradeName).limit(1),
+    supabaseAdmin.from("subjects").select("id, name").ilike("name", subjectName).limit(1),
+  ]);
+
+  if (gradeError) throw gradeError;
+  if (subjectError) throw subjectError;
+
+  const gradeRows = (grades || []) as Array<{ id: string }>;
+  const subjectRows = (subjects || []) as Array<{ id: string }>;
+  const gradeId = gradeRows[0]?.id;
+  const subjectId = subjectRows[0]?.id;
+
+  if (!gradeId || !subjectId) {
+    return null;
+  }
+
+  const { data: existingTopics, error: topicLookupError } = await supabaseAdmin
+    .from("topics")
+    .select("id, title")
+    .eq("grade_id", gradeId)
+    .eq("subject_id", subjectId)
+    .ilike("title", topicTitle)
+    .limit(1);
+
+  if (topicLookupError) throw topicLookupError;
+
+  const existingTopicRows = (existingTopics || []) as Array<{ id: string }>;
+  const existingTopicId = existingTopicRows[0]?.id;
+  if (existingTopicId) {
+    return { topicId: existingTopicId, gradeId, subjectId, topicTitle };
+  }
+
+  const { data: createdTopic, error: createTopicError } = await supabaseAdmin
+    .from("topics")
+    .insert({
+      grade_id: gradeId,
+      subject_id: subjectId,
+      title: topicTitle,
+    })
+    .select("id")
+    .single();
+
+  if (createTopicError) throw createTopicError;
+
+  const createdTopicId = (createdTopic as { id?: string } | null)?.id;
+  if (!createdTopicId) {
+    return null;
+  }
+
+  return { topicId: createdTopicId, gradeId, subjectId, topicTitle };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -49,12 +125,20 @@ Deno.serve(async (req) => {
     }
 
     // ── Persist to Supabase (service role — no RLS restriction) ───────────────
+    const topicContext = await resolveTopicContext(supabaseAdmin, {
+      grade,
+      subject,
+      topic,
+      lessonTitle: lesson.lesson_title,
+    });
+
     const { data: inserted, error: lessonErr } = await supabaseAdmin
       .from("lessons")
       .insert({
         country,
         grade,
         subject,
+        topic_id: topicContext?.topicId ?? null,
         lesson_title: lesson.lesson_title,
         content: lesson.content,
         exercises: lesson.exercises ?? [],
@@ -88,7 +172,17 @@ Deno.serve(async (req) => {
             source_type: "lesson_block",
             content: chunk,
             embedding,
-            metadata: { user_id: userId ?? null, subject, grade, country },
+            metadata: {
+              user_id: userId ?? null,
+              subject,
+              grade,
+              country,
+              topic,
+              topic_id: topicContext?.topicId ?? null,
+              grade_id: topicContext?.gradeId ?? null,
+              subject_id: topicContext?.subjectId ?? null,
+              lesson_id: lessonId,
+            },
           });
           if (chunkErr) console.error("rag_chunks insert error:", chunkErr);
         }

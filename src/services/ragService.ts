@@ -1,5 +1,6 @@
 import { supabase } from "../db/supabase";
 import { ai, handleApiError, LessonTemplate } from "./geminiService";
+import { resolveTopicForLesson } from "../../lib/topicSync";
 
 export const generateEmbedding = async (text: string): Promise<number[]> => {
   try {
@@ -178,11 +179,24 @@ export const saveLesson = async (
 
     if (embedding.length === 0) return false;
 
+    const topicResolution = await resolveTopicForLesson(
+      supabase as any,
+      {
+        grade: lesson.grade,
+        subject: lesson.subject,
+        lesson_title: lesson.lesson_title,
+      },
+      { createIfMissing: true }
+    );
+
+    const topicId = topicResolution.status === "skipped" ? null : topicResolution.topicId;
+
     // 1. Insert the lesson and get its ID
     const { data: insertedLesson, error: lessonError } = await supabase.from("lessons").insert({
       country: lesson.country,
       grade: lesson.grade,
       subject: lesson.subject,
+      topic_id: topicId,
       lesson_title: lesson.lesson_title,
       content: lesson.content,
       blocks: lesson.blocks && lesson.blocks.length > 0 ? lesson.blocks : null, // NEW

@@ -124,12 +124,20 @@ set issue_type = coalesce(nullif(issue_type, ''), 'audit'),
 where true;
 
 alter table public.ai_issues
-  alter column severity type public.ai_severity using severity::text::public.ai_severity,
-  alter column severity set default 'medium',
+  alter column severity drop default,
+  alter column status drop default;
+
+alter table public.ai_issues
+  alter column severity type public.ai_severity using severity::text::public.ai_severity;
+
+alter table public.ai_issues
+  alter column status type public.ai_issue_status using status::text::public.ai_issue_status;
+
+alter table public.ai_issues
+  alter column severity set default 'medium'::public.ai_severity,
   alter column issue_type set default 'audit',
   alter column affected_area set default 'supabase_schema',
-  alter column status type public.ai_issue_status using status::text::public.ai_issue_status,
-  alter column status set default 'open';
+  alter column status set default 'open'::public.ai_issue_status;
 
 alter table public.ai_issues
   alter column issue_type set not null,
@@ -257,20 +265,33 @@ set task_name = coalesce(nullif(task_name, ''), nullif(title, ''), 'Untitled AI 
 where issue_id is null;
 
 alter table public.ai_tasks
+  alter column execution_mode drop default,
+  alter column safety_level drop default,
+  alter column status drop default;
+
+alter table public.ai_tasks
   alter column title set default 'Untitled AI task',
   alter column task_name set default 'Untitled AI task',
   alter column task_type set default 'manual',
   alter column priority set default 'medium',
   alter column assigned_agent set default 'Planner Agent',
   alter column target_area set default 'supabase_schema',
-  alter column execution_mode type public.ai_execution_mode using execution_mode::text::public.ai_execution_mode,
-  alter column execution_mode set default 'execute_with_approval',
-  alter column safety_level type public.ai_safety_level using safety_level::text::public.ai_safety_level,
-  alter column safety_level set default 'destructive_blocked',
-  alter column status type public.ai_task_status using status::text::public.ai_task_status,
-  alter column status set default 'pending',
   alter column progress set default 0,
   alter column requires_approval set default true;
+
+alter table public.ai_tasks
+  alter column execution_mode type public.ai_execution_mode using execution_mode::text::public.ai_execution_mode;
+
+alter table public.ai_tasks
+  alter column safety_level type public.ai_safety_level using safety_level::text::public.ai_safety_level;
+
+alter table public.ai_tasks
+  alter column status type public.ai_task_status using status::text::public.ai_task_status;
+
+alter table public.ai_tasks
+  alter column execution_mode set default 'execute_with_approval'::public.ai_execution_mode,
+  alter column safety_level set default 'destructive_blocked'::public.ai_safety_level,
+  alter column status set default 'pending'::public.ai_task_status;
 
 alter table public.ai_tasks
   drop constraint if exists ai_tasks_priority_check;
@@ -357,12 +378,19 @@ set proposed_action = coalesce(nullif(proposed_action, ''), approval_reason, 'Ap
 where true;
 
 alter table public.ai_task_approvals
+  alter column risk_level drop default;
+
+alter table public.ai_task_approvals
   alter column proposed_action set default 'Approve guarded AI action.',
   alter column proposed_action set not null,
-  alter column risk_level type public.ai_risk_level using risk_level::text::public.ai_risk_level,
-  alter column risk_level set default 'medium',
   alter column status set default 'pending',
   alter column updated_at set default timezone('utc'::text, now());
+
+alter table public.ai_task_approvals
+  alter column risk_level type public.ai_risk_level using risk_level::text::public.ai_risk_level;
+
+alter table public.ai_task_approvals
+  alter column risk_level set default 'medium'::public.ai_risk_level;
 
 alter table public.ai_task_approvals
   drop constraint if exists ai_task_approvals_status_check;

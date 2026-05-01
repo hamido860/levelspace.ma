@@ -20,6 +20,7 @@ import {
   loadAdminRagMetrics,
   loadAdminTableHealth,
   loadAiRecoveryReviewStatusCounts,
+  repairTopicsFromLessons,
 } from "../services/adminDashboardService";
 import {
   RefreshCw, Database, BarChart2, BookOpen, Cpu, Table2,
@@ -231,6 +232,8 @@ export const Admin: React.FC = () => {
   const [aiTaskList, setAiTaskList]   = useState<AITaskList | null>(null);
   const [aiStrategy, setAiStrategy]   = useState<AIStrategy | null>(null);
   const [activeAITab, setActiveAITab] = useState<AIAction>("insights");
+  const [topicRepairLoading, setTopicRepairLoading] = useState(false);
+  const [topicRepairMsg, setTopicRepairMsg] = useState("");
 
   // Browser
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
@@ -357,10 +360,27 @@ export const Admin: React.FC = () => {
     setLoading(false);
   }, []);
 
+  const handleRepairTopics = useCallback(async () => {
+    setTopicRepairLoading(true);
+    setTopicRepairMsg("");
+    try {
+      const summary = await repairTopicsFromLessons();
+      setTopicRepairMsg(`Linked ${summary.lessonsLinked} lessons and created ${summary.topicsCreated} topics.`);
+      await refreshAll();
+    } catch (e: any) {
+      setTopicRepairMsg(e.message || "Unable to repair topics from lessons.");
+    }
+    setTopicRepairLoading(false);
+  }, [refreshAll]);
+
   // Wait for auth to hydrate before firing queries — anon role has no SELECT
   // policy on most tables, so running these as anon would return 0 / null and
   // mislead the AI Analyst into reporting tables as "empty".
   useEffect(() => { if (!authLoading) refreshAll(); }, [authLoading, refreshAll]);
+
+  const lessonsTableCount = tableHealth.find((entry) => entry.table_name === "lessons")?.row_count ?? 0;
+  const topicsTableCount = tableHealth.find((entry) => entry.table_name === "topics")?.row_count ?? 0;
+  const shouldOfferTopicRepair = lessonsTableCount > 0 && topicsTableCount === 0;
 
   // ── Shared fetch helper ────────────────────────────────────────────────────
   // ── Queue actions ──────────────────────────────────────────────────────────
@@ -518,6 +538,39 @@ export const Admin: React.FC = () => {
             <KPI label="RAG Chunks" value={kpis.ragTotal ?? "—"} sub={`${pct(kpis.ragDone, kpis.ragTotal)}% embedded`} variant="success" />
             <KPI label="Users" value={kpis.users ?? "—"} sub="profiles" />
           </div>
+
+          {shouldOfferTopicRepair && (
+            <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 font-semibold text-amber-800">
+                    <AlertTriangle className="w-4 h-4" />
+                    Topics are empty while lessons already exist
+                  </div>
+                  <p className="mt-1 text-sm text-amber-700">
+                    The admin panel found {lessonsTableCount} lessons but 0 rows in `topics`. Run the repair to recreate topic rows and relink existing lessons.
+                  </p>
+                  {topicRepairMsg && (
+                    <p className="mt-2 text-xs font-medium text-amber-900">{topicRepairMsg}</p>
+                  )}
+                </div>
+                <button
+                  onClick={handleRepairTopics}
+                  disabled={topicRepairLoading}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-amber-700 disabled:opacity-60"
+                >
+                  {topicRepairLoading ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      Repairing...
+                    </>
+                  ) : (
+                    "Repair Topics"
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-6">
             <div className="px-5 py-3 border-b border-gray-50 flex items-center gap-2">
