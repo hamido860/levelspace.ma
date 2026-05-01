@@ -25,6 +25,7 @@ import { SearchProvider } from './context/SearchContext';
 import { LanguageProvider } from './context/LanguageContext';
 import { AuthProvider } from './context/AuthContext';
 import { Pricing } from './pages/Pricing';
+import PrivacyPolicy from './pages/PrivacyPolicy';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AICrewStatus } from './components/AICrewStatus';
 
@@ -39,6 +40,7 @@ export default function App() {
                 <Route path="/" element={<Landing />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/pricing" element={<Pricing />} />
+                <Route path="/privacy-policy" element={<PrivacyPolicy />} />
                 <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
                 <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                 <Route path="/modules" element={<ProtectedRoute><Modules /></ProtectedRoute>} />
