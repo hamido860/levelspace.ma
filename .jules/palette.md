@@ -1,0 +1,3 @@
+## 2025-03-09 - Accessible Clickable Non-Button Elements
+**Learning:** When making non-interactive elements (like `div`) clickable, simply adding `onClick` and `cursor-pointer` is insufficient for accessibility. Adding `role="button"` and `tabIndex={0}` allows keyboard focus, but an `onKeyDown` handler that triggers the action on 'Enter' or 'Space' and explicitly calls `e.preventDefault()` is crucial to prevent default page scrolling behavior.
+**Action:** Always add full keyboard support (`role`, `tabIndex`, `onKeyDown` with `preventDefault()`) and clear focus indicators (`focus:outline-none focus-visible:ring-2 ...`) when turning non-interactive elements into custom buttons.
