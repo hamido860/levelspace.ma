@@ -22,7 +22,7 @@ import {
   PlusCircle
 } from 'lucide-react';
 import { generateCurriculum, checkAIProvider } from '../services/geminiService';
-import { mapSubjectsToModules, mergeModulesWithAiSuggestions } from '../services/classroomLoader';
+import { getClassroomLoadPlan, mapSubjectsToModules, mergeModulesWithAiSuggestions, shouldRequestAiCurriculumSuggestions } from '../services/classroomLoader';
 import { useSearch } from '../context/SearchContext';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
@@ -115,7 +115,7 @@ export const Modules: React.FC = () => {
       const supabaseModules = mapSubjectsToModules((subjectRows || []) as any[]);
       let modulesToStore = supabaseModules;
 
-      if (includeAiSuggestions && aiAvailable) {
+      if (shouldRequestAiCurriculumSuggestions({ includeAiSuggestions, aiAvailable })) {
         let fullGrade = grade;
         if (bacTrackName) {
           fullGrade += ` - ${bacTrackName}`;
@@ -193,8 +193,11 @@ export const Modules: React.FC = () => {
           
           <div className="flex items-center gap-4 shrink-0">
             <button
-              onClick={() => fetchCurriculum(true, true)}
-              disabled={isLoading || !aiAvailable}
+              onClick={() => {
+                const plan = getClassroomLoadPlan({ action: 'refresh_suggestions', isPro });
+                fetchCurriculum(plan.includeAiSuggestions, true);
+              }}
+              disabled={isLoading || !aiAvailable || !isPro}
               title={!aiAvailable ? aiUnavailableMsg : undefined}
               className="flex items-center gap-2 px-4 py-2 bg-accent/5 text-accent rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-accent/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -351,7 +354,10 @@ export const Modules: React.FC = () => {
                   </div>
                 )}
                 <button
-                  onClick={() => fetchCurriculum(false)}
+                  onClick={() => {
+                    const plan = getClassroomLoadPlan({ action: 'create_classroom', isPro });
+                    fetchCurriculum(plan.includeAiSuggestions);
+                  }}
                   className="px-10 py-4 bg-accent text-paper rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-accent-hover transition-all shadow-xl shadow-accent/20 flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <PlusCircle className="w-4 h-4" />
@@ -405,4 +411,3 @@ export const Modules: React.FC = () => {
     </Layout>
   );
 };
-

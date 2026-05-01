@@ -58,3 +58,27 @@ export const mergeModulesWithAiSuggestions = (base: Module[], ai: Module[]): Mod
 
   return Array.from(byKey.values());
 };
+
+export const shouldRequestAiCurriculumSuggestions = ({
+  includeAiSuggestions,
+  aiAvailable,
+}: {
+  includeAiSuggestions: boolean;
+  aiAvailable: boolean;
+}): boolean => includeAiSuggestions && aiAvailable;
+
+export type ClassroomLoadAction = 'create_classroom' | 'refresh_suggestions';
+
+export const getClassroomLoadPlan = ({
+  action,
+  isPro,
+}: {
+  action: ClassroomLoadAction;
+  isPro: boolean;
+}): { includeAiSuggestions: boolean } => {
+  if (action === 'create_classroom') {
+    return { includeAiSuggestions: false };
+  }
+
+  return { includeAiSuggestions: isPro };
+};
