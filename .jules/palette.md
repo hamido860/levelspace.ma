@@ -1,0 +1,3 @@
+## 2024-05-03 - Added missing ARIA labels to navigation buttons
+**Learning:** Icon-only navigation buttons in Topbar (Theme, Language, Settings, Notifications, Database Connection) and Sidebar (Collapse/Expand) lacked proper ARIA labels, making them inaccessible to screen readers despite some having `title` attributes.
+**Action:** Always add explicit `aria-label`s to any icon-only interactive element, particularly in core navigational components like sidebars and topbars, as `title` attributes alone are not fully reliable for screen reader announcements across all devices.

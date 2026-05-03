@@ -65,6 +65,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
           {setIsCollapsed && (
             <button 
               onClick={() => setIsCollapsed(!isCollapsed)}
+              aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
               className="p-1.5 rounded-lg hover:bg-ink/5 text-muted hover:text-ink transition-all"
             >
               {isCollapsed 
