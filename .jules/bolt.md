@@ -1,0 +1,3 @@
+## 2026-05-04 - Missing Memoization for Object.fromEntries with useLiveQuery
+**Learning:** When using `useLiveQuery` with Dexie, the returned data changes on every db update. If we compute derived state like `Object.fromEntries(dbSettings.map(...))` without `useMemo`, it creates a new object reference on every render, triggering unnecessary re-renders in React components like ClassroomView, Dashboard, LessonView, and Modules. This is a significant performance bottleneck.
+**Action:** Always wrap derived objects and arrays based on `useLiveQuery` results in `useMemo` to preserve referential equality and prevent cascading re-renders.
