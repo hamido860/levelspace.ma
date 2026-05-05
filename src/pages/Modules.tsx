@@ -106,6 +106,15 @@ export const Modules: React.FC = () => {
     fetchBacDetails();
   }, [selectedBacTrackId, selectedBacIntOptionId, grade]);
 
+  useEffect(() => {
+    if (dbModules === undefined) return;
+    if (dbModules.length > 0) return;
+    if (!country) return;
+
+    const plan = getClassroomLoadPlan({ action: 'create_classroom', isPro });
+    fetchCurriculum(plan.includeAiSuggestions);
+  }, [country, dbModules, grade, isPro]);
+
   const fetchCurriculum = async (includeAiSuggestions = false, bypassAiCache = false) => {
     setIsLoading(true);
     try {
@@ -145,8 +154,22 @@ export const Modules: React.FC = () => {
       }
 
       if (modulesToStore.length > 0) {
-        await db.modules.clear();
-        await db.modules.bulkPut(modulesToStore);
+        const existingById = new Map((dbModules || []).map((module) => [module.id, module]));
+        const mergedModules = modulesToStore.map((module) => {
+          const existing = existingById.get(module.id);
+          if (!existing) return module;
+
+          return {
+            ...module,
+            progress: existing.progress ?? module.progress,
+            selected: existing.selected ?? module.selected,
+            tags: existing.tags ?? module.tags,
+            strictRAG: existing.strictRAG ?? module.strictRAG,
+            createdAt: existing.createdAt ?? module.createdAt,
+          };
+        });
+
+        await db.modules.bulkPut(mergedModules);
       }
     } catch (error) {
       console.error('Failed to fetch classroom curriculum:', error);

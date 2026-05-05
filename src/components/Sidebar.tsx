@@ -4,15 +4,16 @@ import {
   LayoutDashboard, 
   BookOpen, 
   Calendar, 
-  Archive,
-  GitFork,
+  Layers3,
   BarChart3,
   User,
   ChevronLeft,
   ChevronRight,
   LogOut,
-  Sparkles,
-  ShieldCheck
+  ShieldCheck,
+  Brain,
+  GraduationCap,
+  BookMarked
 } from 'lucide-react';
 
 import { useLanguage } from '../context/LanguageContext';
@@ -34,16 +35,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
   const mainNavItems = [
     { label: t('dashboard'), icon: <LayoutDashboard size={20} />, path: '/dashboard' },
     { label: 'Profile', icon: <User size={20} />, path: '/profile' },
-    { label: t('classrooms'), icon: <BookOpen size={20} />, path: '/modules' },
-    { label: t('library'), icon: <Archive size={20} />, path: '/library' },
-    { label: t('blueprints'), icon: <GitFork size={20} />, path: '/blueprints' },
+    { label: t('classrooms'), icon: <GraduationCap size={20} />, path: '/modules' },
+    { label: t('library'), icon: <BookMarked size={20} />, path: '/library' },
+    { label: t('blueprints'), icon: <Layers3 size={20} />, path: '/blueprints' },
     { label: t('schedule'), icon: <Calendar size={20} />, path: '/schedule' },
     { label: t('progress'), icon: <BarChart3 size={20} />, path: '/progress' },
   ];
 
   const toolNavItems = isAdmin ? [
-    { label: 'Admin', icon: <Sparkles size={20} />, path: '/admin' },
-    { label: 'AI Ops', icon: <ShieldCheck size={20} />, path: '/admin/ai-command-center' },
+    { label: 'Admin', icon: <ShieldCheck size={20} />, path: '/admin' },
+    { label: 'AI Ops', icon: <Brain size={20} />, path: '/admin/ai-command-center' },
   ] : [];
 
   return (

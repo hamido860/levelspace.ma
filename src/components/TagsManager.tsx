@@ -50,7 +50,7 @@ export const TagsManager: React.FC<TagsManagerProps> = ({
   const hiddenCount = tags.length - maxDisplay;
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
+    <div className="flex flex-wrap items-center gap-2">
       <AnimatePresence>
         {displayTags.map(tag => (
           <motion.div
@@ -58,16 +58,16 @@ export const TagsManager: React.FC<TagsManagerProps> = ({
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.8 }}
-            className="inline-flex items-center gap-1 px-2 py-0.5 bg-accent/10 text-accent rounded text-[8px] font-mono uppercase tracking-widest border border-accent/20"
+            className="inline-flex items-center gap-1.5 rounded-full border border-accent/20 bg-accent/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-accent"
           >
-            <TagIcon className="w-2.5 h-2.5 opacity-70" />
+            <TagIcon className="h-3 w-3 opacity-70" />
             <span>{tag}</span>
             {!readonly && (
               <button 
                 onClick={(e) => { e.stopPropagation(); onRemoveTag(tag); }}
-                className="ml-0.5 hover:text-error transition-colors p-0.5 rounded-full hover:bg-error/10"
+                className="ml-0.5 rounded-full p-0.5 transition-colors hover:bg-error/10 hover:text-error"
               >
-                <X className="w-2.5 h-2.5" />
+                <X className="h-3 w-3" />
               </button>
             )}
           </motion.div>
@@ -75,7 +75,7 @@ export const TagsManager: React.FC<TagsManagerProps> = ({
       </AnimatePresence>
 
       {hiddenCount > 0 && (
-        <span className="text-[8px] font-mono text-muted px-1">
+        <span className="px-1 text-[10px] font-medium text-muted">
           +{hiddenCount} more
         </span>
       )}
@@ -83,7 +83,7 @@ export const TagsManager: React.FC<TagsManagerProps> = ({
       {!readonly && (
         <div className="relative flex items-center">
           {isAdding ? (
-            <div className="flex items-center gap-1 bg-paper border border-ink/10 rounded px-1.5 py-0.5 shadow-sm">
+            <div className="flex items-center gap-1 rounded-full border border-ink/10 bg-paper px-3 py-1 shadow-sm">
               <input
                 ref={inputRef}
                 type="text"
@@ -92,17 +92,17 @@ export const TagsManager: React.FC<TagsManagerProps> = ({
                 onKeyDown={handleKeyDown}
                 onBlur={handleAdd}
                 placeholder="Add tag..."
-                className="bg-transparent text-[8px] font-mono outline-none w-16 text-ink placeholder:text-muted/50"
+                className="w-24 bg-transparent text-[10px] font-medium text-ink outline-none placeholder:text-muted/50"
                 onClick={(e) => e.stopPropagation()}
               />
             </div>
           ) : (
             <button
               onClick={(e) => { e.stopPropagation(); setIsAdding(true); }}
-              className="inline-flex items-center justify-center w-5 h-5 rounded border border-dashed border-ink/20 text-muted hover:text-accent hover:border-accent/50 hover:bg-accent/5 transition-all"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-dashed border-ink/20 text-muted transition-all hover:border-accent/50 hover:bg-accent/5 hover:text-accent"
               title="Add Tag"
             >
-              <Plus className="w-2.5 h-2.5" />
+              <Plus className="h-3 w-3" />
             </button>
           )}
         </div>

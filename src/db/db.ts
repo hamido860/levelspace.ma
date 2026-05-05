@@ -42,6 +42,10 @@ export interface Lesson {
   blocks?: any[];
   subtitle?: string;
   tags?: string[];
+  grade?: string;
+  country?: string;
+  subject?: string;
+  sourceLessonId?: string;
 }
 
 export interface Note {

@@ -9,7 +9,7 @@ import {
   AlertTriangle, CheckCircle, Clock, Layers, Sparkles,
   Lightbulb, ListChecks, Map as MapIcon, RotateCcw, ChevronRight,
   TrendingUp, TrendingDown, Info, Zap,
-  Trash2, Wrench, Play, Pencil, ChevronDown,
+  Trash2, Wrench, Play, Pencil, ChevronDown, Brain, ShieldCheck, GraduationCap,
   Copy, Check
 } from "lucide-react";
 
@@ -45,6 +45,45 @@ interface RagByGrade {
 interface BrowseRow { [key: string]: any; }
 
 type Tab = "overview" | "grades" | "queue" | "rag" | "browser" | "ai";
+
+const ADMIN_TAB_CONFIG: Record<Tab, { label: string; icon: React.ElementType; activeClass: string; iconClass: string }> = {
+  overview: {
+    label: "Overview",
+    icon: ShieldCheck,
+    activeClass: "border-sky-500 bg-sky-50 text-sky-600",
+    iconClass: "text-sky-500",
+  },
+  grades: {
+    label: "Grade Coverage",
+    icon: GraduationCap,
+    activeClass: "border-indigo-500 bg-indigo-50 text-indigo-600",
+    iconClass: "text-indigo-500",
+  },
+  queue: {
+    label: "Gen Queue",
+    icon: Clock,
+    activeClass: "border-amber-500 bg-amber-50 text-amber-700",
+    iconClass: "text-amber-500",
+  },
+  rag: {
+    label: "RAG / Embeddings",
+    icon: Layers,
+    activeClass: "border-violet-500 bg-violet-50 text-violet-600",
+    iconClass: "text-violet-500",
+  },
+  browser: {
+    label: "Table Browser",
+    icon: Table2,
+    activeClass: "border-slate-500 bg-slate-100 text-slate-700",
+    iconClass: "text-slate-500",
+  },
+  ai: {
+    label: "AI Analyst",
+    icon: Brain,
+    activeClass: "border-emerald-500 bg-emerald-50 text-emerald-700",
+    iconClass: "text-emerald-500",
+  },
+};
 
 const countDistinctIds = (rows: Array<{ topic_id?: string | null }> | null | undefined) =>
   new Set((rows || []).map((row) => row.topic_id).filter((value): value is string => Boolean(value))).size;
@@ -682,14 +721,7 @@ export const Admin: React.FC = () => {
     setBrowseLoading(false);
   };
 
-  const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
-    { id: "overview", label: "Overview",        icon: <BarChart2 className="w-4 h-4" /> },
-    { id: "grades",   label: "Grade Coverage",  icon: <BookOpen className="w-4 h-4" /> },
-    { id: "queue",    label: "Gen Queue",        icon: <Cpu className="w-4 h-4" /> },
-    { id: "rag",      label: "RAG / Embeddings", icon: <Layers className="w-4 h-4" /> },
-    { id: "browser",  label: "Table Browser",   icon: <Table2 className="w-4 h-4" /> },
-    { id: "ai",       label: "AI Analyst",       icon: <Sparkles className="w-4 h-4" /> },
-  ];
+  const tabs: Tab[] = ["overview", "grades", "queue", "rag", "browser", "ai"];
 
   // ── RENDER ────────────────────────────────────────────────────────────────
   return (
@@ -716,21 +748,25 @@ export const Admin: React.FC = () => {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-gray-100 mb-6">
-        {tabs.map((t) => (
+      <div className="flex gap-2 border-b border-gray-100 mb-6 overflow-x-auto pb-2">
+        {tabs.map((tabKey) => {
+          const tabConfig = ADMIN_TAB_CONFIG[tabKey];
+          const TabIcon = tabConfig.icon;
+          const isActive = tab === tabKey;
+          return (
           <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-              tab === t.id
-                ? "border-red-500 text-red-500"
-                : "border-transparent text-gray-500 hover:text-gray-800"
+            key={tabKey}
+            onClick={() => setTab(tabKey)}
+            className={`flex items-center gap-2 rounded-t-2xl px-4 py-2.5 text-sm font-semibold border-b-2 transition-all whitespace-nowrap ${
+              isActive
+                ? tabConfig.activeClass
+                : "border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-800"
             }`}
           >
-            {t.icon}
-            {t.label}
+            <TabIcon className={`w-4 h-4 ${isActive ? tabConfig.iconClass : "text-gray-400"}`} />
+            {tabConfig.label}
           </button>
-        ))}
+        )})}
       </div>
 
       {/* ── OVERVIEW ── */}

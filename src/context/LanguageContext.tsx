@@ -651,6 +651,44 @@ const translations: Record<Language, Record<string, string>> = {
   }
 };
 
+const sharedFallbackTranslations: Record<Language, Record<string, string>> = {
+  en: {
+    content: 'Content',
+    tools: 'Tools',
+    logout: 'Logout',
+    active_session: 'Active Session',
+    back: 'Back',
+  },
+  fr: {
+    content: 'Contenu',
+    tools: 'Outils',
+    logout: 'DÃ©connexion',
+    active_session: 'Session active',
+    back: 'Retour',
+  },
+  ar: {
+    content: 'Ø§Ù„Ù…Ø­ØªÙˆÙ‰',
+    tools: 'Ø§Ù„Ø£Ø¯ÙˆØ§Øª',
+    logout: 'ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø®Ø±ÙˆØ¬',
+    active_session: 'Ø§Ù„Ø¬Ù„Ø³Ø© Ø§Ù„Ù†Ø´Ø·Ø©',
+    back: 'Ø±Ø¬ÙˆØ¹',
+  },
+  es: {
+    content: 'Contenido',
+    tools: 'Herramientas',
+    logout: 'Cerrar sesiÃ³n',
+    active_session: 'SesiÃ³n activa',
+    back: 'Volver',
+  },
+  de: {
+    content: 'Inhalte',
+    tools: 'Werkzeuge',
+    logout: 'Abmelden',
+    active_session: 'Aktive Sitzung',
+    back: 'ZurÃ¼ck',
+  },
+};
+
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -672,7 +710,7 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, [language]);
 
   const t = (key: string, params?: Record<string, string>) => {
-    let text = translations[language][key] || key;
+    let text = translations[language][key] || sharedFallbackTranslations[language]?.[key] || key;
     if (params) {
       Object.entries(params).forEach(([k, v]) => {
         text = text.replace(`{${k}}`, v);
