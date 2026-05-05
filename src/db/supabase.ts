@@ -153,11 +153,13 @@ const createDummyClient = () => {
   } as any;
 };
 
-if (!isValidUrl(supabaseUrl) || !supabaseAnonKey || supabaseAnonKey === 'YOUR_SUPABASE_ANON_KEY') {
+export const isSupabaseConfigured = isValidUrl(supabaseUrl) && !!supabaseAnonKey && supabaseAnonKey !== 'YOUR_SUPABASE_ANON_KEY';
+
+if (!isSupabaseConfigured) {
   // Running in offline mode or with invalid credentials
 }
 
-export const supabase = (isValidUrl(supabaseUrl) && supabaseAnonKey && supabaseAnonKey !== 'YOUR_SUPABASE_ANON_KEY')
+export const supabase = isSupabaseConfigured
   ? createClient<Database>(supabaseUrl, supabaseAnonKey)
   : createDummyClient();
 

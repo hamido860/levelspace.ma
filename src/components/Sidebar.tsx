@@ -12,16 +12,23 @@ import {
   ChevronRight,
   LogOut,
   Sparkles,
-  ShieldCheck
+  ShieldCheck,
+  Wrench
 } from 'lucide-react';
 
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
-import { useAppSettings } from '../context/AppSettingsContext';
 
 interface SidebarProps {
   isCollapsed?: boolean;
   setIsCollapsed?: (collapsed: boolean) => void;
+}
+
+interface NavItem {
+  label: string;
+  icon: React.ReactElement;
+  path: string;
+  matchPrefix?: boolean;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsCollapsed }) => {
@@ -29,9 +36,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
   const location = useLocation();
   const { language, t } = useLanguage();
   const { signOut, isAdmin } = useAuth();
-  const { settings } = useAppSettings();
 
-  const mainNavItems = [
+  const mainNavItems: NavItem[] = [
     { label: t('dashboard'), icon: <LayoutDashboard size={20} />, path: '/dashboard' },
     { label: 'Profile', icon: <User size={20} />, path: '/profile' },
     { label: t('classrooms'), icon: <BookOpen size={20} />, path: '/modules' },
@@ -41,9 +47,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
     { label: t('progress'), icon: <BarChart3 size={20} />, path: '/progress' },
   ];
 
-  const toolNavItems = isAdmin ? [
-    { label: 'Admin', icon: <Sparkles size={20} />, path: '/admin' },
-    { label: 'AI Ops', icon: <ShieldCheck size={20} />, path: '/admin/ai-command-center' },
+  const toolNavItems: NavItem[] = isAdmin ? [
+    { label: 'Admin', icon: <Sparkles size={20} />, path: '/admin', matchPrefix: false },
+    { label: 'AI Ops', icon: <ShieldCheck size={20} />, path: '/admin/ai-command-center', matchPrefix: true },
+    { label: 'AI Recovery', icon: <Wrench size={20} />, path: '/admin/ai-recovery', matchPrefix: true },
   ] : [];
 
   return (
@@ -95,7 +102,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
         <div className="mt-auto flex flex-col gap-1 pt-4 border-t border-ink/5">
           {!isCollapsed && <p className="text-[10px] font-bold text-muted uppercase tracking-widest px-3 mb-2 opacity-50">{t('tools')}</p>}
           {toolNavItems.map((item) => {
-            const isActive = location.pathname === item.path;
+            const isActive = item.matchPrefix
+              ? location.pathname === item.path || location.pathname.startsWith(`${item.path}/`)
+              : location.pathname === item.path;
             return (
               <button
                 key={item.path}
@@ -129,7 +138,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
       {/* Mobile Bottom Navigation */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-surface-low border-t border-ink/5 z-50 px-4 flex items-center gap-2 overflow-x-auto no-scrollbar shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
         {[...mainNavItems, ...toolNavItems].map((item) => {
-          const isActive = location.pathname === item.path;
+          const isActive = item.matchPrefix
+            ? location.pathname === item.path || location.pathname.startsWith(`${item.path}/`)
+            : location.pathname === item.path;
           return (
             <button
               key={`mobile-${item.path}`}

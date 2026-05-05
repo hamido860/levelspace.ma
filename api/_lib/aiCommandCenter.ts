@@ -1,6 +1,289 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import type { User } from "@supabase/supabase-js";
+import type { VercelRequest } from "@vercel/node";
+import postgres from "postgres";
 
 type JsonRecord = Record<string, any>;
+
+type AdminProfileRow = {
+  id: string;
+  role: string | null;
+};
+
+type ApprovalRow = {
+  id: string;
+  task_id: string;
+  status: string;
+  created_at: string;
+};
+
+type ApprovalRecordRow = ApprovalRow & {
+  approved_by?: string | null;
+  approved_at?: string | null;
+};
+
+type MonitoringIssueInput = {
+  title: string;
+  severity: string;
+  issue_type: string;
+  affected_area: string;
+  error_signature: string;
+  evidence: JsonRecord;
+  impact: string;
+  suggested_action: string;
+};
+
+type QueueJobRow = {
+  id: string;
+  topic_id: string | null;
+  status: string | null;
+  attempts: number | null;
+  last_error: string | null;
+  created_at: string | null;
+  claimed_at: string | null;
+  completed_at: string | null;
+};
+
+type TopicRow = {
+  id: string;
+  title: string | null;
+  grade_id: string | null;
+  subject_id: string | null;
+};
+
+type NamedRow = {
+  id: string;
+  name: string | null;
+};
+
+type RecoveryIssueRow = {
+  id: string;
+  error_signature: string;
+  created_at?: string | null;
+};
+
+type RecoveryTaskRow = {
+  id: string;
+  issue_id: string;
+  job_id?: string | null;
+  title?: string | null;
+  task_name?: string | null;
+  priority?: string | null;
+  target_area?: string | null;
+  progress?: number | null;
+  requires_approval?: boolean | null;
+  instructions?: string | null;
+  metadata?: JsonRecord | string | null;
+  result?: JsonRecord | string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
+  updated_at?: string | null;
+  status: string;
+  created_at: string | null;
+};
+
+export type AiRecoveryTaskRef = {
+  id: string;
+  issue_id: string;
+  job_id: string | null;
+  title: string | null;
+  status: string;
+  created_at: string | null;
+};
+
+export type AiRecoveryFailedJobSummary = {
+  job_id: string;
+  topic_id: string | null;
+  status: string | null;
+  attempts: number | null;
+  last_error: string | null;
+  created_at: string | null;
+  claimed_at: string | null;
+  completed_at: string | null;
+  topic_title: string | null;
+  grade_name: string | null;
+  subject_name: string | null;
+  outlines_count: number | null;
+  outlines_status: "available" | "missing_table";
+  existing_task: AiRecoveryTaskRef | null;
+};
+
+export type AiRecoveryJobDiagnostics = {
+  job_id: string;
+  topic_id: string | null;
+  topic_title: string | null;
+  grade_name: string | null;
+  subject_name: string | null;
+  status: string | null;
+  attempts: number | null;
+  last_error: string | null;
+  created_at: string | null;
+  claimed_at: string | null;
+  completed_at: string | null;
+  ordered_topic_outlines: JsonRecord[];
+  topic_outlines_status: "available" | "missing_table";
+  existing_lessons_count: number;
+  existing_lesson_blocks_count: number | null;
+  lesson_blocks_status: "available" | "missing_table";
+  existing_task: AiRecoveryTaskRef | null;
+};
+
+export type AiRecoveryRecoveredLessonStatus = "needs_review" | "approved" | "rejected";
+
+export type AiRecoveryRecoveredLessonSummary = {
+  id: string;
+  lesson_title: string | null;
+  subtitle: string | null;
+  grade: string | null;
+  subject: string | null;
+  topic_id: string | null;
+  topic_title: string | null;
+  teaching_contract: JsonRecord;
+  blocks_count: number;
+  source_type: string | null;
+  repair_reason: string | null;
+  student_publish_allowed: boolean;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type AiRecoveryRecoveredLessonDetail = {
+  lesson: AiRecoveryRecoveredLessonSummary;
+  blocks: JsonRecord[];
+  blocks_status: "available" | "missing_table";
+  lesson_row?: JsonRecord;
+  source_job?: JsonRecord | null;
+  source_task?: JsonRecord | null;
+};
+
+export type CreateAiRecoveryTaskResult = {
+  task: AiRecoveryTaskRef;
+  issue_id: string;
+  already_exists: boolean;
+  message: string;
+};
+
+export type AiRecoveryTaskLogEntry = {
+  id: string;
+  agent_name: string;
+  log_type: string;
+  message: string;
+  metadata: JsonRecord;
+  created_at: string | null;
+};
+
+export type AiRecoveryTaskDetail = {
+  task: {
+    id: string;
+    issue_id: string;
+    job_id: string | null;
+    title: string | null;
+    task_name: string | null;
+    status: string;
+    priority: string | null;
+    target_area: string | null;
+    progress: number | null;
+    requires_approval: boolean | null;
+    instructions: string | null;
+    metadata: JsonRecord;
+    result: JsonRecord;
+    created_at: string | null;
+    updated_at: string | null;
+    started_at: string | null;
+    completed_at: string | null;
+  };
+  issue: {
+    id: string;
+    title: string;
+    severity: string;
+    status: string;
+  } | null;
+  queue_job: {
+    id: string;
+    topic_id: string | null;
+    status: string | null;
+    attempts: number | null;
+    last_error: string | null;
+    created_at: string | null;
+    claimed_at: string | null;
+    completed_at: string | null;
+  } | null;
+  topic: { id: string; title: string | null } | null;
+  grade: { id: string; name: string | null } | null;
+  subject: { id: string; name: string | null } | null;
+  ordered_topic_outlines: JsonRecord[];
+  topic_outlines_status: "available" | "missing_table";
+  existing_lessons: JsonRecord[];
+  lesson_blocks: JsonRecord[];
+  lesson_blocks_status: "available" | "missing_table";
+  generated_sql: string | null;
+  safety_check: JsonRecord | null;
+  logs: AiRecoveryTaskLogEntry[];
+  latest_approval: JsonRecord | null;
+};
+
+export type AiRecoveryLogFilters = {
+  event_type?: string | null;
+  job_id?: string | null;
+  task_id?: string | null;
+  lesson_id?: string | null;
+  date?: string | null;
+};
+
+export type AiRecoverySafetyCheck = {
+  executed_at: string;
+  allowed: boolean;
+  errors: string[];
+  warnings: string[];
+  sql_present: boolean;
+  contains_begin: boolean;
+  contains_commit: boolean;
+  isWrite: boolean;
+  isHighRisk: boolean;
+  isBlocked: boolean;
+  riskLevel: string;
+  summary: string;
+};
+
+export type AiRecoveryExecutionResponse = {
+  success: boolean;
+  executed_at: string;
+  command: string | null;
+  count: number | null;
+};
+
+export type AiRecoveryEventType =
+  | "task_created"
+  | "sql_generated"
+  | "safety_check_passed"
+  | "safety_check_failed"
+  | "execution_started"
+  | "execution_success"
+  | "execution_failed"
+  | "lesson_approved"
+  | "lesson_rejected";
+
+export type AiRecoveryLogEntry = {
+  id: string;
+  source: "ai_task_logs" | "ai_tasks.logs" | "error_recovery_log";
+  timestamp: string | null;
+  actor_user_id: string | null;
+  task_id: string | null;
+  job_id: string | null;
+  lesson_id: string | null;
+  event_type: AiRecoveryEventType | string;
+  message: string;
+  details: JsonRecord;
+};
+
+export class AiCommandCenterHttpError extends Error {
+  status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
 
 export const COMMAND_CENTER_AGENTS = {
   planner: "Planner Agent",
@@ -25,11 +308,14 @@ export const WRITE_SQL_PATTERNS = [/\bINSERT\b/i, /\bUPDATE\b/i, /\bDELETE\b/i, 
 
 export const MINIMUM_RELEVANCE_SCORE = 0.75;
 export const MAX_AUTOMATIC_RETRIES = 3;
+const AI_RECOVERY_SQL_NVIDIA_MODEL = "qwen/qwen3-coder-480b-a35b-instruct";
+const AI_RECOVERY_SQL_GEMINI_MODEL = "gemini-2.5-flash";
 
 type TaskRow = {
   id: string;
   issue_id: string;
   task_name: string;
+  title?: string | null;
   task_type: string;
   priority: string;
   assigned_agent: string;
@@ -37,10 +323,15 @@ type TaskRow = {
   safety_level: string;
   target_area: string;
   instructions: string | null;
+  job_id?: string | null;
+  metadata?: JsonRecord | string | null;
+  result?: JsonRecord | string | null;
   status: string;
   progress: number;
   requires_approval: boolean;
   created_at: string;
+  started_at?: string | null;
+  completed_at?: string | null;
   updated_at: string;
 };
 
@@ -58,19 +349,116 @@ type IssueRow = {
 
 export function getServerSupabase(): SupabaseClient {
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-  const serviceRoleKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.SUPABASE_ANON_KEY ||
-    process.env.VITE_SUPABASE_ANON_KEY;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!url || !serviceRoleKey) {
-    throw new Error("Supabase server credentials are not configured.");
+    throw new Error("Supabase service-role credentials are not configured.");
   }
 
   return createClient(url, serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 }
+
+function getRecoveryExecutionDatabaseUrl() {
+  const value =
+    process.env.SUPABASE_DB_URL ||
+    process.env.DATABASE_URL ||
+    process.env.POSTGRES_URL ||
+    process.env.POSTGRES_PRISMA_URL;
+
+  if (!value) {
+    throw new AiCommandCenterHttpError(
+      503,
+      "Recovery SQL execution is not configured. Set SUPABASE_DB_URL, DATABASE_URL, or POSTGRES_URL on the server.",
+    );
+  }
+
+  return value;
+}
+
+async function executeRecoverySqlServerSide(sqlPreview: string): Promise<AiRecoveryExecutionResponse> {
+  const databaseUrl = getRecoveryExecutionDatabaseUrl();
+  const client = postgres(databaseUrl, {
+    max: 1,
+    prepare: false,
+    idle_timeout: 5,
+    connect_timeout: 30,
+    ssl: "require",
+  });
+
+  try {
+    const result = await client.unsafe(sqlPreview);
+    return {
+      success: true,
+      executed_at: nowIso(),
+      command: typeof result.command === "string" ? result.command : null,
+      count: typeof result.count === "number" ? result.count : null,
+    };
+  } finally {
+    await client.end();
+  }
+}
+
+function getPublicSupabaseForAuth(): SupabaseClient {
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const authKey =
+    process.env.SUPABASE_ANON_KEY ||
+    process.env.VITE_SUPABASE_ANON_KEY;
+
+  if (!url || !authKey) {
+    throw new Error("Supabase auth credentials are not configured.");
+  }
+
+  return createClient(url, authKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
+
+function getBearerToken(req: VercelRequest) {
+  const header = req.headers.authorization || req.headers.Authorization;
+  if (!header || typeof header !== "string") return null;
+  const match = header.match(/^Bearer\s+(.+)$/i);
+  return match?.[1] || null;
+}
+
+async function getAuthenticatedUser(req: VercelRequest): Promise<User> {
+  const token = getBearerToken(req);
+  if (!token) {
+    throw new AiCommandCenterHttpError(401, "Authentication required.");
+  }
+
+  const authSupabase = getPublicSupabaseForAuth();
+  const { data, error } = await authSupabase.auth.getUser(token);
+
+  if (error || !data.user) {
+    throw new AiCommandCenterHttpError(401, "Invalid or expired authentication token.");
+  }
+
+  return data.user;
+}
+
+export async function requireAdminUser(req: VercelRequest) {
+  const user = await getAuthenticatedUser(req);
+  const supabase = getServerSupabase();
+  const { data: profile, error } = await supabase
+    .from("profiles")
+    .select("id, role")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (error) {
+    throw new AiCommandCenterHttpError(500, error.message);
+  }
+
+  if (!profile || String((profile as AdminProfileRow).role || "").toLowerCase() !== "admin") {
+    throw new AiCommandCenterHttpError(403, "Admin access is required.");
+  }
+
+  return { user, profile: profile as AdminProfileRow };
+}
+
+export const requireAiAdmin = requireAdminUser;
 
 export function nowIso() {
   return new Date().toISOString();
@@ -89,6 +477,57 @@ export function normalizeError(error: unknown) {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
   return "Unknown error";
+}
+
+function parseJsonRecord(value: unknown): JsonRecord {
+  if (!value) return {};
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+        ? (parsed as JsonRecord)
+        : {};
+    } catch {
+      return {};
+    }
+  }
+
+  return typeof value === "object" && !Array.isArray(value)
+    ? (value as JsonRecord)
+    : {};
+}
+
+function isMissingTableError(error: { code?: string; message?: string } | null) {
+  const message = String(error?.message || "");
+  return (
+    error?.code === "PGRST205" ||
+    error?.code === "42P01" ||
+    /could not find the table/i.test(message) ||
+    /relation .* does not exist/i.test(message)
+  );
+}
+
+function isMissingColumnError(error: { code?: string; message?: string } | null) {
+  const message = String(error?.message || "");
+  return (
+    error?.code === "42703" ||
+    /column .* does not exist/i.test(message) ||
+    /Could not find the '.*' column/i.test(message)
+  );
+}
+
+function extractRecoveryActorUserId(metadata: JsonRecord) {
+  const candidates = [
+    metadata.actor_user_id,
+    metadata.requested_by,
+    metadata.executed_by,
+    metadata.approved_by,
+    metadata.reviewed_by,
+    metadata.reset_by,
+  ];
+
+  const match = candidates.find((value) => typeof value === "string" && value.trim());
+  return typeof match === "string" ? match : null;
 }
 
 export function buildSqlRisk(sqlPreview?: string | null) {
@@ -123,6 +562,115 @@ export async function createTaskLog(
   };
   await supabase.from("ai_task_logs").insert(payload);
   return payload;
+}
+
+async function appendAiTaskJsonLogIfAvailable(
+  supabase: SupabaseClient,
+  taskId: string | null,
+  entry: AiRecoveryLogEntry,
+) {
+  if (!taskId) {
+    return;
+  }
+
+  const task = await fetchAiRecoveryTaskRecord(supabase, taskId).catch(() => null);
+  if (!task || !Object.prototype.hasOwnProperty.call(task, "logs")) {
+    return;
+  }
+
+  const existingLogs = Array.isArray((task as JsonRecord).logs)
+    ? ((task as JsonRecord).logs as unknown[])
+        .filter((value) => value && typeof value === "object" && !Array.isArray(value))
+        .map((value) => value as JsonRecord)
+    : [];
+
+  const { error } = await supabase
+    .from("ai_tasks")
+    .update({
+      logs: [...existingLogs, entry],
+      updated_at: nowIso(),
+    })
+    .eq("id", taskId);
+
+  if (error && !isMissingColumnError(error)) {
+    throw error;
+  }
+}
+
+async function insertErrorRecoveryLogIfAvailable(
+  supabase: SupabaseClient,
+  entry: AiRecoveryLogEntry,
+) {
+  const { error } = await supabase
+    .from("error_recovery_log")
+    .insert({
+      timestamp: entry.timestamp,
+      actor_user_id: entry.actor_user_id,
+      task_id: entry.task_id,
+      job_id: entry.job_id,
+      lesson_id: entry.lesson_id,
+      event_type: entry.event_type,
+      message: entry.message,
+      details: entry.details,
+    });
+
+  if (error && !isMissingTableError(error) && !isMissingColumnError(error)) {
+    throw error;
+  }
+}
+
+async function recordAiRecoveryEvent(
+  supabase: SupabaseClient,
+  input: {
+    event_type: AiRecoveryEventType;
+    message: string;
+    actor_user_id?: string | null;
+    task_id?: string | null;
+    job_id?: string | null;
+    lesson_id?: string | null;
+    details?: JsonRecord;
+    agent_name?: string;
+    log_type?: string;
+  },
+) {
+  const timestamp = nowIso();
+  const details = parseJsonRecord(input.details);
+  const entry: AiRecoveryLogEntry = {
+    id: `${input.task_id || input.job_id || input.lesson_id || "recovery"}:${input.event_type}:${timestamp}`,
+    source: "ai_task_logs",
+    timestamp,
+    actor_user_id: input.actor_user_id ?? null,
+    task_id: input.task_id ?? null,
+    job_id: input.job_id ?? null,
+    lesson_id: input.lesson_id ?? null,
+    event_type: input.event_type,
+    message: input.message,
+    details,
+  };
+
+  if (entry.task_id) {
+    await createTaskLog(
+      supabase,
+      entry.task_id,
+      input.agent_name || COMMAND_CENTER_AGENTS.reporter,
+      input.log_type || "info",
+      input.message,
+      {
+        ...details,
+        actor_user_id: entry.actor_user_id,
+        task_id: entry.task_id,
+        job_id: entry.job_id,
+        lesson_id: entry.lesson_id,
+        event_type: entry.event_type,
+        timestamp: entry.timestamp,
+      },
+    );
+
+    await appendAiTaskJsonLogIfAvailable(supabase, entry.task_id, entry);
+  }
+
+  await insertErrorRecoveryLogIfAvailable(supabase, entry);
+  return entry;
 }
 
 export async function updateTaskStatus(
@@ -181,6 +729,23 @@ export async function fetchTaskBundle(supabase: SupabaseClient, taskId: string) 
     approvals: approvals || [],
     latestApproval: approvals?.[0] || null,
   };
+}
+
+export async function fetchLatestPendingApproval(supabase: SupabaseClient, taskId: string) {
+  const { data: approval, error } = await supabase
+    .from("ai_task_approvals")
+    .select("*")
+    .eq("task_id", taskId)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return approval as ApprovalRow | null;
 }
 
 export function inferSqlPreview(task: TaskRow, issue: IssueRow) {
@@ -342,6 +907,2391 @@ async function safeSelect(
   } catch (error) {
     return { data: [], error };
   }
+}
+
+async function fetchNamedRowsById(
+  supabase: SupabaseClient,
+  table: string,
+  ids: string[],
+) {
+  if (ids.length === 0) {
+    return new Map<string, NamedRow>();
+  }
+
+  const { data, error } = await supabase
+    .from(table)
+    .select("id, name")
+    .in("id", ids);
+
+  if (error) {
+    throw error;
+  }
+
+  return new Map(((data || []) as NamedRow[]).map((row) => [row.id, row]));
+}
+
+async function fetchTopicContext(
+  supabase: SupabaseClient,
+  topicIds: string[],
+) {
+  if (topicIds.length === 0) {
+    return {
+      topicsById: new Map<string, TopicRow>(),
+      gradesById: new Map<string, NamedRow>(),
+      subjectsById: new Map<string, NamedRow>(),
+    };
+  }
+
+  const { data: topics, error: topicsError } = await supabase
+    .from("topics")
+    .select("id, title, grade_id, subject_id")
+    .in("id", topicIds);
+
+  if (topicsError) {
+    throw topicsError;
+  }
+
+  const topicRows = (topics || []) as TopicRow[];
+  const topicsById = new Map(topicRows.map((topic) => [topic.id, topic]));
+  const gradeIds = Array.from(new Set(topicRows.map((topic) => topic.grade_id).filter(Boolean))) as string[];
+  const subjectIds = Array.from(new Set(topicRows.map((topic) => topic.subject_id).filter(Boolean))) as string[];
+
+  const [gradesById, subjectsById] = await Promise.all([
+    fetchNamedRowsById(supabase, "grades", gradeIds),
+    fetchNamedRowsById(supabase, "subjects", subjectIds),
+  ]);
+
+  return { topicsById, gradesById, subjectsById };
+}
+
+async function fetchLatestRecoveryTasksByIssueId(
+  supabase: SupabaseClient,
+  issueIds: string[],
+) {
+  if (issueIds.length === 0) {
+    return new Map<string, AiRecoveryTaskRef>();
+  }
+
+  const { data, error } = await supabase
+    .from("ai_tasks")
+    .select("id, issue_id, job_id, title, status, created_at")
+    .in("issue_id", issueIds)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw error;
+  }
+
+  const latestTaskByIssueId = new Map<string, AiRecoveryTaskRef>();
+  ((data || []) as RecoveryTaskRow[]).forEach((task) => {
+    if (!latestTaskByIssueId.has(task.issue_id)) {
+      latestTaskByIssueId.set(task.issue_id, {
+        id: task.id,
+        issue_id: task.issue_id,
+        job_id: task.job_id ?? null,
+        title: task.title ?? null,
+        status: task.status,
+        created_at: task.created_at,
+      });
+    }
+  });
+
+  return latestTaskByIssueId;
+}
+
+async function fetchTopicOutlinesByTopicIds(
+  supabase: SupabaseClient,
+  topicIds: string[],
+) {
+  if (topicIds.length === 0) {
+    return { outlinesByTopicId: new Map<string, JsonRecord[]>(), status: "available" as const };
+  }
+
+  const { data, error } = await supabase
+    .from("topic_outlines")
+    .select("*")
+    .in("topic_id", topicIds);
+
+  if (error) {
+    if (isMissingTableError(error)) {
+      return { outlinesByTopicId: new Map<string, JsonRecord[]>(), status: "missing_table" as const };
+    }
+    throw error;
+  }
+
+  const outlinesByTopicId = new Map<string, JsonRecord[]>();
+  ((data || []) as JsonRecord[]).forEach((outline) => {
+    const topicId = String(outline.topic_id || "");
+    if (!topicId) return;
+    const current = outlinesByTopicId.get(topicId) || [];
+    current.push(outline);
+    outlinesByTopicId.set(topicId, current);
+  });
+
+  return { outlinesByTopicId, status: "available" as const };
+}
+
+function sortTopicOutlines(outlines: JsonRecord[]) {
+  const numericOrderFields = ["outline_order", "position", "sort_order", "order_index", "sequence"];
+  const textOrderFields = ["created_at", "updated_at"];
+
+  return [...outlines].sort((left, right) => {
+    for (const field of numericOrderFields) {
+      const leftValue = Number(left[field]);
+      const rightValue = Number(right[field]);
+      const leftValid = Number.isFinite(leftValue);
+      const rightValid = Number.isFinite(rightValue);
+      if (leftValid && rightValid && leftValue !== rightValue) {
+        return leftValue - rightValue;
+      }
+    }
+
+    for (const field of textOrderFields) {
+      const leftValue = left[field] ? new Date(String(left[field])).getTime() : 0;
+      const rightValue = right[field] ? new Date(String(right[field])).getTime() : 0;
+      if (leftValue !== rightValue) {
+        return leftValue - rightValue;
+      }
+    }
+
+    const leftKey = String(left.id || left.title || left.name || "");
+    const rightKey = String(right.id || right.title || right.name || "");
+    return leftKey.localeCompare(rightKey);
+  });
+}
+
+function parseBooleanLike(value: unknown) {
+  return value === true || value === "true";
+}
+
+function normalizeLessonBlockType(value: unknown) {
+  const type = String(value || "").trim().toLowerCase();
+  if (type === "example" || type === "examples") return "example";
+  if (type === "formula") return "formula";
+  if (type === "summary") return "summary";
+  return "text";
+}
+
+function sortLessonBlocks(blocks: JsonRecord[]) {
+  const numericOrderFields = ["order_index", "order", "position", "block_order", "index"];
+  const textOrderFields = ["created_at", "updated_at"];
+
+  return [...blocks].sort((left, right) => {
+    for (const field of numericOrderFields) {
+      const leftValue = Number(left[field]);
+      const rightValue = Number(right[field]);
+      const leftValid = Number.isFinite(leftValue);
+      const rightValid = Number.isFinite(rightValue);
+
+      if (leftValid && rightValid && leftValue !== rightValue) {
+        return leftValue - rightValue;
+      }
+
+      if (leftValid !== rightValid) {
+        return leftValid ? -1 : 1;
+      }
+    }
+
+    for (const field of textOrderFields) {
+      const leftValue = left[field] ? new Date(String(left[field])).getTime() : 0;
+      const rightValue = right[field] ? new Date(String(right[field])).getTime() : 0;
+      if (leftValue !== rightValue) {
+        return leftValue - rightValue;
+      }
+    }
+
+    const leftKey = String(left.id || left.title || left.name || "");
+    const rightKey = String(right.id || right.title || right.name || "");
+    return leftKey.localeCompare(rightKey);
+  });
+}
+
+function coerceRecoveredLessonBlocks(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [] as JsonRecord[];
+  }
+
+  return value
+    .filter((block) => block && typeof block === "object" && !Array.isArray(block))
+    .map((block, index) => {
+      const source = block as JsonRecord;
+      return {
+        ...source,
+        type: normalizeLessonBlockType(source.type),
+        title: typeof source.title === "string" ? source.title : "",
+        content: typeof source.content === "string" ? source.content : "",
+        order_index: Number.isFinite(Number(source.order_index))
+          ? Number(source.order_index)
+          : Number.isFinite(Number(source.order))
+            ? Number(source.order)
+            : index,
+      } satisfies JsonRecord;
+    });
+}
+
+function buildRecoveredLessonSummary(
+  lesson: JsonRecord,
+  blocksCount: number,
+  topicTitle: string | null,
+): AiRecoveryRecoveredLessonSummary {
+  const teachingContract = parseJsonRecord(lesson.teaching_contract);
+
+  return {
+    id: String(lesson.id),
+    lesson_title:
+      typeof lesson.lesson_title === "string"
+        ? lesson.lesson_title
+        : typeof lesson.title === "string"
+          ? lesson.title
+          : null,
+    subtitle: typeof lesson.subtitle === "string" ? lesson.subtitle : null,
+    grade: typeof lesson.grade === "string" ? lesson.grade : null,
+    subject: typeof lesson.subject === "string" ? lesson.subject : null,
+    topic_id: typeof lesson.topic_id === "string" ? lesson.topic_id : null,
+    topic_title: topicTitle,
+    teaching_contract: teachingContract,
+    blocks_count: blocksCount,
+    source_type: typeof teachingContract.source_type === "string" ? teachingContract.source_type : null,
+    repair_reason:
+      typeof teachingContract.repair_reason === "string"
+        ? teachingContract.repair_reason
+        : typeof teachingContract.reason === "string"
+          ? teachingContract.reason
+          : typeof teachingContract.last_error === "string"
+            ? teachingContract.last_error
+            : null,
+    student_publish_allowed: parseBooleanLike(teachingContract.student_publish_allowed),
+    created_at: typeof lesson.created_at === "string" ? lesson.created_at : null,
+    updated_at: typeof lesson.updated_at === "string" ? lesson.updated_at : null,
+  };
+}
+
+async function fetchAiRecoveryTaskForJob(
+  supabase: SupabaseClient,
+  jobId: string,
+) {
+  const { data: task, error } = await supabase
+    .from("ai_tasks")
+    .select("id, issue_id, job_id, title, status, created_at")
+    .eq("job_id", jobId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!task) {
+    return { issue: null, task: null };
+  }
+
+  const { data: issue, error: issueError } = await supabase
+    .from("ai_issues")
+    .select("id, error_signature, created_at")
+    .eq("id", task.issue_id)
+    .maybeSingle();
+
+  if (issueError) {
+    throw issueError;
+  }
+
+  return {
+    issue: (issue as RecoveryIssueRow | null) ?? null,
+    task: {
+      id: task.id,
+      issue_id: task.issue_id,
+      job_id: task.job_id ?? null,
+      title: task.title ?? null,
+      status: task.status,
+      created_at: task.created_at,
+    } satisfies AiRecoveryTaskRef,
+  };
+}
+
+async function fetchAiRecoveryTasksByJobIds(
+  supabase: SupabaseClient,
+  jobIds: string[],
+) {
+  if (jobIds.length === 0) {
+    return new Map<string, AiRecoveryTaskRef>();
+  }
+
+  const { data, error } = await supabase
+    .from("ai_tasks")
+    .select("id, issue_id, job_id, title, status, created_at")
+    .in("job_id", jobIds)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw error;
+  }
+
+  const taskByJobId = new Map<string, AiRecoveryTaskRef>();
+  ((data || []) as RecoveryTaskRow[]).forEach((task) => {
+    const jobId = task.job_id ?? null;
+    if (!jobId || taskByJobId.has(jobId)) {
+      return;
+    }
+
+    taskByJobId.set(jobId, {
+      id: task.id,
+      issue_id: task.issue_id,
+      job_id: task.job_id ?? null,
+      title: task.title ?? null,
+      status: task.status,
+      created_at: task.created_at,
+    });
+  });
+
+  return taskByJobId;
+}
+
+async function fetchOrCreateFailedLessonGenerationIssue(
+  supabase: SupabaseClient,
+) {
+  const errorSignature = slugifySignature("failed_lesson_generation_jobs");
+  const { data: existingIssue, error: existingIssueError } = await supabase
+    .from("ai_issues")
+    .select("id, error_signature, created_at")
+    .eq("error_signature", errorSignature)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (existingIssueError) {
+    throw existingIssueError;
+  }
+
+  if (existingIssue) {
+    return existingIssue as RecoveryIssueRow;
+  }
+
+  const now = nowIso();
+  const { data: createdIssue, error: createdIssueError } = await supabase
+    .from("ai_issues")
+    .insert({
+      title: "Failed lesson generation jobs",
+      severity: "critical",
+      issue_type: "generation",
+      affected_area: "lesson_generation",
+      evidence: {
+        source: "admin_ai_recovery",
+        scope: "failed_lesson_generation_jobs",
+      },
+      impact: "One or more lesson generation jobs are failing and need admin review.",
+      suggested_action: "Inspect the failed job diagnostics and create a guarded recovery task for the affected queue row.",
+      error_signature: errorSignature,
+      status: "open",
+      created_at: now,
+      updated_at: now,
+    })
+    .select("id, error_signature, created_at")
+    .single();
+
+  if (createdIssueError) {
+    throw createdIssueError;
+  }
+
+  return createdIssue as RecoveryIssueRow;
+}
+
+export async function loadAiRecoveryFailedJobs(
+  supabase: SupabaseClient,
+): Promise<AiRecoveryFailedJobSummary[]> {
+  const { data, error } = await supabase
+    .from("lesson_gen_queue")
+    .select("id, topic_id, status, attempts, last_error, created_at, claimed_at, completed_at")
+    .eq("status", "failed")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw error;
+  }
+
+  const jobs = (data || []) as QueueJobRow[];
+  const topicIds = Array.from(new Set(jobs.map((job) => job.topic_id).filter(Boolean))) as string[];
+  const jobIds = jobs.map((job) => job.id);
+
+  const [
+    topicContext,
+    outlineResult,
+    tasksByJobId,
+  ] = await Promise.all([
+    fetchTopicContext(supabase, topicIds),
+    fetchTopicOutlinesByTopicIds(supabase, topicIds),
+    fetchAiRecoveryTasksByJobIds(supabase, jobIds),
+  ]);
+
+  return jobs.map((job) => {
+    const topic = job.topic_id ? topicContext.topicsById.get(job.topic_id) || null : null;
+    const grade = topic?.grade_id ? topicContext.gradesById.get(topic.grade_id) || null : null;
+    const subject = topic?.subject_id ? topicContext.subjectsById.get(topic.subject_id) || null : null;
+    const existingTask = tasksByJobId.get(job.id) || null;
+    const topicOutlines = job.topic_id ? outlineResult.outlinesByTopicId.get(job.topic_id) || [] : [];
+
+    return {
+      job_id: job.id,
+      topic_id: job.topic_id,
+      status: job.status,
+      attempts: job.attempts,
+      last_error: job.last_error,
+      created_at: job.created_at,
+      claimed_at: job.claimed_at,
+      completed_at: job.completed_at,
+      topic_title: topic?.title || null,
+      grade_name: grade?.name || null,
+      subject_name: subject?.name || null,
+      outlines_count: outlineResult.status === "available" ? topicOutlines.length : null,
+      outlines_status: outlineResult.status,
+      existing_task: existingTask,
+    } satisfies AiRecoveryFailedJobSummary;
+  });
+}
+
+export async function loadAiRecoveryJobDiagnostics(
+  supabase: SupabaseClient,
+  jobId: string,
+): Promise<AiRecoveryJobDiagnostics> {
+  const { data: job, error } = await supabase
+    .from("lesson_gen_queue")
+    .select("id, topic_id, status, attempts, last_error, created_at, claimed_at, completed_at")
+    .eq("id", jobId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!job) {
+    throw new AiCommandCenterHttpError(404, "Failed job not found.");
+  }
+
+  const queueJob = job as QueueJobRow;
+  const topicIds = queueJob.topic_id ? [queueJob.topic_id] : [];
+  const [topicContext, outlineResult, existingTaskLookup] = await Promise.all([
+    fetchTopicContext(supabase, topicIds),
+    fetchTopicOutlinesByTopicIds(supabase, topicIds),
+    fetchAiRecoveryTaskForJob(supabase, jobId),
+  ]);
+
+  const topic = queueJob.topic_id ? topicContext.topicsById.get(queueJob.topic_id) || null : null;
+  const grade = topic?.grade_id ? topicContext.gradesById.get(topic.grade_id) || null : null;
+  const subject = topic?.subject_id ? topicContext.subjectsById.get(topic.subject_id) || null : null;
+
+  let existingLessonsCount = 0;
+  let existingLessonBlocksCount: number | null = 0;
+  let lessonBlocksStatus: "available" | "missing_table" = "available";
+
+  let lessonRows: Array<{ id: string }> = [];
+  if (queueJob.topic_id) {
+    const { count, error: lessonsCountError } = await supabase
+      .from("lessons")
+      .select("*", { count: "exact", head: true })
+      .eq("topic_id", queueJob.topic_id);
+
+    if (lessonsCountError) {
+      throw lessonsCountError;
+    }
+    existingLessonsCount = count ?? 0;
+
+    const { data: lessonsForBlocks, error: lessonsForBlocksError } = await supabase
+      .from("lessons")
+      .select("id")
+      .eq("topic_id", queueJob.topic_id);
+
+    if (lessonsForBlocksError) {
+      throw lessonsForBlocksError;
+    }
+
+    lessonRows = (lessonsForBlocks || []) as Array<{ id: string }>;
+  }
+
+  const lessonIds = lessonRows.map((lesson) => lesson.id);
+  if (lessonIds.length > 0) {
+    const { count, error: blocksError } = await supabase
+      .from("lesson_blocks")
+      .select("*", { count: "exact", head: true })
+      .in("lesson_id", lessonIds);
+
+    if (blocksError) {
+      if (isMissingTableError(blocksError)) {
+        existingLessonBlocksCount = null;
+        lessonBlocksStatus = "missing_table";
+      } else {
+        throw blocksError;
+      }
+    } else {
+      existingLessonBlocksCount = count ?? 0;
+    }
+  }
+
+  const outlines =
+    queueJob.topic_id && outlineResult.status === "available"
+      ? sortTopicOutlines(outlineResult.outlinesByTopicId.get(queueJob.topic_id) || [])
+      : [];
+
+  return {
+    job_id: queueJob.id,
+    topic_id: queueJob.topic_id,
+    topic_title: topic?.title || null,
+    grade_name: grade?.name || null,
+    subject_name: subject?.name || null,
+    status: queueJob.status,
+    attempts: queueJob.attempts,
+    last_error: queueJob.last_error,
+    created_at: queueJob.created_at,
+    claimed_at: queueJob.claimed_at,
+    completed_at: queueJob.completed_at,
+    ordered_topic_outlines: outlines,
+    topic_outlines_status: outlineResult.status,
+    existing_lessons_count: existingLessonsCount,
+    existing_lesson_blocks_count: existingLessonBlocksCount,
+    lesson_blocks_status: lessonBlocksStatus,
+    existing_task: existingTaskLookup.task,
+  };
+}
+
+export async function loadAiRecoveryRecoveredLessons(
+  supabase: SupabaseClient,
+  status: AiRecoveryRecoveredLessonStatus = "needs_review",
+): Promise<AiRecoveryRecoveredLessonSummary[]> {
+  if (!["needs_review", "approved", "rejected"].includes(status)) {
+    throw new AiCommandCenterHttpError(400, "Unsupported recovered lesson status filter.");
+  }
+
+  const { data: lessons, error } = await supabase
+    .from("lessons")
+    .select("id, lesson_title, title, subtitle, grade, subject, topic_id, teaching_contract, created_at, updated_at")
+    .eq("teaching_contract->>status", status)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw error;
+  }
+
+  const lessonRows = (lessons || []) as JsonRecord[];
+  const lessonIds = lessonRows.map((lesson) => String(lesson.id)).filter(Boolean);
+  const topicIds = Array.from(
+    new Set(
+      lessonRows
+        .map((lesson) => (typeof lesson.topic_id === "string" ? lesson.topic_id : null))
+        .filter(Boolean),
+    ),
+  ) as string[];
+
+  const topicContext = await fetchTopicContext(supabase, topicIds);
+  const blocksByLessonId = new Map<string, number>();
+
+  if (lessonIds.length > 0) {
+    const { data: blocks, error: blocksError } = await supabase
+      .from("lesson_blocks")
+      .select("lesson_id")
+      .in("lesson_id", lessonIds);
+
+    if (blocksError) {
+      if (!isMissingTableError(blocksError)) {
+        throw blocksError;
+      }
+    } else {
+      ((blocks || []) as JsonRecord[]).forEach((block) => {
+        const lessonId = typeof block.lesson_id === "string" ? block.lesson_id : "";
+        if (!lessonId) return;
+        blocksByLessonId.set(lessonId, (blocksByLessonId.get(lessonId) || 0) + 1);
+      });
+    }
+  }
+
+  return lessonRows.map((lesson) =>
+    buildRecoveredLessonSummary(
+      lesson,
+      blocksByLessonId.get(String(lesson.id)) || 0,
+      typeof lesson.topic_id === "string"
+        ? topicContext.topicsById.get(lesson.topic_id)?.title || null
+        : null,
+    ),
+  );
+}
+
+export async function loadAiRecoveryRecoveredLessonDetail(
+  supabase: SupabaseClient,
+  lessonId: string,
+): Promise<AiRecoveryRecoveredLessonDetail> {
+  const { data: lesson, error } = await supabase
+    .from("lessons")
+    .select("id, lesson_title, title, subtitle, grade, subject, topic_id, content, blocks, teaching_contract, created_at, updated_at")
+    .eq("id", lessonId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!lesson) {
+    throw new AiCommandCenterHttpError(404, "Recovered lesson not found.");
+  }
+
+  let blocks: JsonRecord[] = [];
+  let blocksStatus: "available" | "missing_table" = "available";
+
+  const { data: lessonBlocks, error: blocksError } = await supabase
+    .from("lesson_blocks")
+    .select("*")
+    .eq("lesson_id", lessonId);
+
+  if (blocksError) {
+    if (isMissingTableError(blocksError)) {
+      blocksStatus = "missing_table";
+    } else {
+      throw blocksError;
+    }
+  } else {
+    blocks = sortLessonBlocks((lessonBlocks || []) as JsonRecord[]);
+  }
+
+  const topicId = typeof lesson.topic_id === "string" ? lesson.topic_id : null;
+  const topicContext = await fetchTopicContext(supabase, topicId ? [topicId] : []);
+  const topicTitle = topicId ? topicContext.topicsById.get(topicId)?.title || null : null;
+  const teachingContract = parseJsonRecord((lesson as JsonRecord).teaching_contract);
+  const sourceJobId = typeof teachingContract.source_job_id === "string" ? teachingContract.source_job_id : null;
+  const sourceTaskId = typeof teachingContract.source_task_id === "string" ? teachingContract.source_task_id : null;
+
+  const [sourceJobResult, sourceTaskResult] = await Promise.all([
+    sourceJobId
+      ? supabase
+          .from("lesson_gen_queue")
+          .select("id, topic_id, status, attempts, last_error, created_at, claimed_at, completed_at")
+          .eq("id", sourceJobId)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    sourceTaskId
+      ? supabase
+          .from("ai_tasks")
+          .select("id, issue_id, job_id, title, task_name, status, priority, target_area, progress, requires_approval, instructions, metadata, result, created_at, updated_at, started_at, completed_at")
+          .eq("id", sourceTaskId)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+  ]);
+
+  if (sourceJobResult.error) {
+    throw sourceJobResult.error;
+  }
+
+  if (sourceTaskResult.error) {
+    throw sourceTaskResult.error;
+  }
+
+  return {
+    lesson: buildRecoveredLessonSummary(lesson as JsonRecord, blocks.length, topicTitle),
+    blocks,
+    blocks_status: blocksStatus,
+    lesson_row: lesson as JsonRecord,
+    source_job: (sourceJobResult.data as JsonRecord | null) ?? null,
+    source_task: sourceTaskResult.data
+      ? ({
+          ...(sourceTaskResult.data as JsonRecord),
+          metadata: parseJsonRecord((sourceTaskResult.data as JsonRecord).metadata),
+          result: parseJsonRecord((sourceTaskResult.data as JsonRecord).result),
+        } satisfies JsonRecord)
+      : null,
+  };
+}
+
+async function updateSourceTaskReviewStatus(
+  supabase: SupabaseClient,
+  sourceTaskId: string | null,
+  reviewStatus: AiRecoveryRecoveredLessonStatus,
+  extras: JsonRecord = {},
+) {
+  if (!sourceTaskId) {
+    return;
+  }
+
+  const task = await fetchAiRecoveryTaskRecord(supabase, sourceTaskId);
+  const nextResult = {
+    ...parseJsonRecord(task.result),
+    review_status: reviewStatus,
+    ...extras,
+  };
+
+  await updateAiRecoveryTaskColumns(supabase, sourceTaskId, {
+    result: nextResult,
+  });
+}
+
+export async function updateRecoveredLessonReviewStatus(
+  supabase: SupabaseClient,
+  lessonId: string,
+  status: Exclude<AiRecoveryRecoveredLessonStatus, "needs_review">,
+  actorUserId?: string | null,
+) {
+  if (!["approved", "rejected"].includes(status)) {
+    throw new AiCommandCenterHttpError(400, "Unsupported recovered lesson review status.");
+  }
+
+  const detail = await loadAiRecoveryRecoveredLessonDetail(supabase, lessonId);
+  const nextTeachingContract = {
+    ...detail.lesson.teaching_contract,
+    status,
+    student_publish_allowed: status === "approved",
+  };
+
+  const { error } = await supabase
+    .from("lessons")
+    .update({
+      teaching_contract: nextTeachingContract,
+      updated_at: nowIso(),
+    })
+    .eq("id", lessonId);
+
+  if (error) {
+    throw error;
+  }
+
+  const sourceTaskId = typeof detail.lesson.teaching_contract.source_task_id === "string"
+    ? detail.lesson.teaching_contract.source_task_id
+    : null;
+
+  await updateSourceTaskReviewStatus(supabase, sourceTaskId, status, {
+    reviewed_at: nowIso(),
+  });
+
+  await recordAiRecoveryEvent(supabase, {
+    event_type: status === "approved" ? "lesson_approved" : "lesson_rejected",
+    message:
+      status === "approved"
+        ? "Recovered lesson was approved for students."
+        : "Recovered lesson was rejected and remains blocked from students.",
+    actor_user_id: actorUserId ?? null,
+    task_id: sourceTaskId,
+    job_id:
+      typeof detail.lesson.teaching_contract.source_job_id === "string"
+        ? detail.lesson.teaching_contract.source_job_id
+        : null,
+    lesson_id: lessonId,
+    details: {
+      review_status: status,
+      student_publish_allowed: status === "approved",
+    },
+    agent_name: COMMAND_CENTER_AGENTS.reporter,
+    log_type: status === "approved" ? "approval" : "warning",
+  });
+
+  const refreshed = await loadAiRecoveryRecoveredLessonDetail(supabase, lessonId);
+  return refreshed.lesson;
+}
+
+export async function saveRecoveredLessonReviewEdits(
+  supabase: SupabaseClient,
+  lessonId: string,
+  payload: {
+    lesson_title: string;
+    subtitle: string;
+    blocks: JsonRecord[];
+  },
+) {
+  const detail = await loadAiRecoveryRecoveredLessonDetail(supabase, lessonId);
+  const normalizedBlocks = coerceRecoveredLessonBlocks(payload.blocks);
+  const lessonTitle = String(payload.lesson_title || "").trim();
+  const subtitle = String(payload.subtitle || "").trim();
+
+  if (!lessonTitle) {
+    throw new AiCommandCenterHttpError(400, "lesson_title is required.");
+  }
+
+  if (normalizedBlocks.length === 0) {
+    throw new AiCommandCenterHttpError(400, "At least one lesson block is required.");
+  }
+
+  const nextTeachingContract = {
+    ...detail.lesson.teaching_contract,
+    status: "needs_review",
+    student_publish_allowed: false,
+  };
+
+  const { error: lessonUpdateError } = await supabase
+    .from("lessons")
+    .update({
+      lesson_title: lessonTitle,
+      title: lessonTitle,
+      subtitle: subtitle || null,
+      blocks: normalizedBlocks,
+      teaching_contract: nextTeachingContract,
+      updated_at: nowIso(),
+    })
+    .eq("id", lessonId);
+
+  if (lessonUpdateError) {
+    throw lessonUpdateError;
+  }
+
+  if (detail.blocks_status === "available") {
+    const existingBlocks = sortLessonBlocks(detail.blocks);
+    if (existingBlocks.length !== normalizedBlocks.length) {
+      throw new AiCommandCenterHttpError(
+        400,
+        "This review page only supports editing the existing block set. Add or remove blocks directly in SQL if the lesson shape must change.",
+      );
+    }
+
+    for (let index = 0; index < normalizedBlocks.length; index += 1) {
+      const existingBlock = existingBlocks[index];
+      const incomingBlock = normalizedBlocks[index];
+      const blockId = typeof existingBlock.id === "string" ? existingBlock.id : null;
+
+      if (!blockId) {
+        throw new AiCommandCenterHttpError(400, "A lesson block row is missing its id and cannot be safely updated.");
+      }
+
+      const nextBlockPayload: JsonRecord = {
+        lesson_id: lessonId,
+        updated_at: nowIso(),
+      };
+
+      if ("order_index" in existingBlock || "order_index" in incomingBlock) {
+        nextBlockPayload.order_index = index;
+      }
+      if ("order" in existingBlock || "order" in incomingBlock) {
+        nextBlockPayload.order = index;
+      }
+      if ("position" in existingBlock || "position" in incomingBlock) {
+        nextBlockPayload.position = index;
+      }
+      if ("block_order" in existingBlock || "block_order" in incomingBlock) {
+        nextBlockPayload.block_order = index;
+      }
+      if ("title" in existingBlock || "title" in incomingBlock) {
+        nextBlockPayload.title = typeof incomingBlock.title === "string" ? incomingBlock.title : "";
+      }
+      if ("type" in existingBlock || "type" in incomingBlock) {
+        nextBlockPayload.type = normalizeLessonBlockType(incomingBlock.type);
+      }
+      if ("content" in existingBlock || "content" in incomingBlock) {
+        nextBlockPayload.content = typeof incomingBlock.content === "string" ? incomingBlock.content : "";
+      }
+
+      const { error: blockUpdateError } = await supabase
+        .from("lesson_blocks")
+        .update(nextBlockPayload)
+        .eq("id", blockId);
+
+      if (blockUpdateError) {
+        throw blockUpdateError;
+      }
+    }
+  }
+
+  const sourceTaskId = typeof detail.lesson.teaching_contract.source_task_id === "string"
+    ? detail.lesson.teaching_contract.source_task_id
+    : null;
+
+  await updateSourceTaskReviewStatus(supabase, sourceTaskId, "needs_review", {
+    lesson_review_saved_at: nowIso(),
+  });
+
+  return await loadAiRecoveryRecoveredLessonDetail(supabase, lessonId);
+}
+
+export async function sendRecoveredLessonToAi(
+  supabase: SupabaseClient,
+  lessonId: string,
+  requestedBy: string,
+) {
+  const detail = await loadAiRecoveryRecoveredLessonDetail(supabase, lessonId);
+  const teachingContract = detail.lesson.teaching_contract;
+  const sourceTaskId = typeof teachingContract.source_task_id === "string" ? teachingContract.source_task_id : null;
+  const sourceJobId = typeof teachingContract.source_job_id === "string" ? teachingContract.source_job_id : null;
+
+  let taskRef: AiRecoveryTaskRef | null = null;
+
+  if (sourceTaskId) {
+    const existingTask = await fetchAiRecoveryTaskRecord(supabase, sourceTaskId);
+    const nextMetadata = {
+      ...parseJsonRecord(existingTask.metadata),
+      send_back_requested_at: nowIso(),
+      send_back_requested_by: requestedBy,
+      send_back_lesson_id: lessonId,
+    };
+    const nextResult = {
+      ...parseJsonRecord(existingTask.result),
+      review_status: "needs_review",
+      send_back_requested_at: nowIso(),
+    };
+
+    await updateAiRecoveryTaskColumns(supabase, sourceTaskId, {
+      metadata: nextMetadata,
+      result: nextResult,
+      status: "pending",
+      progress: 0,
+      started_at: null,
+      completed_at: null,
+    });
+
+    await createTaskLog(
+      supabase,
+      sourceTaskId,
+      COMMAND_CENTER_AGENTS.reporter,
+      "info",
+      "Recovered lesson was sent back to AI for another pass.",
+      {
+        lesson_id: lessonId,
+        requested_by: requestedBy,
+      },
+    );
+
+    taskRef = {
+      id: existingTask.id,
+      issue_id: existingTask.issue_id,
+      job_id: existingTask.job_id ?? null,
+      title: existingTask.title ?? existingTask.task_name ?? null,
+      status: "pending",
+      created_at: existingTask.created_at,
+    };
+  } else if (sourceJobId) {
+    const created = await createAiRecoveryTaskForJob(supabase, sourceJobId);
+    taskRef = created.task;
+
+    await createTaskLog(
+      supabase,
+      taskRef.id,
+      COMMAND_CENTER_AGENTS.reporter,
+      "info",
+      "Recovered lesson was sent back to AI and linked to a recovery task.",
+      {
+        lesson_id: lessonId,
+        requested_by: requestedBy,
+      },
+    );
+  } else {
+    throw new AiCommandCenterHttpError(409, "This recovered lesson is not linked to a source job or AI task.");
+  }
+
+  return {
+    task: taskRef,
+    detail: await loadAiRecoveryRecoveredLessonDetail(supabase, lessonId),
+  };
+}
+
+export async function createAiRecoveryTaskForJob(
+  supabase: SupabaseClient,
+  jobId: string,
+  requestedBy?: string | null,
+): Promise<CreateAiRecoveryTaskResult> {
+  const diagnostics = await loadAiRecoveryJobDiagnostics(supabase, jobId);
+
+  if (diagnostics.status !== "failed") {
+    throw new AiCommandCenterHttpError(409, "Only jobs with status 'failed' can create recovery tasks.");
+  }
+
+  const existingTaskLookup = await fetchAiRecoveryTaskForJob(supabase, jobId);
+  if (existingTaskLookup.task) {
+    return {
+      task: existingTaskLookup.task,
+      issue_id: existingTaskLookup.task.issue_id,
+      already_exists: true,
+      message: "Task already exists.",
+    };
+  }
+
+  const now = nowIso();
+  const issue = await fetchOrCreateFailedLessonGenerationIssue(supabase);
+  const issueId = issue?.id || null;
+
+  if (!issueId) {
+    throw new Error("Unable to resolve AI recovery issue.");
+  }
+
+  const secondLookup = await fetchAiRecoveryTaskForJob(supabase, jobId);
+  if (secondLookup.task) {
+    return {
+      task: secondLookup.task,
+      issue_id: secondLookup.task.issue_id,
+      already_exists: true,
+      message: "Task already exists.",
+    };
+  }
+
+  const { data: task, error: taskError } = await supabase
+    .from("ai_tasks")
+    .insert({
+      issue_id: issueId,
+      job_id: diagnostics.job_id,
+      title: "Resolve failed lesson generation job",
+      task_name: "Resolve failed lesson generation job",
+      task_type: "generation",
+      priority: "critical",
+      assigned_agent: COMMAND_CENTER_AGENTS.planner,
+      execution_mode: "execute_with_approval",
+      safety_level: "destructive_blocked",
+      target_area: "lesson_generation",
+      instructions: [
+        `Review failed lesson generation job ${jobId}.`,
+        diagnostics.topic_title ? `Topic: ${diagnostics.topic_title}` : null,
+        diagnostics.grade_name ? `Grade: ${diagnostics.grade_name}` : null,
+        diagnostics.subject_name ? `Subject: ${diagnostics.subject_name}` : null,
+        diagnostics.last_error ? `Last error: ${diagnostics.last_error}` : null,
+        "Inspect the queue row, topic metadata, and any existing lesson or outline context.",
+        "Do not execute any repair, do not generate SQL automatically, and do not mark the queue row as done.",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      status: "pending",
+      progress: 0,
+      requires_approval: true,
+      metadata: {
+        topic_id: diagnostics.topic_id,
+        topic_title: diagnostics.topic_title,
+        grade_name: diagnostics.grade_name,
+        subject_name: diagnostics.subject_name,
+        last_error: diagnostics.last_error,
+      },
+      result: {},
+      created_at: now,
+      updated_at: now,
+    })
+    .select("id, issue_id, job_id, title, status, created_at")
+    .single();
+
+  if (taskError) {
+    throw taskError;
+  }
+
+  const taskRef: AiRecoveryTaskRef = {
+    id: task.id,
+    issue_id: task.issue_id,
+    job_id: task.job_id ?? null,
+    title: task.title ?? null,
+    status: task.status,
+    created_at: task.created_at,
+  };
+
+  await recordAiRecoveryEvent(supabase, {
+    event_type: "task_created",
+    message: "AI recovery task created from a failed lesson generation job.",
+    actor_user_id: requestedBy ?? null,
+    task_id: taskRef.id,
+    job_id: diagnostics.job_id,
+    details: {
+      topic_id: diagnostics.topic_id,
+      topic_title: diagnostics.topic_title,
+      outlines_count: diagnostics.ordered_topic_outlines.length,
+      existing_lessons_count: diagnostics.existing_lessons_count,
+      existing_lesson_blocks_count: diagnostics.existing_lesson_blocks_count,
+      grade_name: diagnostics.grade_name,
+      subject_name: diagnostics.subject_name,
+      last_error: diagnostics.last_error,
+    },
+    agent_name: COMMAND_CENTER_AGENTS.planner,
+    log_type: "info",
+  });
+
+  return {
+    task: taskRef,
+    issue_id: issueId,
+    already_exists: false,
+    message: "AI recovery task created.",
+  };
+}
+
+function clipText(value: string | null | undefined, maxLength: number) {
+  const text = String(value || "");
+  return text.length > maxLength ? `${text.slice(0, maxLength)}\n...[truncated]` : text;
+}
+
+function toPromptJson(value: unknown, maxLength = 12000) {
+  return clipText(JSON.stringify(value, null, 2), maxLength);
+}
+
+function collectObservedKeys(rows: JsonRecord[]) {
+  const keys = new Set<string>();
+  rows.forEach((row) => {
+    Object.keys(parseJsonRecord(row)).forEach((key) => keys.add(key));
+  });
+  return [...keys].sort();
+}
+
+function stripMarkdownCodeFence(text: string) {
+  const trimmed = text.trim();
+  const fencedMatch = trimmed.match(/^```(?:sql)?\s*([\s\S]*?)\s*```$/i);
+  return fencedMatch ? fencedMatch[1].trim() : trimmed.replace(/^sql\s+/i, "").trim();
+}
+
+function sanitizeGeneratedSql(rawOutput: string) {
+  const cleaned = stripMarkdownCodeFence(rawOutput);
+
+  if (!cleaned) {
+    throw new AiCommandCenterHttpError(502, "AI provider returned an empty SQL preview.");
+  }
+
+  if (!/\bBEGIN\b/i.test(cleaned) || !/\bCOMMIT\b/i.test(cleaned)) {
+    throw new AiCommandCenterHttpError(502, "AI provider did not return a transactional SQL preview.");
+  }
+
+  if (!/\b(INSERT|UPDATE)\b/i.test(cleaned)) {
+    throw new AiCommandCenterHttpError(502, "AI provider did not return repair SQL statements.");
+  }
+
+  if (/^\s*(Here|Below|Explanation|Notes?)\b/i.test(cleaned)) {
+    throw new AiCommandCenterHttpError(502, "AI provider returned commentary instead of SQL only.");
+  }
+
+  return cleaned;
+}
+
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function normalizeSqlWhitespace(sql: string) {
+  return sql.replace(/\s+/g, " ").trim();
+}
+
+function collectTouchedSqlTables(sql: string) {
+  const matches = [
+    ...sql.matchAll(/\b(?:insert\s+into|update|delete\s+from|from|join)\s+((?:public\.)?[a-z_][a-z0-9_]*)/gi),
+  ];
+
+  return Array.from(
+    new Set(
+      matches
+        .map((match) => String(match[1] || "").toLowerCase())
+        .filter(Boolean),
+    ),
+  );
+}
+
+function toQualifiedAllowedTableNames(tableNames: string[]) {
+  const names = new Set<string>();
+  tableNames.forEach((name) => {
+    const normalized = name.toLowerCase();
+    names.add(normalized);
+    names.add(normalized.replace(/^public\./, ""));
+  });
+  return names;
+}
+
+function buildAiRecoverySafetyCheck(
+  sqlPreview: string,
+  detail: AiRecoveryTaskDetail,
+): AiRecoverySafetyCheck {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const normalizedSql = normalizeSqlWhitespace(sqlPreview);
+  const containsBegin = /\bBEGIN\b/i.test(sqlPreview);
+  const containsCommit = /\bCOMMIT\b/i.test(sqlPreview);
+  const touchedTables = collectTouchedSqlTables(sqlPreview);
+  const allowedTables = [
+    "public.lessons",
+    "public.lesson_blocks",
+    "public.lesson_gen_queue",
+    "public.ai_tasks",
+    "public.lesson_gen_log",
+    "public.error_recovery_log",
+  ];
+  const allowedTableNames = toQualifiedAllowedTableNames(allowedTables);
+  const dangerousPatterns: Array<{ pattern: RegExp; message: string }> = [
+    { pattern: /\bDROP\s+DATABASE\b/i, message: "Contains DROP DATABASE." },
+    { pattern: /\bDROP\s+SCHEMA\b/i, message: "Contains DROP SCHEMA." },
+    { pattern: /\bALTER\s+ROLE\b/i, message: "Contains ALTER ROLE." },
+    { pattern: /\bALTER\s+USER\b/i, message: "Contains ALTER USER." },
+    { pattern: /\bTRUNCATE\b/i, message: "Contains TRUNCATE." },
+    { pattern: /\bGRANT\b/i, message: "Contains GRANT." },
+    { pattern: /\bREVOKE\b/i, message: "Contains REVOKE." },
+    { pattern: /\bDELETE\s+FROM\s+auth\.users\b/i, message: "Contains DELETE FROM auth.users." },
+    { pattern: /\bDELETE\s+FROM\s+public\.profiles\b/i, message: "Contains DELETE FROM public.profiles." },
+    { pattern: /\bSECURITY\s+DEFINER\b/i, message: "Contains SECURITY DEFINER." },
+  ];
+  const placeholderPatterns: Array<{ pattern: RegExp; value: string }> = [
+    { pattern: /\bJOB_ID\b/i, value: "JOB_ID" },
+    { pattern: /\bTOPIC_ID\b/i, value: "TOPIC_ID" },
+    { pattern: /\bUUID_HERE\b/i, value: "UUID_HERE" },
+    { pattern: /\bINSERT_UUID\b/i, value: "INSERT_UUID" },
+    { pattern: /\bexample-id\b/i, value: "example-id" },
+    { pattern: /\bxxx\b/i, value: "xxx" },
+  ];
+  const jobId = detail.task.job_id || "";
+  const topicId = detail.queue_job?.topic_id || detail.topic?.id || "";
+  const queueUpdatePattern = jobId
+    ? new RegExp(`\\bUPDATE\\s+public\\.lesson_gen_queue\\b[\\s\\S]*?\\bWHERE\\b[\\s\\S]*?\\bid\\s*=\\s*'${escapeRegex(jobId)}'`, "i")
+    : null;
+  const queueUpdatePatternUnqualified = jobId
+    ? new RegExp(`\\bUPDATE\\s+lesson_gen_queue\\b[\\s\\S]*?\\bWHERE\\b[\\s\\S]*?\\bid\\s*=\\s*'${escapeRegex(jobId)}'`, "i")
+    : null;
+
+  if (!sqlPreview.trim()) {
+    errors.push("No generated SQL is stored for this task.");
+  }
+
+  if (!containsBegin) {
+    errors.push("SQL must include BEGIN.");
+  }
+
+  if (!containsCommit) {
+    errors.push("SQL must include COMMIT.");
+  }
+
+  dangerousPatterns.forEach(({ pattern, message }) => {
+    if (pattern.test(sqlPreview)) {
+      errors.push(message);
+    }
+  });
+
+  touchedTables.forEach((tableName) => {
+    if (!allowedTableNames.has(tableName)) {
+      errors.push(`Touches disallowed table: ${tableName}.`);
+    }
+  });
+
+  if (!touchedTables.some((tableName) => tableName.endsWith("lessons"))) {
+    errors.push("SQL must touch public.lessons.");
+  }
+
+  if (!touchedTables.some((tableName) => tableName.endsWith("lesson_gen_queue"))) {
+    errors.push("SQL must touch public.lesson_gen_queue.");
+  }
+
+  if (!touchedTables.some((tableName) => tableName.endsWith("ai_tasks"))) {
+    warnings.push("SQL does not appear to update public.ai_tasks.");
+  }
+
+  if (/\bUPDATE\s+(?:public\.)?ai_tasks\b[\s\S]*?\bSET\b[\s\S]*?\bstatus\s*=\s*'needs_review'/i.test(sqlPreview)) {
+    errors.push("SQL sets ai_tasks.status to 'needs_review', which is not allowed.");
+  }
+
+  if (!/teaching_contract/i.test(sqlPreview)) {
+    errors.push("SQL must reference teaching_contract.");
+  }
+
+  if (!/needs_review/i.test(sqlPreview)) {
+    errors.push("SQL must include needs_review.");
+  }
+
+  if (!/student_publish_allowed/i.test(sqlPreview)) {
+    errors.push("SQL must include student_publish_allowed.");
+  }
+
+  if (!/\bfalse\b/i.test(sqlPreview)) {
+    errors.push("SQL must explicitly set student_publish_allowed to false.");
+  }
+
+  if (!jobId) {
+    errors.push("Task is missing a real job_id.");
+  } else if (
+    !new RegExp(`'${escapeRegex(jobId)}'`, "i").test(sqlPreview) ||
+    !(queueUpdatePattern?.test(sqlPreview) || queueUpdatePatternUnqualified?.test(sqlPreview))
+  ) {
+    errors.push(`SQL does not update the correct lesson_gen_queue job_id ${jobId}.`);
+  }
+
+  if (!topicId) {
+    errors.push("Task is missing a real topic_id.");
+  } else if (
+    !new RegExp(`'${escapeRegex(topicId)}'`, "i").test(sqlPreview) ||
+    !/\btopic_id\b/i.test(sqlPreview)
+  ) {
+    errors.push(`SQL does not use the correct topic_id ${topicId}.`);
+  }
+
+  placeholderPatterns.forEach(({ pattern, value }) => {
+    if (pattern.test(sqlPreview)) {
+      errors.push(`SQL contains placeholder identifier: ${value}.`);
+    }
+  });
+
+  if (/\bDELETE\s+FROM\b/i.test(sqlPreview) && !/\bDELETE\s+FROM\s+(?:public\.)?(lesson_blocks|lesson_gen_log|error_recovery_log)\b/i.test(sqlPreview)) {
+    errors.push("DELETE statements are blocked unless explicitly limited to recovery log cleanup tables.");
+  }
+
+  if (!/\bUPDATE\s+(?:public\.)?lesson_gen_queue\b/i.test(sqlPreview)) {
+    warnings.push("SQL does not clearly show a lesson_gen_queue update statement.");
+  }
+
+  if (!/\bUPDATE\s+(?:public\.)?ai_tasks\b/i.test(sqlPreview)) {
+    warnings.push("SQL does not clearly show an ai_tasks update statement.");
+  }
+
+  if (!/\bINSERT\s+INTO\s+(?:public\.)?lesson_blocks\b|\bUPDATE\s+(?:public\.)?lesson_blocks\b/i.test(sqlPreview)) {
+    warnings.push("SQL does not clearly show lesson_blocks creation or update.");
+  }
+
+  const allowed = errors.length === 0;
+  const risk = buildSqlRisk(sqlPreview);
+  const summary = allowed
+    ? "SQL passed the conservative recovery safety checks."
+    : errors[0] || "SQL failed the conservative recovery safety checks.";
+
+  return {
+    executed_at: nowIso(),
+    allowed,
+    errors,
+    warnings,
+    sql_present: Boolean(sqlPreview.trim()),
+    contains_begin: containsBegin,
+    contains_commit: containsCommit,
+    isWrite: risk.isWrite,
+    isHighRisk: risk.isHighRisk || !allowed,
+    isBlocked: !allowed,
+    riskLevel: allowed ? (warnings.length > 0 ? "medium" : "low") : "high",
+    summary,
+  };
+}
+
+function buildAiRecoverySqlSystemPrompt() {
+  return [
+    "You are a senior PostgreSQL recovery engineer working on a Supabase-backed educational platform.",
+    "Return SQL only.",
+    "Do not include markdown fences, comments, prose, bullet points, or explanations.",
+    "Output one transaction that starts with BEGIN and ends with COMMIT.",
+    "The SQL must create or update exactly one lesson for the requested topic.",
+    "The SQL must follow the provided topic_outlines order exactly.",
+    "Use only the real tables and observed columns supplied in the prompt.",
+    "Populate public.lessons.blocks with the canonical structured lesson JSON.",
+    "The lesson blocks used by the current UI must only use these types: text, example, formula, summary.",
+    "Create ordered public.lesson_blocks rows using the observed lesson_blocks shape.",
+    "Do not use DELETE, DROP, TRUNCATE, or ALTER TABLE.",
+    "Set lessons.teaching_contract.status to needs_review.",
+    "Set lessons.teaching_contract.student_publish_allowed to false.",
+    "Set lessons.teaching_contract.source_type to chatgpt_manual.",
+    "Update public.lesson_gen_queue to status = 'done' for the target job.",
+    "Update public.ai_tasks to status = 'completed' for the target task if it exists.",
+    "Do not ever set ai_tasks.status = 'needs_review'.",
+    "Put review_status = needs_review inside ai_tasks.result JSONB.",
+    "Use modern pedagogy for lower grades.",
+    "Use the same language as the topic title.",
+  ].join("\n");
+}
+
+type AiRecoveryProviderResult = {
+  provider: "nvidia" | "gemini";
+  model: string;
+  sql: string;
+};
+
+async function callNvidiaSqlGenerator(prompt: string, apiKey: string): Promise<AiRecoveryProviderResult> {
+  const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: AI_RECOVERY_SQL_NVIDIA_MODEL,
+      messages: [
+        { role: "system", content: buildAiRecoverySqlSystemPrompt() },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.1,
+      max_tokens: 4096,
+    }),
+  });
+
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const message =
+      payload?.detail ||
+      payload?.message ||
+      payload?.error ||
+      `NVIDIA SQL generation failed with status ${response.status}.`;
+    throw new Error(message);
+  }
+
+  const raw = payload?.choices?.[0]?.message?.content;
+  if (typeof raw !== "string" || !raw.trim()) {
+    throw new Error("NVIDIA SQL generation returned no content.");
+  }
+
+  return {
+    provider: "nvidia",
+    model: AI_RECOVERY_SQL_NVIDIA_MODEL,
+    sql: sanitizeGeneratedSql(raw),
+  };
+}
+
+async function callGeminiSqlGenerator(prompt: string, apiKey: string): Promise<AiRecoveryProviderResult> {
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${AI_RECOVERY_SQL_GEMINI_MODEL}:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                text: `${buildAiRecoverySqlSystemPrompt()}\n\n${prompt}`,
+              },
+            ],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 4096,
+        },
+      }),
+    },
+  );
+
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const message =
+      payload?.error?.message ||
+      payload?.message ||
+      `Gemini SQL generation failed with status ${response.status}.`;
+    throw new Error(message);
+  }
+
+  const raw = payload?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text || "").join("\n");
+  if (typeof raw !== "string" || !raw.trim()) {
+    throw new Error("Gemini SQL generation returned no content.");
+  }
+
+  return {
+    provider: "gemini",
+    model: AI_RECOVERY_SQL_GEMINI_MODEL,
+    sql: sanitizeGeneratedSql(raw),
+  };
+}
+
+async function generateSqlWithConfiguredProvider(prompt: string) {
+  const nvidiaKey = process.env.NVIDIA_API_KEY;
+  const geminiKey = process.env.GEMINI_KEY_0;
+  const errors: string[] = [];
+
+  if (nvidiaKey && nvidiaKey !== "MY_NVIDIA_API_KEY") {
+    try {
+      return await callNvidiaSqlGenerator(prompt, nvidiaKey);
+    } catch (error) {
+      errors.push(`NVIDIA: ${normalizeError(error)}`);
+    }
+  }
+
+  if (geminiKey) {
+    try {
+      return await callGeminiSqlGenerator(prompt, geminiKey);
+    } catch (error) {
+      errors.push(`Gemini: ${normalizeError(error)}`);
+    }
+  }
+
+  if (!nvidiaKey && !geminiKey) {
+    throw new AiCommandCenterHttpError(503, "No server-side AI provider is configured for recovery SQL generation.");
+  }
+
+  throw new AiCommandCenterHttpError(502, errors.join(" | ") || "AI SQL generation failed.");
+}
+
+async function loadRichExistingLessonsForTopic(
+  supabase: SupabaseClient,
+  topicId: string,
+) {
+  const { data, error } = await supabase
+    .from("lessons")
+    .select("id, topic_id, lesson_title, title, subtitle, content, blocks, slug, teaching_contract, created_at, updated_at")
+    .eq("topic_id", topicId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw error;
+  }
+
+  return (data || []) as JsonRecord[];
+}
+
+function buildAiRecoverySqlPrompt(detail: AiRecoveryTaskDetail, richLessons: JsonRecord[]) {
+  const taskId = detail.task.id;
+  const jobId = detail.task.job_id;
+  const topicId = detail.queue_job?.topic_id || detail.topic?.id || null;
+
+  if (!jobId) {
+    throw new AiCommandCenterHttpError(409, "AI recovery task is missing its linked job_id.");
+  }
+
+  if (!detail.queue_job) {
+    throw new AiCommandCenterHttpError(404, "Linked lesson generation queue job was not found.");
+  }
+
+  if (detail.queue_job.status !== "failed") {
+    throw new AiCommandCenterHttpError(409, "Recovery SQL can only be generated for failed lesson generation jobs.");
+  }
+
+  if (!topicId || !detail.topic) {
+    throw new AiCommandCenterHttpError(404, "The failed job is missing a valid topic reference.");
+  }
+
+  const normalizedOutlines = detail.ordered_topic_outlines.map((outline, index) => ({
+    order: index + 1,
+    ...outline,
+  }));
+
+  const normalizedLessons = richLessons.map((lesson) => ({
+    id: lesson.id,
+    topic_id: lesson.topic_id,
+    lesson_title: lesson.lesson_title ?? lesson.title ?? null,
+    title: lesson.title ?? lesson.lesson_title ?? null,
+    subtitle: lesson.subtitle ?? null,
+    slug: lesson.slug ?? null,
+    teaching_contract: parseJsonRecord(lesson.teaching_contract),
+    blocks: Array.isArray(lesson.blocks) ? lesson.blocks : [],
+    content_excerpt: clipText(String(lesson.content || ""), 1500),
+    created_at: lesson.created_at ?? null,
+    updated_at: lesson.updated_at ?? null,
+  }));
+
+  const promptPayload = {
+    task_context: {
+      task_id: taskId,
+      job_id: jobId,
+      issue_id: detail.task.issue_id,
+      queue_status: detail.queue_job.status,
+      queue_attempts: detail.queue_job.attempts,
+      last_error: detail.queue_job.last_error,
+      topic: detail.topic,
+      grade: detail.grade,
+      subject: detail.subject,
+    },
+    required_repair_rules: {
+      lesson_count: "create or update exactly one lesson for this topic",
+      queue_update: "set lesson_gen_queue.status = 'done' for this job",
+      ai_task_update: "set ai_tasks.status = 'completed' and ai_tasks.result.review_status = 'needs_review' for this task",
+      teaching_contract: {
+        status: "needs_review",
+        student_publish_allowed: false,
+        source_type: "chatgpt_manual",
+      },
+      allowed_ui_block_types: ["text", "example", "formula", "summary"],
+      transaction: "must use BEGIN and COMMIT",
+      prohibited: ["ai_tasks.status = 'needs_review'", "DELETE", "DROP", "TRUNCATE", "ALTER TABLE"],
+    },
+    observed_schema: {
+      lessons_columns: collectObservedKeys(richLessons),
+      lesson_blocks_columns: collectObservedKeys(detail.lesson_blocks),
+      topic_outlines_columns: collectObservedKeys(detail.ordered_topic_outlines),
+    },
+    topic_outlines: normalizedOutlines,
+    existing_lessons_for_topic: normalizedLessons,
+    existing_lesson_blocks_for_topic: detail.lesson_blocks,
+    task_metadata: detail.task.metadata,
+    task_result: detail.task.result,
+  };
+
+  return [
+    "Generate PostgreSQL SQL for the recovery task below.",
+    "Return SQL only.",
+    "",
+    toPromptJson(promptPayload, 26000),
+  ].join("\n");
+}
+
+async function fetchAiRecoveryTaskRecord(
+  supabase: SupabaseClient,
+  taskId: string,
+) {
+  const { data, error } = await supabase
+    .from("ai_tasks")
+    .select("*")
+    .eq("id", taskId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    throw new AiCommandCenterHttpError(404, "AI recovery task not found.");
+  }
+
+  return data as RecoveryTaskRow;
+}
+
+async function updateAiRecoveryTaskColumns(
+  supabase: SupabaseClient,
+  taskId: string,
+  payload: JsonRecord,
+) {
+  const { error } = await supabase
+    .from("ai_tasks")
+    .update({
+      ...payload,
+      updated_at: nowIso(),
+    })
+    .eq("id", taskId);
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function loadAiRecoveryTaskDetail(
+  supabase: SupabaseClient,
+  taskId: string,
+): Promise<AiRecoveryTaskDetail> {
+  const task = await fetchAiRecoveryTaskRecord(supabase, taskId);
+  const metadata = parseJsonRecord(task.metadata);
+  const result = parseJsonRecord(task.result);
+  const rawSafetyCheck = metadata.safety_check || result.safety_check || null;
+  const safetyCheck =
+    rawSafetyCheck && typeof rawSafetyCheck === "object" && !Array.isArray(rawSafetyCheck)
+      ? parseJsonRecord(rawSafetyCheck)
+      : null;
+
+  const [issue, queueJob, logs, latestApproval] = await Promise.all([
+    supabase.from("ai_issues").select("id, title, severity, status").eq("id", task.issue_id).maybeSingle(),
+    task.job_id
+      ? supabase
+          .from("lesson_gen_queue")
+          .select("id, topic_id, status, attempts, last_error, created_at, claimed_at, completed_at")
+          .eq("id", task.job_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    supabase.from("ai_task_logs").select("id, agent_name, log_type, message, metadata, created_at").eq("task_id", taskId).order("created_at", { ascending: true }),
+    supabase.from("ai_task_approvals").select("*").eq("task_id", taskId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+  ]);
+
+  if (issue.error) throw issue.error;
+  if (queueJob.error) throw queueJob.error;
+  if (logs.error) throw logs.error;
+  if (latestApproval.error) throw latestApproval.error;
+
+  const queueRow = (queueJob.data as QueueJobRow | null) ?? null;
+  const topicId = queueRow?.topic_id || (typeof metadata.topic_id === "string" ? metadata.topic_id : null);
+  const [topicContext, outlineResult] = await Promise.all([
+    fetchTopicContext(supabase, topicId ? [topicId] : []),
+    fetchTopicOutlinesByTopicIds(supabase, topicId ? [topicId] : []),
+  ]);
+
+  const topic = topicId ? topicContext.topicsById.get(topicId) || null : null;
+  const grade = topic?.grade_id ? topicContext.gradesById.get(topic.grade_id) || null : null;
+  const subject = topic?.subject_id ? topicContext.subjectsById.get(topic.subject_id) || null : null;
+
+  let existingLessons: JsonRecord[] = [];
+  let lessonBlocks: JsonRecord[] = [];
+  let lessonBlocksStatus: "available" | "missing_table" = "available";
+
+  if (topicId) {
+    const { data: lessons, error: lessonsError } = await supabase
+      .from("lessons")
+      .select("id, lesson_title, title, topic_id, slug, teaching_contract, created_at, updated_at")
+      .eq("topic_id", topicId)
+      .order("created_at", { ascending: false });
+
+    if (lessonsError) {
+      throw lessonsError;
+    }
+
+    existingLessons = (lessons || []) as JsonRecord[];
+    const lessonIds = existingLessons.map((lesson) => lesson.id).filter(Boolean);
+
+    if (lessonIds.length > 0) {
+      const { data: blocks, error: blocksError } = await supabase
+        .from("lesson_blocks")
+        .select("*")
+        .in("lesson_id", lessonIds);
+
+      if (blocksError) {
+        if (isMissingTableError(blocksError)) {
+          lessonBlocksStatus = "missing_table";
+          lessonBlocks = [];
+        } else {
+          throw blocksError;
+        }
+      } else {
+        lessonBlocks = (blocks || []) as JsonRecord[];
+      }
+    }
+  }
+
+  return {
+    task: {
+      id: task.id,
+      issue_id: task.issue_id,
+      job_id: task.job_id ?? null,
+      title: task.title ?? null,
+      task_name: task.task_name ?? null,
+      status: task.status,
+      priority: task.priority ?? null,
+      target_area: task.target_area ?? null,
+      progress: task.progress ?? null,
+      requires_approval: task.requires_approval ?? null,
+      instructions: task.instructions ?? null,
+      metadata,
+      result,
+      created_at: task.created_at ?? null,
+      updated_at: task.updated_at ?? null,
+      started_at: task.started_at ?? null,
+      completed_at: task.completed_at ?? null,
+    },
+    issue: issue.data
+      ? {
+          id: issue.data.id,
+          title: issue.data.title,
+          severity: issue.data.severity,
+          status: issue.data.status,
+        }
+      : null,
+    queue_job: queueRow
+      ? {
+          id: queueRow.id,
+          topic_id: queueRow.topic_id,
+          status: queueRow.status,
+          attempts: queueRow.attempts,
+          last_error: queueRow.last_error,
+          created_at: queueRow.created_at,
+          claimed_at: queueRow.claimed_at,
+          completed_at: queueRow.completed_at,
+        }
+      : null,
+    topic: topic ? { id: topic.id, title: topic.title } : null,
+    grade: grade ? { id: grade.id, name: grade.name } : null,
+    subject: subject ? { id: subject.id, name: subject.name } : null,
+    ordered_topic_outlines: topicId && outlineResult.status === "available"
+      ? sortTopicOutlines(outlineResult.outlinesByTopicId.get(topicId) || [])
+      : [],
+    topic_outlines_status: outlineResult.status,
+    existing_lessons: existingLessons,
+    lesson_blocks: lessonBlocks,
+    lesson_blocks_status: lessonBlocksStatus,
+    generated_sql: typeof metadata.generated_sql === "string" ? metadata.generated_sql : null,
+    safety_check: safetyCheck,
+    logs: ((logs.data || []) as JsonRecord[]).map((log) => ({
+      id: String(log.id),
+      agent_name: String(log.agent_name || ""),
+      log_type: String(log.log_type || ""),
+      message: String(log.message || ""),
+      metadata: parseJsonRecord(log.metadata),
+      created_at: typeof log.created_at === "string" ? log.created_at : null,
+    })),
+    latest_approval: latestApproval.data ? (latestApproval.data as JsonRecord) : null,
+  };
+}
+
+function dateMatchesFilter(value: string | null, dateFilter: string | null | undefined) {
+  if (!dateFilter) {
+    return true;
+  }
+
+  if (!value) {
+    return false;
+  }
+
+  if (value.startsWith(dateFilter)) {
+    return true;
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return false;
+  }
+
+  return parsed.toISOString().slice(0, 10) === dateFilter;
+}
+
+function normalizeAiTaskLogEvent(row: JsonRecord, taskRowsById: Map<string, JsonRecord>): AiRecoveryLogEntry {
+  const metadata = parseJsonRecord(row.metadata);
+  const taskId = typeof row.task_id === "string" ? row.task_id : null;
+  const taskRow = taskId ? taskRowsById.get(taskId) || null : null;
+  const eventType =
+    typeof metadata.event_type === "string"
+      ? metadata.event_type
+      : typeof row.log_type === "string" && row.log_type.trim()
+        ? row.log_type
+        : "info";
+
+  return {
+    id: `ai_task_logs:${String(row.id || crypto.randomUUID())}`,
+    source: "ai_task_logs",
+    timestamp: typeof row.created_at === "string" ? row.created_at : null,
+    actor_user_id: extractRecoveryActorUserId(metadata),
+    task_id: taskId,
+    job_id:
+      typeof metadata.job_id === "string"
+        ? metadata.job_id
+        : typeof metadata.recovery_job_id === "string"
+          ? metadata.recovery_job_id
+          : typeof taskRow?.job_id === "string"
+            ? String(taskRow.job_id)
+            : null,
+    lesson_id: typeof metadata.lesson_id === "string" ? metadata.lesson_id : null,
+    event_type: eventType,
+    message: String(row.message || ""),
+    details: metadata,
+  };
+}
+
+function normalizeAiTaskJsonLogEvents(taskRows: JsonRecord[]): AiRecoveryLogEntry[] {
+  const entries: AiRecoveryLogEntry[] = [];
+
+  taskRows.forEach((taskRow) => {
+    const rawLogs = Array.isArray(taskRow.logs) ? taskRow.logs : [];
+    rawLogs.forEach((rawLog, index) => {
+      if (!rawLog || typeof rawLog !== "object" || Array.isArray(rawLog)) {
+        return;
+      }
+
+      const log = rawLog as JsonRecord;
+      entries.push({
+        id: `ai_tasks.logs:${String(taskRow.id)}:${String(log.id || index)}`,
+        source: "ai_tasks.logs",
+        timestamp: typeof log.timestamp === "string" ? log.timestamp : typeof log.created_at === "string" ? log.created_at : null,
+        actor_user_id: typeof log.actor_user_id === "string" ? log.actor_user_id : null,
+        task_id: typeof log.task_id === "string" ? log.task_id : typeof taskRow.id === "string" ? taskRow.id : null,
+        job_id: typeof log.job_id === "string" ? log.job_id : typeof taskRow.job_id === "string" ? taskRow.job_id : null,
+        lesson_id: typeof log.lesson_id === "string" ? log.lesson_id : null,
+        event_type: typeof log.event_type === "string" ? log.event_type : "info",
+        message: typeof log.message === "string" ? log.message : "AI Recovery event",
+        details: parseJsonRecord(log.details),
+      });
+    });
+  });
+
+  return entries;
+}
+
+function normalizeErrorRecoveryLogEvent(row: JsonRecord): AiRecoveryLogEntry {
+  const details = parseJsonRecord(row.details);
+
+  return {
+    id: `error_recovery_log:${String(row.id || crypto.randomUUID())}`,
+    source: "error_recovery_log",
+    timestamp:
+      typeof row.timestamp === "string"
+        ? row.timestamp
+        : typeof row.created_at === "string"
+          ? row.created_at
+          : null,
+    actor_user_id:
+      typeof row.actor_user_id === "string"
+        ? row.actor_user_id
+        : typeof row.user_id === "string"
+          ? row.user_id
+          : extractRecoveryActorUserId(details),
+    task_id: typeof row.task_id === "string" ? row.task_id : typeof details.task_id === "string" ? details.task_id : null,
+    job_id: typeof row.job_id === "string" ? row.job_id : typeof details.job_id === "string" ? details.job_id : null,
+    lesson_id:
+      typeof row.lesson_id === "string"
+        ? row.lesson_id
+        : typeof details.lesson_id === "string"
+          ? details.lesson_id
+          : null,
+    event_type:
+      typeof row.event_type === "string"
+        ? row.event_type
+        : typeof details.event_type === "string"
+          ? details.event_type
+          : "info",
+    message: typeof row.message === "string" ? row.message : "AI Recovery event",
+    details,
+  };
+}
+
+function recoveryLogMatchesFilters(entry: AiRecoveryLogEntry, filters: AiRecoveryLogFilters) {
+  if (filters.event_type && entry.event_type !== filters.event_type) {
+    return false;
+  }
+  if (filters.job_id && entry.job_id !== filters.job_id) {
+    return false;
+  }
+  if (filters.task_id && entry.task_id !== filters.task_id) {
+    return false;
+  }
+  if (filters.lesson_id && entry.lesson_id !== filters.lesson_id) {
+    return false;
+  }
+  if (!dateMatchesFilter(entry.timestamp, filters.date)) {
+    return false;
+  }
+  return true;
+}
+
+function recoveryLogSourcePriority(source: AiRecoveryLogEntry["source"]) {
+  if (source === "error_recovery_log") return 3;
+  if (source === "ai_tasks.logs") return 2;
+  return 1;
+}
+
+function dedupeRecoveryLogs(entries: AiRecoveryLogEntry[]) {
+  const byKey = new Map<string, AiRecoveryLogEntry>();
+
+  entries.forEach((entry) => {
+    const key = [
+      entry.timestamp || "",
+      entry.task_id || "",
+      entry.job_id || "",
+      entry.lesson_id || "",
+      entry.event_type || "",
+      entry.message || "",
+    ].join("::");
+
+    const current = byKey.get(key);
+    if (!current) {
+      byKey.set(key, {
+        ...entry,
+        details: {
+          ...entry.details,
+          sources: [entry.source],
+        },
+      });
+      return;
+    }
+
+    const sources = Array.isArray(current.details.sources)
+      ? current.details.sources.map((value) => String(value))
+      : [current.source];
+
+    const nextSources = Array.from(new Set([...sources, entry.source]));
+    const preferred =
+      recoveryLogSourcePriority(entry.source) > recoveryLogSourcePriority(current.source)
+        ? entry
+        : current;
+
+    byKey.set(key, {
+      ...preferred,
+      details: {
+        ...preferred.details,
+        sources: nextSources,
+      },
+    });
+  });
+
+  return [...byKey.values()].sort((left, right) => {
+    const leftValue = left.timestamp ? new Date(left.timestamp).getTime() : 0;
+    const rightValue = right.timestamp ? new Date(right.timestamp).getTime() : 0;
+    return rightValue - leftValue;
+  });
+}
+
+export async function loadAiRecoveryLogs(
+  supabase: SupabaseClient,
+  filters: AiRecoveryLogFilters = {},
+) {
+  const taskRowsResult = await safeSelect(
+    supabase,
+    "ai_tasks",
+    "*",
+    (query) => {
+      let nextQuery = query.eq("target_area", "lesson_generation").order("updated_at", { ascending: false }).limit(500);
+      if (filters.task_id) nextQuery = nextQuery.eq("id", filters.task_id);
+      if (filters.job_id) nextQuery = nextQuery.eq("job_id", filters.job_id);
+      return nextQuery;
+    },
+  );
+
+  const taskRows = (taskRowsResult.data || []) as JsonRecord[];
+  const taskRowsById = new Map(
+    taskRows
+      .filter((row) => typeof row.id === "string")
+      .map((row) => [String(row.id), row] as const),
+  );
+
+  const taskIds = [...taskRowsById.keys()];
+  const aiTaskLogResult = await safeSelect(
+    supabase,
+    "ai_task_logs",
+    "*",
+    (query) => {
+      let nextQuery = query.order("created_at", { ascending: false }).limit(1000);
+      if (filters.task_id) {
+        nextQuery = nextQuery.eq("task_id", filters.task_id);
+      } else if (taskIds.length > 0) {
+        nextQuery = nextQuery.in("task_id", taskIds);
+      }
+      return nextQuery;
+    },
+  );
+
+  const errorRecoveryLogResult = await safeSelect(
+    supabase,
+    "error_recovery_log",
+    "*",
+    (query) => query.order("timestamp", { ascending: false }).limit(1000),
+  );
+
+  const normalizedAiTaskLogs = ((aiTaskLogResult.data || []) as JsonRecord[]).map((row) =>
+    normalizeAiTaskLogEvent(row, taskRowsById),
+  );
+  const normalizedAiTaskJsonLogs = normalizeAiTaskJsonLogEvents(taskRows);
+  const normalizedErrorRecoveryLogs =
+    errorRecoveryLogResult.error && isMissingTableError(errorRecoveryLogResult.error as { code?: string; message?: string })
+      ? []
+      : ((errorRecoveryLogResult.data || []) as JsonRecord[]).map(normalizeErrorRecoveryLogEvent);
+
+  const filtered = [
+    ...normalizedAiTaskLogs,
+    ...normalizedAiTaskJsonLogs,
+    ...normalizedErrorRecoveryLogs,
+  ].filter((entry) => recoveryLogMatchesFilters(entry, filters));
+
+  return dedupeRecoveryLogs(filtered);
+}
+
+export async function generateAiRecoveryRepairSql(
+  supabase: SupabaseClient,
+  taskId: string,
+  requestedBy?: string | null,
+) {
+  const detail = await loadAiRecoveryTaskDetail(supabase, taskId);
+  const topicId = detail.queue_job?.topic_id || detail.topic?.id || null;
+  const richLessons = topicId ? await loadRichExistingLessonsForTopic(supabase, topicId) : [];
+  const prompt = buildAiRecoverySqlPrompt(detail, richLessons);
+  const generation = await generateSqlWithConfiguredProvider(prompt);
+  const generatedAt = nowIso();
+
+  const nextMetadata = {
+    ...detail.task.metadata,
+    generated_sql: generation.sql,
+    generated_sql_at: generatedAt,
+    generated_sql_provider: generation.provider,
+    generated_sql_model: generation.model,
+  };
+  delete nextMetadata.safety_check;
+
+  await updateAiRecoveryTaskColumns(supabase, taskId, {
+    metadata: nextMetadata,
+    progress: Math.max(Number(detail.task.progress || 0), 20),
+  });
+
+  await recordAiRecoveryEvent(supabase, {
+    event_type: "sql_generated",
+    message: "AI recovery SQL preview was generated and stored for review.",
+    actor_user_id: requestedBy ?? null,
+    task_id: taskId,
+    job_id: detail.task.job_id,
+    details: {
+      provider: generation.provider,
+      model: generation.model,
+      generated_sql_at: generatedAt,
+      topic_id: detail.queue_job?.topic_id || detail.topic?.id || null,
+    },
+    agent_name: COMMAND_CENTER_AGENTS.sql,
+    log_type: "sql",
+  });
+
+  return {
+    generated_sql: generation.sql,
+    detail: await loadAiRecoveryTaskDetail(supabase, taskId),
+  };
+}
+
+export async function runAiRecoverySafetyCheck(
+  supabase: SupabaseClient,
+  taskId: string,
+  requestedBy?: string | null,
+) {
+  const detail = await loadAiRecoveryTaskDetail(supabase, taskId);
+  const sqlPreview = detail.generated_sql || "";
+  const safetyCheck = buildAiRecoverySafetyCheck(sqlPreview, detail);
+
+  const nextMetadata = {
+    ...detail.task.metadata,
+    safety_check: safetyCheck,
+  };
+
+  await updateAiRecoveryTaskColumns(supabase, taskId, {
+    metadata: nextMetadata,
+    progress: Math.max(Number(detail.task.progress || 0), 35),
+  });
+
+  await recordAiRecoveryEvent(supabase, {
+    event_type: safetyCheck.allowed ? "safety_check_passed" : "safety_check_failed",
+    message: safetyCheck.allowed
+      ? "AI recovery safety check passed."
+      : "AI recovery safety check failed.",
+    actor_user_id: requestedBy ?? null,
+    task_id: taskId,
+    job_id: detail.task.job_id,
+    details: safetyCheck,
+    agent_name: COMMAND_CENTER_AGENTS.auditor,
+    log_type: safetyCheck.allowed ? "validation" : "warning",
+  });
+
+  return {
+    safety_check: safetyCheck,
+    detail: await loadAiRecoveryTaskDetail(supabase, taskId),
+  };
+}
+
+export async function approveAiRecoveryTaskExecution(
+  supabase: SupabaseClient,
+  taskId: string,
+  approvedBy: string,
+) {
+  const { task, issue } = await fetchTaskBundle(supabase, taskId);
+  const detail = await loadAiRecoveryTaskDetail(supabase, taskId);
+  const generatedSql = detail.generated_sql;
+
+  if (!generatedSql) {
+    throw new AiCommandCenterHttpError(409, "Generate repair SQL before approving execution.");
+  }
+
+  const safetyCheck = parseJsonRecord(detail.safety_check);
+  if (typeof safetyCheck.allowed !== "boolean") {
+    throw new AiCommandCenterHttpError(409, "Run the safety check before approving execution.");
+  }
+
+  if (!safetyCheck.allowed) {
+    const firstError =
+      Array.isArray(safetyCheck.errors) && typeof safetyCheck.errors[0] === "string"
+        ? safetyCheck.errors[0]
+        : "Stored safety check did not approve this SQL preview.";
+    throw new AiCommandCenterHttpError(409, firstError);
+  }
+
+  const riskLevel = typeof safetyCheck.riskLevel === "string" ? safetyCheck.riskLevel : buildSqlRisk(generatedSql).riskLevel;
+  let approval = await fetchLatestPendingApproval(supabase, taskId);
+
+  if (!approval) {
+    const { data: createdApproval, error: approvalError } = await supabase
+      .from("ai_task_approvals")
+      .insert({
+        task_id: taskId,
+        proposed_action: "Approve guarded execution of the AI recovery SQL preview.",
+        risk_level: riskLevel || "medium",
+        sql_preview: generatedSql,
+        affected_records: null,
+        rollback_plan: buildRollbackPlan(task, issue),
+        status: "pending",
+      })
+      .select("*")
+      .single();
+
+    if (approvalError || !createdApproval) {
+      throw new Error(approvalError?.message || "Unable to create approval request.");
+    }
+
+    approval = createdApproval as ApprovalRow;
+  }
+
+  const { data: approvedRecord, error: approveError } = await supabase
+    .from("ai_task_approvals")
+    .update({
+      status: "approved",
+      approved_by: approvedBy,
+      approved_at: nowIso(),
+    })
+    .eq("id", approval.id)
+    .select("*")
+    .single();
+
+  if (approveError || !approvedRecord) {
+    throw new Error(approveError?.message || "Unable to approve execution.");
+  }
+
+  await updateTaskStatus(supabase, taskId, "pending", 60);
+  await createTaskLog(
+    supabase,
+    taskId,
+    COMMAND_CENTER_AGENTS.reporter,
+    "approval",
+    "Human approval granted for the AI recovery SQL preview.",
+    {
+      approval_id: approval.id,
+      approved_by: approvedBy,
+      sql_preview: generatedSql,
+    },
+  );
+
+  return {
+    approval: approvedRecord,
+    detail: await loadAiRecoveryTaskDetail(supabase, taskId),
+  };
+}
+
+export async function executeAiRecoveryTaskSql(
+  supabase: SupabaseClient,
+  taskId: string,
+  executedBy: string,
+) {
+  const detail = await loadAiRecoveryTaskDetail(supabase, taskId);
+  const generatedSql = detail.generated_sql;
+  const safetyCheck = parseJsonRecord(detail.safety_check);
+  const latestApproval = parseJsonRecord(detail.latest_approval);
+
+  if (!detail.task.requires_approval) {
+    throw new AiCommandCenterHttpError(409, "This recovery task is not marked as approval-required.");
+  }
+
+  if (!generatedSql) {
+    throw new AiCommandCenterHttpError(409, "No generated SQL preview is stored for this task.");
+  }
+
+  if (typeof safetyCheck.allowed !== "boolean") {
+    throw new AiCommandCenterHttpError(409, "Run the safety check before executing the recovery SQL.");
+  }
+
+  if (!safetyCheck.allowed) {
+    const firstError =
+      Array.isArray(safetyCheck.errors) && typeof safetyCheck.errors[0] === "string"
+        ? safetyCheck.errors[0]
+        : "Stored safety check did not approve this SQL preview.";
+    throw new AiCommandCenterHttpError(409, firstError);
+  }
+
+  if (String(latestApproval.status || "").toLowerCase() !== "approved") {
+    throw new AiCommandCenterHttpError(409, "Human approval is required before executing recovery SQL.");
+  }
+
+  await recordAiRecoveryEvent(supabase, {
+    event_type: "execution_started",
+    message: "Approved recovery SQL execution started on the server.",
+    actor_user_id: executedBy,
+    task_id: taskId,
+    job_id: detail.task.job_id,
+    details: {
+      approval_id: typeof latestApproval.id === "string" ? latestApproval.id : null,
+      topic_id: detail.queue_job?.topic_id || detail.topic?.id || null,
+    },
+    agent_name: COMMAND_CENTER_AGENTS.worker,
+    log_type: "execution",
+  });
+
+  try {
+    const execution = await executeRecoverySqlServerSide(generatedSql);
+
+    await recordAiRecoveryEvent(supabase, {
+      event_type: "execution_success",
+      message: "Approved recovery SQL executed successfully on the server.",
+      actor_user_id: executedBy,
+      task_id: taskId,
+      job_id: detail.task.job_id,
+      details: {
+        executed_at: execution.executed_at,
+        command: execution.command,
+        count: execution.count,
+      },
+      agent_name: COMMAND_CENTER_AGENTS.worker,
+      log_type: "execution",
+    });
+
+    return {
+      execution,
+      detail: await loadAiRecoveryTaskDetail(supabase, taskId),
+    };
+  } catch (error) {
+    const message = normalizeError(error);
+
+    await recordAiRecoveryEvent(supabase, {
+      event_type: "execution_failed",
+      message: "Approved recovery SQL execution failed on the server.",
+      actor_user_id: executedBy,
+      task_id: taskId,
+      job_id: detail.task.job_id,
+      details: {
+        error: message,
+      },
+      agent_name: COMMAND_CENTER_AGENTS.worker,
+      log_type: "error",
+    });
+
+    throw new AiCommandCenterHttpError(500, `Recovery SQL execution failed: ${message}`);
+  }
+}
+
+export async function rejectAiRecoveryTaskSql(
+  supabase: SupabaseClient,
+  taskId: string,
+  reviewedBy: string,
+  reason = "SQL preview rejected by reviewer.",
+) {
+  const detail = await loadAiRecoveryTaskDetail(supabase, taskId);
+  const approval = await fetchLatestPendingApproval(supabase, taskId);
+
+  if (approval) {
+    const { error } = await supabase
+      .from("ai_task_approvals")
+      .update({ status: "rejected" })
+      .eq("id", approval.id);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  }
+
+  const nextMetadata = {
+    ...detail.task.metadata,
+    rejected_sql_reason: reason,
+    rejected_sql_at: nowIso(),
+  };
+
+  await updateAiRecoveryTaskColumns(supabase, taskId, {
+    metadata: nextMetadata,
+  });
+
+  await updateTaskStatus(supabase, taskId, "blocked", 58);
+  await createTaskLog(
+    supabase,
+    taskId,
+    COMMAND_CENTER_AGENTS.reporter,
+    "approval",
+    reason,
+    {
+      approval_id: approval?.id || null,
+      reviewed_by: reviewedBy,
+    },
+  );
+
+  return {
+    success: true,
+    detail: await loadAiRecoveryTaskDetail(supabase, taskId),
+  };
+}
+
+export async function resetAiRecoveryTask(
+  supabase: SupabaseClient,
+  taskId: string,
+  resetBy: string,
+) {
+  const detail = await loadAiRecoveryTaskDetail(supabase, taskId);
+  const nextMetadata = { ...detail.task.metadata };
+  delete nextMetadata.generated_sql;
+  delete nextMetadata.generated_sql_at;
+  delete nextMetadata.safety_check;
+  delete nextMetadata.rejected_sql_reason;
+  delete nextMetadata.rejected_sql_at;
+
+  await supabase
+    .from("ai_task_approvals")
+    .update({ status: "rejected" })
+    .eq("task_id", taskId)
+    .eq("status", "pending");
+
+  await updateAiRecoveryTaskColumns(supabase, taskId, {
+    metadata: nextMetadata,
+    result: {},
+    status: "pending",
+    progress: 0,
+    started_at: null,
+    completed_at: null,
+  });
+
+  await createTaskLog(
+    supabase,
+    taskId,
+    COMMAND_CENTER_AGENTS.reporter,
+    "info",
+    "AI recovery task was reset to pending.",
+    { reset_by: resetBy },
+  );
+
+  return {
+    success: true,
+    detail: await loadAiRecoveryTaskDetail(supabase, taskId),
+  };
+}
+
+export async function copyAiRecoverySqlPreview(
+  supabase: SupabaseClient,
+  taskId: string,
+) {
+  const detail = await loadAiRecoveryTaskDetail(supabase, taskId);
+  if (!detail.generated_sql) {
+    throw new AiCommandCenterHttpError(404, "No generated SQL preview is available for this task.");
+  }
+
+  return { sql: detail.generated_sql };
 }
 
 function countInvalidChunkLinks(chunks: JsonRecord[], field: string, expectedValue?: string | null) {
@@ -664,4 +3614,332 @@ export async function validateTaskExecution(
       },
     ],
   };
+}
+
+function slugifySignature(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function inferPatternRiskLevel(severity: string) {
+  if (severity === "critical") return "critical";
+  if (severity === "high") return "high";
+  if (severity === "low") return "low";
+  return "medium";
+}
+
+async function upsertIssuePattern(supabase: SupabaseClient, issue: MonitoringIssueInput) {
+  const now = nowIso();
+  const { data: existing, error: fetchError } = await supabase
+    .from("ai_issue_patterns")
+    .select("*")
+    .eq("error_signature", issue.error_signature)
+    .maybeSingle();
+
+  if (fetchError) throw fetchError;
+
+  const patternPayload = {
+    issue_type: issue.issue_type,
+    affected_area: issue.affected_area,
+    known_fix: issue.suggested_action,
+    auto_fixable: false,
+    risk_level: inferPatternRiskLevel(issue.severity),
+    metadata: {
+      title: issue.title,
+      evidence: issue.evidence,
+    },
+    last_seen_at: now,
+  };
+
+  if (existing) {
+    const { error } = await supabase
+      .from("ai_issue_patterns")
+      .update({
+        ...patternPayload,
+        frequency: Number(existing.frequency || 0) + 1,
+        updated_at: now,
+      })
+      .eq("id", existing.id);
+    if (error) throw error;
+    return existing.id;
+  }
+
+  const { data, error } = await supabase
+    .from("ai_issue_patterns")
+    .insert({
+      error_signature: issue.error_signature,
+      frequency: 1,
+      success_rate: 0,
+      first_seen_at: now,
+      created_at: now,
+      updated_at: now,
+      ...patternPayload,
+    })
+    .select("id")
+    .single();
+
+  if (error) throw error;
+  return data?.id || null;
+}
+
+async function upsertMonitoringIssue(supabase: SupabaseClient, issue: MonitoringIssueInput) {
+  const now = nowIso();
+  const activeStatuses = ["open", "planning", "auditing", "waiting_approval", "running", "blocked"];
+  const { data: existing, error: fetchError } = await supabase
+    .from("ai_issues")
+    .select("*")
+    .eq("error_signature", issue.error_signature)
+    .in("status", activeStatuses)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (fetchError) throw fetchError;
+
+  const issuePayload = {
+    title: issue.title,
+    severity: issue.severity,
+    issue_type: issue.issue_type,
+    affected_area: issue.affected_area,
+    evidence: issue.evidence,
+    impact: issue.impact,
+    suggested_action: issue.suggested_action,
+    error_signature: issue.error_signature,
+    status: "open",
+    updated_at: now,
+  };
+
+  if (existing) {
+    const { data, error } = await supabase
+      .from("ai_issues")
+      .update(issuePayload)
+      .eq("id", existing.id)
+      .select("*")
+      .single();
+    if (error) throw error;
+    return data;
+  }
+
+  const { data, error } = await supabase
+    .from("ai_issues")
+    .insert({
+      ...issuePayload,
+      created_at: now,
+    })
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+async function persistRagHealthReport(
+  supabase: SupabaseClient,
+  issueId: string | null,
+  ragDiagnostic: Awaited<ReturnType<typeof runRagDiagnostic>>,
+  input: {
+    grade_id?: string | null;
+    subject_id?: string | null;
+    topic_id?: string | null;
+    lesson_id?: string | null;
+  } = {},
+) {
+  const status = ragDiagnostic.blocking_reason ? "blocked" : "completed";
+  const payload = {
+    task_id: null,
+    issue_id: issueId,
+    grade_id: input.grade_id || null,
+    subject_id: input.subject_id || null,
+    topic_id: input.topic_id || null,
+    lesson_id: input.lesson_id || null,
+    status,
+    chunk_count: Number(ragDiagnostic.chunks_found || 0),
+    valid_chunk_count: Number(ragDiagnostic.chunks_found || 0),
+    minimum_chunk_count: 1,
+    average_chunk_length: Number(ragDiagnostic.average_chunk_length || 0),
+    relevance_score: Number(ragDiagnostic.relevance_score || 0),
+    blocking_reason: ragDiagnostic.blocking_reason || null,
+    report_data: ragDiagnostic,
+    updated_at: nowIso(),
+  };
+
+  const { error } = await supabase.from("ai_rag_health_reports").insert(payload);
+  if (error) throw error;
+}
+
+export async function runMonitoringSweep(
+  supabase: SupabaseClient,
+  runType = "manual",
+) {
+  const startedAt = nowIso();
+  const { data: run, error: runError } = await supabase
+    .from("ai_monitoring_runs")
+    .insert({
+      run_type: runType,
+      status: "running",
+      issues_detected: 0,
+      grouped_issues: 0,
+      started_at: startedAt,
+      metadata: {},
+      created_at: startedAt,
+    })
+    .select("*")
+    .single();
+
+  if (runError || !run) {
+    throw new Error(runError?.message || "Unable to create monitoring run.");
+  }
+
+  try {
+    const failedJobsResult = await safeSelect(
+      supabase,
+      "lesson_gen_queue",
+      "id, topic_id, status, attempts, last_error, updated_at",
+      (query) => query.limit(500).order("updated_at", { ascending: false }),
+    );
+    const lessonsResult = await safeSelect(
+      supabase,
+      "lessons",
+      "id, topic_id, slug, lesson_order, title, lesson_title",
+      (query) => query.limit(500),
+    );
+
+    const queueRows = failedJobsResult.data || [];
+    const failedJobs = queueRows.filter((job: JsonRecord) =>
+      ["failed", "retryable_failed", "permanent_failed"].includes(job.status),
+    );
+    const jobsMissingTopic = queueRows.filter((job: JsonRecord) => !job.topic_id);
+    const permanentFailed = failedJobs.filter((job: JsonRecord) => Number(job.attempts || 0) >= MAX_AUTOMATIC_RETRIES);
+
+    const lessons = lessonsResult.data || [];
+    const duplicateLessonsMap = new Map<string, number>();
+    lessons.forEach((lesson: JsonRecord) => {
+      const key = `${lesson.topic_id || "none"}::${lesson.slug || lesson.lesson_title || lesson.title || "untitled"}::${lesson.lesson_order || "none"}`;
+      duplicateLessonsMap.set(key, (duplicateLessonsMap.get(key) || 0) + 1);
+    });
+    const duplicateLessons = [...duplicateLessonsMap.entries()]
+      .filter(([, count]) => count > 1)
+      .map(([key, count]) => ({ key, count }));
+
+    const ragDiagnostic = await runRagDiagnostic(supabase, {});
+
+    const monitoringIssues: MonitoringIssueInput[] = [];
+
+    if (failedJobs.length > 0) {
+      monitoringIssues.push({
+        title: "Failed lesson generation jobs detected",
+        severity: permanentFailed.length > 0 ? "critical" : failedJobs.length >= 10 ? "high" : "medium",
+        issue_type: "generation",
+        affected_area: "lessons",
+        error_signature: slugifySignature("lesson_gen_queue_failed_jobs"),
+        evidence: {
+          failed_jobs: failedJobs.length,
+          permanent_failed_jobs: permanentFailed.length,
+          sample_job_ids: failedJobs.slice(0, 10).map((job: JsonRecord) => job.id),
+        },
+        impact: `${failedJobs.length} lesson generation job(s) are failing and blocking fresh curriculum output.`,
+        suggested_action: "Audit the failed queue entries, retry safe jobs, and isolate permanent failures before generation resumes.",
+      });
+    }
+
+    if (jobsMissingTopic.length > 0) {
+      monitoringIssues.push({
+        title: "Lesson generation jobs are missing topic_id",
+        severity: "high",
+        issue_type: "validation",
+        affected_area: "topics",
+        error_signature: slugifySignature("lesson_gen_queue_missing_topic_id"),
+        evidence: {
+          missing_topic_jobs: jobsMissingTopic.length,
+          sample_job_ids: jobsMissingTopic.slice(0, 10).map((job: JsonRecord) => job.id),
+        },
+        impact: "Jobs without topic_id cannot be safely mapped to lessons and must remain blocked.",
+        suggested_action: "Restore exact topic mappings from database relations before retrying generation.",
+      });
+    }
+
+    if (duplicateLessons.length > 0) {
+      monitoringIssues.push({
+        title: "Duplicate lesson groups detected",
+        severity: duplicateLessons.length >= 5 ? "high" : "medium",
+        issue_type: "audit",
+        affected_area: "lessons",
+        error_signature: slugifySignature("lessons_duplicate_groups"),
+        evidence: {
+          duplicate_groups: duplicateLessons.length,
+          sample_groups: duplicateLessons.slice(0, 10),
+        },
+        impact: "Duplicate lessons create curriculum ambiguity and complicate retries, edits, and reporting.",
+        suggested_action: "Review duplicate groups and decide whether to skip, update, or version them explicitly.",
+      });
+    }
+
+    if (ragDiagnostic.blocking_reason || ragDiagnostic.chunks_found === 0) {
+      monitoringIssues.push({
+        title: "RAG health is blocking safe generation",
+        severity: ragDiagnostic.chunks_found === 0 ? "critical" : "high",
+        issue_type: "audit",
+        affected_area: "rag_chunks",
+        error_signature: slugifySignature("rag_chunks_global_health"),
+        evidence: ragDiagnostic,
+        impact: ragDiagnostic.blocking_reason || "RAG data is insufficient for safe lesson generation.",
+        suggested_action: "Repair chunk coverage, validate relevance, and re-run RAG diagnostics before generation resumes.",
+      });
+    }
+
+    const createdIssues = [];
+    for (const issue of monitoringIssues) {
+      await upsertIssuePattern(supabase, issue);
+      const storedIssue = await upsertMonitoringIssue(supabase, issue);
+      createdIssues.push(storedIssue);
+
+      if (issue.affected_area === "rag_chunks") {
+        await persistRagHealthReport(supabase, storedIssue.id, ragDiagnostic);
+      }
+    }
+
+    const completedAt = nowIso();
+    const metadata = {
+      failed_jobs: failedJobs.length,
+      missing_topic_jobs: jobsMissingTopic.length,
+      duplicate_lesson_groups: duplicateLessons.length,
+      rag: ragDiagnostic,
+      issue_signatures: monitoringIssues.map((issue) => issue.error_signature),
+    };
+
+    const { data: finalRun, error: finalRunError } = await supabase
+      .from("ai_monitoring_runs")
+      .update({
+        status: "completed",
+        issues_detected: monitoringIssues.length,
+        grouped_issues: monitoringIssues.length,
+        completed_at: completedAt,
+        metadata,
+      })
+      .eq("id", run.id)
+      .select("*")
+      .single();
+
+    if (finalRunError || !finalRun) {
+      throw new Error(finalRunError?.message || "Unable to finalize monitoring run.");
+    }
+
+    return {
+      run: finalRun,
+      issues: createdIssues,
+      summary: metadata,
+    };
+  } catch (error) {
+    await supabase
+      .from("ai_monitoring_runs")
+      .update({
+        status: "failed",
+        completed_at: nowIso(),
+        metadata: { error: normalizeError(error) },
+      })
+      .eq("id", run.id);
+    throw error;
+  }
 }

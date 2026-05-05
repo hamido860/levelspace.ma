@@ -17,11 +17,15 @@ import { ClassroomView } from './pages/ClassroomView';
 import { Library } from './pages/Library';
 import { Admin } from './pages/Admin';
 import { AiCommandCenter } from './pages/AiCommandCenter';
+import { AdminAiRecovery } from './pages/AdminAiRecovery';
+import { AdminAiRecoveryTaskDetail } from './pages/AdminAiRecoveryTaskDetail';
+import { AdminRecoveredLessonReview } from './pages/AdminRecoveredLessonReview';
 import { Profile } from './pages/Profile';
 import { SearchProvider } from './context/SearchContext';
 import { LanguageProvider } from './context/LanguageContext';
 import { AuthProvider } from './context/AuthContext';
 import { Pricing } from './pages/Pricing';
+import PrivacyPolicy from './pages/PrivacyPolicy';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AICrewStatus } from './components/AICrewStatus';
 
@@ -36,6 +40,7 @@ export default function App() {
                 <Route path="/" element={<Landing />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/pricing" element={<Pricing />} />
+                <Route path="/privacy-policy" element={<PrivacyPolicy />} />
                 <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
                 <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                 <Route path="/modules" element={<ProtectedRoute><Modules /></ProtectedRoute>} />
@@ -50,6 +55,13 @@ export default function App() {
                 <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                 <Route path="/admin" element={<ProtectedRoute requireAdmin><Admin /></ProtectedRoute>} />
                 <Route path="/admin/ai-command-center" element={<ProtectedRoute requireAdmin><AiCommandCenter /></ProtectedRoute>} />
+                <Route path="/admin/ai-recovery" element={<ProtectedRoute requireAdmin><AdminAiRecovery /></ProtectedRoute>} />
+                <Route path="/admin/ai-recovery/failed-jobs" element={<ProtectedRoute requireAdmin><AdminAiRecovery /></ProtectedRoute>} />
+                <Route path="/admin/ai-recovery/ai-tasks" element={<ProtectedRoute requireAdmin><AdminAiRecovery /></ProtectedRoute>} />
+                <Route path="/admin/ai-recovery/ai-tasks/:taskId" element={<ProtectedRoute requireAdmin><AdminAiRecoveryTaskDetail /></ProtectedRoute>} />
+                <Route path="/admin/ai-recovery/recovered-lessons" element={<ProtectedRoute requireAdmin><AdminAiRecovery /></ProtectedRoute>} />
+                <Route path="/admin/ai-recovery/recovered-lessons/:lessonId" element={<ProtectedRoute requireAdmin><AdminRecoveredLessonReview /></ProtectedRoute>} />
+                <Route path="/admin/ai-recovery/logs" element={<ProtectedRoute requireAdmin><AdminAiRecovery /></ProtectedRoute>} />
               </Routes>
             </Router>
             <Toaster position="bottom-right" richColors />
