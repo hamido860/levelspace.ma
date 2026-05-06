@@ -23,7 +23,6 @@ import {
 } from 'lucide-react';
 import { generateCurriculum, checkAIProvider } from '../services/geminiService';
 import { getClassroomLoadPlan, mapSubjectsToModules, mergeModulesWithAiSuggestions, shouldRequestAiCurriculumSuggestions } from '../services/classroomLoader';
-import { mapSubjectsToModules, mergeModulesWithAiSuggestions } from '../services/classroomLoader';
 import { supabase } from '../db/supabase';
 import { useSearch } from '../context/SearchContext';
 import { useLiveQuery } from 'dexie-react-hooks';
