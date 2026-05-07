@@ -22,7 +22,7 @@ import {
   PlusCircle
 } from 'lucide-react';
 import { generateCurriculum, checkAIProvider } from '../services/geminiService';
-import { mapSubjectsToModules, mergeModulesWithAiSuggestions } from '../services/classroomLoader';
+import { getClassroomLoadPlan, mapSubjectsToModules, mergeModulesWithAiSuggestions, shouldRequestAiCurriculumSuggestions } from '../services/classroomLoader';
 import { supabase } from '../db/supabase';
 import { useSearch } from '../context/SearchContext';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -46,6 +46,8 @@ export const Modules: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { searchQuery } = useSearch();
   const navigate = useNavigate();
+  const aiAvailable = checkAIProvider();
+  const aiUnavailableMsg = 'AI curriculum suggestions require an API key.';
 
   const dbModules = useLiveQuery(() => db.modules.toArray());
   const modules = (dbModules || []).map(m => ({
@@ -94,6 +96,15 @@ export const Modules: React.FC = () => {
     fetchBacDetails();
   }, [selectedBacTrackId, selectedBacIntOptionId, grade]);
 
+  useEffect(() => {
+    if (dbModules === undefined) return;
+    if (dbModules.length > 0) return;
+    if (!country) return;
+
+    const plan = getClassroomLoadPlan({ action: 'create_classroom', isPro });
+    fetchCurriculum(plan.includeAiSuggestions);
+  }, [country, dbModules, grade, isPro]);
+
   const fetchCurriculum = async (includeAiSuggestions = false, bypassAiCache = false) => {
     setIsLoading(true);
     try {
@@ -103,7 +114,7 @@ export const Modules: React.FC = () => {
       const supabaseModules = mapSubjectsToModules((subjectRows || []) as any[]);
       let modulesToStore = supabaseModules;
 
-      if (includeAiSuggestions && aiAvailable) {
+      if (shouldRequestAiCurriculumSuggestions({ includeAiSuggestions, aiAvailable })) {
         let fullGrade = grade;
         if (bacTrackName) {
           fullGrade += ` - ${bacTrackName}`;
@@ -133,8 +144,22 @@ export const Modules: React.FC = () => {
       }
 
       if (modulesToStore.length > 0) {
-        await db.modules.clear();
-        await db.modules.bulkPut(modulesToStore);
+        const existingById = new Map((dbModules || []).map((module) => [module.id, module]));
+        const mergedModules = modulesToStore.map((module) => {
+          const existing = existingById.get(module.id);
+          if (!existing) return module;
+
+          return {
+            ...module,
+            progress: existing.progress ?? module.progress,
+            selected: existing.selected ?? module.selected,
+            tags: existing.tags ?? module.tags,
+            strictRAG: existing.strictRAG ?? module.strictRAG,
+            createdAt: existing.createdAt ?? module.createdAt,
+          };
+        });
+
+        await db.modules.bulkPut(mergedModules);
       }
     } catch (error) {
       console.error('Failed to fetch classroom curriculum:', error);
@@ -174,15 +199,18 @@ export const Modules: React.FC = () => {
           <div className="space-y-1 flex-1">
             <div className="flex items-start md:items-center gap-2 text-accent">
               <Sparkles className="w-4 h-4 shrink-0 mt-0.5 md:mt-0" />
-              <span className="text-[10px] font-bold uppercase tracking-[0.3em] leading-relaxed">AI-Curated for {grade}{bacTrackName ? ` - ${bacTrackName}` : ''}{bacIntOptionName ? ` (${bacIntOptionName})` : ''} in {country}</span>
+              <span className="text-[10px] font-bold uppercase tracking-[0.3em] leading-relaxed">Draft AI-Assisted Content — Pending Curriculum Validation</span>
             </div>
             <h2 className="text-2xl md:text-3xl font-bold text-ink font-sans">{t('actions_create_classroom')}</h2>
           </div>
           
           <div className="flex items-center gap-4 shrink-0">
             <button
-              onClick={() => fetchCurriculum(true, true)}
-              disabled={isLoading || !aiAvailable}
+              onClick={() => {
+                const plan = getClassroomLoadPlan({ action: 'refresh_suggestions', isPro });
+                fetchCurriculum(plan.includeAiSuggestions, true);
+              }}
+              disabled={isLoading || !aiAvailable || !isPro}
               title={!aiAvailable ? aiUnavailableMsg : undefined}
               className="flex items-center gap-2 px-4 py-2 bg-accent/5 text-accent rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-accent/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -339,7 +367,10 @@ export const Modules: React.FC = () => {
                   </div>
                 )}
                 <button
-                  onClick={() => fetchCurriculum(false)}
+                  onClick={() => {
+                    const plan = getClassroomLoadPlan({ action: 'create_classroom', isPro });
+                    fetchCurriculum(plan.includeAiSuggestions);
+                  }}
                   className="px-10 py-4 bg-accent text-paper rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-accent-hover transition-all shadow-xl shadow-accent/20 flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <PlusCircle className="w-4 h-4" />
@@ -393,4 +424,3 @@ export const Modules: React.FC = () => {
     </Layout>
   );
 };
-

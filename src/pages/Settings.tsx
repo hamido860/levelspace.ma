@@ -39,6 +39,36 @@ import { useAuth } from '../context/AuthContext';
 import { updateProfile } from '../db/supabase';
 import { getCustomApiKey, setCustomApiKey, getNvidiaApiKey, setNvidiaApiKey } from '../services/geminiService';
 
+const parseStoredArray = (value: unknown): string[] => {
+  if (Array.isArray(value)) return value.filter((item): item is string => typeof item === 'string');
+  if (typeof value !== 'string') return [];
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+  } catch {
+    return value
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+};
+
+const CAREER_GOALS = [
+  'Doctor',
+  'Engineer',
+  'Scientist',
+  'Teacher',
+  'Designer',
+  'Entrepreneur',
+  'Lawyer',
+  'Still exploring',
+] as const;
+
+const TONE_OPTIONS = ['Encouraging', 'Calm', 'Direct', 'Coach-like'] as const;
+const EXPLANATION_STYLES = ['Step by step', 'Simple', 'Exam-focused', 'Real-world'] as const;
+const MOTIVATION_FOCUS_OPTIONS = ['Confidence', 'Career', 'Grades', 'Discipline'] as const;
+
 
 
 export const Settings: React.FC = () => {
@@ -69,8 +99,15 @@ export const Settings: React.FC = () => {
   const [dbBacIntOptions, setDbBacIntOptions] = useState<any[]>([]);
   const [dbBacTrackIntOptions, setDbBacTrackIntOptions] = useState<any[]>([]);
 
-  const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
-  const [selectedGoal, setSelectedGoal] = useState<string>('General Learning');
+  const [careerGoal, setCareerGoal] = useState<string>('Still exploring');
+  const [careerGoalCustom, setCareerGoalCustom] = useState('');
+  const [hobbies, setHobbies] = useState<string[]>([]);
+  const [targetSkills, setTargetSkills] = useState<string[]>([]);
+  const [hobbyInput, setHobbyInput] = useState('');
+  const [targetSkillInput, setTargetSkillInput] = useState('');
+  const [preferredTone, setPreferredTone] = useState<string>('Encouraging');
+  const [preferredExplanationStyle, setPreferredExplanationStyle] = useState<string>('Step by step');
+  const [motivationFocus, setMotivationFocus] = useState<string>('Confidence');
   const [currentSession, setCurrentSession] = useState<string>('Fall 2024');
   const [defaultDuration, setDefaultDuration] = useState<number>(60);
   
@@ -95,39 +132,38 @@ export const Settings: React.FC = () => {
 
   // Load settings from DB when they change
   useEffect(() => {
-    if (dbSettings.length > 0) {
-      if (settingsMap['selected_country']) setSelectedCountry(settingsMap['selected_country']);
-      if (settingsMap['selected_grade']) setSelectedGrade(settingsMap['selected_grade']);
-      if (settingsMap['selected_interests']) setSelectedInterests(settingsMap['selected_interests']);
-      if (settingsMap['selected_goal']) setSelectedGoal(settingsMap['selected_goal']);
-      if (settingsMap['current_session']) setCurrentSession(settingsMap['current_session']);
-      if (settingsMap['default_session_duration']) setDefaultDuration(Number(settingsMap['default_session_duration']));
-      if (settingsMap['selected_bac_section']) setBacSection(settingsMap['selected_bac_section']);
-      if (settingsMap['selected_bac_track']) setBacTrack(settingsMap['selected_bac_track']);
-      if (settingsMap['selected_bac_int_option']) setBacIntOption(settingsMap['selected_bac_int_option']);
-    } else {
-      // Fallback to localStorage if DB is empty
-      const lsCountry = localStorage.getItem('selected_country');
-      const lsGrade = localStorage.getItem('selected_grade');
-      const lsInterests = localStorage.getItem('selected_interests');
-      const lsGoal = localStorage.getItem('selected_goal');
-      const lsSession = localStorage.getItem('current_session');
-      const lsDuration = localStorage.getItem('default_session_duration');
-      const lsBacSection = localStorage.getItem('selected_bac_section');
-      const lsBacTrack = localStorage.getItem('selected_bac_track');
-      const lsBacIntOption = localStorage.getItem('selected_bac_int_option');
+    const getStoredValue = (key: string) => localStorage.getItem(key) ?? settingsMap[key];
 
-      if (lsCountry) setSelectedCountry(lsCountry);
-      if (lsGrade) setSelectedGrade(lsGrade);
-      if (lsInterests) setSelectedInterests(JSON.parse(lsInterests));
-      if (lsGoal) setSelectedGoal(lsGoal);
-      if (lsSession) setCurrentSession(lsSession);
-      if (lsDuration) setDefaultDuration(Number(lsDuration));
-      if (lsBacSection) setBacSection(lsBacSection);
-      if (lsBacTrack) setBacTrack(lsBacTrack);
-      if (lsBacIntOption) setBacIntOption(lsBacIntOption);
-    }
-  }, [dbSettings.length]);
+    const country = getStoredValue('selected_country');
+    const grade = getStoredValue('selected_grade');
+    const session = getStoredValue('current_session');
+    const duration = getStoredValue('default_session_duration');
+    const section = getStoredValue('selected_bac_section');
+    const track = getStoredValue('selected_bac_track');
+    const option = getStoredValue('selected_bac_int_option');
+    const storedCareerGoal = getStoredValue('career_goal');
+    const storedCareerGoalCustom = getStoredValue('career_goal_custom');
+    const storedHobbies = getStoredValue('hobbies');
+    const storedTargetSkills = getStoredValue('target_skills');
+    const storedTone = getStoredValue('preferred_tone');
+    const storedExplanationStyle = getStoredValue('preferred_explanation_style');
+    const storedMotivationFocus = getStoredValue('motivation_focus');
+
+    if (country) setSelectedCountry(String(country));
+    if (grade) setSelectedGrade(String(grade));
+    if (session) setCurrentSession(String(session));
+    if (duration) setDefaultDuration(Number(duration));
+    if (section) setBacSection(String(section));
+    if (track) setBacTrack(String(track));
+    if (option) setBacIntOption(String(option));
+    if (storedCareerGoal) setCareerGoal(String(storedCareerGoal));
+    if (storedCareerGoalCustom) setCareerGoalCustom(String(storedCareerGoalCustom));
+    if (storedHobbies) setHobbies(parseStoredArray(storedHobbies));
+    if (storedTargetSkills) setTargetSkills(parseStoredArray(storedTargetSkills));
+    if (storedTone) setPreferredTone(String(storedTone));
+    if (storedExplanationStyle) setPreferredExplanationStyle(String(storedExplanationStyle));
+    if (storedMotivationFocus) setMotivationFocus(String(storedMotivationFocus));
+  }, [settingsMap]);
 
   useEffect(() => {
     setApiKey(getCustomApiKey());
@@ -212,39 +248,15 @@ export const Settings: React.FC = () => {
     }
   }, [selectedCountry, currentGrades, selectedGrade]);
 
-  // Auto-save settings to localStorage and DB so they are not lost on refresh
-  useEffect(() => {
-    localStorage.setItem('selected_country', selectedCountry);
-    localStorage.setItem('selected_grade', selectedGrade);
-    localStorage.setItem('selected_interests', JSON.stringify(selectedInterests));
-    localStorage.setItem('selected_goal', selectedGoal);
-    localStorage.setItem('current_session', currentSession);
-    localStorage.setItem('default_session_duration', defaultDuration.toString());
-    localStorage.setItem('selected_bac_section', bacSection);
-    localStorage.setItem('selected_bac_track', bacTrack);
-    localStorage.setItem('selected_bac_int_option', bacIntOption);
-    
-    db.settings.bulkPut([
-      { key: 'selected_country', value: selectedCountry },
-      { key: 'selected_grade', value: selectedGrade },
-      { key: 'selected_interests', value: selectedInterests },
-      { key: 'selected_goal', value: selectedGoal },
-      { key: 'current_session', value: currentSession },
-      { key: 'default_session_duration', value: defaultDuration },
-      { key: 'selected_bac_section', value: bacSection },
-      { key: 'selected_bac_track', value: bacTrack },
-      { key: 'selected_bac_int_option', value: bacIntOption }
-    ]);
-
-    window.dispatchEvent(new Event('storage'));
-  }, [selectedCountry, selectedGrade, selectedInterests, selectedGoal, currentSession, defaultDuration, bacSection, bacTrack, bacIntOption]);
-
   const filteredCountries = availableCountries.filter(c => 
     c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     c.code.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const currentCountryName = availableCountries.find(c => c.code === selectedCountry)?.name || selectedCountry;
+  const selectedSectionName = dbBacSections.find((section) => section.id === bacSection)?.name || '';
+  const selectedTrackName = dbBacTracks.find((track) => track.id === bacTrack)?.name || '';
+  const selectedOptionName = dbBacIntOptions.find((option) => option.id === bacIntOption)?.name || '';
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -259,67 +271,78 @@ export const Settings: React.FC = () => {
   const handleSave = async () => {
     localStorage.setItem('selected_country', selectedCountry);
     localStorage.setItem('selected_grade', selectedGrade);
-    localStorage.setItem('selected_interests', JSON.stringify(selectedInterests));
-    localStorage.setItem('selected_goal', selectedGoal);
     localStorage.setItem('current_session', currentSession);
     localStorage.setItem('default_session_duration', defaultDuration.toString());
+    localStorage.setItem('selected_bac_section', bacSection);
+    localStorage.setItem('selected_bac_track', bacTrack);
+    localStorage.setItem('selected_bac_int_option', bacIntOption);
+    localStorage.setItem('career_goal', careerGoal);
+    localStorage.setItem('career_goal_custom', careerGoalCustom);
+    localStorage.setItem('hobbies', JSON.stringify(hobbies));
+    localStorage.setItem('target_skills', JSON.stringify(targetSkills));
+    localStorage.setItem('preferred_tone', preferredTone);
+    localStorage.setItem('preferred_explanation_style', preferredExplanationStyle);
+    localStorage.setItem('motivation_focus', motivationFocus);
 
-    // Save to DB
     await db.settings.bulkPut([
       { key: 'selected_country', value: selectedCountry },
       { key: 'selected_grade', value: selectedGrade },
-      { key: 'selected_interests', value: selectedInterests },
-      { key: 'selected_goal', value: selectedGoal },
       { key: 'current_session', value: currentSession },
-      { key: 'default_session_duration', value: defaultDuration }
+      { key: 'default_session_duration', value: defaultDuration },
+      { key: 'selected_bac_section', value: bacSection },
+      { key: 'selected_bac_track', value: bacTrack },
+      { key: 'selected_bac_int_option', value: bacIntOption },
+      { key: 'career_goal', value: careerGoal },
+      { key: 'career_goal_custom', value: careerGoalCustom },
+      { key: 'hobbies', value: hobbies },
+      { key: 'target_skills', value: targetSkills },
+      { key: 'preferred_tone', value: preferredTone },
+      { key: 'preferred_explanation_style', value: preferredExplanationStyle },
+      { key: 'motivation_focus', value: motivationFocus },
     ]);
 
-    // Persist academic profile to Supabase for backend enforcement
-    if (user && !isLocked) {
+    if (user && (!isLocked || isAdmin)) {
       try {
         await updateProfile(user.id, {
           selected_grade: selectedGrade,
           selected_bac_track: bacTrack || null,
         });
       } catch (err: any) {
-        console.error('Failed to save academic profile:', err.message);
-      }
-    } else if (user && isLocked) {
-      try {
-        await updateProfile(user.id, {
-          selected_grade: selectedGrade,
-          selected_bac_track: bacTrack || null,
-        });
-      } catch (err: any) {
-        if (err.message?.includes('locked')) {
-          alert('Your academic profile is locked. Contact support to request a change.');
-        }
         console.error('Failed to save academic profile:', err.message);
       }
     }
 
-    localStorage.removeItem('curated_modules'); // Force refresh
-
-    // Clear database to force regeneration
-    await db.modules.clear();
-    await db.tasks.clear();
-    await db.schedule.clear();
-
+    window.dispatchEvent(new Event('storage'));
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 3000);
   };
 
-  const toggleInterest = (id: string) => {
-    setSelectedInterests(prev => 
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-    );
+  const addToken = (
+    value: string,
+    setter: React.Dispatch<React.SetStateAction<string[]>>,
+    reset: () => void
+  ) => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+
+    setter((prev) => {
+      if (prev.some((item) => item.toLowerCase() === trimmed.toLowerCase())) {
+        return prev;
+      }
+      return [...prev, trimmed];
+    });
+    reset();
+  };
+
+  const removeToken = (value: string, setter: React.Dispatch<React.SetStateAction<string[]>>) => {
+    setter((prev) => prev.filter((item) => item !== value));
   };
 
   const setupProgress = [
     { label: t('region'), completed: !!selectedCountry },
     { label: t('grade'), completed: !!selectedGrade },
-    { label: t('learning_interests'), completed: selectedInterests.length > 0 },
-    { label: t('academic_goal'), completed: !!selectedGoal },
+    { label: 'Future goal', completed: !!careerGoal },
+    { label: 'Target skills', completed: targetSkills.length > 0 },
   ].filter(s => s.completed).length;
 
   const progressPercentage = (setupProgress / 4) * 100;
@@ -400,7 +423,7 @@ export const Settings: React.FC = () => {
               activeTab === 'profile' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-ink'
             }`}
           >
-            Academic Profile
+            Academic Path
           </button>
           <button
             onClick={() => setActiveTab('preferences')}
@@ -413,286 +436,444 @@ export const Settings: React.FC = () => {
         </div>
 
         {activeTab === 'profile' && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             className="grid grid-cols-1 md:grid-cols-2 gap-4"
           >
-            {/* Region Selection */}
-            <section className="p-5 bg-paper border border-ink/5 rounded-3xl space-y-5 shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-accent/5 rounded-lg flex items-center justify-center text-accent">
-                  <Globe className="w-4 h-4" />
-                </div>
-                <div className="space-y-0.5">
-                  <h2 className="text-base font-medium text-ink leading-tight">{t('academic_region')}</h2>
-                  <p className="text-[10px] text-muted/60 leading-tight">{t('ai_adapts')}</p>
-                </div>
-              </div>
-
-              <div className="relative" ref={dropdownRef}>
-                <button 
-                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  className="w-full p-4 bg-background border border-ink/10 rounded-2xl flex items-center justify-between cursor-pointer hover:border-accent/30 transition-all text-left"
-                >
-                  <span className="text-sm font-medium text-ink">{currentCountryName}</span>
-                  <ChevronDown className={`w-4 h-4 text-muted transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
-                </button>
-
-                <AnimatePresence>
-                  {isDropdownOpen && (
-                    <motion.div 
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 10 }}
-                      className="absolute z-50 left-0 right-0 mt-2 bg-paper border border-ink/10 rounded-2xl shadow-2xl overflow-hidden"
-                    >
-                      <div className="p-3 border-b border-ink/5">
-                        <div className="relative">
-                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted/50" />
-                          <input 
-                            type="text" 
-                            placeholder={t('search_countries')}
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-9 pr-3 py-2 bg-background border border-ink/5 rounded-xl text-sm outline-none focus:ring-1 focus:ring-accent/20"
-                            autoFocus
-                          />
-                        </div>
-                      </div>
-                      <div className="max-h-60 overflow-y-auto">
-                        {filteredCountries.length > 0 ? (
-                          filteredCountries.map((country) => (
-                            <button
-                              key={country.code}
-                              onClick={() => {
-                                setSelectedCountry(country.code);
-                                setIsDropdownOpen(false);
-                                setSearchQuery('');
-                              }}
-                              className={`w-full text-left px-4 py-3 text-sm transition-colors hover:bg-accent/5 flex items-center justify-between ${
-                                selectedCountry === country.code ? 'text-accent font-bold bg-accent/5' : 'text-ink'
-                              }`}
-                            >
-                              {country.name}
-                              {selectedCountry === country.code && <CheckCircle2 className="w-4 h-4" />}
-                            </button>
-                          ))
-                        ) : (
-                          <div className="p-4 text-center text-xs text-muted">{t('no_countries_found')}</div>
-                        )}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            </section>
-
-            {/* Grade Selection */}
-            <section className="p-5 bg-paper border border-ink/5 rounded-3xl space-y-5 shadow-sm">
-              <div className="flex items-center gap-3 justify-between">
+            <section className="p-6 bg-paper border border-ink/5 rounded-3xl space-y-5 shadow-sm md:col-span-2">
+              <div className="flex items-start justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-accent/5 rounded-lg flex items-center justify-center text-accent">
-                    <GraduationCap className="w-4 h-4" />
+                  <div className="w-10 h-10 bg-accent/5 rounded-2xl flex items-center justify-center text-accent shrink-0">
+                    <GraduationCap className="w-5 h-5" />
                   </div>
-                  <div className="space-y-0.5">
-                    <h2 className="text-base font-medium text-ink leading-tight">{t('academic_level')}</h2>
-                    <p className="text-[10px] text-muted/60 leading-tight">{t('grade')}</p>
+                  <div className="space-y-1">
+                    <h2 className="text-lg font-medium text-ink">Academic identity</h2>
+                    <p className="text-xs text-muted leading-relaxed">
+                      This keeps the official curriculum accurate. Normal learners should set it during onboarding and use future goals below to personalize AI explanations.
+                    </p>
                   </div>
                 </div>
-                {isAdmin && profile?.onboarding_completed && (
-                  <div className="px-3 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full text-amber-700 text-[10px] font-bold uppercase tracking-wider">
-                    Admin / Testing Mode
-                  </div>
-                )}
+                <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${isLocked ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-700 border border-amber-500/20'}`}>
+                  {isLocked ? 'Locked after onboarding' : 'Editable for setup'}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="p-4 rounded-2xl border border-ink/5 bg-surface-low space-y-1">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-muted">Country</span>
+                  <p className="text-sm font-semibold text-ink">{currentCountryName || 'Not set'}</p>
+                </div>
+                <div className="p-4 rounded-2xl border border-ink/5 bg-surface-low space-y-1">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-muted">Grade</span>
+                  <p className="text-sm font-semibold text-ink">{selectedGrade || 'Not set'}</p>
+                </div>
+                <div className="p-4 rounded-2xl border border-ink/5 bg-surface-low space-y-1">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-muted">Track</span>
+                  <p className="text-sm font-semibold text-ink">{selectedTrackName || selectedSectionName || 'Not set'}</p>
+                  {selectedOptionName && <p className="text-[11px] text-muted">{selectedOptionName}</p>}
+                </div>
               </div>
 
               {isLocked ? (
-                <div className="p-4 bg-background border border-ink/10 rounded-2xl flex items-center gap-3">
-                  <div className="w-8 h-8 bg-ink/5 rounded-lg flex items-center justify-center text-muted shrink-0">
-                    <GraduationCap className="w-4 h-4" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-ink">{selectedGrade}</p>
-                    <p className="text-[10px] text-muted mt-1">Your academic profile is locked after onboarding.</p>
-                  </div>
+                <div className="p-4 bg-background border border-ink/10 rounded-2xl text-xs text-muted leading-relaxed">
+                  Your academic identity now acts as the official curriculum anchor. Change hobbies, goals, tone, and skills below without changing the school program itself.
                 </div>
               ) : (
-                <div key={selectedCountry} className="grid grid-cols-1 gap-2 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
-                  {currentGrades.map((grade, index) => (
-                    <button
-                      key={`${grade}-${index}`}
-                      onClick={() => setSelectedGrade(grade)}
-                      className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
-                        selectedGrade === grade
-                          ? 'bg-accent border-accent text-paper shadow-lg shadow-accent/20'
-                          : 'bg-background border-ink/5 text-ink hover:border-accent/30'
-                      }`}
-                    >
-                      <span className="text-xs font-medium">{grade}</span>
-                      {selectedGrade === grade && <CheckCircle2 className="w-3.5 h-3.5 text-accent" />}
-                    </button>
-                  ))}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-muted">Country</label>
+                      <div className="relative" ref={dropdownRef}>
+                        <button
+                          onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                          className="w-full p-4 bg-background border border-ink/10 rounded-2xl flex items-center justify-between cursor-pointer hover:border-accent/30 transition-all text-left"
+                        >
+                          <span className="text-sm font-medium text-ink">{currentCountryName}</span>
+                          <ChevronDown className={`w-4 h-4 text-muted transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                        </button>
+
+                        <AnimatePresence>
+                          {isDropdownOpen && (
+                            <motion.div
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: 10 }}
+                              className="absolute z-50 left-0 right-0 mt-2 bg-paper border border-ink/10 rounded-2xl shadow-2xl overflow-hidden"
+                            >
+                              <div className="p-3 border-b border-ink/5">
+                                <div className="relative">
+                                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted/50" />
+                                  <input
+                                    type="text"
+                                    placeholder={t('search_countries')}
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full pl-9 pr-3 py-2 bg-background border border-ink/5 rounded-xl text-sm outline-none focus:ring-1 focus:ring-accent/20"
+                                    autoFocus
+                                  />
+                                </div>
+                              </div>
+                              <div className="max-h-60 overflow-y-auto">
+                                {filteredCountries.length > 0 ? (
+                                  filteredCountries.map((country) => (
+                                    <button
+                                      key={country.code}
+                                      onClick={() => {
+                                        setSelectedCountry(country.code);
+                                        setIsDropdownOpen(false);
+                                        setSearchQuery('');
+                                      }}
+                                      className={`w-full text-left px-4 py-3 text-sm transition-colors hover:bg-accent/5 flex items-center justify-between ${
+                                        selectedCountry === country.code ? 'text-accent font-bold bg-accent/5' : 'text-ink'
+                                      }`}
+                                    >
+                                      {country.name}
+                                      {selectedCountry === country.code && <CheckCircle2 className="w-4 h-4" />}
+                                    </button>
+                                  ))
+                                ) : (
+                                  <div className="p-4 text-center text-xs text-muted">{t('no_countries_found')}</div>
+                                )}
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-muted">Grade</label>
+                      <div key={selectedCountry} className="grid grid-cols-1 gap-2 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
+                        {currentGrades.map((grade, index) => (
+                          <button
+                            key={`${grade}-${index}`}
+                            onClick={() => setSelectedGrade(grade)}
+                            className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
+                              selectedGrade === grade
+                                ? 'bg-accent border-accent text-paper shadow-lg shadow-accent/20'
+                                : 'bg-background border-ink/5 text-ink hover:border-accent/30'
+                            }`}
+                          >
+                            <span className="text-xs font-medium">{grade}</span>
+                            {selectedGrade === grade && <CheckCircle2 className="w-3.5 h-3.5 text-paper" />}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {selectedCountry === 'Morocco' && (selectedGrade.includes('Bac') || selectedGrade.includes('Tronc Commun')) && (
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-muted">Section</label>
+                        <div className="grid grid-cols-1 gap-2 max-h-[180px] overflow-y-auto pr-2 custom-scrollbar">
+                          {dbBacSections.map((section) => (
+                            <button
+                              key={section.id}
+                              onClick={() => {
+                                setBacSection(section.id);
+                                setBacTrack('');
+                                setBacIntOption('');
+                              }}
+                              className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
+                                bacSection === section.id
+                                  ? 'bg-accent border-accent text-paper shadow-lg shadow-accent/20'
+                                  : 'bg-background border-ink/5 text-ink hover:border-accent/30'
+                              }`}
+                            >
+                              <span className="text-xs font-medium text-left pr-2">{section.name}</span>
+                              {bacSection === section.id && <CheckCircle2 className="w-3.5 h-3.5 text-paper shrink-0" />}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {bacSection && !selectedGrade.includes('Tronc Commun') && (
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-muted">Track</label>
+                          <div className="grid grid-cols-1 gap-2 max-h-[180px] overflow-y-auto pr-2 custom-scrollbar">
+                            {dbBacTracks.filter((track) => track.section_id === bacSection).map((track) => (
+                              <button
+                                key={track.id}
+                                onClick={() => {
+                                  setBacTrack(track.id);
+                                  setBacIntOption('');
+                                }}
+                                className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
+                                  bacTrack === track.id
+                                    ? 'bg-accent border-accent text-paper shadow-lg shadow-accent/20'
+                                    : 'bg-background border-ink/5 text-ink hover:border-accent/30'
+                                }`}
+                              >
+                                <span className="text-xs font-medium text-left pr-2">{track.name}</span>
+                                {bacTrack === track.id && <CheckCircle2 className="w-3.5 h-3.5 text-paper shrink-0" />}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {bacTrack && !selectedGrade.includes('Tronc Commun') && dbBacTrackIntOptions.some((item) => item.track_id === bacTrack) && (
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-muted">International option</label>
+                          <div className="grid grid-cols-1 gap-2 max-h-[180px] overflow-y-auto pr-2 custom-scrollbar">
+                            <button
+                              onClick={() => setBacIntOption('')}
+                              className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
+                                bacIntOption === ''
+                                  ? 'bg-accent border-accent text-paper shadow-lg shadow-accent/20'
+                                  : 'bg-background border-ink/5 text-ink hover:border-accent/30'
+                              }`}
+                            >
+                              <span className="text-xs font-medium text-left pr-2">None</span>
+                              {bacIntOption === '' && <CheckCircle2 className="w-3.5 h-3.5 text-paper shrink-0" />}
+                            </button>
+                            {dbBacTrackIntOptions
+                              .filter((item) => item.track_id === bacTrack)
+                              .map((item) => {
+                                const option = dbBacIntOptions.find((match) => match.id === item.international_option_id);
+                                if (!option) return null;
+                                return (
+                                  <button
+                                    key={option.id}
+                                    onClick={() => setBacIntOption(option.id)}
+                                    className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
+                                      bacIntOption === option.id
+                                        ? 'bg-accent border-accent text-paper shadow-lg shadow-accent/20'
+                                        : 'bg-background border-ink/5 text-ink hover:border-accent/30'
+                                    }`}
+                                  >
+                                    <span className="text-xs font-medium text-left pr-2">{option.name}</span>
+                                    {bacIntOption === option.id && <CheckCircle2 className="w-3.5 h-3.5 text-paper shrink-0" />}
+                                  </button>
+                                );
+                              })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </section>
 
-            {/* Baccalaureate Options (Only for Morocco Bac grades) */}
-            {selectedCountry === 'Morocco' && (selectedGrade.includes('Bac') || selectedGrade.includes('Tronc Commun')) && (
-              <section className="p-5 bg-paper border border-ink/5 rounded-3xl space-y-5 shadow-sm col-span-1 md:col-span-2">
-                <div className="flex items-center gap-3 justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-accent/5 rounded-lg flex items-center justify-center text-accent">
-                      <BookOpen className="w-4 h-4" />
-                    </div>
-                    <div className="space-y-0.5">
-                      <h2 className="text-base font-medium text-ink leading-tight">
-                        {selectedGrade.includes('Tronc Commun') ? 'Common Core Section' : 'Baccalaureate Track'}
-                      </h2>
-                      <p className="text-[10px] text-muted/60 leading-tight">
-                        {selectedGrade.includes('Tronc Commun')
-                          ? 'Select your foundation year section.'
-                          : 'Select your specific track to get the correct curriculum.'}
-                      </p>
-                    </div>
+            <section className="p-5 bg-paper border border-ink/5 rounded-3xl space-y-5 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-accent/5 rounded-lg flex items-center justify-center text-accent">
+                  <Target className="w-4 h-4" />
+                </div>
+                <div className="space-y-0.5">
+                  <h2 className="text-base font-medium text-ink leading-tight">Future goals</h2>
+                  <p className="text-[10px] text-muted/60 leading-tight">This shapes AI tone, examples, and projects without changing the official curriculum.</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted">Career direction</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {CAREER_GOALS.map((goal) => (
+                      <button
+                        key={goal}
+                        onClick={() => setCareerGoal(goal)}
+                        className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
+                          careerGoal === goal
+                            ? 'bg-ink border-ink text-paper shadow-lg shadow-ink/20'
+                            : 'bg-background border-ink/5 text-ink hover:border-accent/30'
+                        }`}
+                      >
+                        <span className="text-xs font-medium">{goal}</span>
+                        {careerGoal === goal && <Check className="w-3.5 h-3.5 text-accent" />}
+                      </button>
+                    ))}
                   </div>
-                  {isAdmin && profile?.onboarding_completed && (
-                    <div className="px-3 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full text-amber-700 text-[10px] font-bold uppercase tracking-wider">
-                      Admin / Testing Mode
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted">Custom goal</label>
+                  <input
+                    type="text"
+                    value={careerGoalCustom}
+                    onChange={(e) => setCareerGoalCustom(e.target.value)}
+                    placeholder="Pediatric doctor, civil engineer, product designer..."
+                    className="w-full p-3 bg-background border border-ink/5 rounded-xl text-sm outline-none focus:ring-1 focus:ring-accent/20"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted">Hobbies and interests</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={hobbyInput}
+                      onChange={(e) => setHobbyInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          addToken(hobbyInput, setHobbies, () => setHobbyInput(''));
+                        }
+                      }}
+                      placeholder="Robotics, football, drawing..."
+                      className="flex-1 p-3 bg-background border border-ink/5 rounded-xl text-sm outline-none focus:ring-1 focus:ring-accent/20"
+                    />
+                    <button
+                      onClick={() => addToken(hobbyInput, setHobbies, () => setHobbyInput(''))}
+                      className="px-4 py-3 rounded-xl bg-ink text-paper text-[10px] font-bold uppercase tracking-widest"
+                    >
+                      Add
+                    </button>
+                  </div>
+                  {hobbies.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {hobbies.map((item) => (
+                        <button
+                          key={item}
+                          onClick={() => removeToken(item, setHobbies)}
+                          className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-accent/8 text-accent text-xs font-semibold"
+                        >
+                          {item}
+                          <X className="w-3 h-3" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </section>
+
+            <section className="p-5 bg-paper border border-ink/5 rounded-3xl space-y-5 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-accent/5 rounded-lg flex items-center justify-center text-accent">
+                  <Brain className="w-4 h-4" />
+                </div>
+                <div className="space-y-0.5">
+                  <h2 className="text-base font-medium text-ink leading-tight">Learning style</h2>
+                  <p className="text-[10px] text-muted/60 leading-tight">Guide how the AI explains ideas, motivates you, and connects schoolwork to your future.</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted">Target skills</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={targetSkillInput}
+                      onChange={(e) => setTargetSkillInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          addToken(targetSkillInput, setTargetSkills, () => setTargetSkillInput(''));
+                        }
+                      }}
+                      placeholder="Problem solving, public speaking, writing..."
+                      className="flex-1 p-3 bg-background border border-ink/5 rounded-xl text-sm outline-none focus:ring-1 focus:ring-accent/20"
+                    />
+                    <button
+                      onClick={() => addToken(targetSkillInput, setTargetSkills, () => setTargetSkillInput(''))}
+                      className="px-4 py-3 rounded-xl bg-ink text-paper text-[10px] font-bold uppercase tracking-widest"
+                    >
+                      Add
+                    </button>
+                  </div>
+                  {targetSkills.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {targetSkills.map((item) => (
+                        <button
+                          key={item}
+                          onClick={() => removeToken(item, setTargetSkills)}
+                          className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-ink text-paper text-xs font-semibold"
+                        >
+                          {item}
+                          <X className="w-3 h-3 text-accent" />
+                        </button>
+                      ))}
                     </div>
                   )}
                 </div>
 
-
-                {isLocked ? (
-                  <div className="p-4 bg-background border border-ink/10 rounded-2xl flex items-center gap-3">
-                    <div className="w-8 h-8 bg-ink/5 rounded-lg flex items-center justify-center text-muted shrink-0">
-                      <BookOpen className="w-4 h-4" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold text-ink">{bacSection && dbBacSections.find(s => s.id === bacSection)?.name || 'No selection'}</p>
-                      {bacTrack && (
-                        <p className="text-xs text-muted mt-1">{dbBacTracks.find(t => t.id === bacTrack)?.name || 'No track selected'}</p>
-                      )}
-                      <p className="text-[10px] text-muted mt-2">Your academic profile is locked after onboarding.</p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex flex-col md:flex-row gap-4">
-                    {/* Section */}
-                    <div className="space-y-2 flex-1">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted">Section</label>
-                    <div className="grid grid-cols-1 gap-2 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
-                      {dbBacSections.map((s) => (
+                <div className="grid grid-cols-1 gap-3">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted">Preferred tone</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {TONE_OPTIONS.map((option) => (
                         <button
-                          key={s.id}
-                          onClick={() => {
-                            setBacSection(s.id);
-                            setBacTrack("");
-                            setBacIntOption("");
-                          }}
-                          className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
-                            bacSection === s.id 
-                              ? 'bg-accent border-accent text-paper shadow-lg shadow-accent/20' 
+                          key={option}
+                          onClick={() => setPreferredTone(option)}
+                          className={`p-3 rounded-xl border text-xs font-medium transition-all ${
+                            preferredTone === option
+                              ? 'bg-accent border-accent text-paper'
                               : 'bg-background border-ink/5 text-ink hover:border-accent/30'
                           }`}
                         >
-                          <span className="text-xs font-medium text-left pr-2">{s.name}</span>
-                          {bacSection === s.id && <CheckCircle2 className="w-3.5 h-3.5 text-paper shrink-0" />}
+                          {option}
                         </button>
                       ))}
                     </div>
                   </div>
 
-                  {/* Track - Only show if NOT Tronc Commun */}
-                  {bacSection && !selectedGrade.includes('Tronc Commun') && (
-                    <div className="space-y-2 flex-1">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-muted">Track</label>
-                      <div className="grid grid-cols-1 gap-2 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
-                        {dbBacTracks.filter(t => t.section_id === bacSection).map((t) => (
-                          <button
-                            key={t.id}
-                            onClick={() => {
-                              setBacTrack(t.id);
-                              setBacIntOption("");
-                            }}
-                            className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
-                              bacTrack === t.id 
-                                ? 'bg-accent border-accent text-paper shadow-lg shadow-accent/20' 
-                                : 'bg-background border-ink/5 text-ink hover:border-accent/30'
-                            }`}
-                          >
-                            <span className="text-xs font-medium text-left pr-2">{t.name}</span>
-                            {bacTrack === t.id && <CheckCircle2 className="w-3.5 h-3.5 text-paper shrink-0" />}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* International Option */}
-                  {bacTrack && !selectedGrade.includes('Tronc Commun') && dbBacTrackIntOptions.some(tio => tio.track_id === bacTrack) && (
-                    <div className="space-y-2 flex-1">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-muted">International Option</label>
-                      <div className="grid grid-cols-1 gap-2 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted">Explanation style</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {EXPLANATION_STYLES.map((option) => (
                         <button
-                          onClick={() => setBacIntOption("")}
-                          className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
-                            bacIntOption === "" 
-                              ? 'bg-accent border-accent text-paper shadow-lg shadow-accent/20' 
+                          key={option}
+                          onClick={() => setPreferredExplanationStyle(option)}
+                          className={`p-3 rounded-xl border text-xs font-medium transition-all ${
+                            preferredExplanationStyle === option
+                              ? 'bg-accent border-accent text-paper'
                               : 'bg-background border-ink/5 text-ink hover:border-accent/30'
                           }`}
                         >
-                          <span className="text-xs font-medium text-left pr-2">None (Standard)</span>
-                          {bacIntOption === "" && <CheckCircle2 className="w-3.5 h-3.5 text-paper shrink-0" />}
+                          {option}
                         </button>
-                        {dbBacTrackIntOptions
-                          .filter(tio => tio.track_id === bacTrack)
-                          .map(tio => {
-                            const option = dbBacIntOptions.find(o => o.id === tio.international_option_id);
-                            if (!option) return null;
-                            return (
-                              <button
-                                key={option.id}
-                                onClick={() => setBacIntOption(option.id)}
-                                className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
-                                  bacIntOption === option.id 
-                                    ? 'bg-accent border-accent text-paper shadow-lg shadow-accent/20' 
-                                    : 'bg-background border-ink/5 text-ink hover:border-accent/30'
-                                }`}
-                              >
-                                <span className="text-xs font-medium text-left pr-2">{option.name}</span>
-                                {bacIntOption === option.id && <CheckCircle2 className="w-3.5 h-3.5 text-paper shrink-0" />}
-                              </button>
-                            );
-                          })}
-                      </div>
+                      ))}
                     </div>
-                  )}
-                </div>
-                )}
-              </section>
-            )}
+                  </div>
 
-            {/* Cloud & Data Sync */}
-            <section className="p-5 bg-paper border border-ink/5 rounded-3xl space-y-5 shadow-sm">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted">Motivation focus</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {MOTIVATION_FOCUS_OPTIONS.map((option) => (
+                        <button
+                          key={option}
+                          onClick={() => setMotivationFocus(option)}
+                          className={`p-3 rounded-xl border text-xs font-medium transition-all ${
+                            motivationFocus === option
+                              ? 'bg-ink border-ink text-paper'
+                              : 'bg-background border-ink/5 text-ink hover:border-accent/30'
+                          }`}
+                        >
+                          {option}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section className="p-5 bg-paper border border-ink/5 rounded-3xl space-y-5 shadow-sm md:col-span-2">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 bg-accent/5 rounded-lg flex items-center justify-center text-accent">
                   <Cloud className="w-4 h-4" />
                 </div>
                 <div className="space-y-0.5">
-                  <h2 className="text-base font-medium text-ink leading-tight">Cloud & Data</h2>
-                  <p className="text-[10px] text-muted/60 leading-tight">Manage your cloud synchronization and local data.</p>
+                  <h2 className="text-base font-medium text-ink leading-tight">Cloud and data</h2>
+                  <p className="text-[10px] text-muted/60 leading-tight">Sync your work across devices without treating this page like a database reset.</p>
                 </div>
               </div>
-              
-              <div className="space-y-4">
-                <div className="p-4 bg-surface-low rounded-2xl border border-ink/5 flex items-center justify-between">
+
+              <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4 items-center">
+                <div className="p-4 bg-surface-low rounded-2xl border border-ink/5 flex items-center justify-between gap-4">
                   <div className="space-y-1">
-                    <p className="text-xs font-bold text-ink uppercase tracking-widest">Supabase Connection</p>
-                    <p className="text-[10px] text-muted">Status: <span className={dbConnected ? 'text-success font-bold' : 'text-error font-bold'}>{dbConnected ? 'Connected' : 'Disconnected'}</span></p>
+                    <p className="text-xs font-bold text-ink uppercase tracking-widest">Supabase connection</p>
+                    <p className="text-[10px] text-muted">
+                      Status: <span className={dbConnected ? 'text-success font-bold' : 'text-error font-bold'}>{dbConnected ? 'Connected' : 'Disconnected'}</span>
+                    </p>
                   </div>
-                  <button 
+                  <button
                     onClick={refreshDbConnection}
                     className="p-2 hover:bg-ink/5 rounded-full transition-all"
                     title="Refresh Connection"
@@ -718,77 +899,11 @@ export const Settings: React.FC = () => {
                     }
                   }}
                   disabled={isSyncing || !dbConnected}
-                  className="w-full flex items-center justify-center gap-3 p-4 bg-accent text-paper rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-accent-hover transition-all shadow-lg shadow-accent/20 disabled:opacity-50"
+                  className="w-full md:w-auto flex items-center justify-center gap-3 px-6 py-4 bg-accent text-paper rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-accent-hover transition-all shadow-lg shadow-accent/20 disabled:opacity-50"
                 >
                   {isSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Cloud className="w-4 h-4" />}
-                  {isSyncing ? 'Synchronizing...' : 'Sync All Data to Cloud'}
+                  {isSyncing ? 'Synchronizing...' : 'Sync all data'}
                 </button>
-              </div>
-            </section>
-
-            {/* Interests Selection */}
-            <section className="p-5 bg-paper border border-ink/5 rounded-3xl space-y-5 shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-accent/5 rounded-lg flex items-center justify-center text-accent">
-                  <Brain className="w-4 h-4" />
-                </div>
-                <div className="space-y-0.5">
-                  <h2 className="text-base font-medium text-ink leading-tight">{t('learning_interests')}</h2>
-                  <p className="text-[10px] text-muted/60 leading-tight">{t('personalize_space')}</p>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-2">
-                {interests.map((interest) => (
-                  <button
-                    key={interest.id}
-                    onClick={() => toggleInterest(interest.id)}
-                    className={`flex items-center gap-2 p-3 rounded-xl border transition-all ${
-                      selectedInterests.includes(interest.id)
-                        ? 'bg-ink border-ink text-paper shadow-lg shadow-ink/20'
-                        : 'bg-background border-ink/5 text-ink hover:border-accent/30'
-                    }`}
-                  >
-                    <span className={selectedInterests.includes(interest.id) ? 'text-accent' : 'text-muted'}>
-                      {interest.icon}
-                    </span>
-                    <span className="text-xs font-medium">{interest.label}</span>
-                  </button>
-                ))}
-              </div>
-            </section>
-
-            {/* Goals Selection */}
-            <section className="p-5 bg-paper border border-ink/5 rounded-3xl space-y-5 shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-accent/5 rounded-lg flex items-center justify-center text-accent">
-                  <Target className="w-4 h-4" />
-                </div>
-                <div className="space-y-0.5">
-                  <h2 className="text-base font-medium text-ink leading-tight">{t('academic_goal')}</h2>
-                  <p className="text-[10px] text-muted/60 leading-tight">{t('status')}</p>
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                {goals.map((goal) => (
-                  <button
-                    key={goal.id}
-                    onClick={() => setSelectedGoal(goal.id)}
-                    className={`w-full flex items-center justify-between p-3 rounded-xl border transition-all ${
-                      selectedGoal === goal.id
-                        ? 'bg-ink border-ink text-paper shadow-lg shadow-ink/20'
-                        : 'bg-background border-ink/5 text-ink hover:border-accent/30'
-                    }`}
-                  >
-                    <span className="text-xs font-medium">{goal.label}</span>
-                    <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center ${
-                      selectedGoal === goal.id ? 'border-accent bg-accent' : 'border-ink/10'
-                    }`}>
-                      {selectedGoal === goal.id && <Check className="w-2.5 h-2.5 text-paper" />}
-                    </div>
-                  </button>
-                ))}
               </div>
             </section>
           </motion.div>

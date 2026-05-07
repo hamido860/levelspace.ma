@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Layout } from '../components/Layout';
-import { ShieldCheck, ArrowLeft, BookOpen, Plus, ChevronRight, CheckCircle2, Clock, Brain, Sparkles, Loader2, MoreHorizontal, Play, Target, Dumbbell, Database, BarChart2 } from 'lucide-react';
+import { ShieldCheck, AlertTriangle, ArrowLeft, BookOpen, Plus, ChevronRight, CheckCircle2, Clock, Brain, Sparkles, Loader2, Play, Target, Dumbbell, Database } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 import { supabase } from '../db/supabase';
@@ -14,66 +14,75 @@ import { getExercisesByLesson } from '../services/exerciseService';
 import { filterStudentVisibleLessons } from '../services/lessonRecovery';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
+import { getGradeCandidates, getSubjectCandidates, pickBestCurriculumMatch } from '../services/curriculumMatching';
+import {
+  compareCurriculumValidationForStudents,
+  getCurriculumValidationBadgeClass,
+  getCurriculumValidationLabel,
+  selectStudentFacingValidatedContent,
+} from '../services/curriculumValidation';
 
-// Moroccan bilingual system — map English ↔ French subject/grade names
-const SUBJECT_ALIASES: Record<string, string[]> = {
-  'mathematics': ['mathématiques', 'maths', 'math'],
-  'mathématiques': ['mathematics', 'maths', 'math'],
-  'physics': ['physique-chimie', 'physique', 'physics-chemistry'],
-  'chemistry': ['physique-chimie', 'chimie'],
-  'physics-chemistry': ['physique-chimie', 'physics', 'chemistry'],
-  'physique-chimie': ['physics-chemistry', 'physics', 'chemistry'],
-  'biology': ['sciences de la vie et de la terre', 'svt', 'life and earth sciences'],
-  'svt': ['biology', 'sciences de la vie et de la terre', 'life and earth sciences'],
-  'sciences de la vie et de la terre': ['biology', 'svt', 'life and earth sciences'],
-  'life and earth sciences': ['sciences de la vie et de la terre', 'svt', 'biology'],
-  'engineering': ['sciences de l\'ingénieur', 'engineering sciences', 'technology'],
-  'sciences de l\'ingénieur': ['engineering', 'engineering sciences', 'technology'],
-  'engineering sciences': ['sciences de l\'ingénieur', 'engineering', 'technology'],
-  'accounting': ['comptabilité', 'finance', 'business'],
-  'comptabilité': ['accounting', 'finance', 'business'],
-  'philosophy': ['philosophie'],
-  'philosophie': ['philosophy'],
-  'history': ['histoire-géographie', 'histoire', 'history-geography'],
-  'histoire': ['history', 'histoire-géographie', 'history-geography'],
-  'histoire-géographie': ['history', 'geography', 'history-geography'],
-  'geography': ['géographie', 'histoire-géographie'],
-  'french': ['langue française', 'français', 'french language'],
-  'français': ['french', 'langue française', 'french language'],
-  'arabic': ['langue arabe', 'arabe', 'arabic language'],
-  'arabe': ['arabic', 'langue arabe', 'arabic language'],
-  'english': ['anglais', 'english language'],
-  'anglais': ['english', 'english language'],
-  'computer science': ['informatique', 'it', 'computer'],
-  'informatique': ['computer science', 'it'],
-  'economics': ['économie', 'economy'],
-  'économie': ['economics', 'economy'],
-  'management': ['sciences de gestion', 'business studies', 'gestion'],
-  'sciences de gestion': ['management', 'business studies', 'gestion'],
+const normalizeLessonTitle = (title: string | null | undefined) =>
+  String(title || '').trim().toLocaleLowerCase();
+
+type SupabaseLessonRow = {
+  id?: string;
+  lesson_title: string;
+  content?: string | null;
+  blocks?: any[] | null;
+  subtitle?: string | null;
+  status?: string | null;
+  grade?: string | null;
+  country?: string | null;
+  subject?: string | null;
+  validation_status?: string | null;
+  source_confidence?: number | null;
+  source_name?: string | null;
+  source_url?: string | null;
+  review_notes?: string | null;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  is_ai_generated?: boolean | null;
+  teaching_contract?: unknown;
 };
 
-const GRADE_ALIASES: Record<string, string[]> = {
-  'grade 12': ['terminale', '2ème bac', 'bac 2', 'tle'],
-  'terminale': ['grade 12', '2ème bac', 'bac 2', 'tle'],
-  '2ème bac': ['grade 12', 'terminale'],
-  'grade 11': ['première', '1ère bac', 'bac 1'],
-  'première': ['grade 11', '1ère bac', 'bac 1'],
-  '1ère bac': ['grade 11', 'première'],
-  'grade 10': ['tronc commun', 'seconde', 'tc'],
-  'tronc commun': ['grade 10', 'seconde'],
-  'seconde': ['grade 10', 'tronc commun'],
-};
+const CLASSROOM_TAB_CONFIG = {
+  lessons: {
+    label: 'Lessons',
+    icon: BookOpen,
+    activeClass: 'border-accent bg-accent/10 text-accent',
+    iconClass: 'text-accent',
+  },
+  quizzes: {
+    label: 'Quizzes',
+    icon: Target,
+    activeClass: 'border-warning bg-warning/10 text-warning',
+    iconClass: 'text-warning',
+  },
+  exercises: {
+    label: 'Exercises',
+    icon: Dumbbell,
+    activeClass: 'border-success bg-success/10 text-success',
+    iconClass: 'text-success',
+  },
+} as const;
 
-const getSubjectSearchTerms = (name: string): string[] => {
-  const key = name.toLowerCase().trim();
-  const aliases = SUBJECT_ALIASES[key] || [];
-  return [name, ...aliases];
-};
+const resolveCurriculumIds = async (grade: string, subject: string, category?: string | null) => {
+  const gradeCandidates = getGradeCandidates(grade);
+  const subjectCandidates = getSubjectCandidates(subject, category);
 
-const getGradeSearchTerms = (grade: string): string[] => {
-  const key = grade.toLowerCase().trim();
-  const aliases = GRADE_ALIASES[key] || [];
-  return [grade, ...aliases];
+  const [{ data: grades }, { data: subjects }] = await Promise.all([
+    supabase.from('grades').select('id, name').in('name', gradeCandidates),
+    supabase.from('subjects').select('id, name').in('name', subjectCandidates),
+  ]);
+
+  const matchedGrade = pickBestCurriculumMatch<{ id: string; name?: string | null }>(grades as any, gradeCandidates);
+  const matchedSubject = pickBestCurriculumMatch<{ id: string; name?: string | null }>(subjects as any, subjectCandidates);
+
+  return {
+    gradeId: matchedGrade?.id ?? null,
+    subjectId: matchedSubject?.id ?? null,
+  };
 };
 
 type ClassroomSupabaseLesson = {
@@ -84,6 +93,14 @@ type ClassroomSupabaseLesson = {
   subtitle?: string | null;
   status?: string | null;
   teaching_contract?: unknown;
+  validation_status?: string | null;
+  source_confidence?: number | null;
+  source_name?: string | null;
+  source_url?: string | null;
+  review_notes?: string | null;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  is_ai_generated?: boolean | null;
 };
 
 export const ClassroomView: React.FC = () => {
@@ -103,78 +120,184 @@ export const ClassroomView: React.FC = () => {
 
   const module = useLiveQuery(() => id ? db.modules.get(id) : undefined, [id]);
   const allLessons = useLiveQuery(() => id ? db.lessons.where('moduleId').equals(id).sortBy('createdAt') : [], [id]);
-  const lessons = filterStudentVisibleLessons(
-    allLessons?.filter(l => l.status !== 'suggested') || []
+  const storedLessons = useMemo(
+    () => (allLessons?.filter((lesson) => lesson.status !== 'suggested') || []).sort(compareCurriculumValidationForStudents),
+    [allLessons],
   );
-
-  // Auto-seed from Supabase when local lessons are empty — no AI needed
-  useEffect(() => {
-    if (!module || !id || allLessons === undefined) return;
-    if (allLessons.filter(l => l.status !== 'suggested').length > 0) return;
-    (async () => {
-      try {
-        const subjectTerms = getSubjectSearchTerms(module.name);
-        const gradeTerms = getGradeSearchTerms(selectedGrade);
-        // Build OR of (subject AND grade) pairs to handle bilingual name mismatches
-        const pairs = subjectTerms.flatMap(st =>
-          gradeTerms.map(gt => `and(subject.ilike.%${st}%,grade.ilike.%${gt}%)`)
-        ).join(',');
-        const { data: dbLessons } = await supabase
-          .from('lessons')
-          .select('id, lesson_title, content, blocks, subtitle, status, teaching_contract')
-          .or(pairs);
-        const visibleLessons = filterStudentVisibleLessons<ClassroomSupabaseLesson>(
-          (dbLessons as ClassroomSupabaseLesson[] | null | undefined) ?? []
-        );
-        if (visibleLessons.length === 0) return;
-        const toAdd = [];
-        for (const les of visibleLessons) {
-          const existing = await db.lessons
-            .where('title').equals(les.lesson_title)
-            .and(l => l.moduleId === module.id)
-            .first();
-          if (!existing) {
-            toAdd.push({
-              id: les.id,
-              moduleId: module.id,
-              title: les.lesson_title,
-              content: les.content || '',
-              blocks: les.blocks,
-              teaching_contract: les.teaching_contract,
-              subtitle: les.subtitle,
-              status: (les.status === 'published' || les.status === 'done') ? 'done' as const : 'pending' as const,
-              createdAt: Date.now()
-            });
-          }
-        }
-        if (toAdd.length > 0) await db.lessons.bulkAdd(toAdd);
-      } catch (err) {
-        console.warn('[ClassroomView] Auto-seed from Supabase failed:', err);
-      }
-    })();
-  }, [module?.id, allLessons?.length]);
-
   const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
   const settingsMap = Object.fromEntries(dbSettings.map(s => [s.key, s.value]));
 
-  const selectedGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
-  const country = settingsMap['selected_country'] || localStorage.getItem('selected_country') || '';
+  const currentGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
+  const currentCountry = settingsMap['selected_country'] || localStorage.getItem('selected_country') || '';
+  const studentVisibleLessons = useMemo(
+    () => filterStudentVisibleLessons(storedLessons),
+    [storedLessons],
+  );
+  const studentLessonSelection = useMemo(
+    () => selectStudentFacingValidatedContent(studentVisibleLessons),
+    [studentVisibleLessons],
+  );
+  const lessons = useMemo(
+    () => (
+      isAdmin
+        ? storedLessons
+        : (studentLessonSelection.hasPreferred
+          ? studentLessonSelection.preferredOnly
+          : studentLessonSelection.fallback)
+    ),
+    [isAdmin, storedLessons, studentLessonSelection],
+  );
+  const hasLessons = lessons.length > 0;
+  const hasSupplementalContent = quizzes.length > 0 || exercises.length > 0;
+  const showStats = module?.progress > 0 || hasLessons;
+  const showTabs = hasLessons || hasSupplementalContent || isLoadingExtra;
+  const showSetupState = !hasLessons && suggestions.length === 0;
+  const showValidationWarningBanner = !isAdmin && lessons.length > 0 && !studentLessonSelection.hasPreferred;
+  const cloudHydrationKeyRef = useRef<string | null>(null);
+  const classroomScopeKey = `${id || ''}:${module?.name || ''}:${module?.category || ''}:${currentGrade}:${currentCountry}`;
+
+  useEffect(() => {
+    if (!id) return;
+    if (module?.name) return;
+
+    (async () => {
+      try {
+        const { data: subject, error } = await supabase
+          .from('subjects')
+          .select('id, name')
+          .eq('id', id)
+          .single();
+
+        if (error || !subject) return;
+
+        await db.modules.put({
+          id: subject.id,
+          name: subject.name,
+          code: subject.name.slice(0, 3).toUpperCase(),
+          description: 'Supabase curriculum subject',
+          category: 'General',
+          progress: 0,
+          selected: false,
+          tags: [],
+          strictRAG: false,
+          createdAt: Date.now(),
+        });
+      } catch (error) {
+        console.warn('[ClassroomView] Failed to hydrate module cache from subject route:', error);
+      }
+    })();
+  }, [id, module?.name]);
+
+  const fetchSupabaseLessons = async () => {
+    if (!module) return [] as SupabaseLessonRow[];
+
+    const subjectCandidates = getSubjectCandidates(module.name, module.category);
+    const gradeCandidates = getGradeCandidates(currentGrade);
+
+    let query = supabase
+      .from('lessons')
+      .select('id, lesson_title, content, blocks, subtitle, status, grade, country, subject, validation_status, source_confidence, source_name, source_url, review_notes, reviewed_by, reviewed_at, is_ai_generated, teaching_contract')
+      .in('subject', subjectCandidates)
+      .in('grade', gradeCandidates);
+
+    if (currentCountry) {
+      query = query.eq('country', currentCountry);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    return (data || []) as SupabaseLessonRow[];
+  };
+
+  const hydrateLessonCache = async (cloudLessons: SupabaseLessonRow[]) => {
+    if (!module) return;
+
+    const existingById = new Map((allLessons || []).map((lesson) => [lesson.id, lesson]));
+    const existingByTitle = new Map((allLessons || []).map((lesson) => [normalizeLessonTitle(lesson.title), lesson]));
+
+    const toPut = cloudLessons.map((lesson) => {
+      const existing =
+        (lesson.id ? existingById.get(lesson.id) : undefined) ||
+        existingByTitle.get(normalizeLessonTitle(lesson.lesson_title));
+      const hasStoredContent =
+        Boolean(lesson.content?.trim()) ||
+        (Array.isArray(lesson.blocks) && lesson.blocks.length > 0);
+      const normalizedStatus = String(lesson.status || '').toLowerCase();
+
+      return {
+        id: existing?.id || lesson.id || crypto.randomUUID(),
+        moduleId: module.id,
+        title: lesson.lesson_title,
+        content: lesson.content || existing?.content || '',
+        blocks: lesson.blocks ?? existing?.blocks,
+        subtitle: lesson.subtitle ?? existing?.subtitle,
+        grade: lesson.grade ?? existing?.grade,
+        country: lesson.country ?? existing?.country,
+        subject: lesson.subject ?? existing?.subject ?? module.name,
+        sourceLessonId: lesson.id ?? existing?.sourceLessonId,
+        teaching_contract: lesson.teaching_contract ?? existing?.teaching_contract,
+        validation_status: lesson.validation_status ?? existing?.validation_status,
+        source_confidence: Number(lesson.source_confidence ?? existing?.source_confidence ?? 0),
+        source_name: lesson.source_name ?? existing?.source_name,
+        source_url: lesson.source_url ?? existing?.source_url,
+        review_notes: lesson.review_notes ?? existing?.review_notes,
+        reviewed_by: lesson.reviewed_by ?? existing?.reviewed_by,
+        reviewed_at: lesson.reviewed_at ?? existing?.reviewed_at,
+        is_ai_generated: Boolean(lesson.is_ai_generated ?? existing?.is_ai_generated),
+        status: (hasStoredContent || normalizedStatus === 'published' || normalizedStatus === 'done' || normalizedStatus === 'draft')
+          ? 'done' as const
+          : (existing?.status || 'pending') as 'suggested' | 'pending' | 'active' | 'done',
+        tags: existing?.tags || [],
+        createdAt: existing?.createdAt || Date.now(),
+      };
+    });
+
+    if (toPut.length > 0) {
+      await db.lessons.bulkPut(toPut);
+    }
+  };
+
+  // Hydrate the local classroom cache from Supabase so cloud stays the source of truth.
+  useEffect(() => {
+    if (!module || !id || allLessons === undefined) return;
+    if (cloudHydrationKeyRef.current === classroomScopeKey) return;
+
+    cloudHydrationKeyRef.current = classroomScopeKey;
+
+    (async () => {
+      try {
+        const cloudLessons = await fetchSupabaseLessons();
+        if (cloudLessons.length === 0) return;
+        await hydrateLessonCache(cloudLessons);
+      } catch (err) {
+        cloudHydrationKeyRef.current = null;
+        console.warn('[ClassroomView] Supabase classroom hydration failed:', err);
+      }
+    })();
+  }, [allLessons, classroomScopeKey, currentCountry, currentGrade, id, module]);
 
   useEffect(() => {
     const fetchExtraData = async () => {
       if (!lessons.length) return;
       setIsLoadingExtra(true);
       try {
-        const allQuizzes = [];
-        const allExercises = [];
-        for (const lesson of lessons) {
-          const lessonQuizzes = await getQuizzesByLesson(lesson.id);
-          const lessonExercises = await getExercisesByLesson(lesson.id);
-          allQuizzes.push(...(lessonQuizzes || []));
-          allExercises.push(...(lessonExercises || []));
-        }
-        setQuizzes(allQuizzes);
-        setExercises(allExercises);
+        const lessonExtras = await Promise.all(
+          lessons.map(async (lesson) => {
+            const [lessonQuizzes, lessonExercises] = await Promise.all([
+              getQuizzesByLesson(lesson.id),
+              getExercisesByLesson(lesson.id),
+            ]);
+
+            return {
+              quizzes: lessonQuizzes || [],
+              exercises: lessonExercises || [],
+            };
+          })
+        );
+
+        setQuizzes(lessonExtras.flatMap((entry) => entry.quizzes));
+        setExercises(lessonExtras.flatMap((entry) => entry.exercises));
       } catch (error) {
         console.error("Failed to fetch extra data:", error);
       } finally {
@@ -194,11 +317,7 @@ export const ClassroomView: React.FC = () => {
       // Fetch existing topics from Supabase if they exist
       let existingTopics: string[] = [];
       try {
-        const { data: grades } = await supabase.from('grades').select('id').eq('name', selectedGrade).limit(1);
-        const gradeId = grades?.[0]?.id;
-
-        const { data: subjects } = await supabase.from('subjects').select('id').eq('name', module.name).limit(1);
-        const subjectId = subjects?.[0]?.id;
+        const { gradeId, subjectId } = await resolveCurriculumIds(currentGrade, module.name, module.category);
 
         if (gradeId && subjectId) {
           const { data: topics } = await supabase
@@ -215,10 +334,7 @@ export const ClassroomView: React.FC = () => {
       }
 
       // Check database first
-      const existingSuggestions = await db.lessons
-        .where('moduleId').equals(module.id)
-        .filter(l => l.status === 'suggested')
-        .toArray();
+      const existingSuggestions = allLessons?.filter((lesson) => lesson.status === 'suggested') || [];
         
       if (existingSuggestions.length > 0) {
         setSuggestions(existingSuggestions.map(s => ({ title: s.title, description: s.content })));
@@ -226,7 +342,7 @@ export const ClassroomView: React.FC = () => {
       }
 
       // If not in DB, fetch from net
-      const gallery = await generateLessonSuggestions(module.name, selectedGrade, country, 2, existingTopics);
+      const gallery = await generateLessonSuggestions(module.name, currentGrade, currentCountry, 2, existingTopics);
       
       // Save to DB for future
       const newSuggestions = gallery.map(g => ({
@@ -234,6 +350,9 @@ export const ClassroomView: React.FC = () => {
         moduleId: module.id,
         title: g.title,
         content: g.description,
+        validation_status: 'ai_generated',
+        source_confidence: 0,
+        is_ai_generated: true,
         status: 'suggested' as const,
         createdAt: Date.now()
       }));
@@ -251,29 +370,25 @@ export const ClassroomView: React.FC = () => {
   const buildChainContext = async (maxChars = 8000): Promise<string> => {
     if (!module) return '';
     const parts: string[] = [];
+    const includedTitles = new Set<string>();
 
     // 1. Local lessons (IndexedDB)
     const localLessons = allLessons?.filter(l => l.status !== 'suggested') || [];
     for (const l of localLessons) {
+      includedTitles.add(normalizeLessonTitle(l.title));
       parts.push(`Title: ${l.title}\nContent: ${l.content || (l.blocks ? l.blocks.map((b: any) => b.content).join('\n') : '')}`);
     }
 
     // 2. Supabase lessons for this subject/grade/country (seed chaining)
     try {
-      const { data: dbLessons } = await supabase
-        .from('lessons')
-        .select('lesson_title, content, teaching_contract')
-        .eq('subject', module.category || module.name)
-        .eq('grade', selectedGrade)
-        .eq('country', country)
-        .limit(5);
-      const visibleLessons = filterStudentVisibleLessons<ClassroomSupabaseLesson>(
-        (dbLessons as ClassroomSupabaseLesson[] | null | undefined) ?? []
-      );
-      if (visibleLessons.length > 0) {
-        for (const l of visibleLessons) {
+      const dbLessons = await fetchSupabaseLessons();
+      if (dbLessons) {
+        for (const l of dbLessons.slice(0, 5)) {
+          const normalizedTitle = normalizeLessonTitle(l.lesson_title);
+          if (includedTitles.has(normalizedTitle)) continue;
           const entry = `Title: ${l.lesson_title}\nContent: ${l.content?.substring(0, 600) ?? ''}`;
-          if (!parts.some(p => p.includes(l.lesson_title))) parts.push(entry);
+          parts.push(entry);
+          includedTitles.add(normalizedTitle);
         }
       }
     } catch { /* non-critical */ }
@@ -289,7 +404,7 @@ export const ClassroomView: React.FC = () => {
     try {
       const existingContext = await buildChainContext();
 
-      const seedLesson = await generateSeedLesson(lessonTitle, selectedGrade, country, 2, module.strictRAG, existingContext);
+      const seedLesson = await generateSeedLesson(lessonTitle, currentGrade, currentCountry, 2, module.strictRAG, existingContext);
       if (seedLesson) {
         const newLessonId = crypto.randomUUID();
         await db.lessons.add({
@@ -299,6 +414,9 @@ export const ClassroomView: React.FC = () => {
           content: '',
           blocks: seedLesson.blocks,
           subtitle: seedLesson.subtitle,
+          validation_status: 'ai_generated',
+          source_confidence: 0,
+          is_ai_generated: true,
           status: 'pending',
           createdAt: Date.now()
         });
@@ -336,7 +454,7 @@ export const ClassroomView: React.FC = () => {
       const existingContext = await buildChainContext();
 
       for (const title of selectedSuggestions) {
-        const seedLesson = await generateSeedLesson(title, selectedGrade, country, 2, module.strictRAG, existingContext);
+        const seedLesson = await generateSeedLesson(title, currentGrade, currentCountry, 2, module.strictRAG, existingContext);
         if (seedLesson) {
           await db.lessons.add({
             id: crypto.randomUUID(),
@@ -345,6 +463,9 @@ export const ClassroomView: React.FC = () => {
             content: '',
             blocks: seedLesson.blocks,
             subtitle: seedLesson.subtitle,
+            validation_status: 'ai_generated',
+            source_confidence: 0,
+            is_ai_generated: true,
             status: 'pending',
             createdAt: Date.now()
           });
@@ -376,7 +497,7 @@ export const ClassroomView: React.FC = () => {
 
       const titles = suggestions.map(s => s.title);
       for (const title of titles) {
-        const seedLesson = await generateSeedLesson(title, selectedGrade, country, 2, module.strictRAG, existingContext);
+        const seedLesson = await generateSeedLesson(title, currentGrade, currentCountry, 2, module.strictRAG, existingContext);
         if (seedLesson) {
           await db.lessons.add({
             id: crypto.randomUUID(),
@@ -385,6 +506,9 @@ export const ClassroomView: React.FC = () => {
             content: '',
             blocks: seedLesson.blocks,
             subtitle: seedLesson.subtitle,
+            validation_status: 'ai_generated',
+            source_confidence: 0,
+            is_ai_generated: true,
             status: 'pending',
             createdAt: Date.now()
           });
@@ -412,39 +536,49 @@ export const ClassroomView: React.FC = () => {
     if (!module) return;
     setIsSeeding(true);
     try {
-      // Find matching curriculum metadata
-      const { data: dbLessons, error } = await supabase
-        .from('lessons')
-        .select('*')
-        .eq('subject', module.category)
-        .eq('grade', selectedGrade)
-        .eq('country', country);
+      const existingTitles = new Set(storedLessons.map((lesson) => normalizeLessonTitle(lesson.title)));
+      const dbLessons = await fetchSupabaseLessons();
 
-      if (error) throw error;
-      const visibleLessons = filterStudentVisibleLessons<ClassroomSupabaseLesson>(
-        (dbLessons as ClassroomSupabaseLesson[] | null | undefined) ?? []
-      );
-      
-      if (visibleLessons.length === 0) {
+      if (!dbLessons || dbLessons.length === 0) {
+        // Fallback: load lesson titles from curriculum topics outline
+        const { gradeId, subjectId } = await resolveCurriculumIds(currentGrade, module.name, module.category);
+
+        if (gradeId && subjectId) {
+          const { data: topics } = await supabase
+            .from('topics').select('id, title')
+            .eq('grade_id', gradeId).eq('subject_id', subjectId);
+
+          if (topics && topics.length > 0) {
+            const toAdd = topics
+              .filter((topic) => !existingTitles.has(normalizeLessonTitle(topic.title)))
+              .map((topic) => ({
+                id: crypto.randomUUID(),
+                moduleId: module.id,
+                title: topic.title,
+                content: '',
+                validation_status: 'source_matched',
+                source_confidence: 0.65,
+                source_name: 'Curriculum Outline',
+                status: 'pending' as const,
+                createdAt: Date.now(),
+              }));
+
+            if (toAdd.length > 0) {
+              await db.lessons.bulkAdd(toAdd);
+            }
+            toast.success(`Loaded ${topics.length} lesson titles from curriculum outline.`);
+            setIsSeeding(false);
+            return;
+          }
+        }
+
         toast.info("No existing lessons found in Supabase for this curriculum.");
+        setIsSeeding(false);
         return;
       }
 
-      // Add to dexie db
-      for (const les of visibleLessons) {
-        const existing = await db.lessons.where('title').equals(les.lesson_title).and(l => l.moduleId === module.id).first();
-        if (!existing) {
-          await db.lessons.add({
-            id: les.id || crypto.randomUUID(),
-            moduleId: module.id,
-            title: les.lesson_title,
-            content: les.content,
-            teaching_contract: les.teaching_contract,
-            status: 'done',
-            createdAt: Date.now()
-          });
-        }
-      }
+      await hydrateLessonCache(dbLessons);
+      cloudHydrationKeyRef.current = classroomScopeKey;
 
       // Enforce strict RAG mode for this module by default as requested
       await db.modules.update(module.id, { strictRAG: true });
@@ -464,8 +598,8 @@ export const ClassroomView: React.FC = () => {
     toast.promise(
       aiCrew.addTask('classroom_audit', {
         moduleName: module.name,
-        country: country,
-        grade: selectedGrade,
+        country: currentCountry,
+        grade: currentGrade,
         subject: module.category,
         existingLessons: lessons.map(l => ({ title: l.title, content: l.content }))
       }),
@@ -522,246 +656,257 @@ export const ClassroomView: React.FC = () => {
             </div>
           </div>
 
-            <div className="flex items-center gap-3">
-            <button
-              onClick={handleAuditClassroom}
-              disabled={!aiAvailable}
-              title={!aiAvailable ? "AI features need an API key, but your classroom content is available." : "Audit Classroom Content"}
-              className="flex items-center gap-2 bg-surface-low text-muted hover:text-accent px-4 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all border border-ink/5 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <ShieldCheck size={14} />
-              Audit
-            </button>
-            <button
-              onClick={() => handleGenerateLesson()}
-              disabled={!aiAvailable || !!generatingTitle}
-              title={!aiAvailable ? "AI features need an API key, but your classroom content is available." : ""}
-              className="flex items-center gap-2 bg-ink text-paper px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-accent transition-all shadow-lg shadow-ink/10 disabled:opacity-50"
-            >
-              {generatingTitle === module.name ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-              Generate Lesson
-            </button>
-            <button className="w-12 h-12 bg-surface-low rounded-xl flex items-center justify-center text-muted hover:text-ink transition-colors">
-              <MoreHorizontal size={20} />
-            </button>
-          </div>
-        </div>
-
-        {/* Admin Dashboard Panel */}
-        {isAdmin && (
-          <div className="bg-surface-low rounded-3xl p-6 border border-accent/20">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center text-accent">
-                <Database size={20} />
-              </div>
-              <div>
-                <h2 className="text-xl font-bold text-ink">Admin Operations</h2>
-                <p className="text-xs text-muted">Manage Supabase synchronization and constraints.</p>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-paper border border-ink/5 p-5 rounded-2xl">
-                 <div className="flex items-center justify-between mb-4">
-                   <div className="flex items-center gap-2 font-bold text-ink text-sm">
-                     <BarChart2 size={16} className="text-accent" />
-                     Classroom Settings
-                   </div>
-                 </div>
-                 <div className="flex items-center justify-between p-3 bg-surface-low rounded-xl">
-                   <div>
-                     <p className="text-sm font-bold text-ink">Strict RAG Mode</p>
-                     <p className="text-[10px] text-muted">Restrict AI generation to lesson context only</p>
-                   </div>
-                   <button
-                     onClick={async () => {
-                       await db.modules.update(module.id, { strictRAG: !module.strictRAG });
-                     }}
-                     className={`w-12 h-6 rounded-full transition-colors relative ${module.strictRAG ? 'bg-accent' : 'bg-ink/20'}`}
-                   >
-                     <div className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${module.strictRAG ? 'translate-x-6' : 'translate-x-0'}`} />
-                   </button>
-                 </div>
-              </div>
-
-              <div className="bg-paper border border-ink/5 p-5 rounded-2xl space-y-4">
-                <div className="flex items-center gap-2 font-bold text-ink text-sm">
-                  <Database size={16} className="text-accent" />
-                  Supabase Seeding
-                </div>
-                <p className="text-xs text-muted">Fetch existing certified curriculum units from the master database directly into this local classroom.</p>
+          {!showSetupState && (
+            <div className="flex flex-wrap items-center gap-3 md:justify-end">
+              {isAdmin && (
                 <button
                   onClick={handleSeedFromSupabase}
                   disabled={isSeeding}
-                  className="w-full flex items-center justify-center gap-2 bg-ink text-paper py-2 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-accent transition-colors disabled:opacity-50"
+                  className="flex items-center gap-2 bg-surface-low text-ink px-4 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all border border-ink/5 hover:border-accent/30 hover:text-accent disabled:opacity-50"
                 >
                   {isSeeding ? <Loader2 size={14} className="animate-spin" /> : <Database size={14} />}
-                  Seed Classroom from Supabase
+                  {isSeeding ? 'Loading Units' : 'Load from Supabase'}
                 </button>
+              )}
+              {aiAvailable ? (
+                <>
+                  {isAdmin && hasLessons && (
+                    <button
+                      onClick={handleAuditClassroom}
+                      className="flex items-center gap-2 bg-surface-low text-muted hover:text-accent px-4 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all border border-ink/5"
+                    >
+                      <ShieldCheck size={14} />
+                      Audit
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleGenerateLesson()}
+                    disabled={!!generatingTitle}
+                    className="flex items-center gap-2 bg-ink text-paper px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-accent transition-all shadow-lg shadow-ink/10 disabled:opacity-50"
+                  >
+                    {generatingTitle === module.name ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                    {hasLessons ? 'Generate Lesson' : 'Generate First Lesson'}
+                  </button>
+                </>
+              ) : (
+                <div className="px-4 py-3 rounded-xl border border-amber-200 bg-amber-50 text-amber-800 text-[10px] font-bold uppercase tracking-widest">
+                  AI features need an API key
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Admin Controls */}
+        {isAdmin && (
+          <div className="bg-surface-low/70 rounded-2xl p-4 border border-ink/5">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-accent">Admin Controls</p>
+                <p className="text-sm text-ink font-medium">Keep this classroom grounded in certified content before using AI.</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-paper border border-ink/5">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted">Strict RAG</p>
+                    <p className="text-[11px] text-muted">Use lesson context only</p>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      await db.modules.update(module.id, { strictRAG: !module.strictRAG });
+                    }}
+                    className={`w-12 h-6 rounded-full transition-colors relative ${module.strictRAG ? 'bg-accent' : 'bg-ink/20'}`}
+                  >
+                    <div className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${module.strictRAG ? 'translate-x-6' : 'translate-x-0'}`} />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         )}
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-paper border border-ink/5 rounded-2xl p-6 space-y-2">
-            <p className="text-[10px] font-bold text-muted uppercase tracking-widest">Progress</p>
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-bold text-ink">{module.progress}%</span>
-              <span className="text-xs text-muted">Complete</span>
+        {showStats && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-paper border border-ink/5 rounded-2xl p-6 space-y-2">
+              <p className="text-[10px] font-bold text-muted uppercase tracking-widest">Progress</p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-bold text-ink">{module.progress}%</span>
+                <span className="text-xs text-muted">Complete</span>
+              </div>
+              <div className="w-full h-1.5 bg-surface-low rounded-full overflow-hidden">
+                <div className="h-full bg-accent" style={{ width: `${module.progress}%` }} />
+              </div>
             </div>
-            <div className="w-full h-1.5 bg-surface-low rounded-full overflow-hidden">
-              <div className="h-full bg-accent" style={{ width: `${module.progress}%` }} />
-            </div>
-          </div>
-          <div className="bg-paper border border-ink/5 rounded-2xl p-6 space-y-2">
-            <p className="text-[10px] font-bold text-muted uppercase tracking-widest">Lessons</p>
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-bold text-ink">{lessons.length}</span>
-              <span className="text-xs text-muted">Units Curated</span>
-            </div>
-          </div>
-          <div className="bg-paper border border-ink/5 rounded-2xl p-6 space-y-2">
-            <p className="text-[10px] font-bold text-muted uppercase tracking-widest">Status</p>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-sm font-bold text-ink">Active Learning</span>
+            <div className="bg-paper border border-ink/5 rounded-2xl p-6 space-y-2">
+              <p className="text-[10px] font-bold text-muted uppercase tracking-widest">Lessons</p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-bold text-ink">{lessons.length}</span>
+                <span className="text-xs text-muted">Units Curated</span>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* Tabs */}
-        <div className="flex border-b border-ink/10">
-          <button
-            onClick={() => setActiveTab('lessons')}
-            className={`px-6 py-3 text-sm font-bold uppercase tracking-widest transition-colors border-b-2 ${
-              activeTab === 'lessons' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-ink'
-            }`}
-          >
-            Lessons
-          </button>
-          <button
-            onClick={() => setActiveTab('quizzes')}
-            className={`px-6 py-3 text-sm font-bold uppercase tracking-widest transition-colors border-b-2 ${
-              activeTab === 'quizzes' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-ink'
-            }`}
-          >
-            Quizzes
-          </button>
-          <button
-            onClick={() => setActiveTab('exercises')}
-            className={`px-6 py-3 text-sm font-bold uppercase tracking-widest transition-colors border-b-2 ${
-              activeTab === 'exercises' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-ink'
-            }`}
-          >
-            Exercises
-          </button>
-        </div>
-
-        {/* Tab Content */}
-        {activeTab === 'lessons' && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-ink flex items-center gap-2">
-                <BookOpen size={20} className="text-accent" />
-                Curriculum Units
-              </h3>
-              {lessons.length > 0 && suggestions.length === 0 && (
+        {showSetupState ? (
+          <div className="bg-surface-low/50 border border-dashed border-ink/10 rounded-3xl p-10 md:p-14 flex flex-col items-center justify-center text-center space-y-6">
+            <div className="w-16 h-16 bg-paper rounded-full flex items-center justify-center shadow-sm">
+              <BookOpen size={24} className="text-accent" />
+            </div>
+            <div className="space-y-2 max-w-md">
+              <p className="text-xl font-bold text-ink">Set up this classroom</p>
+              <p className="text-sm text-muted">Start with teacher-reviewed or officially validated curriculum units, then add draft AI content only when you need it.</p>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-widest text-muted">
+              <span className="px-3 py-1 rounded-full bg-paper border border-ink/5">Supabase First</span>
+              <span className="px-3 py-1 rounded-full bg-paper border border-ink/5">Local Classroom</span>
+              <span className="px-3 py-1 rounded-full bg-paper border border-ink/5">{module.strictRAG ? 'Strict RAG On' : 'Strict RAG Off'}</span>
+            </div>
+            {!aiAvailable && (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 w-full max-w-md">
+                <p className="text-xs text-amber-800 font-medium">AI features need an API key, but you can still load certified units right now.</p>
+              </div>
+            )}
+            <div className="flex flex-col sm:flex-row gap-3 w-full max-w-md">
+              <button
+                onClick={handleSeedFromSupabase}
+                disabled={isSeeding}
+                className="flex-1 flex items-center justify-center gap-2 bg-ink text-paper px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-accent transition-all disabled:opacity-50"
+              >
+                {isSeeding ? <Loader2 size={14} className="animate-spin" /> : <Database size={14} />}
+                {isSeeding ? 'Loading...' : 'Load from Supabase'}
+              </button>
+              {aiAvailable && (
                 <button
-                  onClick={fetchGallery}
-                  disabled={isFetchingGallery || !aiAvailable}
-                  title={!aiAvailable ? "AI features need an API key, but your classroom content is available." : ""}
-                  className="text-[10px] font-bold text-accent uppercase tracking-widest hover:underline flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={() => handleGenerateLesson()}
+                  disabled={!!generatingTitle}
+                  className="flex-1 flex items-center justify-center gap-2 bg-paper text-ink px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-widest border border-ink/5 hover:border-accent/30 hover:text-accent transition-all disabled:opacity-50"
                 >
-                  {isFetchingGallery ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />}
-                  Fetch Lesson Gallery
+                  {generatingTitle === module.name ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                  Generate First Lesson
                 </button>
               )}
             </div>
-            
-            <div className="grid grid-cols-1 gap-3">
-              {Array.isArray(lessons) && lessons.length > 0 ? (
-                lessons.map((lesson, i) => (
-                  <motion.div 
-                    key={lesson.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.05 }}
-                    onClick={() => navigate(`/lesson/${lesson.id}`)}
-                    className="bg-paper border border-ink/5 p-5 rounded-2xl flex items-center justify-between group cursor-pointer hover:border-accent/30 hover:shadow-xl hover:shadow-ink/5 transition-all"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors ${
-                        lesson.status === 'done' ? 'bg-emerald-50 text-emerald-600' : 'bg-surface-low text-muted group-hover:bg-accent/10 group-hover:text-accent'
-                      }`}>
-                        {lesson.status === 'done' ? <CheckCircle2 size={24} /> : <Play size={20} className="ml-1" />}
-                      </div>
-                      <div>
-                        <h4 className="text-base font-bold text-ink group-hover:text-accent transition-colors">{lesson.title}</h4>
-                        <div className="flex items-center gap-3 mt-1">
-                          <span className="text-[10px] font-mono uppercase tracking-widest text-muted/60">Unit {i + 1}</span>
-                          <span className="w-1 h-1 rounded-full bg-ink/10" />
-                          <span className="text-[10px] font-mono uppercase tracking-widest text-muted/60">~15 min</span>
-                        </div>
-                        <div className="mt-2" onClick={(e) => e.stopPropagation()}>
-                          <TagsManager 
-                            tags={lesson.tags || []} 
-                            onAddTag={async (tag) => {
-                              const currentTags = lesson.tags || [];
-                              if (!currentTags.includes(tag)) {
-                                await db.lessons.update(lesson.id, { tags: [...currentTags, tag] });
-                              }
-                            }}
-                            onRemoveTag={async (tag) => {
-                              const currentTags = lesson.tags || [];
-                              await db.lessons.update(lesson.id, { tags: currentTags.filter(t => t !== tag) });
-                            }}
-                            maxDisplay={7}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                    <ChevronRight size={20} className="text-muted/30 group-hover:text-accent group-hover:translate-x-1 transition-all" />
-                  </motion.div>
-                ))
-              ) : (
-                <div className="bg-surface-low/50 border border-dashed border-ink/10 rounded-3xl p-16 flex flex-col items-center justify-center text-center space-y-6">
-                  <div className="w-16 h-16 bg-paper rounded-full flex items-center justify-center shadow-sm">
-                    <BookOpen size={24} className="text-accent" />
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-sm font-bold text-ink">No units curated yet</p>
-                    <p className="text-xs text-muted max-w-xs">Load existing curriculum units from Supabase or generate new ones with AI.</p>
-                  </div>
-                  {!aiAvailable && (
-                    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 w-full max-w-sm">
-                      <p className="text-xs text-amber-800 font-medium">AI features need an API key, but your classroom content is available.</p>
-                    </div>
-                  )}
-                  <div className="flex flex-col sm:flex-row gap-3 w-full max-w-sm">
+          </div>
+        ) : (
+          <>
+            {/* Tabs */}
+            {showTabs && (
+              <div className="flex gap-2 border-b border-ink/10 overflow-x-auto pb-2">
+                {(['lessons', 'quizzes', 'exercises'] as const).map((tabKey) => {
+                  const tabConfig = CLASSROOM_TAB_CONFIG[tabKey];
+                  const TabIcon = tabConfig.icon;
+                  const isActive = activeTab === tabKey;
+                  return (
                     <button
-                      onClick={handleSeedFromSupabase}
-                      disabled={isSeeding}
-                      className="flex-1 flex items-center justify-center gap-2 bg-ink text-paper px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-accent transition-all disabled:opacity-50"
+                      key={tabKey}
+                      onClick={() => setActiveTab(tabKey)}
+                      className={`flex items-center gap-2 rounded-t-2xl px-4 py-3 text-sm font-bold uppercase tracking-widest transition-all border-b-2 whitespace-nowrap ${
+                        isActive
+                          ? tabConfig.activeClass
+                          : 'border-transparent text-muted hover:bg-surface-low hover:text-ink'
+                      }`}
                     >
-                      {isSeeding ? <Loader2 size={14} className="animate-spin" /> : <Database size={14} />}
-                      {isSeeding ? "Loading..." : "Load from Supabase"}
+                      <TabIcon size={16} className={isActive ? tabConfig.iconClass : 'text-muted'} />
+                      {tabConfig.label}
                     </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Tab Content */}
+            {activeTab === 'lessons' && (
+              <div className="space-y-4">
+                {showValidationWarningBanner && (
+                  <div className="rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4 text-amber-900">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+                      <div>
+                        <p className="text-sm font-semibold">Draft AI-assisted content is shown because no teacher-reviewed or officially validated lesson is available yet.</p>
+                        <p className="mt-1 text-sm text-amber-800">Use the status badge on each unit before treating it as final Moroccan curriculum truth.</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-bold text-ink flex items-center gap-2">
+                    <BookOpen size={20} className="text-accent" />
+                    Curriculum Units
+                  </h3>
+                  {lessons.length > 0 && suggestions.length === 0 && (
                     <button
                       onClick={fetchGallery}
                       disabled={isFetchingGallery || !aiAvailable}
                       title={!aiAvailable ? "AI features need an API key, but your classroom content is available." : ""}
-                      className="flex-1 flex items-center justify-center gap-2 bg-surface-low text-ink px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-accent/10 transition-all disabled:opacity-50"
+                      className="text-[10px] font-bold text-accent uppercase tracking-widest hover:underline flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {isFetchingGallery ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-                      {isFetchingGallery ? "Generating..." : "Generate with AI"}
+                      {isFetchingGallery ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />}
+                      Fetch Lesson Gallery
                     </button>
-                  </div>
+                  )}
                 </div>
-              )}
-            </div>
-          </div>
+                
+                <div className="grid grid-cols-1 gap-3">
+                  {Array.isArray(lessons) && lessons.length > 0 ? (
+                    lessons.map((lesson, i) => (
+                      <motion.div 
+                        key={lesson.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.05 }}
+                        onClick={() => navigate(`/lesson/${lesson.id}`)}
+                        className="bg-paper border border-ink/5 p-5 rounded-2xl flex items-center justify-between group cursor-pointer hover:border-accent/30 hover:shadow-xl hover:shadow-ink/5 transition-all"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors ${
+                            lesson.status === 'done' ? 'bg-emerald-50 text-emerald-600' : 'bg-surface-low text-muted group-hover:bg-accent/10 group-hover:text-accent'
+                          }`}>
+                            {lesson.status === 'done' ? <CheckCircle2 size={24} /> : <Play size={20} className="ml-1" />}
+                          </div>
+                          <div>
+                            <h4 className="text-base font-bold text-ink group-hover:text-accent transition-colors">{lesson.title}</h4>
+                            <div className="mt-2 flex flex-wrap items-center gap-2">
+                              <span className={getCurriculumValidationBadgeClass(lesson.validation_status, !!lesson.is_ai_generated)}>
+                                {getCurriculumValidationLabel(lesson.validation_status, !!lesson.is_ai_generated)}
+                              </span>
+                              {lesson.source_confidence ? (
+                                <span className="pill pill--neutral">
+                                  {Math.round(Number(lesson.source_confidence) * 100)}% source confidence
+                                </span>
+                              ) : null}
+                            </div>
+                            <div className="flex items-center gap-3 mt-2">
+                              <span className="text-[10px] font-mono uppercase tracking-widest text-muted/60">Unit {i + 1}</span>
+                              <span className="w-1 h-1 rounded-full bg-ink/10" />
+                              <span className="text-[10px] font-mono uppercase tracking-widest text-muted/60">~15 min</span>
+                            </div>
+                            <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                              <TagsManager 
+                                tags={lesson.tags || []} 
+                                onAddTag={async (tag) => {
+                                  const currentTags = lesson.tags || [];
+                                  if (!currentTags.includes(tag)) {
+                                    await db.lessons.update(lesson.id, { tags: [...currentTags, tag] });
+                                  }
+                                }}
+                                onRemoveTag={async (tag) => {
+                                  const currentTags = lesson.tags || [];
+                                  await db.lessons.update(lesson.id, { tags: currentTags.filter(t => t !== tag) });
+                                }}
+                                maxDisplay={7}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                        <ChevronRight size={20} className="text-muted/30 group-hover:text-accent group-hover:translate-x-1 transition-all" />
+                      </motion.div>
+                    ))
+                  ) : null}
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {activeTab === 'quizzes' && (

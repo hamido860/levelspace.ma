@@ -1,3 +1,5 @@
+import { isRejectedValidationStatus } from "./curriculumValidation";
+
 export type LessonBlockUiType = "text" | "example" | "formula" | "summary";
 
 const BLOCK_UI_TYPE_MAP: Record<string, LessonBlockUiType> = {
@@ -47,8 +49,14 @@ export const lessonNeedsReview = (lesson: { teaching_contract?: unknown } | null
 export const lessonAllowsStudentPublish = (lesson: { teaching_contract?: unknown } | null | undefined) =>
   isTrue(getTeachingContract(lesson)?.student_publish_allowed);
 
-export const isStudentVisibleLesson = (lesson: { teaching_contract?: unknown } | null | undefined) =>
+export const isStudentVisibleLesson = (
+  lesson: { teaching_contract?: unknown; validation_status?: unknown; is_ai_generated?: boolean } | null | undefined,
+) =>
   (() => {
+    if (isRejectedValidationStatus(lesson?.validation_status, !!lesson?.is_ai_generated)) {
+      return false;
+    }
+
     const teachingContract = getTeachingContract(lesson);
 
     // Legacy lessons without a teaching contract stay visible.
@@ -65,7 +73,9 @@ export const isStudentVisibleLesson = (lesson: { teaching_contract?: unknown } |
     return false;
   })();
 
-export const filterStudentVisibleLessons = <T extends { teaching_contract?: unknown }>(lessons: T[] | null | undefined) =>
+export const filterStudentVisibleLessons = <
+  T extends { teaching_contract?: unknown; validation_status?: unknown; is_ai_generated?: boolean }
+>(lessons: T[] | null | undefined) =>
   (lessons || []).filter(isStudentVisibleLesson);
 
 export const normalizeLessonBlockUiType = (type: string | null | undefined): LessonBlockUiType =>

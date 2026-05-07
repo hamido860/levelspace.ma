@@ -16,6 +16,7 @@ import { BlueprintHub } from './pages/BlueprintHub';
 import { ClassroomView } from './pages/ClassroomView';
 import { Library } from './pages/Library';
 import { Admin } from './pages/Admin';
+import { AdminCurriculumReview } from './pages/AdminCurriculumReview';
 import { AiCommandCenter } from './pages/AiCommandCenter';
 import { AdminAiRecovery } from './pages/AdminAiRecovery';
 import { AdminAiRecoveryTaskDetail } from './pages/AdminAiRecoveryTaskDetail';
@@ -54,6 +55,7 @@ export default function App() {
                 <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                 <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                 <Route path="/admin" element={<ProtectedRoute requireAdmin><Admin /></ProtectedRoute>} />
+                <Route path="/admin/curriculum-review" element={<ProtectedRoute requireAdmin><AdminCurriculumReview /></ProtectedRoute>} />
                 <Route path="/admin/ai-command-center" element={<ProtectedRoute requireAdmin><AiCommandCenter /></ProtectedRoute>} />
                 <Route path="/admin/ai-recovery" element={<ProtectedRoute requireAdmin><AdminAiRecovery /></ProtectedRoute>} />
                 <Route path="/admin/ai-recovery/failed-jobs" element={<ProtectedRoute requireAdmin><AdminAiRecovery /></ProtectedRoute>} />
