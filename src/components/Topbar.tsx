@@ -88,8 +88,9 @@ export const Topbar: React.FC<{ isCollapsed?: boolean }> = ({ isCollapsed = fals
                 e.stopPropagation();
                 refreshDbConnection();
               }}
-              className="p-1 hover:bg-ink/5 rounded-full text-muted/40 hover:text-accent transition-all"
+              className="p-1 hover:bg-ink/5 rounded-full text-muted/40 hover:text-accent transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
               title="Refresh Connection"
+              aria-label="Refresh Database Connection"
             >
               <RefreshCw className={`w-2.5 h-2.5 ${dbConnected === null ? 'animate-spin' : ''}`} />
             </button>
@@ -108,6 +109,7 @@ export const Topbar: React.FC<{ isCollapsed?: boolean }> = ({ isCollapsed = fals
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{ backgroundColor: 'var(--accent-soft)' }}
             className="w-full h-7 ps-9 pe-3 bg-paper/50 border border-ink/5 rounded-full text-sm focus:ring-1 focus:ring-accent/20 outline-none transition-all hover:bg-paper"
+            aria-label={t('search')}
           />
         </div>
       </div>
@@ -117,7 +119,8 @@ export const Topbar: React.FC<{ isCollapsed?: boolean }> = ({ isCollapsed = fals
           <button 
             onClick={toggleTheme}
             title={theme === 'light' ? 'Dark Mode' : 'Light Mode'}
-            className="text-muted hover:text-accent hover:bg-surface-mid transition-all p-2 rounded-full"
+            aria-label={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+            className="text-muted hover:text-accent hover:bg-surface-mid transition-all p-2 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
           >
             {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
           </button>
@@ -128,14 +131,16 @@ export const Topbar: React.FC<{ isCollapsed?: boolean }> = ({ isCollapsed = fals
               setLanguage(nextLang as any);
             }}
             title={t('language')}
-            className="text-muted hover:text-accent hover:bg-surface-mid transition-all p-2 rounded-full"
+            aria-label="Change Language"
+            className="text-muted hover:text-accent hover:bg-surface-mid transition-all p-2 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
           >
             <Globe size={18} />
           </button>
           <button 
             onClick={() => navigate('/settings')}
             title={t('settings')}
-            className={`text-muted hover:text-accent hover:bg-surface-mid transition-all p-2 rounded-full ${location.pathname === '/settings' ? 'text-accent bg-accent/5' : ''}`}
+            aria-label="Open Settings"
+            className={`text-muted hover:text-accent hover:bg-surface-mid transition-all p-2 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 ${location.pathname === '/settings' ? 'text-accent bg-accent/5' : ''}`}
           >
             <Settings size={18} />
           </button>
@@ -144,7 +149,10 @@ export const Topbar: React.FC<{ isCollapsed?: boolean }> = ({ isCollapsed = fals
         <div className="h-8 w-px bg-ink/5 mx-1 hidden md:block" />
 
         <div className="flex items-center">
-          <button className="text-muted hover:text-accent p-2 rounded-full hover:bg-ink/5 transition-all relative">
+          <button
+            className="text-muted hover:text-accent p-2 rounded-full hover:bg-ink/5 transition-all relative focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
+            aria-label="View Notifications"
+          >
             <Bell size={18} />
             <span className="absolute top-2 right-2 w-2 h-2 bg-accent rounded-full border-2 border-surface-low"></span>
           </button>
