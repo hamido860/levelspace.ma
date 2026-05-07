@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Timer, 
@@ -95,11 +95,13 @@ export const Dashboard: React.FC = () => {
   const lastLesson = useLiveQuery(() => lastViewedLessonId ? db.lessons.get(lastViewedLessonId) : undefined, [lastViewedLessonId]);
   const visibleLastLesson = lastLesson && isStudentVisibleLesson(lastLesson) ? lastLesson : undefined;
 
-  const activeModules = allModules.filter(m => m.selected);
+  // ⚡ Bolt Optimization: Memoize filtered modules to prevent unnecessary array recreation on re-renders.
+  const activeModules = useMemo(() => allModules.filter(m => m.selected), [allModules]);
   const reminders = useLiveQuery(() => db.tasks.toArray()) || [];
   const schedule = useLiveQuery(() => db.schedule.toArray()) || [];
-  const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
-  const settingsMap = Object.fromEntries(dbSettings.map(s => [s.key, s.value]));
+  const dbSettings = useLiveQuery(() => db.settings.toArray());
+  // ⚡ Bolt Optimization: Memoize settings map to maintain referential stability, avoiding cascading re-renders when other states change (like the timer).
+  const settingsMap = useMemo(() => Object.fromEntries((dbSettings || []).map(s => [s.key, s.value])), [dbSettings]);
 
   const selectedGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
   const selectedCountry = settingsMap['selected_country'] || localStorage.getItem('selected_country') || '';

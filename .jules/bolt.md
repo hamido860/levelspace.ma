@@ -1,0 +1,3 @@
+## 2024-05-24 - Memoize Derived `useLiveQuery` Data
+**Learning:** `useLiveQuery` triggers a re-render on *any* IndexedDB update. If the result is then mapped, filtered, or otherwise transformed into a new object/array *without* memoization (e.g., `Object.fromEntries(dbSettings.map(...))`), it creates a new object reference on every single re-render. In components like `Dashboard.tsx` with a timer ticking every second, this leads to massive, unnecessary re-evaluations and cascading re-renders down the component tree.
+**Action:** Always wrap derived data from `useLiveQuery` arrays/objects in a `useMemo` hook, with the raw query result as the dependency, to maintain referential stability.

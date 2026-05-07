@@ -380,8 +380,9 @@ export const LessonView: React.FC = () => {
   }, [contentDir, language]);
   const module = useLiveQuery(() => effectiveLesson?.moduleId ? db.modules.get(effectiveLesson.moduleId) : undefined, [effectiveLesson?.moduleId]);
   const notes = useLiveQuery(() => id ? db.notes.where('lessonId').equals(id).toArray() : [], [id]) || [];
-  const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
-  const settingsMap = Object.fromEntries(dbSettings.map(s => [s.key, s.value]));
+  const dbSettings = useLiveQuery(() => db.settings.toArray());
+  // ⚡ Bolt Optimization: Memoize settings map to maintain referential stability.
+  const settingsMap = useMemo(() => Object.fromEntries((dbSettings || []).map(s => [s.key, s.value])), [dbSettings]);
 
   const selectedGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
   const selectedCountry = settingsMap['selected_country'] || localStorage.getItem('selected_country') || '';
