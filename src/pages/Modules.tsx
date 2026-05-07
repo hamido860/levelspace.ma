@@ -23,7 +23,6 @@ import {
 } from 'lucide-react';
 import { generateCurriculum, checkAIProvider } from '../services/geminiService';
 import { getClassroomLoadPlan, mapSubjectsToModules, mergeModulesWithAiSuggestions, shouldRequestAiCurriculumSuggestions } from '../services/classroomLoader';
-import { mapSubjectsToModules, mergeModulesWithAiSuggestions } from '../services/classroomLoader';
 import { supabase } from '../db/supabase';
 import { useSearch } from '../context/SearchContext';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -47,6 +46,8 @@ export const Modules: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { searchQuery } = useSearch();
   const navigate = useNavigate();
+  const aiAvailable = checkAIProvider();
+  const aiUnavailableMsg = 'AI curriculum suggestions require an API key.';
 
   const dbModules = useLiveQuery(() => db.modules.toArray());
   const modules = (dbModules || []).map(m => ({
@@ -198,7 +199,7 @@ export const Modules: React.FC = () => {
           <div className="space-y-1 flex-1">
             <div className="flex items-start md:items-center gap-2 text-accent">
               <Sparkles className="w-4 h-4 shrink-0 mt-0.5 md:mt-0" />
-              <span className="text-[10px] font-bold uppercase tracking-[0.3em] leading-relaxed">AI-Curated for {grade}{bacTrackName ? ` - ${bacTrackName}` : ''}{bacIntOptionName ? ` (${bacIntOptionName})` : ''} in {country}</span>
+              <span className="text-[10px] font-bold uppercase tracking-[0.3em] leading-relaxed">Draft AI-Assisted Content — Pending Curriculum Validation</span>
             </div>
             <h2 className="text-2xl md:text-3xl font-bold text-ink font-sans">{t('actions_create_classroom')}</h2>
           </div>

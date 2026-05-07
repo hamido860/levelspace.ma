@@ -62,6 +62,13 @@ import { useAppSettings } from '../context/AppSettingsContext';
 import { indexLessonContent } from '../services/ragService';
 import { getSubjectCandidates } from '../services/curriculumMatching';
 import { isStudentVisibleLesson, normalizeLessonBlockUiType } from '../services/lessonRecovery';
+import {
+  getCurriculumValidationBadgeClass,
+  getCurriculumValidationLabel,
+  getCurriculumValidationStatus,
+  isDraftValidationStatus,
+  isStudentPreferredValidationStatus,
+} from '../services/curriculumValidation';
 
 const BLOCK_TYPE_CONFIG: Record<string, { icon: React.ElementType; colorClass: string; label: string }> = {
   text:     { icon: FileText,      colorClass: 'text-accent',   label: 'Text'         },
@@ -202,6 +209,15 @@ type SupabaseLessonRecord = {
   grade?: string | null;
   country?: string | null;
   subject?: string | null;
+  validation_status?: string | null;
+  source_confidence?: number | null;
+  source_name?: string | null;
+  source_url?: string | null;
+  review_notes?: string | null;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  is_ai_generated?: boolean | null;
+  teaching_contract?: unknown;
 };
 
 // Shown when AI Crew is generating a lesson on-demand (status === 'pending')
@@ -424,7 +440,7 @@ export const LessonView: React.FC = () => {
     const hydrateSupabaseLesson = async () => {
       const directMatch = await supabase
         .from('lessons')
-        .select('id, topic_id, lesson_title, content, blocks, subtitle, tags, status, grade, country, subject')
+        .select('id, topic_id, lesson_title, content, blocks, subtitle, tags, status, grade, country, subject, validation_status, source_confidence, source_name, source_url, review_notes, reviewed_by, reviewed_at, is_ai_generated, teaching_contract')
         .or(`id.eq.${id},topic_id.eq.${id}`)
         .maybeSingle();
 
@@ -438,7 +454,7 @@ export const LessonView: React.FC = () => {
 
       let titleQuery = supabase
         .from('lessons')
-        .select('id, topic_id, lesson_title, content, blocks, subtitle, tags, status, grade, country, subject')
+        .select('id, topic_id, lesson_title, content, blocks, subtitle, tags, status, grade, country, subject, validation_status, source_confidence, source_name, source_url, review_notes, reviewed_by, reviewed_at, is_ai_generated, teaching_contract')
         .eq('lesson_title', lesson.title);
 
       const subjectCandidates = module ? getSubjectCandidates(module.name, module.category) : [];
@@ -472,13 +488,31 @@ export const LessonView: React.FC = () => {
       country: lesson.country || supabaseLesson.country || undefined,
       subject: lesson.subject || supabaseLesson.subject || module?.name || undefined,
       sourceLessonId: lesson.sourceLessonId || supabaseLesson.id || undefined,
+      validation_status: lesson.validation_status || supabaseLesson.validation_status || undefined,
+      source_confidence: lesson.source_confidence ?? supabaseLesson.source_confidence ?? undefined,
+      source_name: lesson.source_name || supabaseLesson.source_name || undefined,
+      source_url: lesson.source_url || supabaseLesson.source_url || undefined,
+      review_notes: lesson.review_notes || supabaseLesson.review_notes || undefined,
+      reviewed_by: lesson.reviewed_by || supabaseLesson.reviewed_by || undefined,
+      reviewed_at: lesson.reviewed_at || supabaseLesson.reviewed_at || undefined,
+      teaching_contract: lesson.teaching_contract || supabaseLesson.teaching_contract || undefined,
+      is_ai_generated: lesson.is_ai_generated ?? supabaseLesson.is_ai_generated ?? undefined,
     };
 
     if (
       nextPatch.grade !== lesson.grade ||
       nextPatch.country !== lesson.country ||
       nextPatch.subject !== lesson.subject ||
-      nextPatch.sourceLessonId !== lesson.sourceLessonId
+      nextPatch.sourceLessonId !== lesson.sourceLessonId ||
+      nextPatch.validation_status !== lesson.validation_status ||
+      nextPatch.source_confidence !== lesson.source_confidence ||
+      nextPatch.source_name !== lesson.source_name ||
+      nextPatch.source_url !== lesson.source_url ||
+      nextPatch.review_notes !== lesson.review_notes ||
+      nextPatch.reviewed_by !== lesson.reviewed_by ||
+      nextPatch.reviewed_at !== lesson.reviewed_at ||
+      nextPatch.teaching_contract !== lesson.teaching_contract ||
+      nextPatch.is_ai_generated !== lesson.is_ai_generated
     ) {
       db.lessons.update(lesson.id, nextPatch);
     }
@@ -492,6 +526,15 @@ export const LessonView: React.FC = () => {
         country: lesson.country || supabaseLesson?.country || undefined,
         subject: lesson.subject || supabaseLesson?.subject || module?.name || undefined,
         sourceLessonId: lesson.sourceLessonId || supabaseLesson?.id || undefined,
+        validation_status: lesson.validation_status || supabaseLesson?.validation_status || undefined,
+        source_confidence: lesson.source_confidence ?? supabaseLesson?.source_confidence ?? undefined,
+        source_name: lesson.source_name || supabaseLesson?.source_name || undefined,
+        source_url: lesson.source_url || supabaseLesson?.source_url || undefined,
+        review_notes: lesson.review_notes || supabaseLesson?.review_notes || undefined,
+        reviewed_by: lesson.reviewed_by || supabaseLesson?.reviewed_by || undefined,
+        reviewed_at: lesson.reviewed_at || supabaseLesson?.reviewed_at || undefined,
+        teaching_contract: lesson.teaching_contract || supabaseLesson?.teaching_contract || undefined,
+        is_ai_generated: lesson.is_ai_generated ?? supabaseLesson?.is_ai_generated ?? undefined,
       }
     : (supabaseLesson ? {
         id: supabaseLesson.id,
@@ -507,10 +550,38 @@ export const LessonView: React.FC = () => {
         country: supabaseLesson.country || undefined,
         subject: supabaseLesson.subject || undefined,
         sourceLessonId: supabaseLesson.id || undefined,
+        validation_status: supabaseLesson.validation_status || undefined,
+        source_confidence: supabaseLesson.source_confidence ?? undefined,
+        source_name: supabaseLesson.source_name || undefined,
+        source_url: supabaseLesson.source_url || undefined,
+        review_notes: supabaseLesson.review_notes || undefined,
+        reviewed_by: supabaseLesson.reviewed_by || undefined,
+        reviewed_at: supabaseLesson.reviewed_at || undefined,
+        teaching_contract: supabaseLesson.teaching_contract || undefined,
+        is_ai_generated: supabaseLesson.is_ai_generated ?? undefined,
       } : undefined);
   const lessonHasStoredContent =
     Boolean(effectiveLesson?.content?.trim()) ||
     ((effectiveLesson?.blocks?.length || 0) > 0);
+  const validationStatus = getCurriculumValidationStatus(
+    effectiveLesson?.validation_status,
+    !!effectiveLesson?.is_ai_generated,
+  );
+  const validationLabel = getCurriculumValidationLabel(
+    effectiveLesson?.validation_status,
+    !!effectiveLesson?.is_ai_generated,
+  );
+  const validationBadgeClass = getCurriculumValidationBadgeClass(
+    effectiveLesson?.validation_status,
+    !!effectiveLesson?.is_ai_generated,
+  );
+  const showLessonValidationWarning =
+    !isAdmin &&
+    effectiveLesson !== undefined &&
+    effectiveLesson !== null &&
+    isDraftValidationStatus(effectiveLesson.validation_status, !!effectiveLesson.is_ai_generated);
+  const lessonHasPreferredValidation =
+    isStudentPreferredValidationStatus(effectiveLesson?.validation_status, !!effectiveLesson?.is_ai_generated);
 
   const contentDir = useMemo(() => {
     if (forceDir) return forceDir;
@@ -543,11 +614,11 @@ export const LessonView: React.FC = () => {
       setOpenBlocks(['content']);
     }
 
-    if (visibleLocalLesson) {
+    if (effectiveLesson?.id) {
       // Save last viewed lesson
       db.settings.put({ key: 'last_viewed_lesson_id', value: effectiveLesson.id });
     }
-  }, [visibleLocalLesson]);
+  }, [effectiveLesson?.id, effectiveLesson?.blocks, openBlocks.length]);
 
   useEffect(() => {
     const fetchExtraData = async () => {
@@ -804,6 +875,19 @@ export const LessonView: React.FC = () => {
         <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
           <AlertCircle className="w-12 h-12 text-error" />
           <p className="text-ink font-medium">Lesson not found.</p>
+          <button onClick={() => navigate('/dashboard')} className="text-accent hover:underline">Return to Dashboard</button>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!isAdmin && !isStudentVisibleLesson(effectiveLesson)) {
+    return (
+      <Layout fullWidth topbarGradeOverride={lessonGrade}>
+        <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4 px-6 text-center">
+          <ShieldAlert className="w-12 h-12 text-error" />
+          <p className="text-ink font-medium">This lesson is not available to students.</p>
+          <p className="max-w-lg text-sm text-muted">It is currently blocked by curriculum review rules or has been rejected during validation.</p>
           <button onClick={() => navigate('/dashboard')} className="text-accent hover:underline">Return to Dashboard</button>
         </div>
       </Layout>
@@ -1147,8 +1231,12 @@ export const LessonView: React.FC = () => {
           <div className="lesson-header__meta">
             <span className="pill pill--info">{lessonGrade}</span>
             {module && <span className="pill pill--neutral">{module.name}</span>}
-            <span className="pill pill--success">saved</span>
-            <span className="pill pill--warn">medium</span>
+            <span className={validationBadgeClass}>{validationLabel}</span>
+            {effectiveLesson.source_confidence ? (
+              <span className="pill pill--neutral">
+                {Math.round(Number(effectiveLesson.source_confidence) * 100)}% source confidence
+              </span>
+            ) : null}
           </div>
 
           <h1 className="lesson-header__title">
@@ -1159,9 +1247,23 @@ export const LessonView: React.FC = () => {
             {effectiveLesson.subtitle || `${totalBlocks} blocks · ~15 min · AI Generated`}
           </p>
 
-          <p className="text-[11px] text-success font-medium mt-2">
-            Ready instantly from stored Supabase content.
+          <p className={`text-[11px] font-medium mt-2 ${lessonHasPreferredValidation ? 'text-success' : 'text-warning'}`}>
+            {lessonHasPreferredValidation
+              ? 'Validated for student-facing use.'
+              : 'Draft AI-assisted content pending curriculum validation.'}
           </p>
+
+          {showLessonValidationWarning ? (
+            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <div>
+                  <p className="font-semibold">This lesson should not be treated as final curriculum truth yet.</p>
+                  <p className="mt-1 text-amber-800">Use it as draft guidance until a teacher review or official validation is attached.</p>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           <div className="lesson-workspace-grid">
             <section className="lesson-tool-card lesson-tool-card--wide">
@@ -1436,7 +1538,6 @@ export const LessonView: React.FC = () => {
 
               const blockHeading = getBlockTitle(block, index);
               const blockPreview = getBlockPreview(block);
-              const blockTypeLabel = getBlockTypeConfig(block.type || '').label;
 
               return (
                 <article

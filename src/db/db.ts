@@ -47,6 +47,14 @@ export interface Lesson {
   subject?: string;
   sourceLessonId?: string;
   teaching_contract?: unknown;
+  validation_status?: string;
+  source_confidence?: number;
+  source_name?: string;
+  source_url?: string;
+  review_notes?: string;
+  reviewed_by?: string;
+  reviewed_at?: string;
+  is_ai_generated?: boolean;
 }
 
 export interface Note {

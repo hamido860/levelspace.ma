@@ -39,7 +39,9 @@ export const indexLessonContent = async (
           source_type: 'lesson_block',
           content: chunk,
           embedding: embedding,
-          metadata: { user_id: userId }
+          metadata: { user_id: userId },
+          validation_status: 'ai_generated',
+          source_confidence: 0,
         });
       }
     }
@@ -193,6 +195,8 @@ export const saveLesson = async (
       embedding: embedding.length > 0 ? embedding : null,
       author_id: userId === "dummy-user-id" ? null : (userId || null),
       is_ai_generated: isAiGenerated,
+      validation_status: isAiGenerated ? 'ai_generated' : 'unverified',
+      source_confidence: 0,
     }).select('id').single();
 
     if (lessonError) throw lessonError;

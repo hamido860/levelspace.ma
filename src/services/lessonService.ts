@@ -4,6 +4,7 @@ import { generateFullLesson, LessonTemplate, AILesson, AILessonBlock, flatLesson
 import { saveLesson, searchLessons } from "./ragService";
 import { aiCrew } from "./aiCrewService";
 import { isStudentVisibleLesson } from "./lessonRecovery";
+import { compareCurriculumValidationForStudents } from "./curriculumValidation";
 
 export const lessonService = {
   fetchOrGenerate: async (
@@ -43,16 +44,20 @@ export const lessonService = {
       const subject = moduleData?.name || "General";
 
       // 2. Check Supabase by exact (title, grade, country) before similarity search
-      const { data: exactMatch } = await supabase
+      const { data: exactMatches } = await supabase
         .from("lessons")
         .select("*")
         .eq("lesson_title", title)
         .eq("grade", grade)
         .eq("country", country)
-        .maybeSingle();
+        .limit(10);
+
+      const exactMatch = (exactMatches || [])
+        .filter(isStudentVisibleLesson)
+        .sort(compareCurriculumValidationForStudents)[0] || null;
 
       let lessonData: LessonTemplate | null =
-        exactMatch && isStudentVisibleLesson(exactMatch)
+        exactMatch
           ? (exactMatch as LessonTemplate | null)
           : null;
 

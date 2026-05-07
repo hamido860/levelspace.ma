@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Layout } from '../components/Layout';
-import { ShieldCheck, ArrowLeft, BookOpen, Plus, ChevronRight, CheckCircle2, Clock, Brain, Sparkles, Loader2, Play, Target, Dumbbell, Database } from 'lucide-react';
+import { ShieldCheck, AlertTriangle, ArrowLeft, BookOpen, Plus, ChevronRight, CheckCircle2, Clock, Brain, Sparkles, Loader2, Play, Target, Dumbbell, Database } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 import { supabase } from '../db/supabase';
@@ -15,6 +15,12 @@ import { filterStudentVisibleLessons } from '../services/lessonRecovery';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { getGradeCandidates, getSubjectCandidates, pickBestCurriculumMatch } from '../services/curriculumMatching';
+import {
+  compareCurriculumValidationForStudents,
+  getCurriculumValidationBadgeClass,
+  getCurriculumValidationLabel,
+  selectStudentFacingValidatedContent,
+} from '../services/curriculumValidation';
 
 const normalizeLessonTitle = (title: string | null | undefined) =>
   String(title || '').trim().toLocaleLowerCase();
@@ -29,6 +35,15 @@ type SupabaseLessonRow = {
   grade?: string | null;
   country?: string | null;
   subject?: string | null;
+  validation_status?: string | null;
+  source_confidence?: number | null;
+  source_name?: string | null;
+  source_url?: string | null;
+  review_notes?: string | null;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  is_ai_generated?: boolean | null;
+  teaching_contract?: unknown;
 };
 
 const CLASSROOM_TAB_CONFIG = {
@@ -61,8 +76,8 @@ const resolveCurriculumIds = async (grade: string, subject: string, category?: s
     supabase.from('subjects').select('id, name').in('name', subjectCandidates),
   ]);
 
-  const matchedGrade = pickBestCurriculumMatch(grades, gradeCandidates);
-  const matchedSubject = pickBestCurriculumMatch(subjects, subjectCandidates);
+  const matchedGrade = pickBestCurriculumMatch<{ id: string; name?: string | null }>(grades as any, gradeCandidates);
+  const matchedSubject = pickBestCurriculumMatch<{ id: string; name?: string | null }>(subjects as any, subjectCandidates);
 
   return {
     gradeId: matchedGrade?.id ?? null,
@@ -78,6 +93,14 @@ type ClassroomSupabaseLesson = {
   subtitle?: string | null;
   status?: string | null;
   teaching_contract?: unknown;
+  validation_status?: string | null;
+  source_confidence?: number | null;
+  source_name?: string | null;
+  source_url?: string | null;
+  review_notes?: string | null;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  is_ai_generated?: boolean | null;
 };
 
 export const ClassroomView: React.FC = () => {
@@ -97,17 +120,39 @@ export const ClassroomView: React.FC = () => {
 
   const module = useLiveQuery(() => id ? db.modules.get(id) : undefined, [id]);
   const allLessons = useLiveQuery(() => id ? db.lessons.where('moduleId').equals(id).sortBy('createdAt') : [], [id]);
-  const lessons = allLessons?.filter(l => l.status !== 'suggested') || [];
+  const storedLessons = useMemo(
+    () => (allLessons?.filter((lesson) => lesson.status !== 'suggested') || []).sort(compareCurriculumValidationForStudents),
+    [allLessons],
+  );
   const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
   const settingsMap = Object.fromEntries(dbSettings.map(s => [s.key, s.value]));
 
   const currentGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
   const currentCountry = settingsMap['selected_country'] || localStorage.getItem('selected_country') || '';
+  const studentVisibleLessons = useMemo(
+    () => filterStudentVisibleLessons(storedLessons),
+    [storedLessons],
+  );
+  const studentLessonSelection = useMemo(
+    () => selectStudentFacingValidatedContent(studentVisibleLessons),
+    [studentVisibleLessons],
+  );
+  const lessons = useMemo(
+    () => (
+      isAdmin
+        ? storedLessons
+        : (studentLessonSelection.hasPreferred
+          ? studentLessonSelection.preferredOnly
+          : studentLessonSelection.fallback)
+    ),
+    [isAdmin, storedLessons, studentLessonSelection],
+  );
   const hasLessons = lessons.length > 0;
   const hasSupplementalContent = quizzes.length > 0 || exercises.length > 0;
   const showStats = module?.progress > 0 || hasLessons;
   const showTabs = hasLessons || hasSupplementalContent || isLoadingExtra;
   const showSetupState = !hasLessons && suggestions.length === 0;
+  const showValidationWarningBanner = !isAdmin && lessons.length > 0 && !studentLessonSelection.hasPreferred;
   const cloudHydrationKeyRef = useRef<string | null>(null);
   const classroomScopeKey = `${id || ''}:${module?.name || ''}:${module?.category || ''}:${currentGrade}:${currentCountry}`;
 
@@ -151,7 +196,7 @@ export const ClassroomView: React.FC = () => {
 
     let query = supabase
       .from('lessons')
-      .select('id, lesson_title, content, blocks, subtitle, status, grade, country, subject')
+      .select('id, lesson_title, content, blocks, subtitle, status, grade, country, subject, validation_status, source_confidence, source_name, source_url, review_notes, reviewed_by, reviewed_at, is_ai_generated, teaching_contract')
       .in('subject', subjectCandidates)
       .in('grade', gradeCandidates);
 
@@ -191,6 +236,15 @@ export const ClassroomView: React.FC = () => {
         country: lesson.country ?? existing?.country,
         subject: lesson.subject ?? existing?.subject ?? module.name,
         sourceLessonId: lesson.id ?? existing?.sourceLessonId,
+        teaching_contract: lesson.teaching_contract ?? existing?.teaching_contract,
+        validation_status: lesson.validation_status ?? existing?.validation_status,
+        source_confidence: Number(lesson.source_confidence ?? existing?.source_confidence ?? 0),
+        source_name: lesson.source_name ?? existing?.source_name,
+        source_url: lesson.source_url ?? existing?.source_url,
+        review_notes: lesson.review_notes ?? existing?.review_notes,
+        reviewed_by: lesson.reviewed_by ?? existing?.reviewed_by,
+        reviewed_at: lesson.reviewed_at ?? existing?.reviewed_at,
+        is_ai_generated: Boolean(lesson.is_ai_generated ?? existing?.is_ai_generated),
         status: (hasStoredContent || normalizedStatus === 'published' || normalizedStatus === 'done' || normalizedStatus === 'draft')
           ? 'done' as const
           : (existing?.status || 'pending') as 'suggested' | 'pending' | 'active' | 'done',
@@ -296,6 +350,9 @@ export const ClassroomView: React.FC = () => {
         moduleId: module.id,
         title: g.title,
         content: g.description,
+        validation_status: 'ai_generated',
+        source_confidence: 0,
+        is_ai_generated: true,
         status: 'suggested' as const,
         createdAt: Date.now()
       }));
@@ -357,6 +414,9 @@ export const ClassroomView: React.FC = () => {
           content: '',
           blocks: seedLesson.blocks,
           subtitle: seedLesson.subtitle,
+          validation_status: 'ai_generated',
+          source_confidence: 0,
+          is_ai_generated: true,
           status: 'pending',
           createdAt: Date.now()
         });
@@ -403,6 +463,9 @@ export const ClassroomView: React.FC = () => {
             content: '',
             blocks: seedLesson.blocks,
             subtitle: seedLesson.subtitle,
+            validation_status: 'ai_generated',
+            source_confidence: 0,
+            is_ai_generated: true,
             status: 'pending',
             createdAt: Date.now()
           });
@@ -443,6 +506,9 @@ export const ClassroomView: React.FC = () => {
             content: '',
             blocks: seedLesson.blocks,
             subtitle: seedLesson.subtitle,
+            validation_status: 'ai_generated',
+            source_confidence: 0,
+            is_ai_generated: true,
             status: 'pending',
             createdAt: Date.now()
           });
@@ -470,6 +536,7 @@ export const ClassroomView: React.FC = () => {
     if (!module) return;
     setIsSeeding(true);
     try {
+      const existingTitles = new Set(storedLessons.map((lesson) => normalizeLessonTitle(lesson.title)));
       const dbLessons = await fetchSupabaseLessons();
 
       if (!dbLessons || dbLessons.length === 0) {
@@ -489,6 +556,9 @@ export const ClassroomView: React.FC = () => {
                 moduleId: module.id,
                 title: topic.title,
                 content: '',
+                validation_status: 'source_matched',
+                source_confidence: 0.65,
+                source_name: 'Curriculum Outline',
                 status: 'pending' as const,
                 createdAt: Date.now(),
               }));
@@ -685,7 +755,7 @@ export const ClassroomView: React.FC = () => {
             </div>
             <div className="space-y-2 max-w-md">
               <p className="text-xl font-bold text-ink">Set up this classroom</p>
-              <p className="text-sm text-muted">Start with certified Supabase units, then add AI-generated lessons only when you need them.</p>
+              <p className="text-sm text-muted">Start with teacher-reviewed or officially validated curriculum units, then add draft AI content only when you need it.</p>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-widest text-muted">
               <span className="px-3 py-1 rounded-full bg-paper border border-ink/5">Supabase First</span>
@@ -748,6 +818,17 @@ export const ClassroomView: React.FC = () => {
             {/* Tab Content */}
             {activeTab === 'lessons' && (
               <div className="space-y-4">
+                {showValidationWarningBanner && (
+                  <div className="rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4 text-amber-900">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+                      <div>
+                        <p className="text-sm font-semibold">Draft AI-assisted content is shown because no teacher-reviewed or officially validated lesson is available yet.</p>
+                        <p className="mt-1 text-sm text-amber-800">Use the status badge on each unit before treating it as final Moroccan curriculum truth.</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-bold text-ink flex items-center gap-2">
                     <BookOpen size={20} className="text-accent" />
@@ -785,7 +866,17 @@ export const ClassroomView: React.FC = () => {
                           </div>
                           <div>
                             <h4 className="text-base font-bold text-ink group-hover:text-accent transition-colors">{lesson.title}</h4>
-                            <div className="flex items-center gap-3 mt-1">
+                            <div className="mt-2 flex flex-wrap items-center gap-2">
+                              <span className={getCurriculumValidationBadgeClass(lesson.validation_status, !!lesson.is_ai_generated)}>
+                                {getCurriculumValidationLabel(lesson.validation_status, !!lesson.is_ai_generated)}
+                              </span>
+                              {lesson.source_confidence ? (
+                                <span className="pill pill--neutral">
+                                  {Math.round(Number(lesson.source_confidence) * 100)}% source confidence
+                                </span>
+                              ) : null}
+                            </div>
+                            <div className="flex items-center gap-3 mt-2">
                               <span className="text-[10px] font-mono uppercase tracking-widest text-muted/60">Unit {i + 1}</span>
                               <span className="w-1 h-1 rounded-full bg-ink/10" />
                               <span className="text-[10px] font-mono uppercase tracking-widest text-muted/60">~15 min</span>
