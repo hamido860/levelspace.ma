@@ -46,6 +46,7 @@ export interface Lesson {
   country?: string;
   subject?: string;
   sourceLessonId?: string;
+  teaching_contract?: unknown;
 }
 
 export interface Note {

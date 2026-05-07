@@ -1,51 +1,39 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { Layout } from "../components/Layout";
 import { SEO } from "../components/SEO";
-import { supabase } from "../db/supabase";
+import { isSupabaseConfigured, supabase } from "../db/supabase";
 import { useAuth } from "../context/AuthContext";
 import { validateMetrics, formatValidationErrors } from "../services/metricsValidator";
 import {
+  AdminGradeRow,
+  AdminOverviewKpis,
+  AdminTableHealth,
+  AiReviewStatusCount,
+  FailedQueueJob,
+  QueueStatusBreakdown,
+  RagByGrade,
+  RagMetrics,
+  loadAdminGradeMetrics,
+  loadAdminOverviewKpis,
+  loadAdminQueueMetrics,
+  loadAdminRagMetrics,
+  loadAdminTableHealth,
+  loadAiRecoveryReviewStatusCounts,
+} from "../services/adminDashboardService";
+import {
   RefreshCw, Database, BarChart2, BookOpen, Cpu, Table2,
   AlertTriangle, CheckCircle, Clock, Layers, Sparkles,
-  Lightbulb, ListChecks, Map as MapIcon, RotateCcw, ChevronRight,
+  Lightbulb, ListChecks, Map as MapIcon, ChevronRight,
   TrendingUp, TrendingDown, Info, Zap,
   Trash2, Wrench, Play, Pencil, ChevronDown, Brain, ShieldCheck, GraduationCap,
   Copy, Check
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-interface GradeRow {
-  id: string;
-  cycle: string;
-  cycle_order: number;
-  grade: string;
-  grade_order: number;
-  total_topics: number;
-  lessons_generated: number;
-  q_done: number;
-  q_pending: number;
-  q_failed: number;
-}
-
-interface TableHealth {
-  table_name: string;
-  row_count: number | null; // null = RLS-denied or query failed (do NOT treat as 0)
-}
-
-
-interface RagByGrade {
-  id: string;
-  grade: string;
-  grade_order: number;
-  cycle_order: number;
-  total: number;
-  done: number;
-}
-
 interface BrowseRow { [key: string]: any; }
 
 type Tab = "overview" | "grades" | "queue" | "rag" | "browser" | "ai";
-
 const ADMIN_TAB_CONFIG: Record<Tab, { label: string; icon: React.ElementType; activeClass: string; iconClass: string }> = {
   overview: {
     label: "Overview",
@@ -87,9 +75,9 @@ const ADMIN_TAB_CONFIG: Record<Tab, { label: string; icon: React.ElementType; ac
 
 const countDistinctIds = (rows: Array<{ topic_id?: string | null }> | null | undefined) =>
   new Set((rows || []).map((row) => row.topic_id).filter((value): value is string => Boolean(value))).size;
-
+ 
 // ─── AI Analyst Types ────────────────────────────────────────────────────────
-type AIAction = "insights" | "tasks" | "strategy" | "retry_failed";
+type AIAction = "insights" | "tasks" | "strategy";
 interface AIHighlight { type: "warning" | "success" | "info"; title: string; detail: string; }
 interface AIBottleneck { area: string; severity: "high" | "medium" | "low"; description: string; }
 interface AIInsights { summary: string; highlights: AIHighlight[]; bottlenecks: AIBottleneck[]; }
@@ -119,7 +107,7 @@ const ProgressBar: React.FC<{ val: number; total: number }> = ({ val, total }) =
   );
 };
 
-const Pill: React.FC<{ status: "done" | "pending" | "failed" | "empty" | "partial" | "populated" | "unknown"; label?: string | number }> = ({ status, label }) => {
+const Pill: React.FC<{ status: "done" | "pending" | "failed" | "empty" | "partial" | "populated" | "unknown" | "missing" | "restricted"; label?: string | number }> = ({ status, label }) => {
   const map = {
     done:      "bg-emerald-100 text-emerald-800",
     pending:   "bg-amber-100 text-amber-800",
@@ -128,6 +116,8 @@ const Pill: React.FC<{ status: "done" | "pending" | "failed" | "empty" | "partia
     partial:   "bg-amber-100 text-amber-700",
     populated: "bg-emerald-100 text-emerald-700",
     unknown:   "bg-gray-100 text-gray-600",
+    missing:   "bg-red-100 text-red-700",
+    restricted:"bg-slate-100 text-slate-700",
   };
   return (
     <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${map[status]}`}>
@@ -234,24 +224,45 @@ const KPI: React.FC<{ label: string; value: number | string; sub?: string; varia
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export const Admin: React.FC = () => {
+  const navigate = useNavigate();
   const { loading: authLoading } = useAuth();
   const [tab, setTab] = useState<Tab>("overview");
   const [loading, setLoading] = useState(true);
+  const [dashboardError, setDashboardError] = useState("");
   const [lastRefresh, setLastRefresh] = useState<string>("");
 
   // Overview state
-  const [kpis, setKpis] = useState<any>({});
-  const [tableHealth, setTableHealth] = useState<TableHealth[]>([]);
+  const [kpis, setKpis] = useState<AdminOverviewKpis>({
+    topics: 0,
+    completedJobs: 0,
+    pendingJobs: 0,
+    failedJobs: 0,
+    recoveredLessonsNeedsReview: 0,
+    studentPublishReadyLessons: 0,
+    ragTotal: 0,
+    ragDone: 0,
+    users: 0,
+  });
+  const [tableHealth, setTableHealth] = useState<AdminTableHealth[]>([]);
+  const [aiReviewStatuses, setAiReviewStatuses] = useState<AiReviewStatusCount[]>([]);
 
   // Grade coverage
-  const [gradeData, setGradeData] = useState<GradeRow[]>([]);
+  const [gradeData, setGradeData] = useState<AdminGradeRow[]>([]);
 
   // Queue
-  const [queueStats, setQueueStats] = useState<any>({});
-  const [failedJobs, setFailedJobs] = useState<any[]>([]);
+  const [queueStats, setQueueStats] = useState<QueueStatusBreakdown>({
+    done: 0,
+    pending: 0,
+    failed: 0,
+    processing: 0,
+    other: 0,
+    unresolvedTopicJobs: 0,
+    otherStatuses: [],
+  });
+  const [failedJobs, setFailedJobs] = useState<FailedQueueJob[]>([]);
 
   // RAG
-  const [ragStats, setRagStats] = useState<any>({});
+  const [ragStats, setRagStats] = useState<RagMetrics>({ total: 0, done: 0, pending: 0, other: 0, byStatus: {} });
   const [ragByGrade, setRagByGrade] = useState<RagByGrade[]>([]);
 
   // AI Analyst
@@ -260,13 +271,7 @@ export const Admin: React.FC = () => {
   const [aiInsights, setAiInsights]   = useState<AIInsights | null>(null);
   const [aiTaskList, setAiTaskList]   = useState<AITaskList | null>(null);
   const [aiStrategy, setAiStrategy]   = useState<AIStrategy | null>(null);
-  const [aiRetryMsg, setAiRetryMsg]   = useState("");
   const [activeAITab, setActiveAITab] = useState<AIAction>("insights");
-
-  // Task executor
-  const [execModal, setExecModal] = useState<{ task: any; open: boolean } | null>(null);
-  const [execLoading, setExecLoading] = useState(false);
-  const [execResult, setExecResult] = useState<any>(null);
 
   // Browser
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
@@ -278,22 +283,17 @@ export const Admin: React.FC = () => {
   const [browseError, setBrowseError] = useState("");
   const [editRow, setEditRow] = useState<{ id: any; row: BrowseRow } | null>(null);
   const [editSaving, setEditSaving] = useState(false);
-  const [rowDeleteLoading, setRowDeleteLoading] = useState<string | null>(null);
-
-  // Queue per-job actions
-  const [jobLoading, setJobLoading] = useState<Record<string, string | null>>({});
-  const [jobMsg, setJobMsg] = useState<Record<string, string>>({});
-
-  // Grade bulk queue
-  const [bulkLoading, setBulkLoading] = useState<Record<string, boolean>>({});
-  const [bulkMsg, setBulkMsg] = useState<Record<string, string>>({});
 
   // RAG chunk browser
   const [ragChunkGradeId, setRagChunkGradeId] = useState<string | null>(null);
   const [ragChunks, setRagChunks] = useState<any[]>([]);
   const [ragChunkLoading, setRagChunkLoading] = useState(false);
-  const [chunkLoading, setChunkLoading] = useState<Record<string, string | null>>({});
-  const [chunkMsg, setChunkMsg] = useState<Record<string, string>>({});
+  const [ragChunkError, setRagChunkError] = useState("");
+
+  // Dormant modal state kept isolated until protected workflow routes are added.
+  const [execModal, setExecModal] = useState<{ task: any; open: boolean } | null>(null);
+  const [execLoading, setExecLoading] = useState(false);
+  const [execResult, setExecResult] = useState<any>(null);
 
 
   // Fallback: use regular Supabase queries instead of raw SQL RPC
@@ -324,14 +324,14 @@ export const Admin: React.FC = () => {
     const failedCount = normalizedQueueRows.filter((row) => row.status === "failed").length;
 
     setKpis({
-      topics: normalizedTopicsCount,
-      topicSource,
-      lessons: coveredTopicsCount,
-      pending: pendingCount,
-      failed: failedCount,
-      ragTotal: ragTotal ?? 0,
-      ragDone: ragDone ?? 0,
-      users: usersCount ?? 0,
+          topics: normalizedTopicsCount,
+          topicSource,
+          lessons: coveredTopicsCount,
+          pending: pendingCount,
+          failed: failedCount,
+          ragTotal: ragTotal ?? 0,
+          ragDone: ragDone ?? 0,
+          users: usersCount ?? 0,
     });
   }, []);
 
@@ -348,14 +348,13 @@ export const Admin: React.FC = () => {
     ];
     const results = await Promise.all(
       tableNames.map(async (t) => {
-        // count is null when RLS denies access — preserve that signal instead of coercing to 0.
         const { count } = await supabase.from(t as any).select("*", { count: "exact", head: true });
         return { table_name: t, row_count: count };
       })
     );
     setTableHealth(results.sort((a, b) => (b.row_count ?? -1) - (a.row_count ?? -1)));
   }, []);
-
+ 
   const loadGrades = useCallback(async () => {
     const { data: grades } = await supabase
       .from("grades")
@@ -468,39 +467,37 @@ export const Admin: React.FC = () => {
   const callAgent = useCallback(async (action: AIAction) => {
     setAiLoading(true);
     setAiError("");
-    setAiRetryMsg("");
 
     // Build a compact metrics snapshot from live state
     const metricsSnapshot: any = {
       totalTopics: kpis.topics,
-      lessonsGenerated: kpis.lessons,
-      lessonCoverage: `${pct(kpis.lessons, kpis.topics)}%`,
-      queuePending: kpis.pending,
-      failedJobs: kpis.failed,
+      lessonsGenerated: gradeData.reduce((sum, grade) => sum + grade.lessons_covered, 0),
+      completedJobs: kpis.completedJobs,
+      lessonCoverage: `${pct(gradeData.reduce((sum, grade) => sum + grade.lessons_covered, 0), kpis.topics)}%`,
+      queuePending: kpis.pendingJobs,
+      failedJobs: kpis.failedJobs,
       ragChunksTotal: kpis.ragTotal,
       ragChunksEmbedded: kpis.ragDone,
       ragCoverage: `${pct(kpis.ragDone, kpis.ragTotal)}%`,
       totalUsers: kpis.users,
+      recoveredLessonsNeedingReview: kpis.recoveredLessonsNeedsReview,
+      studentPublishReadyLessons: kpis.studentPublishReadyLessons,
+      aiRecoveryTaskReviewStatuses: aiReviewStatuses,
       gradeBreakdown: gradeData.map(g => ({
         grade: g.grade,
         cycle: g.cycle,
         topics: g.total_topics,
-        lessons: g.lessons_generated,
-        coverage: `${pct(g.lessons_generated, g.total_topics)}%`,
+        lessons: g.lessons_covered,
+        completedJobs: g.q_done,
+        coverage: `${pct(g.lessons_covered, g.total_topics)}%`,
         queueFailed: g.q_failed,
         queuePending: g.q_pending,
+        recoveredLessons: g.needs_review,
       })),
-      tableHealth: tableHealth.slice(0, 15).map(t => ({
+      tableHealth: tableHealth.map(t => ({
         table: t.table_name,
         rows: t.row_count,
-        status:
-          t.table_name === "topics" && t.row_count === 0 && kpis.lessons > 0
-            ? "inconsistent (linked lessons exist but topics are not visible; check RLS or seed state)"
-          :
-          t.row_count === null ? "unknown (no read access — do NOT generate tasks for this table)"
-          : t.row_count > 100 ? "populated"
-          : t.row_count > 0 ? "partial"
-          : "empty",
+        status: t.health_status,
       })),
     };
 
@@ -513,9 +510,14 @@ export const Admin: React.FC = () => {
     }
 
     try {
+      const { data } = await supabase.auth.getSession();
+      const accessToken = data?.session?.access_token;
       const res = await fetch("/api/ai-analyst", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
         body: JSON.stringify({ metrics: metricsSnapshot, action }),
       });
       const text = await res.text();
@@ -528,174 +530,94 @@ export const Admin: React.FC = () => {
       if (action === "insights")      setAiInsights(json.result as AIInsights);
       else if (action === "tasks")    setAiTaskList(json.result as AITaskList);
       else if (action === "strategy") setAiStrategy(json.result as AIStrategy);
-      else if (action === "retry_failed") setAiRetryMsg(json.message ?? "Done.");
     } catch (e: any) {
       setAiError(e.message);
     }
     setAiLoading(false);
-  }, [kpis, gradeData, tableHealth]);
+  }, [aiReviewStatuses, gradeData, kpis, tableHealth]);
 
   const refreshAll = useCallback(async () => {
     setLoading(true);
     try {
-      await Promise.all([loadOverview(), loadTableHealth(), loadGrades(), loadQueue(), loadRag()]);
+      const [overview, health, grades, queue, rag, reviewStatuses] = await Promise.all([
+        loadAdminOverviewKpis(),
+        loadAdminTableHealth(),
+        loadAdminGradeMetrics(),
+        loadAdminQueueMetrics(),
+        loadAdminRagMetrics(),
+        loadAiRecoveryReviewStatusCounts(),
+      ]);
+      setKpis(overview);
+      setTableHealth(health);
+      setGradeData(grades);
+      setQueueStats(queue.stats);
+      setFailedJobs(queue.failedJobs);
+      setRagStats(rag.ragStats);
+      setRagByGrade(rag.ragByGrade);
+      setAiReviewStatuses(reviewStatuses);
+      setDashboardError("");
       setLastRefresh(new Date().toLocaleTimeString());
     } catch (e: any) {
       console.error(e);
+      setDashboardError(e.message || "Unable to load live admin metrics from Supabase.");
     }
     setLoading(false);
-  }, [loadOverview, loadTableHealth, loadGrades, loadQueue, loadRag]);
+  }, []);
 
   // Wait for auth to hydrate before firing queries — anon role has no SELECT
   // policy on most tables, so running these as anon would return 0 / null and
   // mislead the AI Analyst into reporting tables as "empty".
-  useEffect(() => { if (!authLoading) refreshAll(); }, [authLoading]);
+  useEffect(() => { if (!authLoading) refreshAll(); }, [authLoading, refreshAll]);
 
   // ── Shared fetch helper ────────────────────────────────────────────────────
-  const adminPost = async (endpoint: string, body: any) => {
-    const res = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    const text = await res.text();
-    if (!text) throw new Error(`Empty response (HTTP ${res.status})`);
-    let json: any;
-    try { json = JSON.parse(text); } catch { throw new Error(`Non-JSON response (HTTP ${res.status})`); }
-    if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
-    return json;
-  };
-
   // ── Queue actions ──────────────────────────────────────────────────────────
-  const retryJob = async (jobId: string) => {
-    setJobLoading(p => ({ ...p, [jobId]: "retry" }));
-    try {
-      await adminPost("/api/admin/retry-job", { jobId });
-      setJobMsg(p => ({ ...p, [jobId]: "Reset to pending" }));
-      await loadQueue();
-    } catch (e: any) { setJobMsg(p => ({ ...p, [jobId]: `Error: ${e.message}` })); }
-    setJobLoading(p => ({ ...p, [jobId]: null }));
-  };
-
-  const deleteJob = async (jobId: string) => {
-    setJobLoading(p => ({ ...p, [jobId]: "delete" }));
-    try {
-      await adminPost("/api/admin/delete-job", { jobId });
-      setFailedJobs(prev => prev.filter(j => j.id !== jobId));
-      await loadQueue();
-    } catch (e: any) { setJobMsg(p => ({ ...p, [jobId]: `Error: ${e.message}` })); }
-    setJobLoading(p => ({ ...p, [jobId]: null }));
-  };
-
-  const generateLesson = async (job: any) => {
-    const topicTitle = (job.topics as any)?.title ?? job.topic_id;
-    setJobLoading(p => ({ ...p, [job.id]: "generate" }));
-    try {
-      await adminPost("/api/admin/generate-lesson", { topicId: job.topic_id, topicTitle, trackId: job.track_id });
-      setJobMsg(p => ({ ...p, [job.id]: "Lesson generated" }));
-      setFailedJobs(prev => prev.filter(j => j.id !== job.id));
-      await Promise.all([loadQueue(), loadGrades()]);
-    } catch (e: any) { setJobMsg(p => ({ ...p, [job.id]: `Error: ${e.message}` })); }
-    setJobLoading(p => ({ ...p, [job.id]: null }));
-  };
-
   // ── Grade bulk actions ─────────────────────────────────────────────────────
-  const bulkGenerate = async (gradeId: string) => {
-    setBulkLoading(p => ({ ...p, [gradeId]: true }));
-    try {
-      const res = await adminPost("/api/admin/bulk-generate", { gradeId });
-      setBulkMsg(p => ({ ...p, [gradeId]: res.message }));
-      await loadGrades();
-    } catch (e: any) { setBulkMsg(p => ({ ...p, [gradeId]: `Error: ${e.message}` })); }
-    setBulkLoading(p => ({ ...p, [gradeId]: false }));
-  };
-
   // ── Task executor (gated: preview + confirm) ──────────────────────────────
-  const executeTask = async (task: any) => {
-    setExecLoading(true);
-    setExecResult(null);
-    try {
-      const res = await adminPost("/api/admin/exec-task", {
-        action_type: task.action_type,
-        task_id: task.id,
-      });
-      setExecResult(res);
-      if (res.ok) {
-        setExecModal(null);
-        // Refresh relevant data
-        await Promise.all([loadOverview(), loadTableHealth(), loadQueue()]);
-      }
-    } catch (e: any) {
-      setExecResult({ error: e.message });
-    }
-    setExecLoading(false);
-  };
-
   // ── RAG chunk actions ──────────────────────────────────────────────────────
   const loadRagChunks = async (gradeId: string) => {
-    if (ragChunkGradeId === gradeId) { setRagChunkGradeId(null); setRagChunks([]); return; }
+    if (ragChunkGradeId === gradeId) {
+      setRagChunkGradeId(null);
+      setRagChunks([]);
+      setRagChunkError("");
+      return;
+    }
+    if (!isSupabaseConfigured) {
+      setRagChunkGradeId(gradeId);
+      setRagChunks([]);
+      setRagChunkError("Supabase is not configured, so chunk inspection is unavailable.");
+      return;
+    }
+
     setRagChunkGradeId(gradeId);
     setRagChunkLoading(true);
-    const { data } = await supabase.from("rag_chunks").select("id, content, embedding_status, source_url").eq("grade_id", gradeId).order("embedding_status").limit(100);
-    setRagChunks(data || []);
+    try {
+      setRagChunkError("");
+      const { data, error } = await supabase
+        .from("rag_chunks")
+        .select("id, content, embedding_status, source_url")
+        .eq("grade_id", gradeId)
+        .order("embedding_status")
+        .limit(100);
+      if (error) throw error;
+      setRagChunks(data || []);
+    } catch (e: any) {
+      setRagChunks([]);
+      setRagChunkError(e.message || "Unable to load chunk details.");
+    }
     setRagChunkLoading(false);
   };
 
-  const repairChunk = async (chunkId: string, content: string) => {
-    setChunkLoading(p => ({ ...p, [chunkId]: "repair" }));
-    try {
-      const res = await adminPost("/api/admin/repair-chunk", { chunkId, content });
-      setRagChunks(prev => prev.map(c => c.id === chunkId ? { ...c, content: res.content, embedding_status: "pending" } : c));
-      setChunkMsg(p => ({ ...p, [chunkId]: "Repaired & re-queued" }));
-    } catch (e: any) { setChunkMsg(p => ({ ...p, [chunkId]: `Error: ${e.message}` })); }
-    setChunkLoading(p => ({ ...p, [chunkId]: null }));
-  };
-
-  const deleteChunk = async (chunkId: string) => {
-    setChunkLoading(p => ({ ...p, [chunkId]: "delete" }));
-    try {
-      await adminPost("/api/admin/delete-chunk", { chunkId });
-      setRagChunks(prev => prev.filter(c => c.id !== chunkId));
-      await loadRag();
-    } catch (e: any) { setChunkMsg(p => ({ ...p, [chunkId]: `Error: ${e.message}` })); }
-    setChunkLoading(p => ({ ...p, [chunkId]: null }));
-  };
-
-  const reEmbedChunk = async (chunkId: string) => {
-    setChunkLoading(p => ({ ...p, [chunkId]: "embed" }));
-    try {
-      await adminPost("/api/admin/re-embed-chunk", { chunkId });
-      setRagChunks(prev => prev.map(c => c.id === chunkId ? { ...c, embedding_status: "pending" } : c));
-      setChunkMsg(p => ({ ...p, [chunkId]: "Re-queued for embedding" }));
-    } catch (e: any) { setChunkMsg(p => ({ ...p, [chunkId]: `Error: ${e.message}` })); }
-    setChunkLoading(p => ({ ...p, [chunkId]: null }));
-  };
-
   // ── Table browser actions ──────────────────────────────────────────────────
-  const saveRowEdit = async () => {
-    if (!editRow || !selectedTable) return;
-    setEditSaving(true);
-    try {
-      const clean: Record<string, any> = {};
-      Object.entries(editRow.row).forEach(([k, v]) => {
-        if (k !== "id" && k !== "created_at" && k !== "updated_at") clean[k] = v;
-      });
-      await adminPost("/api/admin/update-row", { table: selectedTable, id: editRow.id, data: clean });
-      setBrowseRows(prev => prev.map(r => r.id === editRow.id ? { ...r, ...editRow.row } : r));
-      setEditRow(null);
-    } catch (e: any) { alert(e.message); }
-    setEditSaving(false);
-  };
-
-  const deleteTableRow = async (id: any) => {
-    if (!selectedTable || !window.confirm("Delete this row?")) return;
-    setRowDeleteLoading(String(id));
-    try {
-      await adminPost("/api/admin/delete-row", { table: selectedTable, id });
-      setBrowseRows(prev => prev.filter(r => r.id !== id));
-    } catch (e: any) { alert(e.message); }
-    setRowDeleteLoading(null);
-  };
-
   const browseTable = async (tableName?: string) => {
     const t = tableName ?? selectedTable;
     if (!t) return;
+    if (!isSupabaseConfigured) {
+      setBrowseError("Supabase is not configured, so table browsing is unavailable.");
+      setBrowseRows([]);
+      setBrowseCols([]);
+      return;
+    }
+
     setBrowseLoading(true);
     setBrowseError("");
     setBrowseRows([]);
@@ -719,6 +641,18 @@ export const Admin: React.FC = () => {
       setBrowseError(e.message);
     }
     setBrowseLoading(false);
+  };
+
+  const saveRowEdit = async () => {
+    setEditSaving(true);
+    setBrowseError("Dashboard write actions are disabled until protected admin routes exist.");
+    setEditSaving(false);
+  };
+
+  const sendTaskToCommandCenter = async (_task: any) => {
+    setExecLoading(true);
+    setExecResult({ error: "Workflow creation is disabled from this dashboard for now." });
+    setExecLoading(false);
   };
 
   const tabs: Tab[] = ["overview", "grades", "queue", "rag", "browser", "ai"];
@@ -747,6 +681,13 @@ export const Admin: React.FC = () => {
         </button>
       </div>
 
+      {dashboardError && (
+        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="font-semibold">Live admin metrics are unavailable.</div>
+          <div className="mt-1">{dashboardError}</div>
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="flex gap-2 border-b border-gray-100 mb-6 overflow-x-auto pb-2">
         {tabs.map((tabKey) => {
@@ -772,17 +713,35 @@ export const Admin: React.FC = () => {
       {/* ── OVERVIEW ── */}
       {tab === "overview" && (
         <div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
-            <KPI
-              label="Total Topics"
-              value={kpis.topics ?? "—"}
-              sub={kpis.topicSource === "topics" ? "across all grades" : "derived from linked queue / lessons"}
-            />
-            <KPI label="Lessons Generated" value={kpis.lessons ?? "—"} sub={`${pct(kpis.lessons, kpis.topics)}% of topics covered`} />
-            <KPI label="Queue Pending"     value={kpis.pending ?? "—"} sub="need generation"    variant="warn" />
-            <KPI label="Queue Failed"      value={kpis.failed ?? "—"}  sub="need retry"          variant="danger" />
-            <KPI label="RAG Chunks"        value={kpis.ragTotal ?? "—"} sub={`${pct(kpis.ragDone, kpis.ragTotal)}% embedded`} variant="success" />
-            <KPI label="Users"             value={kpis.users ?? "—"}   sub="profiles" />
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
+            <KPI label="Total Topics" value={kpis.topics ?? "—"} sub="across all grades" />
+            <KPI label="Completed Jobs" value={kpis.completedJobs ?? "—"} sub="lesson_gen_queue status = done" variant="success" />
+            <KPI label="Queue Pending" value={kpis.pendingJobs ?? "—"} sub="lesson_gen_queue status = pending" variant="warn" />
+            <KPI label="Queue Failed" value={kpis.failedJobs ?? "—"} sub="lesson_gen_queue status = failed" variant="danger" />
+            <KPI label="Needs Review" value={kpis.recoveredLessonsNeedsReview ?? "—"} sub="teaching_contract.status = needs_review" variant="warn" />
+            <KPI label="Student Publish Ready" value={kpis.studentPublishReadyLessons ?? "—"} sub="needs_review + student_publish_allowed = true" variant="success" />
+            <KPI label="RAG Chunks" value={kpis.ragTotal ?? "—"} sub={`${pct(kpis.ragDone, kpis.ragTotal)}% embedded`} variant="success" />
+            <KPI label="Users" value={kpis.users ?? "—"} sub="profiles" />
+          </div>
+
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-6">
+            <div className="px-5 py-3 border-b border-gray-50 flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-gray-400" />
+              <h2 className="font-bold text-sm">AI Recovery Review Status</h2>
+            </div>
+            {loading ? <Spinner /> : aiReviewStatuses.length === 0 ? (
+              <div className="p-5 text-sm text-gray-500">No `lesson_generation` AI task review statuses were found in Supabase.</div>
+            ) : (
+              <div className="flex flex-wrap gap-3 p-5">
+                {aiReviewStatuses.map((item) => (
+                  <div key={item.status} className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
+                    <div className="text-xs uppercase tracking-wide text-gray-500">{item.status}</div>
+                    <div className="text-lg font-bold text-gray-900">{item.count}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+ 
           </div>
 
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
@@ -793,7 +752,9 @@ export const Admin: React.FC = () => {
                 {tableHealth.length} tables
               </span>
             </div>
-            {loading ? <Spinner /> : (
+            {loading ? <Spinner /> : tableHealth.length === 0 ? (
+              <div className="p-5 text-sm text-gray-500">No confirmed admin tables were available to inspect.</div>
+            ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
@@ -805,17 +766,23 @@ export const Admin: React.FC = () => {
                   </thead>
                   <tbody>
                     {tableHealth.map((t) => {
-                      const status: "populated" | "partial" | "empty" | "unknown" =
-                        t.row_count === null ? "unknown"
-                        : t.row_count > 100 ? "populated"
-                        : t.row_count > 0 ? "partial"
-                        : "empty";
+                      const status =
+                        t.health_status === "present" ? "populated"
+                        : t.health_status === "empty" ? "empty"
+                        : t.health_status;
                       return (
                         <tr key={t.table_name} className="border-t border-gray-50 hover:bg-gray-50/50">
                           <td className="px-4 py-2 font-medium">{t.table_name}</td>
                           <td className="px-4 py-2">{t.row_count === null ? "—" : t.row_count.toLocaleString()}</td>
                           <td className="px-4 py-2">
-                            <Pill status={status} label={status === "unknown" ? "no access" : status} />
+                            <Pill
+                              status={status as any}
+                              label={
+                                t.health_status === "missing" ? "missing table"
+                                : t.health_status === "restricted" ? "restricted"
+                                : status
+                              }
+                            />
                           </td>
                         </tr>
                       );
@@ -835,19 +802,21 @@ export const Admin: React.FC = () => {
             <BookOpen className="w-4 h-4 text-gray-400" />
             <h2 className="font-bold text-sm">Grade-by-Grade Content Coverage</h2>
           </div>
-          {loading ? <Spinner /> : (
+          {loading ? <Spinner /> : gradeData.length === 0 ? (
+            <div className="p-5 text-sm text-gray-500">No grade rows were returned from Supabase.</div>
+          ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
                   <tr>
                     <th className="px-4 py-2 text-left">Grade</th>
                     <th className="px-4 py-2 text-left">Topics</th>
-                    <th className="px-4 py-2 text-left">Lessons</th>
+                    <th className="px-4 py-2 text-left">Lesson Coverage</th>
                     <th className="px-4 py-2 text-left">Coverage</th>
-                    <th className="px-4 py-2 text-left">Done</th>
-                    <th className="px-4 py-2 text-left">Pending</th>
-                    <th className="px-4 py-2 text-left">Failed</th>
-                    <th className="px-4 py-2 text-left">Actions</th>
+                    <th className="px-4 py-2 text-left">Completed Jobs</th>
+                    <th className="px-4 py-2 text-left">Pending Jobs</th>
+                    <th className="px-4 py-2 text-left">Failed Jobs</th>
+                    <th className="px-4 py-2 text-left">Needs Review</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -868,8 +837,8 @@ export const Admin: React.FC = () => {
                           <tr className="border-t border-gray-50 hover:bg-gray-50/40">
                             <td className="px-4 py-2">{row.grade}</td>
                             <td className="px-4 py-2">{row.total_topics}</td>
-                            <td className="px-4 py-2">{row.lessons_generated}</td>
-                            <td className="px-4 py-2"><ProgressBar val={row.lessons_generated} total={row.total_topics} /></td>
+                            <td className="px-4 py-2">{row.lessons_covered}</td>
+                            <td className="px-4 py-2"><ProgressBar val={row.lessons_covered} total={row.total_topics} /></td>
                             <td className="px-4 py-2"><Pill status="done" label={row.q_done} /></td>
                             <td className="px-4 py-2"><Pill status="pending" label={row.q_pending} /></td>
                             <td className="px-4 py-2">
@@ -877,13 +846,7 @@ export const Admin: React.FC = () => {
                                 ? <Pill status="failed" label={row.q_failed} />
                                 : <span className="text-gray-300 text-xs">0</span>}
                             </td>
-                            <td className="px-4 py-2">
-                              <button onClick={() => bulkGenerate(row.id)} disabled={bulkLoading[row.id]}
-                                className="flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium bg-gray-900 text-white hover:bg-red-500 disabled:opacity-40 transition-colors whitespace-nowrap">
-                                <Play className="w-3 h-3" />{bulkLoading[row.id] ? "Queuing…" : "Bulk Queue"}
-                              </button>
-                              {bulkMsg[row.id] && <p className="text-xs mt-1 text-emerald-600 whitespace-nowrap">{bulkMsg[row.id]}</p>}
-                            </td>
+                            <td className="px-4 py-2"><Pill status={row.needs_review > 0 ? "pending" : "done"} label={row.needs_review} /></td>
                           </tr>
                         </React.Fragment>
                       );
@@ -899,19 +862,29 @@ export const Admin: React.FC = () => {
       {/* ── QUEUE ── */}
       {tab === "queue" && (
         <div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-            <KPI label="Done"       value={queueStats.done ?? 0}       sub={`${pct(queueStats.done, (queueStats.done||0)+(queueStats.pending||0)+(queueStats.failed||0))}% complete`} variant="success" />
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
+            <KPI label="Done" value={queueStats.done ?? 0} sub={`${pct(queueStats.done, (queueStats.done||0)+(queueStats.pending||0)+(queueStats.failed||0)+(queueStats.processing||0)+(queueStats.other||0))}% complete`} variant="success" />
             <KPI label="Pending"    value={queueStats.pending ?? 0}     sub="waiting"      variant="warn" />
             <KPI label="Failed"     value={queueStats.failed ?? 0}      sub="need retry"   variant="danger" />
             <KPI label="Processing" value={queueStats.processing ?? 0}  sub="in progress" />
+            <KPI label="Other Statuses" value={queueStats.other ?? 0} sub="non-canonical queue states" variant="warn" />
+            <KPI label="Missing Topic ID" value={queueStats.unresolvedTopicJobs ?? 0} sub="jobs not attributable to a grade" variant="danger" />
           </div>
+
+          {queueStats.otherStatuses.length > 0 && (
+            <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              Other queue statuses detected in Supabase: {queueStats.otherStatuses.map((item) => `${item.status} (${item.count})`).join(", ")}
+            </div>
+          )}
 
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-4">
             <div className="px-5 py-3 border-b border-gray-50 flex items-center gap-2">
               <Clock className="w-4 h-4 text-gray-400" />
               <h2 className="font-bold text-sm">Generation Queue — by Grade</h2>
             </div>
-            {loading ? <Spinner /> : (
+            {loading ? <Spinner /> : gradeData.length === 0 ? (
+              <div className="p-5 text-sm text-gray-500">No queue-to-grade mappings were returned from Supabase.</div>
+            ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
@@ -964,6 +937,7 @@ export const Admin: React.FC = () => {
             <div className="px-5 py-3 border-b border-gray-50 flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-red-400" />
               <h2 className="font-bold text-sm">Recent Failed Jobs</h2>
+              <span className="ml-auto text-xs text-gray-400">latest 10 rows from `lesson_gen_queue`</span>
             </div>
             {loading ? <Spinner /> : failedJobs.length === 0 ? (
               <div className="flex items-center gap-2 p-5 text-emerald-600 text-sm">
@@ -979,39 +953,18 @@ export const Admin: React.FC = () => {
                       <th className="px-4 py-2 text-left">Attempts</th>
                       <th className="px-4 py-2 text-left">Error</th>
                       <th className="px-4 py-2 text-left">Date</th>
-                      <th className="px-4 py-2 text-left">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {failedJobs.map((j: any) => {
-                      const busy = jobLoading[j.id];
-                      return (
-                        <tr key={j.id} className="border-t border-gray-50 hover:bg-gray-50/40">
-                          <td className="px-4 py-2">{(j.topics as any)?.title ?? j.topic_id}</td>
-                          <td className="px-4 py-2 font-mono text-xs text-gray-500">{j.track_id ?? "—"}</td>
-                          <td className="px-4 py-2">{j.attempts}</td>
-                          <td className="px-4 py-2 text-red-500 text-xs max-w-xs truncate">{(j.last_error ?? "").substring(0, 100)}</td>
-                          <td className="px-4 py-2 text-xs text-gray-400">{new Date(j.created_at).toLocaleDateString()}</td>
-                          <td className="px-4 py-2">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <button onClick={() => retryJob(j.id)} disabled={!!busy}
-                                className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-amber-50 text-amber-700 hover:bg-amber-100 disabled:opacity-40">
-                                <RotateCcw className="w-3 h-3" />{busy === "retry" ? "…" : "Retry"}
-                              </button>
-                              <button onClick={() => generateLesson(j)} disabled={!!busy}
-                                className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-40">
-                                <Play className="w-3 h-3" />{busy === "generate" ? "…" : "Generate"}
-                              </button>
-                              <button onClick={() => deleteJob(j.id)} disabled={!!busy}
-                                className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-40">
-                                <Trash2 className="w-3 h-3" />{busy === "delete" ? "…" : "Delete"}
-                              </button>
-                            </div>
-                            {jobMsg[j.id] && <p className="text-xs mt-1 text-emerald-600">{jobMsg[j.id]}</p>}
-                          </td>
-                        </tr>
-                      );
-                    })}
+                    {failedJobs.map((j: any) => (
+                      <tr key={j.id} className="border-t border-gray-50 hover:bg-gray-50/40">
+                        <td className="px-4 py-2">{(j.topics as any)?.title ?? j.topic_id}</td>
+                        <td className="px-4 py-2 font-mono text-xs text-gray-500">{j.track_id ?? "—"}</td>
+                        <td className="px-4 py-2">{j.attempts}</td>
+                        <td className="px-4 py-2 text-red-500 text-xs max-w-xs truncate">{(j.last_error ?? "").substring(0, 100)}</td>
+                        <td className="px-4 py-2 text-xs text-gray-400">{new Date(j.created_at).toLocaleDateString()}</td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -1024,19 +977,21 @@ export const Admin: React.FC = () => {
       {tab === "rag" && (
         <div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-            <KPI label="Total Chunks"   value={(ragStats.total ?? 0).toLocaleString()} sub="in rag_chunks" />
-            <KPI label="Embedded"       value={(ragStats.done ?? 0).toLocaleString()} sub={`${pct(ragStats.done, ragStats.total)}% done`} variant="success" />
-            <KPI label="Pending"        value={(ragStats.pending ?? 0).toLocaleString()} sub="to embed" variant="warn" />
-            <KPI label="RAG Questions"  value={ragStats.rqCount ?? 0} sub="QA pairs generated" />
+            <KPI label="Total Chunks" value={(ragStats.total ?? 0).toLocaleString()} sub="in rag_chunks" />
+            <KPI label="Embedded" value={(ragStats.done ?? 0).toLocaleString()} sub={`${pct(ragStats.done, ragStats.total)}% done`} variant="success" />
+            <KPI label="Pending" value={(ragStats.pending ?? 0).toLocaleString()} sub="embedding_status = pending" variant="warn" />
+            <KPI label="Other Statuses" value={(ragStats.other ?? 0).toLocaleString()} sub="non-pending / non-done chunks" variant="warn" />
           </div>
 
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="px-5 py-3 border-b border-gray-50 flex items-center gap-2">
               <Layers className="w-4 h-4 text-gray-400" />
               <h2 className="font-bold text-sm">RAG Chunks — by Grade</h2>
-              <span className="ml-auto text-xs text-gray-400">Click a row to browse & manage chunks</span>
+              <span className="ml-auto text-xs text-gray-400">Click a row to inspect the latest 100 chunks for that grade</span>
             </div>
-            {loading ? <Spinner /> : (
+            {loading ? <Spinner /> : ragByGrade.length === 0 ? (
+              <div className="p-5 text-sm text-gray-500">No RAG chunks were returned from Supabase for any grade.</div>
+            ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
@@ -1045,6 +1000,7 @@ export const Admin: React.FC = () => {
                       <th className="px-4 py-2 text-left">Total</th>
                       <th className="px-4 py-2 text-left">Embedded</th>
                       <th className="px-4 py-2 text-left">Pending</th>
+                      <th className="px-4 py-2 text-left">Other</th>
                       <th className="px-4 py-2 text-left">Coverage</th>
                       <th className="px-4 py-2 text-left">Chunks</th>
                     </tr>
@@ -1056,7 +1012,8 @@ export const Admin: React.FC = () => {
                           <td className="px-4 py-2">{row.grade}</td>
                           <td className="px-4 py-2">{row.total.toLocaleString()}</td>
                           <td className="px-4 py-2"><Pill status="done" label={row.done.toLocaleString()} /></td>
-                          <td className="px-4 py-2"><Pill status="pending" label={(row.total - row.done).toLocaleString()} /></td>
+                          <td className="px-4 py-2"><Pill status="pending" label={row.pending.toLocaleString()} /></td>
+                          <td className="px-4 py-2"><Pill status={row.other > 0 ? "failed" : "done"} label={row.other.toLocaleString()} /></td>
                           <td className="px-4 py-2"><ProgressBar val={row.done} total={row.total || 1} /></td>
                           <td className="px-4 py-2">
                             <button onClick={() => loadRagChunks(row.id)}
@@ -1068,8 +1025,10 @@ export const Admin: React.FC = () => {
                         </tr>
                         {ragChunkGradeId === row.id && (
                           <tr>
-                            <td colSpan={6} className="bg-gray-50 px-4 py-3">
-                              {ragChunkLoading ? <Spinner /> : ragChunks.length === 0 ? (
+                            <td colSpan={7} className="bg-gray-50 px-4 py-3">
+                              {ragChunkLoading ? <Spinner /> : ragChunkError ? (
+                                <p className="text-xs text-red-500">{ragChunkError}</p>
+                              ) : ragChunks.length === 0 ? (
                                 <p className="text-xs text-gray-400">No chunks found.</p>
                               ) : (
                                 <div className="space-y-2 max-h-80 overflow-y-auto">
@@ -1077,28 +1036,13 @@ export const Admin: React.FC = () => {
                                     <div key={c.id} className="bg-white rounded-lg border border-gray-100 p-3 flex items-start gap-3">
                                       <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-1">
-                                          <Pill status={c.embedding_status === "done" ? "done" : "pending"} label={c.embedding_status} />
+                                          <Pill
+                                            status={c.embedding_status === "done" ? "done" : c.embedding_status === "pending" ? "pending" : "failed"}
+                                            label={c.embedding_status}
+                                          />
                                           {c.source_url && <span className="text-xs text-gray-400 truncate max-w-[200px]">{c.source_url}</span>}
                                         </div>
                                         <p className="text-xs text-gray-600 leading-relaxed line-clamp-2">{c.content}</p>
-                                        {chunkMsg[c.id] && <p className="text-xs mt-1 text-emerald-600">{chunkMsg[c.id]}</p>}
-                                      </div>
-                                      <div className="flex gap-1.5 flex-shrink-0">
-                                        <button onClick={() => repairChunk(c.id, c.content)} disabled={!!chunkLoading[c.id]}
-                                          title="Repair with Qwen"
-                                          className="p-1.5 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 disabled:opacity-40">
-                                          {chunkLoading[c.id] === "repair" ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Wrench className="w-3 h-3" />}
-                                        </button>
-                                        <button onClick={() => reEmbedChunk(c.id)} disabled={!!chunkLoading[c.id]}
-                                          title="Re-embed"
-                                          className="p-1.5 rounded bg-amber-50 text-amber-600 hover:bg-amber-100 disabled:opacity-40">
-                                          {chunkLoading[c.id] === "embed" ? <RefreshCw className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />}
-                                        </button>
-                                        <button onClick={() => deleteChunk(c.id)} disabled={!!chunkLoading[c.id]}
-                                          title="Delete chunk"
-                                          className="p-1.5 rounded bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-40">
-                                          {chunkLoading[c.id] === "delete" ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
-                                        </button>
                                       </div>
                                     </div>
                                   ))}
@@ -1146,9 +1090,12 @@ export const Admin: React.FC = () => {
             )}
           </div>
           <div className="p-5">
+            <div className="mb-4 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-xs text-gray-600">
+              Read-only inspector for confirmed Supabase tables. Broken write actions were removed from the dashboard until protected server routes exist.
+            </div>
             {/* Table selector */}
             <div className="flex flex-wrap gap-2 mb-4">
-              {tableHealth.map((t) => (
+              {tableHealth.filter((t) => t.health_status === "present" || t.health_status === "empty").map((t) => (
                 <button
                   key={t.table_name}
                   onClick={() => { setSelectedTable(t.table_name); browseTable(t.table_name); }}
@@ -1206,7 +1153,6 @@ export const Admin: React.FC = () => {
                       {browseCols.map((c) => (
                         <th key={c} className="px-3 py-2 text-left font-semibold whitespace-nowrap">{c}</th>
                       ))}
-                      <th className="px-3 py-2 text-left font-semibold">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1223,22 +1169,6 @@ export const Admin: React.FC = () => {
                             </td>
                           );
                         })}
-                        <td className="px-3 py-2">
-                          <div className="flex gap-1">
-                            <CopyButton
-                              getText={() => JSON.stringify(row, null, 2)}
-                              className="p-1 rounded bg-gray-100 text-gray-600 hover:bg-emerald-50 hover:text-emerald-600"
-                            />
-                            <button onClick={() => setEditRow({ id: row.id, row: { ...row } })}
-                              className="p-1 rounded bg-gray-100 text-gray-600 hover:bg-blue-50 hover:text-blue-600">
-                              <Pencil className="w-3 h-3" />
-                            </button>
-                            <button onClick={() => deleteTableRow(row.id)} disabled={rowDeleteLoading === String(row.id)}
-                              className="p-1 rounded bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-600 disabled:opacity-40">
-                              {rowDeleteLoading === String(row.id) ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
-                            </button>
-                          </div>
-                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -1303,7 +1233,6 @@ export const Admin: React.FC = () => {
               { id: "insights"     as AIAction, label: "Insights",       icon: <Lightbulb className="w-4 h-4" />, desc: "Interpret what the metrics mean" },
               { id: "tasks"        as AIAction, label: "Task List",      icon: <ListChecks className="w-4 h-4" />, desc: "Prioritized action items" },
               { id: "strategy"     as AIAction, label: "Strategy Plan",  icon: <MapIcon className="w-4 h-4" />,       desc: "Phased roadmap to fix gaps" },
-              { id: "retry_failed" as AIAction, label: "Retry Failed",   icon: <RotateCcw className="w-4 h-4" />, desc: "Reset all failed queue jobs" },
             ] as { id: AIAction; label: string; icon: React.ReactNode; desc: string }[]).map((a) => (
               <button
                 key={a.id}
@@ -1334,13 +1263,6 @@ export const Admin: React.FC = () => {
             <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
               <div><strong>Agent error:</strong> {aiError}</div>
-            </div>
-          )}
-
-          {/* Retry result */}
-          {aiRetryMsg && !aiLoading && activeAITab === "retry_failed" && (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-emerald-800 text-sm flex items-center gap-2">
-              <CheckCircle className="w-4 h-4" /> {aiRetryMsg}
             </div>
           )}
 
@@ -1457,12 +1379,9 @@ export const Admin: React.FC = () => {
                         </div>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
-                        <button
-                          onClick={() => setExecModal({ task: t, open: true })}
-                          className="px-2.5 py-1 rounded text-xs font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
-                        >
-                          Execute
-                        </button>
+                        <span className="px-2.5 py-1 rounded text-xs font-semibold bg-gray-100 text-gray-500">
+                          Planning only
+                        </span>
                         <CopyButton
                           getText={() => formatTaskForCopy(t)}
                           className="text-gray-400 hover:text-gray-700 p-1.5 rounded hover:bg-gray-100"
@@ -1551,7 +1470,7 @@ export const Admin: React.FC = () => {
           )}
 
           {/* Empty state */}
-          {!aiLoading && !aiError && !aiInsights && !aiTaskList && !aiStrategy && !aiRetryMsg && (
+          {!aiLoading && !aiError && !aiInsights && !aiTaskList && !aiStrategy && (
             <div className="bg-white rounded-xl border border-dashed border-gray-200 p-10 flex flex-col items-center gap-3 text-center">
               <Sparkles className="w-8 h-8 text-gray-300" />
               <p className="text-gray-500 text-sm">Click an action above to run the AI Analyst against your live metrics.</p>
@@ -1567,7 +1486,7 @@ export const Admin: React.FC = () => {
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
             <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
               <Zap className="w-5 h-5 text-amber-600" />
-              <h3 className="font-bold text-lg">Confirm Task Execution</h3>
+              <h3 className="font-bold text-lg">Queue in Command Center</h3>
             </div>
 
             <div className="px-6 py-4 space-y-4">
@@ -1591,7 +1510,7 @@ export const Admin: React.FC = () => {
                 <div className={`rounded-lg p-3 text-sm ${
                   execResult.error
                     ? "bg-red-50 text-red-700"
-                    : execResult.executed
+                    : execResult.created
                     ? "bg-emerald-50 text-emerald-700"
                     : "bg-blue-50 text-blue-700"
                 }`}>
@@ -1600,13 +1519,15 @@ export const Admin: React.FC = () => {
                       <div className="font-semibold mb-1">Error</div>
                       <p>{execResult.error}</p>
                     </>
-                  ) : execResult.executed ? (
+                  ) : execResult.created ? (
                     <>
-                      <div className="font-semibold mb-1">✓ Executed Successfully</div>
+                      <div className="font-semibold mb-1">Queued Successfully</div>
                       <p>{execResult.preview}</p>
-                      {execResult.rows_affected !== undefined && (
-                        <div className="mt-1 text-xs font-semibold">{execResult.rows_affected} row(s) affected</div>
-                      )}
+                      <div className="mt-2 space-y-1 text-xs font-semibold">
+                        <div>Issue ID: {execResult.issue_id}</div>
+                        <div>Task ID: {execResult.task_id}</div>
+                        <div>Approval required: {execResult.approval_required ? "Yes" : "No"}</div>
+                      </div>
                     </>
                   ) : (
                     <>
@@ -1624,23 +1545,30 @@ export const Admin: React.FC = () => {
                   disabled={execLoading}
                   className="flex-1 px-4 py-2 rounded-lg border border-gray-200 text-gray-700 font-semibold hover:bg-gray-50 disabled:opacity-40 transition-colors"
                 >
-                  {execResult?.executed ? "Close" : "Cancel"}
+                  {execResult?.created ? "Close" : "Cancel"}
                 </button>
-                {!execResult && (
+                {execResult?.created ? (
                   <button
-                    onClick={() => executeTask(execModal.task)}
+                    onClick={() => navigate("/admin/ai-command-center")}
+                    className="flex-1 px-4 py-2 rounded-lg bg-gray-900 text-white font-semibold hover:bg-black transition-colors"
+                  >
+                    Open Command Center
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => sendTaskToCommandCenter(execModal.task)}
                     disabled={execLoading}
                     className="flex-1 px-4 py-2 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700 disabled:opacity-40 transition-colors flex items-center justify-center gap-2"
                   >
                     {execLoading ? (
                       <>
                         <RefreshCw className="w-4 h-4 animate-spin" />
-                        Executing...
+                        Creating...
                       </>
                     ) : (
                       <>
                         <Play className="w-4 h-4" />
-                        Execute Now
+                        Create Workflow
                       </>
                     )}
                   </button>

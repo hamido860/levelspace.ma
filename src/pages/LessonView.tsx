@@ -61,26 +61,17 @@ import { useAuth } from '../context/AuthContext';
 import { useAppSettings } from '../context/AppSettingsContext';
 import { indexLessonContent } from '../services/ragService';
 import { getSubjectCandidates } from '../services/curriculumMatching';
+import { isStudentVisibleLesson, normalizeLessonBlockUiType } from '../services/lessonRecovery';
 
 const BLOCK_TYPE_CONFIG: Record<string, { icon: React.ElementType; colorClass: string; label: string }> = {
-  // New canonical types
-  intro:    { icon: BookOpen,      colorClass: 'text-accent',   label: 'Introduction' },
-  theory:   { icon: FileText,      colorClass: 'text-accent',   label: 'Theory'       },
+  text:     { icon: FileText,      colorClass: 'text-accent',   label: 'Text'         },
   formula:  { icon: Type,          colorClass: 'text-warning',  label: 'Formula'      },
   example:  { icon: FlaskConical,  colorClass: 'text-warning',  label: 'Example'      },
-  exercise: { icon: Dumbbell,      colorClass: 'text-success',  label: 'Exercise'     },
-  quiz:     { icon: HelpCircle,    colorClass: 'text-accent',   label: 'Quiz'         },
-  exam:     { icon: GraduationCap, colorClass: 'text-warning',  label: 'Exam'         },
   summary:  { icon: List,          colorClass: 'text-success',  label: 'Summary'      },
-  // Legacy fallback types
-  definition: { icon: BookOpen,    colorClass: 'text-accent',   label: 'Definition'   },
-  content:    { icon: FileText,    colorClass: 'text-accent',   label: 'Content'      },
-  rules:      { icon: List,        colorClass: 'text-success',  label: 'Key Rules'    },
-  examples:   { icon: FlaskConical,colorClass: 'text-warning',  label: 'Examples'     },
 };
 
 const getBlockTypeConfig = (type: string) =>
-  BLOCK_TYPE_CONFIG[type] ?? { icon: FileText, colorClass: 'text-muted', label: 'Content' };
+  BLOCK_TYPE_CONFIG[normalizeLessonBlockUiType(type)] ?? { icon: FileText, colorClass: 'text-muted', label: 'Text' };
 
 const isRTL = (text: string) => {
   const rtlChars = /[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
@@ -552,11 +543,11 @@ export const LessonView: React.FC = () => {
       setOpenBlocks(['content']);
     }
 
-    if (lesson) {
+    if (visibleLocalLesson) {
       // Save last viewed lesson
       db.settings.put({ key: 'last_viewed_lesson_id', value: effectiveLesson.id });
     }
-  }, [lesson]);
+  }, [visibleLocalLesson]);
 
   useEffect(() => {
     const fetchExtraData = async () => {
@@ -1430,7 +1421,8 @@ export const LessonView: React.FC = () => {
                 blocks.map((block, index) => {
                   const blockId = `block-${index}`;
                   const isOpen = openBlocks.includes(blockId);
-                  const { icon: BlockIcon, colorClass: blockColorClass } = getBlockTypeConfig(block.type || '');
+                  const uiBlockType = normalizeLessonBlockUiType(block.type || '');
+                  const { icon: BlockIcon, colorClass: blockColorClass, label: blockTypeLabel } = getBlockTypeConfig(uiBlockType);
 
               // Determine status
               let status = 'pending';
@@ -1470,8 +1462,7 @@ export const LessonView: React.FC = () => {
                       {blockPreview && !isOpen && <p className="block__preview">{blockPreview}</p>}
                     </div>
                     <div className="flex items-center gap-2 ml-auto mr-2">
-                      {block.type === 'quiz' && <span className="pill pill--warn text-[10px]">interactive</span>}
-                      {block.type === 'exam' && <span className="pill pill--danger text-[10px]">national exam</span>}
+                      <span className="pill pill--neutral text-[10px]">{blockTypeLabel}</span>
                       
                       <button 
                         onClick={(e) => {

@@ -11,6 +11,7 @@ import { generateSeedLesson, generateLessonSuggestions, LessonSuggestion, checkA
 import { aiCrew } from '../services/aiCrewService';
 import { getQuizzesByLesson } from '../services/quizService';
 import { getExercisesByLesson } from '../services/exerciseService';
+import { filterStudentVisibleLessons } from '../services/lessonRecovery';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { getGradeCandidates, getSubjectCandidates, pickBestCurriculumMatch } from '../services/curriculumMatching';
@@ -67,6 +68,16 @@ const resolveCurriculumIds = async (grade: string, subject: string, category?: s
     gradeId: matchedGrade?.id ?? null,
     subjectId: matchedSubject?.id ?? null,
   };
+};
+
+type ClassroomSupabaseLesson = {
+  id?: string;
+  lesson_title?: string;
+  content?: string | null;
+  blocks?: any[] | null;
+  subtitle?: string | null;
+  status?: string | null;
+  teaching_contract?: unknown;
 };
 
 export const ClassroomView: React.FC = () => {
@@ -459,11 +470,8 @@ export const ClassroomView: React.FC = () => {
     if (!module) return;
     setIsSeeding(true);
     try {
-      const existingTitles = new Set((allLessons || []).map((lesson) => normalizeLessonTitle(lesson.title)));
-
-      // Find matching curriculum metadata
       const dbLessons = await fetchSupabaseLessons();
-      
+
       if (!dbLessons || dbLessons.length === 0) {
         // Fallback: load lesson titles from curriculum topics outline
         const { gradeId, subjectId } = await resolveCurriculumIds(currentGrade, module.name, module.category);
@@ -489,11 +497,13 @@ export const ClassroomView: React.FC = () => {
               await db.lessons.bulkAdd(toAdd);
             }
             toast.success(`Loaded ${topics.length} lesson titles from curriculum outline.`);
+            setIsSeeding(false);
             return;
           }
         }
 
         toast.info("No existing lessons found in Supabase for this curriculum.");
+        setIsSeeding(false);
         return;
       }
 
