@@ -10,14 +10,36 @@ interface AuthContextType {
   profile: any | null;
   loading: boolean;
   signOut: () => Promise<void>;
+  signInDemoAdmin: () => Promise<void>;
   isPro: boolean;
   isAdmin: boolean;
+  isDemoAdmin: boolean;
   dbConnected: boolean | null;
   refreshDbConnection: () => Promise<void>;
   syncData: () => Promise<any>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const DEMO_ADMIN_STORAGE_KEY = 'demo_admin_logged_in';
+const DEMO_ADMIN_USER_ID = 'demo-admin-id';
+
+const createDemoAdminUser = (): User => ({
+  id: DEMO_ADMIN_USER_ID,
+  app_metadata: { provider: 'demo' },
+  user_metadata: { full_name: 'Demo Admin' },
+  aud: 'authenticated',
+  created_at: new Date(0).toISOString(),
+  email: 'admin-demo@levelspace.local',
+  role: 'authenticated',
+} as User);
+
+const createDemoAdminProfile = () => ({
+  id: DEMO_ADMIN_USER_ID,
+  full_name: 'Demo Admin',
+  role: 'admin',
+  plan: 'pro',
+  onboarding_completed: true,
+});
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -25,6 +47,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [dbConnected, setDbConnected] = useState<boolean | null>(null);
+  const isDemoAdmin = user?.id === DEMO_ADMIN_USER_ID;
+
+  const applyDemoAdminAuth = async () => {
+    const demoUser = createDemoAdminUser();
+    const demoProfile = createDemoAdminProfile();
+    localStorage.setItem(DEMO_ADMIN_STORAGE_KEY, 'true');
+    setSession(null);
+    setUser(demoUser);
+    setProfile(demoProfile);
+    await db.settings.put({ key: `profile_${DEMO_ADMIN_USER_ID}`, value: demoProfile });
+  };
 
   const refreshDbConnection = async () => {
     const connected = await checkSupabaseConnection();
@@ -32,6 +65,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const syncData = async () => {
+    if (isDemoAdmin) {
+      return { errors: ['Demo admin mode does not sync with cloud data.'] };
+    }
     if (!dbConnected || !user) {
       return { errors: ['Not connected to cloud or user is not authenticated'] };
     }
@@ -42,7 +78,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    if (dbConnected && user && user.id !== 'demo-admin-id') {
+    if (dbConnected && user && user.id !== DEMO_ADMIN_USER_ID) {
       syncData();
     }
   }, [dbConnected, user?.id]);
@@ -68,8 +104,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setProfile(userProfile);
           await db.settings.put({ key: `profile_${session.user.id}`, value: userProfile });
         }
+      } else if (localStorage.getItem(DEMO_ADMIN_STORAGE_KEY) === 'true') {
+        await applyDemoAdminAuth();
       } else {
-        localStorage.removeItem('demo_admin_logged_in');
+        localStorage.removeItem(DEMO_ADMIN_STORAGE_KEY);
         setUser(null);
         setProfile(null);
       }
@@ -95,8 +133,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setProfile(userProfile);
           await db.settings.put({ key: `profile_${session.user.id}`, value: userProfile });
         }
+      } else if (localStorage.getItem(DEMO_ADMIN_STORAGE_KEY) === 'true') {
+        await applyDemoAdminAuth();
       } else {
-        localStorage.removeItem('demo_admin_logged_in');
+        localStorage.removeItem(DEMO_ADMIN_STORAGE_KEY);
         setUser(null);
         setProfile(null);
       }
@@ -112,11 +152,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     setLoading(true);
-    localStorage.removeItem('demo_admin_logged_in');
+    localStorage.removeItem(DEMO_ADMIN_STORAGE_KEY);
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);
     setProfile(null);
+    setLoading(false);
+  };
+
+  const signInDemoAdmin = async () => {
+    setLoading(true);
+    await applyDemoAdminAuth();
     setLoading(false);
   };
 
@@ -168,8 +214,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       profile, 
       loading, 
       signOut, 
+      signInDemoAdmin,
       isPro, 
       isAdmin,
+      isDemoAdmin,
       dbConnected,
       refreshDbConnection,
       syncData
