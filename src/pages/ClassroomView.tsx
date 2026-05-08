@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Layout } from '../components/Layout';
@@ -103,9 +103,10 @@ export const ClassroomView: React.FC = () => {
 
   const module = useLiveQuery(() => id ? db.modules.get(id) : undefined, [id]);
   const allLessons = useLiveQuery(() => id ? db.lessons.where('moduleId').equals(id).sortBy('createdAt') : [], [id]);
-  const lessons = filterStudentVisibleLessons(
+  // ⚡ Bolt Optimization: Memoize derived lessons calculation to prevent cascading re-renders
+  const lessons = useMemo(() => filterStudentVisibleLessons(
     allLessons?.filter(l => l.status !== 'suggested') || []
-  );
+  ), [allLessons]);
 
   // Auto-seed from Supabase when local lessons are empty — no AI needed
   useEffect(() => {
@@ -155,7 +156,8 @@ export const ClassroomView: React.FC = () => {
   }, [module?.id, allLessons?.length]);
 
   const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
-  const settingsMap = Object.fromEntries(dbSettings.map(s => [s.key, s.value]));
+  // ⚡ Bolt Optimization: Memoize derived settings to prevent unnecessary re-renders when useLiveQuery triggers
+  const settingsMap = useMemo(() => Object.fromEntries(dbSettings.map(s => [s.key, s.value])), [dbSettings]);
 
   const selectedGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
   const country = settingsMap['selected_country'] || localStorage.getItem('selected_country') || '';

@@ -1,0 +1,3 @@
+## 2024-06-25 - Prevent cascading re-renders by memoizing derived state from useLiveQuery
+**Learning:** `useLiveQuery` from `dexie-react-hooks` triggers a re-render on any database update. Deriving data from its results (e.g. `Object.fromEntries(dbSettings.map(...))` or `.filter()`) without memoization causes new object references on every render. This creates severe performance bottlenecks in this codebase's architecture due to cascading React re-renders.
+**Action:** Always wrap data derived from `useLiveQuery` results with `useMemo`. For example: `const settingsMap = useMemo(() => Object.fromEntries(dbSettings.map(s => [s.key, s.value])), [dbSettings]);`.
