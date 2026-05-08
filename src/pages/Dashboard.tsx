@@ -530,9 +530,9 @@ export const Dashboard: React.FC = () => {
               <div className="flex items-center justify-between">
                 <h3 className="text-[10px] font-bold text-muted uppercase tracking-widest">{t('calendar')}</h3>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-1 hover:bg-background rounded-lg"><ChevronLeft size={14} /></button>
+                  <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} aria-label="Previous month" className="p-1 hover:bg-background rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"><ChevronLeft size={14} /></button>
                   <span className="text-[10px] font-bold text-ink">{format(currentMonth, 'MMM yyyy')}</span>
-                  <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-1 hover:bg-background rounded-lg"><ChevronRight size={14} /></button>
+                  <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} aria-label="Next month" className="p-1 hover:bg-background rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"><ChevronRight size={14} /></button>
                 </div>
               </div>
 
