@@ -22,7 +22,8 @@ import {
   PlusCircle
 } from 'lucide-react';
 import { generateCurriculum, checkAIProvider } from '../services/geminiService';
-import { mapSubjectsToModules, mergeModulesWithAiSuggestions } from '../services/classroomLoader';
+import { getClassroomLoadPlan, mapSubjectsToModules, mergeModulesWithAiSuggestions, shouldRequestAiCurriculumSuggestions } from '../services/classroomLoader';
+import { getSubjectCandidates, normalizeCurriculumValue } from '../services/curriculumMatching';
 import { supabase } from '../db/supabase';
 import { useSearch } from '../context/SearchContext';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -40,19 +41,84 @@ const getIconForCategory = (category: string) => {
   return <Library className="w-5 h-5" />;
 };
 
+const MOROCCAN_SCOPE_SUBJECTS: Record<string, string[]> = {
+  'tronc commun::tronc commun scientifique': [
+    'Mathématiques',
+    'Physique-Chimie',
+    'Sciences de la Vie et de la Terre (SVT)',
+    'Français',
+    'Informatique',
+    'Arabe',
+    'Education Islamique',
+    'Histoire-Géographie',
+  ],
+  'tronc commun::tronc commun litteraire': [
+    'Arabe',
+    'Français',
+    'Histoire-Géographie',
+    'Education Islamique',
+    'Mathématiques',
+    'Informatique',
+  ],
+  'tronc commun::tronc commun technologique': [
+    'Mathématiques',
+    'Physique-Chimie',
+    "Sciences de l'Ingénieur",
+    'Français',
+    'Informatique',
+  ],
+};
+
+const buildTrustedSubjectNames = (country: string, grade: string, track: string) => {
+  if (normalizeCurriculumValue(country) !== 'morocco') return [];
+  return MOROCCAN_SCOPE_SUBJECTS[`${normalizeCurriculumValue(grade)}::${normalizeCurriculumValue(track)}`] || [];
+};
+
+const buildTrustedSubjectSet = (subjectNames: string[]) =>
+  new Set(
+    subjectNames
+      .flatMap((name) => getSubjectCandidates(name))
+      .map((name) => normalizeCurriculumValue(name)),
+  );
+
+const moduleMatchesTrustedSubjects = (
+  module: { name: string; category: string; code: string },
+  trustedSubjects: Set<string>,
+) => {
+  if (trustedSubjects.size === 0) return true;
+
+  const candidates = new Set(
+    [
+      ...getSubjectCandidates(module.name, module.category),
+      module.code,
+    ].map((value) => normalizeCurriculumValue(String(value || ''))),
+  );
+
+  return Array.from(candidates).some((candidate) => trustedSubjects.has(candidate));
+};
+
+const buildFallbackTrustedModules = (subjectNames: string[]) =>
+  subjectNames.map((name) => ({
+    id: `trusted-${normalizeCurriculumValue(name).replace(/\s+/g, '-')}`,
+    name,
+    code: name,
+    description: 'Trusted Moroccan curriculum subject',
+    category: name,
+    progress: 0,
+    selected: false,
+    createdAt: Date.now(),
+  }));
+
 export const Modules: React.FC = () => {
   const { t } = useLanguage();
   const { isPro } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const { searchQuery } = useSearch();
   const navigate = useNavigate();
+  const aiAvailable = checkAIProvider();
+  const aiUnavailableMsg = 'AI curriculum suggestions require an API key.';
 
   const dbModules = useLiveQuery(() => db.modules.toArray());
-  const modules = (dbModules || []).map(m => ({
-    ...m,
-    icon: getIconForCategory(m.category)
-  }));
-  const selectedCount = modules.filter(m => m.selected).length;
 
   const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
   // ⚡ Bolt Optimization: Memoize derived settings to prevent unnecessary re-renders when useLiveQuery triggers
@@ -65,6 +131,15 @@ export const Modules: React.FC = () => {
 
   const [bacTrackName, setBacTrackName] = useState<string>('');
   const [bacIntOptionName, setBacIntOptionName] = useState<string>('');
+  const trustedSubjectNames = buildTrustedSubjectNames(country, grade, bacTrackName || selectedBacTrackId);
+  const trustedSubjectSet = buildTrustedSubjectSet(trustedSubjectNames);
+  const modules = (dbModules || [])
+    .filter((module) => moduleMatchesTrustedSubjects(module, trustedSubjectSet))
+    .map(m => ({
+      ...m,
+      icon: getIconForCategory(m.category)
+    }));
+  const selectedCount = modules.filter(m => m.selected).length;
 
   useEffect(() => {
     const fetchBacDetails = async () => {
@@ -95,6 +170,15 @@ export const Modules: React.FC = () => {
     fetchBacDetails();
   }, [selectedBacTrackId, selectedBacIntOptionId, grade]);
 
+  useEffect(() => {
+    if (dbModules === undefined) return;
+    if (!country) return;
+    if (modules.length > 0) return;
+
+    const plan = getClassroomLoadPlan({ action: 'create_classroom', isPro });
+    fetchCurriculum(plan.includeAiSuggestions);
+  }, [country, dbModules, grade, isPro, modules.length]);
+
   const fetchCurriculum = async (includeAiSuggestions = false, bypassAiCache = false) => {
     setIsLoading(true);
     try {
@@ -104,7 +188,14 @@ export const Modules: React.FC = () => {
       const supabaseModules = mapSubjectsToModules((subjectRows || []) as any[]);
       let modulesToStore = supabaseModules;
 
-      if (includeAiSuggestions && aiAvailable) {
+      if (trustedSubjectSet.size > 0) {
+        const scopedSupabaseModules = supabaseModules.filter((module) => moduleMatchesTrustedSubjects(module, trustedSubjectSet));
+        modulesToStore = scopedSupabaseModules.length > 0
+          ? scopedSupabaseModules
+          : buildFallbackTrustedModules(trustedSubjectNames);
+      }
+
+      if (shouldRequestAiCurriculumSuggestions({ includeAiSuggestions, aiAvailable })) {
         let fullGrade = grade;
         if (bacTrackName) {
           fullGrade += ` - ${bacTrackName}`;
@@ -126,16 +217,38 @@ export const Modules: React.FC = () => {
               selected: false,
               createdAt: Date.now()
             }));
-            modulesToStore = mergeModulesWithAiSuggestions(supabaseModules, formattedAiModules);
+            if (trustedSubjectSet.size > 0) {
+              modulesToStore = mergeModulesWithAiSuggestions(modulesToStore, formattedAiModules);
+            } else {
+              modulesToStore = mergeModulesWithAiSuggestions(supabaseModules, formattedAiModules);
+            }
           }
         } catch (aiError) {
           console.warn('AI curriculum suggestions failed; keeping Supabase curriculum:', aiError);
         }
       }
 
+      if (trustedSubjectSet.size > 0) {
+        modulesToStore = modulesToStore.filter((module) => moduleMatchesTrustedSubjects(module, trustedSubjectSet));
+      }
+
       if (modulesToStore.length > 0) {
-        await db.modules.clear();
-        await db.modules.bulkPut(modulesToStore);
+        const existingById = new Map((dbModules || []).map((module) => [module.id, module]));
+        const mergedModules = modulesToStore.map((module) => {
+          const existing = existingById.get(module.id);
+          if (!existing) return module;
+
+          return {
+            ...module,
+            progress: existing.progress ?? module.progress,
+            selected: existing.selected ?? module.selected,
+            tags: existing.tags ?? module.tags,
+            strictRAG: existing.strictRAG ?? module.strictRAG,
+            createdAt: existing.createdAt ?? module.createdAt,
+          };
+        });
+
+        await db.modules.bulkPut(mergedModules);
       }
     } catch (error) {
       console.error('Failed to fetch classroom curriculum:', error);
@@ -175,15 +288,18 @@ export const Modules: React.FC = () => {
           <div className="space-y-1 flex-1">
             <div className="flex items-start md:items-center gap-2 text-accent">
               <Sparkles className="w-4 h-4 shrink-0 mt-0.5 md:mt-0" />
-              <span className="text-[10px] font-bold uppercase tracking-[0.3em] leading-relaxed">AI-Curated for {grade}{bacTrackName ? ` - ${bacTrackName}` : ''}{bacIntOptionName ? ` (${bacIntOptionName})` : ''} in {country}</span>
+              <span className="text-[10px] font-bold uppercase tracking-[0.3em] leading-relaxed">Draft AI-Assisted Content — Pending Curriculum Validation</span>
             </div>
             <h2 className="text-2xl md:text-3xl font-bold text-ink font-sans">{t('actions_create_classroom')}</h2>
           </div>
           
           <div className="flex items-center gap-4 shrink-0">
             <button
-              onClick={() => fetchCurriculum(true, true)}
-              disabled={isLoading || !aiAvailable}
+              onClick={() => {
+                const plan = getClassroomLoadPlan({ action: 'refresh_suggestions', isPro });
+                fetchCurriculum(plan.includeAiSuggestions, true);
+              }}
+              disabled={isLoading || !aiAvailable || !isPro}
               title={!aiAvailable ? aiUnavailableMsg : undefined}
               className="flex items-center gap-2 px-4 py-2 bg-accent/5 text-accent rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-accent/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -340,7 +456,10 @@ export const Modules: React.FC = () => {
                   </div>
                 )}
                 <button
-                  onClick={() => fetchCurriculum(false)}
+                  onClick={() => {
+                    const plan = getClassroomLoadPlan({ action: 'create_classroom', isPro });
+                    fetchCurriculum(plan.includeAiSuggestions);
+                  }}
                   className="px-10 py-4 bg-accent text-paper rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-accent-hover transition-all shadow-xl shadow-accent/20 flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <PlusCircle className="w-4 h-4" />
@@ -394,4 +513,3 @@ export const Modules: React.FC = () => {
     </Layout>
   );
 };
-

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Layout } from '../components/Layout';
@@ -46,14 +46,12 @@ import {
   auditLessonLanguage,
   AuditResult,
   explainText,
-  generateLessonTags,
   generateInteractiveContent,
   generateAnotherExample,
   checkAIProvider
 } from '../services/geminiService';
 import { getQuizzesByLesson } from '../services/quizService';
 import { getExercisesByLesson } from '../services/exerciseService';
-import { TagsManager } from '../components/TagsManager';
 import { Modal } from '../components/Modal';
 import { PedagogicalTools } from '../components/PedagogicalTools';
 import { AIAssistant } from '../components/AIAssistant';
@@ -62,7 +60,22 @@ import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { useAppSettings } from '../context/AppSettingsContext';
 import { indexLessonContent } from '../services/ragService';
+import { getSubjectCandidates } from '../services/curriculumMatching';
 import { isStudentVisibleLesson, normalizeLessonBlockUiType } from '../services/lessonRecovery';
+import {
+  getLessonSelectColumns,
+  inferLegacyLessonSourceConfidence,
+  inferLegacyLessonSourceName,
+  inferLegacyLessonValidationStatus,
+  isMissingLessonValidationColumnError,
+} from '../services/lessonSupabase';
+import {
+  getCurriculumValidationBadgeClass,
+  getCurriculumValidationLabel,
+  getCurriculumValidationStatus,
+  isDraftValidationStatus,
+  isStudentPreferredValidationStatus,
+} from '../services/curriculumValidation';
 
 const BLOCK_TYPE_CONFIG: Record<string, { icon: React.ElementType; colorClass: string; label: string }> = {
   text:     { icon: FileText,      colorClass: 'text-accent',   label: 'Text'         },
@@ -77,6 +90,70 @@ const getBlockTypeConfig = (type: string) =>
 const isRTL = (text: string) => {
   const rtlChars = /[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
   return rtlChars.test(text);
+};
+
+const stripMarkdown = (text: string) =>
+  text
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/!\[.*?\]\(.*?\)/g, ' ')
+    .replace(/\[(.*?)\]\(.*?\)/g, '$1')
+    .replace(/[#>*_~\-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const truncateText = (text: string, max = 110) =>
+  text.length <= max ? text : `${text.slice(0, max).trim()}...`;
+
+const getBlockTitle = (block: any, index: number) => {
+  const config = getBlockTypeConfig(block?.type || '');
+  return block?.title || block?.label || `${config.label} ${index + 1}`;
+};
+
+const getBlockPreviewHint = (type: string) => {
+  switch (type) {
+    case 'intro':
+      return 'Open for the full concept overview.';
+    case 'theory':
+    case 'content':
+    case 'definition':
+      return 'Open for the full explanation and key idea.';
+    case 'formula':
+      return 'Open to see the formula highlighted clearly.';
+    case 'example':
+    case 'examples':
+      return 'Open the worked example step by step.';
+    case 'summary':
+      return 'Open for the condensed takeaways.';
+    case 'rules':
+      return 'Open for the key rules and structure.';
+    default:
+      return 'Open for the full explanation.';
+  }
+};
+
+const getBlockPreview = (block: any) => {
+  if (block?.question) return truncateText(stripMarkdown(String(block.question)));
+  const type = String(block?.type || '');
+  if (typeof block?.content === 'string' && block.content.trim()) {
+    const contentPreview = truncateText(stripMarkdown(block.content), 90);
+    if (['intro', 'theory', 'content', 'definition', 'formula', 'example'].includes(type)) {
+      return getBlockPreviewHint(type);
+    }
+    return contentPreview;
+  }
+  if (Array.isArray(block?.points) && block.points.length > 0) {
+    return truncateText(stripMarkdown(String(block.points[0])));
+  }
+  if (Array.isArray(block?.rules) && block.rules.length > 0) {
+    return truncateText(stripMarkdown(String(block.rules[0])));
+  }
+  if (Array.isArray(block?.examples) && block.examples.length > 0) {
+    return truncateText(stripMarkdown(String(block.examples[0]?.question || block.examples[0]?.answer || '')));
+  }
+  if (block?.quiz?.question) return truncateText(stripMarkdown(String(block.quiz.question)));
+  if (block?.exercise?.prompt) return truncateText(stripMarkdown(String(block.exercise.prompt)));
+  return '';
 };
 
 const Timer = () => {
@@ -126,6 +203,29 @@ const PENDING_STAGES = [
   'Generating lesson content...',
   'Validating and saving...',
 ];
+
+type SupabaseLessonRecord = {
+  id?: string;
+  topic_id?: string | null;
+  lesson_title: string;
+  content?: string | null;
+  blocks?: any[] | null;
+  subtitle?: string | null;
+  tags?: string[] | null;
+  status?: string | null;
+  grade?: string | null;
+  country?: string | null;
+  subject?: string | null;
+  validation_status?: string | null;
+  source_confidence?: number | null;
+  source_name?: string | null;
+  source_url?: string | null;
+  review_notes?: string | null;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  is_ai_generated?: boolean | null;
+  teaching_contract?: unknown;
+};
 
 // Shown when AI Crew is generating a lesson on-demand (status === 'pending')
 const PendingLessonView: React.FC<{ title: string; lessonId: string; onReady: () => void }> = ({ title, lessonId, onReady }) => {
@@ -213,7 +313,6 @@ export const LessonView: React.FC = () => {
 
   // Scroll Progress state
   const [scrollProgress, setScrollProgress] = useState(0);
-  const [isGeneratingTags, setIsGeneratingTags] = useState(false);
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [showReminderModal, setShowReminderModal] = useState(false);
   const [showNoteModal, setShowNoteModal] = useState(false);
@@ -236,6 +335,7 @@ export const LessonView: React.FC = () => {
   const [readingBlockIndex, setReadingBlockIndex] = useState<number | null>(null);
   const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
   const [forceDir, setForceDir] = useState<'ltr' | 'rtl' | null>(null);
+  const blockRefs = useRef<Record<string, HTMLElement | null>>({});
 
   useEffect(() => {
     const handleScroll = () => {
@@ -324,7 +424,7 @@ export const LessonView: React.FC = () => {
     setExplanation(null);
     try {
       const context = effectiveLesson.blocks?.map(b => b.content || '').join('\n') || effectiveLesson.content || '';
-      const result = await explainText(selectedText, context, selectedGrade, selectedCountry, language, module?.strictRAG);
+      const result = await explainText(selectedText, context, lessonGrade, lessonCountry, language, module?.strictRAG);
       setExplanation(result);
     } catch (error) {
       console.error("Failed to explain text:", error);
@@ -335,35 +435,203 @@ export const LessonView: React.FC = () => {
   };
 
   const lesson = useLiveQuery(() => id ? db.lessons.get(id) : undefined, [id]);
-  const [supabaseLesson, setSupabaseLesson] = useState<any>(null);
-  const visibleLocalLesson = lesson && isStudentVisibleLesson(lesson) ? lesson : undefined;
+  const [supabaseLesson, setSupabaseLesson] = useState<SupabaseLessonRecord | null>(null);
+  const moduleIdForLookup = lesson?.moduleId || supabaseLesson?.topic_id || undefined;
+  const module = useLiveQuery(() => moduleIdForLookup ? db.modules.get(moduleIdForLookup) : undefined, [moduleIdForLookup]);
 
   useEffect(() => {
-    // If not found in IndexedDB, try Supabase by topic_id
-    if (visibleLocalLesson === undefined && id) {
-      supabase
-        .from('lessons')
-        .select('*')
-        .eq('topic_id', id)
-        .maybeSingle()
-        .then(({ data }) => {
-          if (data && isStudentVisibleLesson(data)) setSupabaseLesson(data);
-        });
-    }
-  }, [visibleLocalLesson, id]);
+    if (!id) return;
 
-  // Merge: prefer IndexedDB lesson, fall back to Supabase
-  const effectiveLesson = visibleLocalLesson || (supabaseLesson ? {
-    id: supabaseLesson.id,
-    moduleId: supabaseLesson.topic_id,
-    title: supabaseLesson.lesson_title,
-    content: supabaseLesson.content,
-    status: 'done' as const,
-    createdAt: Date.now(),
-    blocks: supabaseLesson.blocks || [],
-    subtitle: supabaseLesson.subtitle,
-    tags: supabaseLesson.tags,
-  } : undefined);
+    let isCancelled = false;
+
+    const hydrateSupabaseLesson = async () => {
+      const fetchAttempt = async (includeValidation: boolean) => {
+        const selectColumns = getLessonSelectColumns({ includeTags: true, includeValidation });
+
+        const directMatch = await supabase
+          .from('lessons')
+          .select(selectColumns)
+          .or(`id.eq.${id},topic_id.eq.${id}`)
+          .maybeSingle();
+
+        if (isCancelled) return;
+        if (directMatch.data) {
+          setSupabaseLesson(directMatch.data as SupabaseLessonRecord);
+          return;
+        }
+
+        if (!lesson?.title) return;
+
+        let titleQuery = supabase
+          .from('lessons')
+          .select(selectColumns)
+          .eq('lesson_title', lesson.title);
+
+        const subjectCandidates = module ? getSubjectCandidates(module.name, module.category) : [];
+        if (subjectCandidates.length > 0) {
+          titleQuery = titleQuery.in('subject', subjectCandidates);
+        }
+
+        const { data: titleMatches } = await titleQuery.limit(5);
+        if (isCancelled) return;
+
+        const fallbackMatch = (titleMatches || [])[0] as SupabaseLessonRecord | undefined;
+        if (fallbackMatch) {
+          setSupabaseLesson(fallbackMatch);
+        }
+      };
+
+      try {
+        await fetchAttempt(true);
+      } catch (error) {
+        if (isMissingLessonValidationColumnError(error)) {
+          console.warn('[LessonView] Lesson validation columns are missing in Supabase; retrying with legacy lesson schema.');
+          await fetchAttempt(false);
+          return;
+        }
+
+        throw error;
+      }
+    };
+
+    hydrateSupabaseLesson().catch((error) => {
+      console.warn('[LessonView] Failed to hydrate lesson metadata from Supabase:', error);
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [id, lesson?.title, module?.name, module?.category]);
+
+  useEffect(() => {
+    if (!lesson || !supabaseLesson) return;
+
+    const inferredValidationStatus =
+      lesson.validation_status ||
+      supabaseLesson.validation_status ||
+      inferLegacyLessonValidationStatus(supabaseLesson);
+    const inferredSourceConfidence =
+      lesson.source_confidence ??
+      supabaseLesson.source_confidence ??
+      inferLegacyLessonSourceConfidence(supabaseLesson) ??
+      undefined;
+    const inferredSourceName =
+      lesson.source_name ||
+      supabaseLesson.source_name ||
+      inferLegacyLessonSourceName(supabaseLesson);
+
+    const nextPatch = {
+      grade: lesson.grade || supabaseLesson.grade || undefined,
+      country: lesson.country || supabaseLesson.country || undefined,
+      subject: lesson.subject || supabaseLesson.subject || module?.name || undefined,
+      topic_id: lesson.topic_id || supabaseLesson.topic_id || undefined,
+      sourceLessonId: lesson.sourceLessonId || supabaseLesson.id || undefined,
+      validation_status: inferredValidationStatus,
+      source_confidence: inferredSourceConfidence,
+      source_name: inferredSourceName,
+      source_url: lesson.source_url || supabaseLesson.source_url || undefined,
+      review_notes: lesson.review_notes || supabaseLesson.review_notes || undefined,
+      reviewed_by: lesson.reviewed_by || supabaseLesson.reviewed_by || undefined,
+      reviewed_at: lesson.reviewed_at || supabaseLesson.reviewed_at || undefined,
+      teaching_contract: lesson.teaching_contract || supabaseLesson.teaching_contract || undefined,
+      is_ai_generated: lesson.is_ai_generated ?? supabaseLesson.is_ai_generated ?? undefined,
+    };
+
+    if (
+      nextPatch.grade !== lesson.grade ||
+      nextPatch.country !== lesson.country ||
+      nextPatch.subject !== lesson.subject ||
+      nextPatch.topic_id !== lesson.topic_id ||
+      nextPatch.sourceLessonId !== lesson.sourceLessonId ||
+      nextPatch.validation_status !== lesson.validation_status ||
+      nextPatch.source_confidence !== lesson.source_confidence ||
+      nextPatch.source_name !== lesson.source_name ||
+      nextPatch.source_url !== lesson.source_url ||
+      nextPatch.review_notes !== lesson.review_notes ||
+      nextPatch.reviewed_by !== lesson.reviewed_by ||
+      nextPatch.reviewed_at !== lesson.reviewed_at ||
+      nextPatch.teaching_contract !== lesson.teaching_contract ||
+      nextPatch.is_ai_generated !== lesson.is_ai_generated
+    ) {
+      db.lessons.update(lesson.id, nextPatch);
+    }
+  }, [lesson, module?.name, supabaseLesson]);
+
+  // Merge: prefer IndexedDB lesson, enriched with Supabase metadata when available.
+  const effectiveLesson = lesson
+    ? {
+        ...lesson,
+        grade: lesson.grade || supabaseLesson?.grade || undefined,
+        country: lesson.country || supabaseLesson?.country || undefined,
+        subject: lesson.subject || supabaseLesson?.subject || module?.name || undefined,
+        topic_id: lesson.topic_id || supabaseLesson?.topic_id || undefined,
+        sourceLessonId: lesson.sourceLessonId || supabaseLesson?.id || undefined,
+        validation_status:
+          lesson.validation_status ||
+          supabaseLesson?.validation_status ||
+          (supabaseLesson ? inferLegacyLessonValidationStatus(supabaseLesson) : undefined),
+        source_confidence:
+          lesson.source_confidence ??
+          supabaseLesson?.source_confidence ??
+          (supabaseLesson ? inferLegacyLessonSourceConfidence(supabaseLesson) : undefined),
+        source_name:
+          lesson.source_name ||
+          supabaseLesson?.source_name ||
+          (supabaseLesson ? inferLegacyLessonSourceName(supabaseLesson) : undefined),
+        source_url: lesson.source_url || supabaseLesson?.source_url || undefined,
+        review_notes: lesson.review_notes || supabaseLesson?.review_notes || undefined,
+        reviewed_by: lesson.reviewed_by || supabaseLesson?.reviewed_by || undefined,
+        reviewed_at: lesson.reviewed_at || supabaseLesson?.reviewed_at || undefined,
+        teaching_contract: lesson.teaching_contract || supabaseLesson?.teaching_contract || undefined,
+        is_ai_generated: lesson.is_ai_generated ?? supabaseLesson?.is_ai_generated ?? undefined,
+      }
+    : (supabaseLesson ? {
+        id: supabaseLesson.id,
+        moduleId: supabaseLesson.topic_id,
+        title: supabaseLesson.lesson_title,
+        content: supabaseLesson.content,
+        status: 'done' as const,
+        createdAt: Date.now(),
+        blocks: supabaseLesson.blocks || [],
+        subtitle: supabaseLesson.subtitle,
+        tags: supabaseLesson.tags || [],
+        topic_id: supabaseLesson.topic_id || undefined,
+        grade: supabaseLesson.grade || undefined,
+        country: supabaseLesson.country || undefined,
+        subject: supabaseLesson.subject || undefined,
+        sourceLessonId: supabaseLesson.id || undefined,
+        validation_status: inferLegacyLessonValidationStatus(supabaseLesson),
+        source_confidence: supabaseLesson.source_confidence ?? inferLegacyLessonSourceConfidence(supabaseLesson) ?? undefined,
+        source_name: supabaseLesson.source_name || inferLegacyLessonSourceName(supabaseLesson) || undefined,
+        source_url: supabaseLesson.source_url || undefined,
+        review_notes: supabaseLesson.review_notes || undefined,
+        reviewed_by: supabaseLesson.reviewed_by || undefined,
+        reviewed_at: supabaseLesson.reviewed_at || undefined,
+        teaching_contract: supabaseLesson.teaching_contract || undefined,
+        is_ai_generated: supabaseLesson.is_ai_generated ?? undefined,
+      } : undefined);
+  const lessonHasStoredContent =
+    Boolean(effectiveLesson?.content?.trim()) ||
+    ((effectiveLesson?.blocks?.length || 0) > 0);
+  const validationStatus = getCurriculumValidationStatus(
+    effectiveLesson?.validation_status,
+    !!effectiveLesson?.is_ai_generated,
+  );
+  const validationLabel = getCurriculumValidationLabel(
+    effectiveLesson?.validation_status,
+    !!effectiveLesson?.is_ai_generated,
+  );
+  const validationBadgeClass = getCurriculumValidationBadgeClass(
+    effectiveLesson?.validation_status,
+    !!effectiveLesson?.is_ai_generated,
+  );
+  const showLessonValidationWarning =
+    !isAdmin &&
+    effectiveLesson !== undefined &&
+    effectiveLesson !== null &&
+    isDraftValidationStatus(effectiveLesson.validation_status, !!effectiveLesson.is_ai_generated);
+  const lessonHasPreferredValidation =
+    isStudentPreferredValidationStatus(effectiveLesson?.validation_status, !!effectiveLesson?.is_ai_generated);
 
   const contentDir = useMemo(() => {
     if (forceDir) return forceDir;
@@ -378,7 +646,6 @@ export const LessonView: React.FC = () => {
     const uiDir = language === 'ar' ? 'rtl' : 'ltr';
     return contentDir !== uiDir;
   }, [contentDir, language]);
-  const module = useLiveQuery(() => effectiveLesson?.moduleId ? db.modules.get(effectiveLesson.moduleId) : undefined, [effectiveLesson?.moduleId]);
   const notes = useLiveQuery(() => id ? db.notes.where('lessonId').equals(id).toArray() : [], [id]) || [];
   const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
   // ⚡ Bolt Optimization: Memoize derived settings to prevent unnecessary re-renders when useLiveQuery triggers
@@ -386,6 +653,9 @@ export const LessonView: React.FC = () => {
 
   const selectedGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
   const selectedCountry = settingsMap['selected_country'] || localStorage.getItem('selected_country') || '';
+  const lessonGrade = effectiveLesson?.grade || supabaseLesson?.grade || selectedGrade;
+  const lessonCountry = effectiveLesson?.country || supabaseLesson?.country || selectedCountry;
+  const lessonSubject = effectiveLesson?.subject || supabaseLesson?.subject || module?.name || '';
 
   // Initialize first block open
   useEffect(() => {
@@ -395,11 +665,11 @@ export const LessonView: React.FC = () => {
       setOpenBlocks(['content']);
     }
 
-    if (visibleLocalLesson) {
+    if (effectiveLesson?.id) {
       // Save last viewed lesson
       db.settings.put({ key: 'last_viewed_lesson_id', value: effectiveLesson.id });
     }
-  }, [visibleLocalLesson]);
+  }, [effectiveLesson?.id, effectiveLesson?.blocks, openBlocks.length]);
 
   useEffect(() => {
     const fetchExtraData = async () => {
@@ -428,6 +698,31 @@ export const LessonView: React.FC = () => {
         ? prev.filter(b => b !== blockId) 
         : [...prev, blockId]
     );
+  };
+
+  const focusBlock = (blockId: string) => {
+    setOpenBlocks(prev => (prev.includes(blockId) ? prev : [...prev, blockId]));
+    window.setTimeout(() => {
+      blockRefs.current[blockId]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+  };
+
+  const expandAllBlocks = () => {
+    if (!effectiveLesson?.blocks?.length) return;
+    setOpenBlocks(effectiveLesson.blocks.map((_, index) => `block-${index}`));
+  };
+
+  const collapseAllBlocks = () => {
+    setOpenBlocks([]);
+  };
+
+  const openOutlineSection = (blockIndex: number) => {
+    setShowOutlineModal(false);
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      setReadingBlockIndex(null);
+    }
+    focusBlock(`block-${blockIndex}`);
   };
 
   const markLessonComplete = async () => {
@@ -484,32 +779,14 @@ export const LessonView: React.FC = () => {
         effectiveLesson.title,
         effectiveLesson.blocks || [{ content: effectiveLesson.content }],
         module.name,
-        selectedGrade,
-        selectedCountry
+        lessonGrade,
+        lessonCountry
       );
       setAuditResult(result);
     } catch (error) {
       console.error("Audit failed", error);
     } finally {
       setIsAuditing(false);
-    }
-  };
-
-  const handleGenerateTags = async () => {
-    if (!effectiveLesson || !hasAiAccess || !aiAvailable) return;
-    setIsGeneratingTags(true);
-    try {
-      const content = effectiveLesson.blocks?.map(b => b.content || '').join('\n') || effectiveLesson.content || '';
-      const newTags = await generateLessonTags(effectiveLesson.title, content, selectedGrade, selectedCountry);
-      if (newTags.length > 0) {
-        const currentTags = effectiveLesson.tags || [];
-        const combined = Array.from(new Set([...currentTags, ...newTags]));
-        await db.lessons.update(effectiveLesson.id, { tags: combined });
-      }
-    } catch (error) {
-      console.error("Failed to generate tags", error);
-    } finally {
-      setIsGeneratingTags(false);
     }
   };
 
@@ -586,7 +863,7 @@ export const LessonView: React.FC = () => {
     setInteractiveContent(null);
     try {
       const content = effectiveLesson.blocks?.map((b: any) => b.content || '').join('\n') || effectiveLesson.content || '';
-      const result = await generateInteractiveContent(type, content, selectedGrade, selectedCountry, module?.strictRAG);
+      const result = await generateInteractiveContent(type, content, lessonGrade, lessonCountry, module?.strictRAG);
       setInteractiveContent(result);
     } catch (error) {
       console.error("Failed to generate interactive content:", error);
@@ -609,8 +886,8 @@ export const LessonView: React.FC = () => {
         effectiveLesson.title,
         block.title || 'Examples',
         block.examples,
-        selectedGrade,
-        selectedCountry,
+        lessonGrade,
+        lessonCountry,
         module?.strictRAG
       );
 
@@ -635,7 +912,7 @@ export const LessonView: React.FC = () => {
 
   if (effectiveLesson === undefined) {
     return (
-      <Layout fullWidth>
+      <Layout fullWidth topbarGradeOverride={lessonGrade}>
         <div className="flex items-center justify-center min-h-[50vh]">
           <Loader2 className="w-8 h-8 text-accent animate-spin" />
         </div>
@@ -645,7 +922,7 @@ export const LessonView: React.FC = () => {
 
   if (effectiveLesson === null) {
     return (
-      <Layout fullWidth>
+      <Layout fullWidth topbarGradeOverride={lessonGrade}>
         <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
           <AlertCircle className="w-12 h-12 text-error" />
           <p className="text-ink font-medium">Lesson not found.</p>
@@ -655,8 +932,21 @@ export const LessonView: React.FC = () => {
     );
   }
 
+  if (!isAdmin && !isStudentVisibleLesson(effectiveLesson)) {
+    return (
+      <Layout fullWidth topbarGradeOverride={lessonGrade}>
+        <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4 px-6 text-center">
+          <ShieldAlert className="w-12 h-12 text-error" />
+          <p className="text-ink font-medium">This lesson is not available to students.</p>
+          <p className="max-w-lg text-sm text-muted">It is currently blocked by curriculum review rules or has been rejected during validation.</p>
+          <button onClick={() => navigate('/dashboard')} className="text-accent hover:underline">Return to Dashboard</button>
+        </div>
+      </Layout>
+    );
+  }
+
   // AI Crew is generating this lesson on-demand (Pro planned, Gemma 4 is executing)
-  if (effectiveLesson.status === 'pending') {
+  if (effectiveLesson.status === 'pending' && !lessonHasStoredContent) {
     return (
       <PendingLessonView
         title={effectiveLesson.title}
@@ -670,9 +960,39 @@ export const LessonView: React.FC = () => {
   const totalBlocks = blocks.length > 0 ? blocks.length : 1;
   const openCount = openBlocks.length;
   const progressPct = Math.round((openCount / totalBlocks) * 100);
+  const interactiveBlockCount = blocks.filter((block: any) => ['quiz', 'exercise', 'exam'].includes(block?.type || '')).length;
+  const conceptBlockCount = blocks.filter((block: any) => ['intro', 'theory', 'formula', 'definition', 'content', 'summary'].includes(block?.type || '')).length;
+  const estimatedMinutes = Math.max(8, totalBlocks * 3);
+  const blockCards = blocks.map((block: any, index: number) => {
+    const blockId = `block-${index}`;
+    const isOpen = openBlocks.includes(blockId);
+    const { label } = getBlockTypeConfig(block?.type || '');
+    let status: 'pending' | 'active' | 'done' | 'error' = 'pending';
+    if (isOpen) status = 'active';
+    if (block?.type === 'quiz' && quizAnswered[index]) {
+      status = quizCorrect[index] ? 'done' : 'error';
+    }
+    if (block?.type === 'exam' && examResult[index]) {
+      status = examResult[index] === 'correct' ? 'done' : 'error';
+    }
+
+    return {
+      id: blockId,
+      index,
+      title: getBlockTitle(block, index),
+      preview: getBlockPreview(block),
+      typeLabel: label,
+      status,
+      isOpen,
+    };
+  });
+  const nextBlockCard = blockCards.find((card) => !card.isOpen) || blockCards[0];
+  const outlinePreviewCards = nextBlockCard
+    ? [nextBlockCard, ...blockCards.filter((card) => card.id !== nextBlockCard.id).slice(0, 2)]
+    : blockCards.slice(0, 3);
 
   return (
-    <Layout fullWidth>
+    <Layout fullWidth topbarGradeOverride={lessonGrade}>
       {/* Fixed Progress Bar */}
       <div className="fixed top-0 left-0 right-0 h-1.5 z-40 bg-ink/5 pointer-events-none">
         <motion.div 
@@ -960,10 +1280,14 @@ export const LessonView: React.FC = () => {
           {/* Lesson Header */}
           <header className="lesson-header">
           <div className="lesson-header__meta">
-            <span className="pill pill--info">{selectedGrade}</span>
+            <span className="pill pill--info">{lessonGrade}</span>
             {module && <span className="pill pill--neutral">{module.name}</span>}
-            <span className="pill pill--success">saved</span>
-            <span className="pill pill--warn">medium</span>
+            <span className={validationBadgeClass}>{validationLabel}</span>
+            {effectiveLesson.source_confidence ? (
+              <span className="pill pill--neutral">
+                {Math.round(Number(effectiveLesson.source_confidence) * 100)}% source confidence
+              </span>
+            ) : null}
           </div>
 
           <h1 className="lesson-header__title">
@@ -974,47 +1298,105 @@ export const LessonView: React.FC = () => {
             {effectiveLesson.subtitle || `${totalBlocks} blocks · ~15 min · AI Generated`}
           </p>
 
-          <div className="mt-4 mb-6 flex items-center gap-4">
-            <div className="flex-grow">
-              <TagsManager 
-                tags={effectiveLesson.tags || []}
-                onAddTag={async (tag) => {
-                  const currentTags = effectiveLesson.tags || [];
-                  if (!currentTags.includes(tag)) {
-                    await db.lessons.update(effectiveLesson.id, { tags: [...currentTags, tag] });
-                  }
-                }}
-                onRemoveTag={async (tag) => {
-                  const currentTags = effectiveLesson.tags || [];
-                  await db.lessons.update(effectiveLesson.id, { tags: currentTags.filter(t => t !== tag) });
-                }}
-                maxDisplay={7}
-              />
+          <p className={`text-[11px] font-medium mt-2 ${lessonHasPreferredValidation ? 'text-success' : 'text-warning'}`}>
+            {lessonHasPreferredValidation
+              ? 'Validated for student-facing use.'
+              : 'Draft AI-assisted content pending curriculum validation.'}
+          </p>
+
+          {showLessonValidationWarning ? (
+            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <div>
+                  <p className="font-semibold">This lesson should not be treated as final curriculum truth yet.</p>
+                  <p className="mt-1 text-amber-800">Use it as draft guidance until a teacher review or official validation is attached.</p>
+                </div>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
+          ) : null}
+
+          <div className="lesson-workspace-grid">
+            <section className="lesson-tool-card lesson-tool-card--wide">
+              <div className="lesson-tool-card__header">
+                <div className="lesson-tool-card__icon">
+                  <List className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="lesson-tool-card__eyebrow">Lesson Flow</p>
+                  <h3 className="lesson-tool-card__title">
+                    {nextBlockCard ? `Next: ${nextBlockCard.title}` : 'All sections explored'}
+                  </h3>
+                </div>
+              </div>
+
+              <p className="lesson-tool-card__desc">
+                Move through the lesson with less friction. Use the quick outline to jump ahead, keep your place, and open the full navigator only when you need the bigger view.
+              </p>
+
+              <div className="lesson-flow-strip">
+                <div className="lesson-flow-chip">
+                  <span className="lesson-flow-chip__label">Subject</span>
+                  <strong className="lesson-flow-chip__value">{lessonSubject || module?.name || 'Lesson'}</strong>
+                </div>
+                <div className="lesson-flow-chip">
+                  <span className="lesson-flow-chip__label">Sections</span>
+                  <strong className="lesson-flow-chip__value">{totalBlocks}</strong>
+                </div>
+                <div className="lesson-flow-chip">
+                  <span className="lesson-flow-chip__label">Open now</span>
+                  <strong className="lesson-flow-chip__value">{openCount}</strong>
+                </div>
+              </div>
+
+              <div className="lesson-outline-preview">
+                {outlinePreviewCards.map((card) => (
+                  <button
+                    key={card.id}
+                    onClick={() => focusBlock(card.id)}
+                    className={`lesson-outline-preview__item ${card.id === nextBlockCard?.id ? 'lesson-outline-preview__item--active' : ''}`}
+                  >
+                    <span className="lesson-outline-preview__index">{card.index + 1}</span>
+                    <span className="lesson-outline-preview__copy">
+                      <strong>{card.title}</strong>
+                      <span>{card.preview || card.typeLabel}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="lesson-tool-actions">
+                <button
+                  onClick={() => setShowOutlineModal(true)}
+                  className="lesson-tool-card__button"
+                >
+                  Open outline
+                </button>
+                <button
+                  onClick={() => nextBlockCard && focusBlock(nextBlockCard.id)}
+                  disabled={!nextBlockCard}
+                  className="lesson-tool-card__button"
+                >
+                  Jump to next
+                </button>
+              </div>
+            </section>
+
+            <div className="lesson-tools">
               <button
                 onClick={() => setIsWorkspaceOpen(true)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-accent text-white rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-ink transition-all shadow-lg shadow-accent/20"
+                className="lesson-workspace-button"
               >
-                <Sparkles className="w-3 h-3" />
-                Workspace
-              </button>
-              <button
-                onClick={handleGenerateTags}
-                disabled={isGeneratingTags || !hasAiAccess || !aiAvailable}
-                title={!aiAvailable ? "AI features need an API key — configure one in Settings to enable." : ""}
-                className="flex items-center gap-2 px-3 py-1.5 bg-accent/5 text-accent rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-accent/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isGeneratingTags ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                {isGeneratingTags ? 'Generating...' : 'Auto Tags'}
+                <Sparkles className="w-4 h-4" />
+                Open workspace
               </button>
             </div>
           </div>
 
           <div className="progress">
             <div className="progress__label">
-              <span>Progress</span>
-              <span>{openCount} / {totalBlocks} blocks</span>
+              <span>Explored</span>
+              <span>{openCount} / {totalBlocks} blocks · {progressPct}%</span>
             </div>
             <div className="progress__track">
               <div className="progress__fill" style={{ width: `${progressPct}%` }}></div>
@@ -1077,6 +1459,62 @@ export const LessonView: React.FC = () => {
             </div>
           </div>
         </div>
+
+        <section className="lesson-cockpit">
+          <div className="lesson-cockpit__stats">
+            <div className="lesson-cockpit__stat">
+              <span className="lesson-cockpit__stat-label">Concepts</span>
+              <strong className="lesson-cockpit__stat-value">{conceptBlockCount}</strong>
+            </div>
+            <div className="lesson-cockpit__stat">
+              <span className="lesson-cockpit__stat-label">Interactive</span>
+              <strong className="lesson-cockpit__stat-value">{interactiveBlockCount}</strong>
+            </div>
+            <div className="lesson-cockpit__stat">
+              <span className="lesson-cockpit__stat-label">Study time</span>
+              <strong className="lesson-cockpit__stat-value">~{estimatedMinutes} min</strong>
+            </div>
+          </div>
+
+          <div className="lesson-cockpit__actions">
+            <button
+              onClick={() => nextBlockCard && focusBlock(nextBlockCard.id)}
+              className="lesson-cockpit__button lesson-cockpit__button--primary"
+            >
+              Continue
+            </button>
+            <button onClick={expandAllBlocks} className="lesson-cockpit__button">
+              Expand all
+            </button>
+            <button onClick={collapseAllBlocks} className="lesson-cockpit__button">
+              Collapse all
+            </button>
+          </div>
+
+          <div className="lesson-map">
+            <div className="lesson-map__header">
+              <span className="lesson-map__eyebrow">Lesson map</span>
+              <button onClick={() => setShowOutlineModal(true)} className="lesson-map__link">
+                Open outline
+              </button>
+            </div>
+            <div className="lesson-map__rail no-scrollbar">
+              {blockCards.map((card) => (
+                <button
+                  key={card.id}
+                  onClick={() => focusBlock(card.id)}
+                  className={`lesson-map__chip ${card.isOpen ? 'lesson-map__chip--active' : ''} ${card.status === 'done' ? 'lesson-map__chip--done' : ''}`}
+                >
+                  <span className="lesson-map__chip-index">{card.index + 1}</span>
+                  <span className="lesson-map__chip-copy">
+                    <span className="lesson-map__chip-title">{card.title}</span>
+                    {card.preview && <span className="lesson-map__chip-preview">{card.preview}</span>}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </section>
 
         {/* Tabs */}
         <div className="flex border-b border-ink/10 mb-8">
@@ -1149,17 +1587,32 @@ export const LessonView: React.FC = () => {
                 status = examResult[index] === 'correct' ? 'done' : 'error';
               }
 
+              const blockHeading = getBlockTitle(block, index);
+              const blockPreview = getBlockPreview(block);
+
               return (
-                <article key={index} className="block group">
+                <article
+                  key={index}
+                  className="block group scroll-mt-28"
+                  ref={(node) => {
+                    blockRefs.current[blockId] = node;
+                  }}
+                >
                   <div
-                    className={`block__header sticky top-16 z-20 backdrop-blur-xl bg-paper/90 border-b border-surface-mid transition-all duration-200 ${isOpen ? 'shadow-md' : 'shadow-sm'}`}
+                    className={`block__header border-b border-surface-mid transition-all duration-200 ${isOpen ? 'bg-surface-low/70 shadow-sm' : 'bg-paper'}`}
                     onClick={() => toggleBlock(blockId)}
                   >
                     <div className={`block__num block__num--${status}`}>
                       {status === 'done' ? '✓' : status === 'error' ? '!' : index + 1}
                     </div>
                     <BlockIcon size={14} className={`shrink-0 ${blockColorClass} opacity-70`} />
-                    <span className="block__label">{block.title}</span>
+                    <div className="block__copy">
+                      <div className="block__copy-top">
+                        <span className="block__label">{blockHeading}</span>
+                        <span className="pill pill--neutral text-[10px]">{blockTypeLabel}</span>
+                      </div>
+                      {blockPreview && !isOpen && <p className="block__preview">{blockPreview}</p>}
+                    </div>
                     <div className="flex items-center gap-2 ml-auto mr-2">
                       <span className="pill pill--neutral text-[10px]">{blockTypeLabel}</span>
                       
@@ -1225,7 +1678,7 @@ export const LessonView: React.FC = () => {
                       
                                             {/* Intro */}
                       {block.type === 'intro' && block.content && (
-                        <div className="p-4 rounded-2xl bg-accent/5 border border-accent/15">
+                        <div className="lesson-intro lesson-copy">
                           <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>
                             {block.content}
                           </Markdown>
@@ -1234,7 +1687,7 @@ export const LessonView: React.FC = () => {
 
                       {/* Theory */}
                       {block.type === 'theory' && block.content && (
-                        <div className="def-box">
+                        <div className="def-box lesson-copy">
                           <div className="flex items-center gap-1.5 mb-2.5 pb-2 border-b border-accent/15">
                             <FileText size={11} className="text-accent" />
                             <span className="text-[9px] font-bold text-accent uppercase tracking-widest">
@@ -1249,14 +1702,14 @@ export const LessonView: React.FC = () => {
 
                       {/* Formula */}
                       {block.type === 'formula' && block.content && (
-                        <div className="p-4 rounded-2xl bg-warning/5 border border-warning/20">
+                        <div className="lesson-formula">
                           <div className="flex items-center gap-1.5 mb-2 pb-2 border-b border-warning/15">
                             <Type size={11} className="text-warning" />
                             <span className="text-[9px] font-bold text-warning uppercase tracking-widest">
                               {block.label || 'Formula'}
                             </span>
                           </div>
-                          <div className="font-mono text-sm">
+                          <div className="lesson-copy lesson-copy--formula font-mono text-sm">
                             <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>
                               {block.content}
                             </Markdown>
@@ -1273,7 +1726,7 @@ export const LessonView: React.FC = () => {
                               {block.title || 'Example'}
                             </span>
                           </div>
-                          <div className="example-card__question">
+                          <div className="example-card__question lesson-copy">
                             <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>
                               {block.content}
                             </Markdown>
@@ -1292,7 +1745,7 @@ export const LessonView: React.FC = () => {
                             {block.points.map((point: string, i: number) => (
                               <li key={i} className="rules-list__item">
                                 <div className="rules-list__dot"></div>
-                                <span>
+                                <span className="lesson-copy">
                                   <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>
                                     {point}
                                   </Markdown>
@@ -1305,7 +1758,7 @@ export const LessonView: React.FC = () => {
 
                       {/* Definition / Content */}
                           {(block.type === 'definition' || block.type === 'content') && block.content && (
-                            <div className="def-box">
+                            <div className="def-box lesson-copy">
                               <div className="flex items-center gap-1.5 mb-2.5 pb-2 border-b border-accent/15">
                                 <BookOpen size={11} className="text-accent" />
                                 <span className="text-[9px] font-bold text-accent uppercase tracking-widest">
@@ -1328,7 +1781,7 @@ export const LessonView: React.FC = () => {
                                 {block.rules.map((rule, i) => (
                                   <li key={i} className="rules-list__item">
                                     <div className="rules-list__dot"></div>
-                                    <span><Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{rule}</Markdown></span>
+                                    <span className="lesson-copy"><Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{rule}</Markdown></span>
                                   </li>
                                 ))}
                               </ul>
@@ -1344,11 +1797,11 @@ export const LessonView: React.FC = () => {
                               </div>
                               {block.examples.map((ex, i) => (
                                 <div key={i} className="example-card">
-                                  <div className="example-card__question"><Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{ex.question}</Markdown></div>
+                                  <div className="example-card__question lesson-copy"><Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{ex.question}</Markdown></div>
                                   {Array.isArray(ex.steps) && ex.steps.map((step, j) => (
-                                    <div key={j} className="example-card__step"><Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{step}</Markdown></div>
+                                    <div key={j} className="example-card__step lesson-copy"><Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{step}</Markdown></div>
                                   ))}
-                                  <div className="example-card__answer"><Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{ex.answer}</Markdown></div>
+                                  <div className="example-card__answer lesson-copy"><Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{ex.answer}</Markdown></div>
                                 </div>
                               ))}
                               <div className="action-row">
@@ -1867,36 +2320,58 @@ export const LessonView: React.FC = () => {
         title="Lesson Outline"
       >
         <div className="space-y-4">
-          <div className="p-4 bg-accent/5 rounded-xl border border-accent/10 space-y-2">
-            <h3 className="font-bold text-accent">Audio Reading</h3>
-            <p className="text-sm text-muted">Click any section title to hear it read aloud. Click again to stop.</p>
+          <div className="outline-summary">
+            <div className="outline-summary__stat">
+              <span className="outline-summary__label">Sections</span>
+              <strong className="outline-summary__value">{totalBlocks}</strong>
+            </div>
+            <div className="outline-summary__stat">
+              <span className="outline-summary__label">Concepts</span>
+              <strong className="outline-summary__value">{conceptBlockCount}</strong>
+            </div>
+            <div className="outline-summary__stat">
+              <span className="outline-summary__label">Interactive</span>
+              <strong className="outline-summary__value">{interactiveBlockCount}</strong>
+            </div>
           </div>
 
-          <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-2">
+          <div className="p-4 bg-accent/5 rounded-xl border border-accent/10 space-y-2">
+            <h3 className="font-bold text-accent">Jump or listen</h3>
+            <p className="text-sm text-muted">
+              Tap a section card to move there instantly. Use the play button when you want read-aloud for that section.
+            </p>
+          </div>
+
+          <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
             {effectiveLesson?.blocks?.map((block, index) => {
               const isReading = readingBlockIndex === index;
+              const preview = getBlockPreview(block);
+              const label = getBlockTypeConfig(block.type || '').label;
               return (
-                <button
+                <div
                   key={block.id || index}
-                  onClick={() => toggleReadAloud(index, block.content || '')}
-                  className={`w-full text-left p-4 rounded-xl border transition-all flex items-center justify-between gap-4 ${
-                    isReading
-                      ? 'bg-accent/10 border-accent/30 shadow-sm'
-                      : 'bg-surface-low border-ink/5 hover:border-accent/30 hover:bg-surface-mid'
-                  }`}
+                  className={`outline-item ${isReading ? 'outline-item--reading' : ''}`}
                 >
-                  <div className="flex-1">
-                    <span className="text-xs font-bold text-muted uppercase tracking-wider mb-1 block">
-                      Section {index + 1}
-                    </span>
-                    <h4 className={`font-bold ${isReading ? 'text-accent' : 'text-ink'}`}>
-                      {block.title || 'Untitled Section'}
-                    </h4>
-                  </div>
+                  <button
+                    onClick={() => openOutlineSection(index)}
+                    className="outline-item__main"
+                  >
+                    <div className="outline-item__index">{index + 1}</div>
+                    <div className="outline-item__copy">
+                      <div className="outline-item__top">
+                        <span className="outline-item__section">Section {index + 1}</span>
+                        <span className="pill pill--neutral text-[10px]">{label}</span>
+                      </div>
+                      <h4 className="outline-item__title">{getBlockTitle(block, index)}</h4>
+                      {preview && <p className="outline-item__preview">{preview}</p>}
+                    </div>
+                  </button>
 
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
-                    isReading ? 'bg-accent text-paper' : 'bg-surface-mid text-ink-secondary'
-                  }`}>
+                  <button
+                    onClick={() => toggleReadAloud(index, block.content || preview || '')}
+                    className={`outline-item__audio ${isReading ? 'outline-item__audio--active' : ''}`}
+                    title={isReading ? 'Stop reading' : 'Read this section aloud'}
+                  >
                     {isReading ? (
                       <div className="w-4 h-4 flex items-center justify-center gap-1">
                         <span className="w-1 h-3 bg-paper rounded-full animate-pulse" style={{ animationDelay: '0ms' }} />
@@ -1904,10 +2379,10 @@ export const LessonView: React.FC = () => {
                         <span className="w-1 h-3 bg-paper rounded-full animate-pulse" style={{ animationDelay: '300ms' }} />
                       </div>
                     ) : (
-                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
                     )}
-                  </div>
-                </button>
+                  </button>
+                </div>
               );
             })}
 
@@ -2003,16 +2478,16 @@ export const LessonView: React.FC = () => {
         lessonContext={{
           title: lesson?.title || '',
           content: effectiveLesson?.blocks?.map(b => b.content || '').join('\n') || effectiveLesson?.content || '',
-          grade: selectedGrade,
-          country: selectedCountry
+          grade: lessonGrade,
+          country: lessonCountry
         }}
       />
 
       <AIAssistant
         lessonContent={effectiveLesson?.blocks?.map((b: any) => b.content || '').join('\n') || effectiveLesson?.content || ''}
         strictRAG={module?.strictRAG}
-        subject={module?.name}
-        grade={selectedGrade}
+        subject={lessonSubject || module?.name}
+        grade={lessonGrade}
         aiAvailable={aiAvailable}
       />
     </Layout>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { SEO } from '../components/SEO';
 import { supabase } from '../db/supabase';
@@ -15,14 +15,18 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useAuth } from '../context/AuthContext';
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { signInDemoAdmin } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<'login' | 'signup'>('login');
+  const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname;
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,6 +68,20 @@ export const Login: React.FC = () => {
       } else {
         setError(err.message);
       }
+    }
+  };
+
+  const handleDemoAdminLogin = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      await signInDemoAdmin();
+      navigate(from || '/admin');
+    } catch (err: any) {
+      setError(err.message || 'Unable to start demo admin mode.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -154,6 +172,30 @@ export const Login: React.FC = () => {
                 {!loading && <LogIn className="w-4 h-4 group-hover:translate-x-1 transition-transform" />}
               </button>
             </form>
+
+            <div className="rounded-2xl border border-accent/15 bg-accent/5 p-4 space-y-3">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-xl bg-accent text-paper flex items-center justify-center shrink-0">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-sm font-bold text-ink">Admin demo mode</h3>
+                  <p className="text-xs text-muted leading-relaxed">
+                    Open the platform with a local admin identity for demos and UI testing, without a real Supabase login.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                disabled={loading}
+                onClick={handleDemoAdminLogin}
+                className="w-full h-11 bg-accent text-paper rounded-full flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-widest hover:bg-accent-hover transition-all disabled:opacity-50"
+              >
+                Enter Admin Demo
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
 
             <div className="relative py-2">
               <div className="absolute inset-0 flex items-center">

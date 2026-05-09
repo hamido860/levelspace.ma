@@ -1,5 +1,8 @@
 import { supabase } from "../db/supabase";
 import { ai, handleApiError, LessonTemplate } from "./geminiService";
+import { resolveTopicForLesson } from "../../lib/topicSync";
+import { deriveCycleFromGrade } from "./curriculumMatching";
+import { isMissingLessonValidationColumnError, stripLessonValidationFields } from "./lessonSupabase";
 
 export const generateEmbedding = async (text: string): Promise<number[]> => {
   try {
@@ -39,7 +42,9 @@ export const indexLessonContent = async (
           source_type: 'lesson_block',
           content: chunk,
           embedding: embedding,
-          metadata: { user_id: userId }
+          metadata: { user_id: userId },
+          validation_status: 'ai_generated',
+          source_confidence: 0,
         });
       }
     }
@@ -178,11 +183,26 @@ export const saveLesson = async (
 
     if (embedding.length === 0) return false;
 
+    const topicResolution = await resolveTopicForLesson(
+      supabase as any,
+      {
+        grade: lesson.grade,
+        subject: lesson.subject,
+        lesson_title: lesson.lesson_title,
+      },
+      { createIfMissing: true }
+    );
+
+    const topicId = topicResolution.status === "skipped" ? null : topicResolution.topicId;
+    const cycle = deriveCycleFromGrade(lesson.grade);
+
     // 1. Insert the lesson and get its ID
-    const { data: insertedLesson, error: lessonError } = await supabase.from("lessons").insert({
+    const lessonInsertPayload = {
       country: lesson.country,
+      cycle,
       grade: lesson.grade,
       subject: lesson.subject,
+      topic_id: topicId,
       lesson_title: lesson.lesson_title,
       content: lesson.content,
       blocks: lesson.blocks && lesson.blocks.length > 0 ? lesson.blocks : null, // NEW
@@ -193,7 +213,27 @@ export const saveLesson = async (
       embedding: embedding.length > 0 ? embedding : null,
       author_id: userId === "dummy-user-id" ? null : (userId || null),
       is_ai_generated: isAiGenerated,
-    }).select('id').single();
+      validation_status: isAiGenerated ? 'ai_generated' : 'unverified',
+      source_confidence: 0,
+    };
+
+    let insertedLesson: { id: string } | null = null;
+    let lessonError: any = null;
+
+    const firstInsert = await supabase.from("lessons").insert(lessonInsertPayload).select('id').single();
+    insertedLesson = firstInsert.data;
+    lessonError = firstInsert.error;
+
+    if (lessonError && isMissingLessonValidationColumnError(lessonError)) {
+      const legacyInsert = await supabase
+        .from("lessons")
+        .insert(stripLessonValidationFields(lessonInsertPayload))
+        .select('id')
+        .single();
+
+      insertedLesson = legacyInsert.data;
+      lessonError = legacyInsert.error;
+    }
 
     if (lessonError) throw lessonError;
     

@@ -20,13 +20,14 @@ import {
   loadAdminRagMetrics,
   loadAdminTableHealth,
   loadAiRecoveryReviewStatusCounts,
+  repairTopicsFromLessons,
 } from "../services/adminDashboardService";
 import {
   RefreshCw, Database, BarChart2, BookOpen, Cpu, Table2,
   AlertTriangle, CheckCircle, Clock, Layers, Sparkles,
   Lightbulb, ListChecks, Map as MapIcon, ChevronRight,
   TrendingUp, TrendingDown, Info, Zap,
-  Play, ChevronDown,
+  Trash2, Wrench, Play, Pencil, ChevronDown, Brain, ShieldCheck, GraduationCap,
   Copy, Check
 } from "lucide-react";
 
@@ -34,7 +35,48 @@ import {
 interface BrowseRow { [key: string]: any; }
 
 type Tab = "overview" | "grades" | "queue" | "rag" | "browser" | "ai";
+const ADMIN_TAB_CONFIG: Record<Tab, { label: string; icon: React.ElementType; activeClass: string; iconClass: string }> = {
+  overview: {
+    label: "Overview",
+    icon: ShieldCheck,
+    activeClass: "border-sky-500 bg-sky-50 text-sky-600",
+    iconClass: "text-sky-500",
+  },
+  grades: {
+    label: "Grade Coverage",
+    icon: GraduationCap,
+    activeClass: "border-indigo-500 bg-indigo-50 text-indigo-600",
+    iconClass: "text-indigo-500",
+  },
+  queue: {
+    label: "Gen Queue",
+    icon: Clock,
+    activeClass: "border-amber-500 bg-amber-50 text-amber-700",
+    iconClass: "text-amber-500",
+  },
+  rag: {
+    label: "RAG / Embeddings",
+    icon: Layers,
+    activeClass: "border-violet-500 bg-violet-50 text-violet-600",
+    iconClass: "text-violet-500",
+  },
+  browser: {
+    label: "Table Browser",
+    icon: Table2,
+    activeClass: "border-slate-500 bg-slate-100 text-slate-700",
+    iconClass: "text-slate-500",
+  },
+  ai: {
+    label: "AI Analyst",
+    icon: Brain,
+    activeClass: "border-emerald-500 bg-emerald-50 text-emerald-700",
+    iconClass: "text-emerald-500",
+  },
+};
 
+const countDistinctIds = (rows: Array<{ topic_id?: string | null }> | null | undefined) =>
+  new Set((rows || []).map((row) => row.topic_id).filter((value): value is string => Boolean(value))).size;
+ 
 // ─── AI Analyst Types ────────────────────────────────────────────────────────
 type AIAction = "insights" | "tasks" | "strategy";
 interface AIHighlight { type: "warning" | "success" | "info"; title: string; detail: string; }
@@ -231,6 +273,8 @@ export const Admin: React.FC = () => {
   const [aiTaskList, setAiTaskList]   = useState<AITaskList | null>(null);
   const [aiStrategy, setAiStrategy]   = useState<AIStrategy | null>(null);
   const [activeAITab, setActiveAITab] = useState<AIAction>("insights");
+  const [topicRepairLoading, setTopicRepairLoading] = useState(false);
+  const [topicRepairMsg, setTopicRepairMsg] = useState("");
 
   // Browser
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
@@ -255,6 +299,172 @@ export const Admin: React.FC = () => {
   const [execResult, setExecResult] = useState<any>(null);
 
 
+  // Fallback: use regular Supabase queries instead of raw SQL RPC
+  const loadOverview = useCallback(async () => {
+    const [
+      { count: topicsCount },
+      { data: lessonTopicLinks },
+      { data: queueRows },
+      { count: ragTotal },
+      { count: ragDone },
+      { count: usersCount },
+    ] = await Promise.all([
+      supabase.from("topics").select("*", { count: "exact", head: true }),
+      supabase.from("lessons").select("topic_id"),
+      supabase.from("lesson_gen_queue").select("topic_id, status"),
+      supabase.from("rag_chunks").select("*", { count: "exact", head: true }),
+      supabase.from("rag_chunks").select("*", { count: "exact", head: true }).eq("embedding_status", "done"),
+      supabase.from("profiles").select("*", { count: "exact", head: true }),
+    ]);
+
+    const coveredTopicsCount = countDistinctIds(lessonTopicLinks as Array<{ topic_id?: string | null }> | null);
+    const queueTopicCount = countDistinctIds(queueRows as Array<{ topic_id?: string | null }> | null);
+    const normalizedTopicsCount = Math.max(topicsCount ?? 0, coveredTopicsCount, queueTopicCount);
+    const topicSource =
+      (topicsCount ?? 0) > 0 ? "topics" : queueTopicCount > 0 ? "queue" : coveredTopicsCount > 0 ? "lessons" : "topics";
+    const normalizedQueueRows = (queueRows || []) as Array<{ status?: string | null }>;
+    const pendingCount = normalizedQueueRows.filter((row) => row.status === "pending").length;
+    const failedCount = normalizedQueueRows.filter((row) => row.status === "failed").length;
+
+    setKpis({
+          topics: normalizedTopicsCount,
+          topicSource,
+          lessons: coveredTopicsCount,
+          pending: pendingCount,
+          failed: failedCount,
+          ragTotal: ragTotal ?? 0,
+          ragDone: ragDone ?? 0,
+          users: usersCount ?? 0,
+    });
+  }, []);
+
+  const loadTableHealth = useCallback(async () => {
+    // Get counts for major tables
+    const tableNames = [
+      "profiles","lessons","topics","grades","subjects","cycles","curricula",
+      "lesson_gen_queue","rag_chunks","rag_questions","exercises","quizzes",
+      "quiz_results","exercise_attempts","notes","tasks","schedule","settings",
+      "app_settings","audits","topic_outlines","lesson_gen_log","student_progress",
+      "student_answers","ghost_interventions","lesson_blocks","skills","user_skills",
+      "bac_sections","bac_tracks","bac_exams","bac_track_subjects","grade_subjects",
+      "embeddings","embeddings_archive",
+    ];
+    const results = await Promise.all(
+      tableNames.map(async (t) => {
+        const { count } = await supabase.from(t as any).select("*", { count: "exact", head: true });
+        return { table_name: t, row_count: count };
+      })
+    );
+    setTableHealth(results.sort((a, b) => (b.row_count ?? -1) - (a.row_count ?? -1)));
+  }, []);
+ 
+  const loadGrades = useCallback(async () => {
+    const { data: grades } = await supabase
+      .from("grades")
+      .select("id, name, grade_order, cycle_id, cycles(name, cycle_order)");
+
+    const { data: topics } = await supabase
+      .from("topics")
+      .select("id, grade_id");
+
+    const { data: lessons } = await supabase
+      .from("lessons")
+      .select("id, topic_id");
+
+    const { data: queue } = await supabase
+      .from("lesson_gen_queue")
+      .select("id, topic_id, status");
+
+    if (!grades) return;
+
+    const rows: GradeRow[] = grades.map((g: any) => {
+      const gradeTopics = (topics || []).filter((t: any) => t.grade_id === g.id);
+      const topicIds = new Set(gradeTopics.map((t: any) => t.id));
+      const coveredTopicIds = new Set(
+        (lessons || [])
+          .map((l: any) => l.topic_id)
+          .filter((topicId: string | null | undefined): topicId is string => Boolean(topicId) && topicIds.has(topicId))
+      );
+      const gradeQueue = (queue || []).filter((q: any) => topicIds.has(q.topic_id));
+      const cycle: any = g.cycles;
+      return {
+        id: g.id,
+        cycle: cycle?.name ?? "Unknown",
+        cycle_order: cycle?.cycle_order ?? 0,
+        grade: g.name,
+        grade_order: g.grade_order,
+        total_topics: gradeTopics.length,
+        lessons_generated: coveredTopicIds.size,
+        q_done: gradeQueue.filter((q: any) => q.status === "done").length,
+        q_pending: gradeQueue.filter((q: any) => q.status === "pending").length,
+        q_failed: gradeQueue.filter((q: any) => q.status === "failed").length,
+      };
+    });
+    rows.sort((a, b) => a.cycle_order - b.cycle_order || a.grade_order - b.grade_order);
+    setGradeData(rows);
+  }, []);
+
+  const loadQueue = useCallback(async () => {
+    const { data: qAll } = await supabase.from("lesson_gen_queue").select("status");
+    const stats = { done: 0, pending: 0, failed: 0, processing: 0 };
+    (qAll || []).forEach((r: any) => { if (r.status in stats) (stats as any)[r.status]++; });
+    setQueueStats(stats);
+
+    const { data: failed } = await supabase
+      .from("lesson_gen_queue")
+      .select("id, topic_id, track_id, attempts, last_error, created_at")
+      .eq("status", "failed")
+      .order("created_at", { ascending: false })
+      .limit(10);
+    const topicIds = Array.from(
+      new Set((failed || []).map((job: any) => job.topic_id).filter((topicId: string | null | undefined): topicId is string => Boolean(topicId)))
+    );
+
+    let topicsById = new Map<string, string>();
+    if (topicIds.length > 0) {
+      const { data: topicRows } = await supabase
+        .from("topics")
+        .select("id, title")
+        .in("id", topicIds);
+
+      topicsById = new Map((topicRows || []).map((topic: any) => [topic.id, topic.title]));
+    }
+
+    setFailedJobs((failed || []).map((job: any) => ({
+      ...job,
+      topics: job.topic_id ? { title: topicsById.get(job.topic_id) ?? null } : null,
+    })));
+  }, []);
+
+  const loadRag = useCallback(async () => {
+    const { data: all } = await supabase.from("rag_chunks").select("embedding_status, grade_id");
+    const { count: rqCount } = await supabase.from("rag_questions").select("*", { count: "exact", head: true });
+
+    const byStatus: any = {};
+    (all || []).forEach((r: any) => {
+      byStatus[r.embedding_status] = (byStatus[r.embedding_status] || 0) + 1;
+    });
+    setRagStats({ ...byStatus, rqCount: rqCount ?? 0, total: (all || []).length });
+
+    const { data: grades } = await supabase
+      .from("grades")
+      .select("id, name, grade_order, cycles(cycle_order)");
+
+    const ragRows: RagByGrade[] = (grades || []).map((g: any) => {
+      const chunks = (all || []).filter((c: any) => c.grade_id === g.id);
+      const cycle: any = g.cycles;
+      return {
+        id: g.id,
+        grade: g.name,
+        grade_order: g.grade_order,
+        cycle_order: cycle?.cycle_order ?? 0,
+        total: chunks.length,
+        done: chunks.filter((c: any) => c.embedding_status === "done").length,
+      };
+    });
+    ragRows.sort((a, b) => a.cycle_order - b.cycle_order || a.grade_order - b.grade_order);
+    setRagByGrade(ragRows);
+  }, []);
 
   // ── AI Agent caller ──────────────────────────────────────────────────────
   const callAgent = useCallback(async (action: AIAction) => {
@@ -357,10 +567,27 @@ export const Admin: React.FC = () => {
     setLoading(false);
   }, []);
 
+  const handleRepairTopics = useCallback(async () => {
+    setTopicRepairLoading(true);
+    setTopicRepairMsg("");
+    try {
+      const summary = await repairTopicsFromLessons();
+      setTopicRepairMsg(`Linked ${summary.lessonsLinked} lessons and created ${summary.topicsCreated} topics.`);
+      await refreshAll();
+    } catch (e: any) {
+      setTopicRepairMsg(e.message || "Unable to repair topics from lessons.");
+    }
+    setTopicRepairLoading(false);
+  }, [refreshAll]);
+
   // Wait for auth to hydrate before firing queries — anon role has no SELECT
   // policy on most tables, so running these as anon would return 0 / null and
   // mislead the AI Analyst into reporting tables as "empty".
   useEffect(() => { if (!authLoading) refreshAll(); }, [authLoading, refreshAll]);
+
+  const lessonsTableCount = tableHealth.find((entry) => entry.table_name === "lessons")?.row_count ?? 0;
+  const topicsTableCount = tableHealth.find((entry) => entry.table_name === "topics")?.row_count ?? 0;
+  const shouldOfferTopicRepair = lessonsTableCount > 0 && topicsTableCount === 0;
 
   // ── Shared fetch helper ────────────────────────────────────────────────────
   // ── Queue actions ──────────────────────────────────────────────────────────
@@ -448,19 +675,13 @@ export const Admin: React.FC = () => {
     setExecLoading(false);
   };
 
-  const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
-    { id: "overview", label: "Overview",        icon: <BarChart2 className="w-4 h-4" /> },
-    { id: "grades",   label: "Grade Coverage",  icon: <BookOpen className="w-4 h-4" /> },
-    { id: "queue",    label: "Gen Queue",        icon: <Cpu className="w-4 h-4" /> },
-    { id: "rag",      label: "RAG / Embeddings", icon: <Layers className="w-4 h-4" /> },
-    { id: "browser",  label: "Table Browser",   icon: <Table2 className="w-4 h-4" /> },
-    { id: "ai",       label: "AI Analyst",       icon: <Sparkles className="w-4 h-4" /> },
-  ];
+  const tabs: Tab[] = ["overview", "grades", "queue", "rag", "browser", "ai"];
 
   // ── RENDER ────────────────────────────────────────────────────────────────
   return (
     <Layout>
       <SEO title="Admin Panel" />
+      <div className="admin-theme-scope">
 
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
@@ -488,21 +709,25 @@ export const Admin: React.FC = () => {
       )}
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-gray-100 mb-6">
-        {tabs.map((t) => (
+      <div className="flex gap-2 border-b border-gray-100 mb-6 overflow-x-auto pb-2">
+        {tabs.map((tabKey) => {
+          const tabConfig = ADMIN_TAB_CONFIG[tabKey];
+          const TabIcon = tabConfig.icon;
+          const isActive = tab === tabKey;
+          return (
           <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-              tab === t.id
-                ? "border-red-500 text-red-500"
-                : "border-transparent text-gray-500 hover:text-gray-800"
+            key={tabKey}
+            onClick={() => setTab(tabKey)}
+            className={`flex items-center gap-2 rounded-t-2xl px-4 py-2.5 text-sm font-semibold border-b-2 transition-all whitespace-nowrap ${
+              isActive
+                ? tabConfig.activeClass
+                : "border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-800"
             }`}
           >
-            {t.icon}
-            {t.label}
+            <TabIcon className={`w-4 h-4 ${isActive ? tabConfig.iconClass : "text-gray-400"}`} />
+            {tabConfig.label}
           </button>
-        ))}
+        )})}
       </div>
 
       {/* ── OVERVIEW ── */}
@@ -518,6 +743,39 @@ export const Admin: React.FC = () => {
             <KPI label="RAG Chunks" value={kpis.ragTotal ?? "—"} sub={`${pct(kpis.ragDone, kpis.ragTotal)}% embedded`} variant="success" />
             <KPI label="Users" value={kpis.users ?? "—"} sub="profiles" />
           </div>
+
+          {shouldOfferTopicRepair && (
+            <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 font-semibold text-amber-800">
+                    <AlertTriangle className="w-4 h-4" />
+                    Topics are empty while lessons already exist
+                  </div>
+                  <p className="mt-1 text-sm text-amber-700">
+                    The admin panel found {lessonsTableCount} lessons but 0 rows in `topics`. Run the repair to recreate topic rows and relink existing lessons.
+                  </p>
+                  {topicRepairMsg && (
+                    <p className="mt-2 text-xs font-medium text-amber-900">{topicRepairMsg}</p>
+                  )}
+                </div>
+                <button
+                  onClick={handleRepairTopics}
+                  disabled={topicRepairLoading}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-amber-700 disabled:opacity-60"
+                >
+                  {topicRepairLoading ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      Repairing...
+                    </>
+                  ) : (
+                    "Repair Topics"
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-6">
             <div className="px-5 py-3 border-b border-gray-50 flex items-center gap-2">
@@ -536,6 +794,7 @@ export const Admin: React.FC = () => {
                 ))}
               </div>
             )}
+ 
           </div>
 
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
@@ -1372,6 +1631,7 @@ export const Admin: React.FC = () => {
           </div>
         </div>
       )}
+      </div>
 
     </Layout>
   );

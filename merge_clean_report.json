@@ -1,0 +1,94 @@
+{
+  "status": "done",
+  "overall": {
+    "merged": [
+      {
+        "number": 69,
+        "branch": "jules-memoize-dexie-queries-1056629681032519813",
+        "out": "[main eefd9cf] Merge PR #69: ⚡ Bolt: Memoize Dexie live queries to prevent cascading re-renders\n"
+      },
+      {
+        "number": 68,
+        "branch": "palette-topbar-accessibility-1373358772333518450",
+        "out": "[main b9456d2] Merge PR #68: 🎨 Palette: Add ARIA labels and keyboard accessibility to Topbar interactive elements\n"
+      },
+      {
+        "number": 66,
+        "branch": "bolt-performance-memoize-livequery-118869108235954401",
+        "out": "[main b94eb22] Merge PR #66: ⚡ Bolt: Memoize useLiveQuery derived data to prevent re-renders\n"
+      },
+      {
+        "number": 65,
+        "branch": "palette/icon-accessibility-16195405332334006850",
+        "out": "[main d156ec5] Merge PR #65: 🎨 Palette: Add accessible labels and keyboard focus to icon buttons\n"
+      },
+      {
+        "number": 63,
+        "branch": "palette/topbar-aria-focus-8844965061138701391",
+        "out": "[main 125a66c] Merge PR #63: 🎨 Palette: Add ARIA labels and focus states to Topbar icon buttons\n"
+      },
+      {
+        "number": 61,
+        "branch": "sentinel-fix-weak-random-ids-4607639377235026399",
+        "out": "[main d6762e8] Merge PR #61: 🛡️ Sentinel: [MEDIUM] Fix weak random ID generation\n"
+      },
+      {
+        "number": 60,
+        "branch": "codex/investigate-lesson-generation-quality-and-tests",
+        "out": "[main ecb3750] Merge PR #60: Prefer Supabase-first classroom loading; add AI gating helpers and tests\n"
+      },
+      {
+        "number": 57,
+        "branch": "palette-topbar-a11y-2800266621582839836",
+        "out": "[main aa9a832] Merge PR #57: 🎨 Palette: Improve Topbar keyboard accessibility and ARIA support\n"
+      },
+      {
+        "number": 51,
+        "branch": "palette-topbar-a11y-6194112837694417098",
+        "out": "[main 5a3130c] Merge PR #51: 🎨 Palette: Add accessibility and focus styles to Topbar icon-only buttons\n"
+      },
+      {
+        "number": 46,
+        "branch": "jules-713513340720929759-d9f36163",
+        "out": "[main 90c0267] Merge PR #46: Fix NVIDIA API CORS proxy issue and Supabase unmount websocket errors\n"
+      },
+      {
+        "number": 45,
+        "branch": "jules-bolt-dexie-usememo-optimization-3222218612148441142",
+        "out": "[main 2575549] Merge PR #45: ⚡ Bolt: Memoize Dexie useLiveQuery derived data\n"
+      },
+      {
+        "number": 39,
+        "branch": "palette-topbar-a11y-2668385863952702212",
+        "out": "[main 8d5e420] Merge PR #39: 🎨 Palette: Enhance Topbar accessibility\n"
+      }
+    ],
+    "skipped": [
+      {
+        "number": 67,
+        "branch": "palette-topbar-a11y-6917247524514564960",
+        "reason": "Auto-merging src/components/Topbar.tsx\nCONFLICT (content): Merge conflict in src/components/Topbar.tsx\nAutomatic merge failed; fix conflicts and then commit the result.\n"
+      },
+      {
+        "number": 64,
+        "branch": "palette/add-aria-labels-navigation-7479874849260126881",
+        "reason": "Auto-merging .jules/palette.md\nCONFLICT (add/add): Merge conflict in .jules/palette.md\nAuto-merging src/components/Sidebar.tsx\nCONFLICT (content): Merge conflict in src/components/Sidebar.tsx\nAuto-merging src/components/Topbar.tsx\nCONFLICT (content): Merge conflict in src/components/Topbar.tsx\nAutomatic merge failed; fix conflicts and then commit the result.\n"
+      },
+      {
+        "number": 62,
+        "branch": "palette/topbar-accessibility-12768565705540992136",
+        "reason": "Auto-merging src/components/Topbar.tsx\nCONFLICT (content): Merge conflict in src/components/Topbar.tsx\nAutomatic merge failed; fix conflicts and then commit the result.\n"
+      },
+      {
+        "number": 55,
+        "branch": "palette-topbar-accessibility-8729395399035198307",
+        "reason": "Auto-merging .jules/palette.md\nCONFLICT (add/add): Merge conflict in .jules/palette.md\nAuto-merging src/components/Topbar.tsx\nCONFLICT (content): Merge conflict in src/components/Topbar.tsx\nAutomatic merge failed; fix conflicts and then commit the result.\n"
+      },
+      {
+        "number": 44,
+        "branch": "palette/topbar-accessibility-14747110258534138572",
+        "reason": "Auto-merging .jules/palette.md\nCONFLICT (add/add): Merge conflict in .jules/palette.md\nAuto-merging src/components/Topbar.tsx\nCONFLICT (content): Merge conflict in src/components/Topbar.tsx\nAutomatic merge failed; fix conflicts and then commit the result.\n"
+      }
+    ]
+  }
+}

@@ -2,6 +2,7 @@
 @import "katex/dist/katex.min.css";
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
   --font-sans: "DM Sans", "Inter", "Noto Sans Arabic", ui-sans-serif, system-ui, sans-serif;
@@ -171,6 +172,209 @@
 .avatar--gold { @apply bg-gold-soft text-gold; }
 .btn-fork { @apply text-[11px] font-medium px-2.5 py-0.5 rounded-full border border-surface-mid bg-transparent text-accent cursor-pointer transition-colors hover:bg-accent-soft; }
 
+.lesson-cockpit {
+  @apply mb-8 space-y-4 rounded-3xl border border-surface-mid bg-paper p-4 shadow-sm;
+}
+.lesson-cockpit__stats {
+  @apply grid grid-cols-1 gap-3 md:grid-cols-3;
+}
+.lesson-cockpit__stat {
+  @apply rounded-2xl bg-surface-low p-4;
+}
+.lesson-cockpit__stat-label {
+  @apply mb-1 block text-[10px] font-bold uppercase tracking-widest text-ink-muted;
+}
+.lesson-cockpit__stat-value {
+  @apply block text-sm font-semibold text-ink;
+}
+.lesson-cockpit__actions {
+  @apply flex flex-wrap gap-2;
+}
+.lesson-cockpit__button {
+  @apply rounded-xl border border-surface-mid bg-paper px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-ink transition-all hover:border-accent/30 hover:text-accent;
+}
+.lesson-cockpit__button--primary {
+  @apply border-accent bg-accent text-paper hover:bg-accent-hover hover:text-paper;
+}
+.lesson-map {
+  @apply space-y-3;
+}
+.lesson-map__header {
+  @apply flex items-center justify-between gap-3;
+}
+.lesson-map__eyebrow {
+  @apply text-[10px] font-bold uppercase tracking-widest text-ink-muted;
+}
+.lesson-map__link {
+  @apply text-[10px] font-bold uppercase tracking-widest text-accent transition-colors hover:text-accent-hover;
+}
+.lesson-map__rail {
+  @apply flex gap-3 overflow-x-auto pb-1;
+}
+.lesson-map__chip {
+  @apply flex min-w-[220px] items-start gap-3 rounded-2xl border border-surface-mid bg-surface-low px-3 py-3 text-left transition-all hover:border-accent/30 hover:bg-accent/5;
+}
+.lesson-map__chip--active {
+  @apply border-accent/30 bg-accent/5;
+}
+.lesson-map__chip--done .lesson-map__chip-index {
+  @apply bg-success-soft text-success;
+}
+.lesson-map__chip-index {
+  @apply flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-paper text-[11px] font-bold text-ink-muted;
+}
+.lesson-map__chip-copy {
+  @apply flex min-w-0 flex-1 flex-col;
+}
+.lesson-map__chip-title {
+  @apply text-xs font-semibold text-ink;
+}
+.lesson-map__chip-preview {
+  @apply mt-1 text-[11px] leading-relaxed text-ink-muted;
+}
+
+.lesson-workspace-grid {
+  @apply mt-5 mb-6 grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(300px,0.8fr)] xl:items-start;
+}
+.lesson-tools {
+  @apply flex w-full flex-col gap-3;
+}
+.lesson-tool-card {
+  @apply rounded-2xl border border-surface-mid bg-paper p-4 shadow-sm;
+}
+.lesson-tool-card--wide {
+  @apply min-w-0;
+}
+.lesson-tool-card__header {
+  @apply flex items-start gap-3;
+}
+.lesson-tool-card__icon {
+  @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-surface-low text-ink;
+}
+.lesson-tool-card__icon--accent {
+  @apply bg-accent/8 text-accent;
+}
+.lesson-tool-card__eyebrow {
+  @apply mb-1 text-[10px] font-bold uppercase tracking-widest text-ink-muted;
+}
+.lesson-tool-card__title {
+  @apply text-sm font-semibold text-ink;
+}
+.lesson-tool-card__desc {
+  @apply mt-3 text-[12px] leading-relaxed text-ink-secondary;
+}
+.lesson-tool-card__button {
+  @apply mt-3 inline-flex items-center justify-center rounded-xl border border-surface-mid bg-surface-low px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-ink transition-all hover:border-accent/30 hover:text-accent disabled:cursor-not-allowed disabled:opacity-50;
+}
+.lesson-tool-actions {
+  @apply mt-4 flex flex-wrap items-center gap-2;
+}
+.lesson-flow-strip {
+  @apply mt-4 grid gap-3 md:grid-cols-3;
+}
+.lesson-flow-chip {
+  @apply rounded-2xl border border-surface-mid bg-surface-low/70 p-4;
+}
+.lesson-flow-chip__label {
+  @apply mb-1 block text-[10px] font-bold uppercase tracking-widest text-ink-muted;
+}
+.lesson-flow-chip__value {
+  @apply block text-sm font-semibold text-ink;
+}
+.lesson-tag-panel {
+  @apply mt-4 grid gap-4 md:grid-cols-2;
+}
+.lesson-tag-panel__group {
+  @apply rounded-2xl border border-surface-mid bg-surface-low/70 p-4;
+}
+.lesson-tag-panel__top {
+  @apply mb-3 flex items-center justify-between gap-3;
+}
+.lesson-tag-panel__label {
+  @apply text-[10px] font-bold uppercase tracking-widest text-ink-muted;
+}
+.lesson-tag-panel__value {
+  @apply rounded-full bg-paper px-2.5 py-1 text-[10px] font-semibold text-ink;
+}
+.lesson-tag-panel__empty {
+  @apply text-[12px] leading-relaxed text-ink-secondary;
+}
+.lesson-suggested-tags {
+  @apply flex flex-wrap gap-2;
+}
+.lesson-suggested-tag {
+  @apply inline-flex items-center rounded-full border border-accent/20 bg-accent/8 px-3 py-1 text-[10px] font-semibold text-accent;
+}
+.lesson-outline-preview {
+  @apply mt-4 flex flex-col gap-2;
+}
+.lesson-outline-preview__item {
+  @apply flex items-start gap-3 rounded-2xl border border-surface-mid bg-surface-low/70 p-3 text-left transition-all hover:border-accent/30 hover:bg-accent/5;
+}
+.lesson-outline-preview__item--active {
+  @apply border-accent/25 bg-accent/6 shadow-sm;
+}
+.lesson-outline-preview__index {
+  @apply flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-paper text-[11px] font-bold text-ink-muted;
+}
+.lesson-outline-preview__copy {
+  @apply flex min-w-0 flex-1 flex-col;
+}
+.lesson-outline-preview__copy strong {
+  @apply text-sm font-semibold text-ink;
+}
+.lesson-outline-preview__copy span {
+  @apply mt-1 text-[11px] leading-relaxed text-ink-secondary;
+}
+.lesson-workspace-button {
+  @apply inline-flex items-center justify-center gap-2 rounded-2xl bg-accent px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-paper shadow-lg shadow-accent/20 transition-all hover:bg-ink;
+}
+.outline-summary {
+  @apply grid grid-cols-3 gap-3;
+}
+.outline-summary__stat {
+  @apply rounded-2xl bg-surface-low p-4 text-center;
+}
+.outline-summary__label {
+  @apply mb-1 block text-[10px] font-bold uppercase tracking-widest text-ink-muted;
+}
+.outline-summary__value {
+  @apply block text-sm font-semibold text-ink;
+}
+.outline-item {
+  @apply flex items-stretch gap-3 rounded-2xl border border-surface-mid bg-surface-low p-3 transition-all;
+}
+.outline-item--reading {
+  @apply border-accent/30 bg-accent/5 shadow-sm;
+}
+.outline-item__main {
+  @apply flex flex-1 items-start gap-3 text-left;
+}
+.outline-item__index {
+  @apply flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-paper text-[11px] font-bold text-ink-muted;
+}
+.outline-item__copy {
+  @apply min-w-0 flex-1;
+}
+.outline-item__top {
+  @apply mb-1 flex flex-wrap items-center gap-2;
+}
+.outline-item__section {
+  @apply text-[10px] font-bold uppercase tracking-widest text-ink-muted;
+}
+.outline-item__title {
+  @apply text-sm font-semibold text-ink;
+}
+.outline-item__preview {
+  @apply mt-1 text-[12px] leading-relaxed text-ink-secondary;
+}
+.outline-item__audio {
+  @apply flex h-10 w-10 shrink-0 items-center justify-center self-center rounded-2xl bg-paper text-ink-muted transition-all hover:border-accent/30 hover:bg-accent hover:text-paper;
+}
+.outline-item__audio--active {
+  @apply bg-accent text-paper;
+}
+
 .block {
   @apply bg-paper border border-surface-mid rounded-xl mb-2 shadow-sm transition-colors hover:border-surface-mid/80 overflow-hidden;
 }
@@ -181,12 +385,15 @@
 .block__num--done { @apply bg-success-soft text-success; }
 .block__num--error { @apply bg-error-soft text-error; }
 .block__label { @apply text-[13px] font-medium text-ink flex-1; }
+.block__copy { @apply min-w-0 flex-1; }
+.block__copy-top { @apply flex flex-wrap items-center gap-2; }
+.block__preview { @apply mt-1 text-[11px] italic leading-relaxed text-ink-muted; }
 .block__chevron { @apply text-sm text-ink-muted transition-transform duration-200; }
 .block__chevron--open { @apply rotate-90; }
-.block__body { @apply px-5 pb-6 pt-5 border-t border-surface-mid; }
+.block__body { @apply border-t border-surface-mid px-5 pb-7 pt-6 md:px-6 md:pb-8 md:pt-7; }
 
 .def-box {
-  @apply bg-surface-low border-l-[3px] border-accent rounded-r-lg p-4 md:p-5 text-ink-secondary leading-[1.75] mt-4;
+  @apply mt-4 rounded-r-lg border-l-[3px] border-accent bg-surface-low p-4 text-ink-secondary leading-[1.8] md:p-5;
 }
 .def-box strong { @apply font-semibold text-ink; }
 .def-box__source { @apply text-[11px] text-ink-muted mt-3 block; }
@@ -291,6 +498,71 @@
   margin: 1.5em 0;
 }
 
+.lesson-copy {
+  font-size: 15px;
+  line-height: 1.9;
+  color: var(--ink-secondary);
+}
+.lesson-copy > * + * {
+  margin-top: 0.95em;
+}
+.lesson-copy p {
+  margin-bottom: 0;
+}
+.lesson-copy strong {
+  color: var(--ink);
+  font-weight: 700;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  padding: 0.05em 0.28em;
+  border-radius: 0.35rem;
+}
+.lesson-copy em {
+  color: var(--ink);
+  font-style: italic;
+}
+.lesson-copy ul,
+.lesson-copy ol {
+  padding-left: 1.35em;
+}
+.lesson-copy li + li {
+  margin-top: 0.55em;
+}
+.lesson-copy li::marker {
+  color: var(--accent);
+}
+.lesson-copy code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface-low));
+  padding: 0.15em 0.4em;
+  border-radius: 0.4rem;
+}
+.lesson-copy blockquote {
+  margin-left: 0;
+  border-left: 3px solid color-mix(in srgb, var(--accent) 70%, white);
+  padding-left: 1em;
+  color: var(--ink);
+}
+.lesson-copy .katex-display {
+  margin: 1.2em 0;
+  overflow-x: auto;
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--surface-low) 88%, white);
+  padding: 0.95rem 1rem;
+}
+.lesson-copy .katex {
+  font-size: 1.08em;
+}
+.lesson-copy--formula {
+  color: var(--ink);
+}
+
+.lesson-formula {
+  @apply rounded-2xl border border-warning/20 bg-warning/5 p-4 md:p-5;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warning) 10%, transparent);
+}
+
 /* Lesson intro card — "What you'll learn" */
 .lesson-intro {
   @apply bg-accent/5 border border-accent/15 rounded-2xl p-5 mb-2;
@@ -365,4 +637,60 @@
 .katex .mop                { color: var(--math-function); } /* functions: sin cos log */
 .katex .mopen,
 .katex .mclose             { color: var(--math-bracket);  } /* delimiters: ( ) [ ] */
+
+/* Scoped admin-page palette remap so legacy light-only utility classes inherit theme tokens */
+.dark .admin-theme-scope .bg-white {
+  background-color: var(--paper) !important;
+}
+
+.dark .admin-theme-scope .bg-gray-50,
+.dark .admin-theme-scope .bg-gray-50\/40,
+.dark .admin-theme-scope .bg-gray-50\/50,
+.dark .admin-theme-scope .bg-gray-50\/60,
+.dark .admin-theme-scope .bg-gray-100 {
+  background-color: var(--surface-low) !important;
+}
+
+.dark .admin-theme-scope .border-gray-50,
+.dark .admin-theme-scope .border-gray-100,
+.dark .admin-theme-scope .border-gray-200 {
+  border-color: color-mix(in srgb, var(--ink) 12%, transparent) !important;
+}
+
+.dark .admin-theme-scope .text-gray-900,
+.dark .admin-theme-scope .text-gray-800,
+.dark .admin-theme-scope .text-black {
+  color: var(--ink) !important;
+}
+
+.dark .admin-theme-scope .text-gray-700,
+.dark .admin-theme-scope .text-gray-600,
+.dark .admin-theme-scope .text-gray-500 {
+  color: var(--ink-secondary) !important;
+}
+
+.dark .admin-theme-scope .text-gray-400,
+.dark .admin-theme-scope .text-gray-300 {
+  color: var(--ink-muted) !important;
+}
+
+.dark .admin-theme-scope .hover\:bg-gray-50:hover,
+.dark .admin-theme-scope .hover\:bg-gray-50\/40:hover,
+.dark .admin-theme-scope .hover\:bg-gray-50\/50:hover,
+.dark .admin-theme-scope .hover\:bg-gray-50\/60:hover,
+.dark .admin-theme-scope .hover\:bg-gray-100:hover,
+.dark .admin-theme-scope .hover\:bg-gray-200:hover {
+  background-color: var(--surface-mid) !important;
+}
+
+.dark .admin-theme-scope .hover\:text-gray-700:hover,
+.dark .admin-theme-scope .hover\:text-gray-900:hover,
+.dark .admin-theme-scope .hover\:text-gray-800:hover {
+  color: var(--ink) !important;
+}
+
+.dark .admin-theme-scope .hover\:border-gray-300:hover,
+.dark .admin-theme-scope .hover\:border-gray-900:hover {
+  border-color: color-mix(in srgb, var(--ink) 18%, transparent) !important;
+}
 

@@ -1,0 +1,171 @@
+[
+  {
+    "number": 69,
+    "branch": "jules-memoize-dexie-queries-1056629681032519813",
+    "status": "clean",
+    "mergeOutput": "Already up to date.\n"
+  },
+  {
+    "number": 68,
+    "branch": "palette-topbar-accessibility-1373358772333518450",
+    "status": "clean",
+    "mergeOutput": "Already up to date.\n"
+  },
+  {
+    "number": 67,
+    "branch": "palette-topbar-a11y-6917247524514564960",
+    "status": "clean",
+    "mergeOutput": "Already up to date.\n"
+  },
+  {
+    "number": 66,
+    "branch": "bolt-performance-memoize-livequery-118869108235954401",
+    "status": "clean",
+    "mergeOutput": "Already up to date.\n"
+  },
+  {
+    "number": 65,
+    "branch": "palette/icon-accessibility-16195405332334006850",
+    "status": "clean",
+    "mergeOutput": "Already up to date.\n"
+  },
+  {
+    "number": 64,
+    "branch": "palette/add-aria-labels-navigation-7479874849260126881",
+    "status": "clean",
+    "mergeOutput": "Already up to date.\n"
+  },
+  {
+    "number": 63,
+    "branch": "palette/topbar-aria-focus-8844965061138701391",
+    "status": "clean",
+    "mergeOutput": "Already up to date.\n"
+  },
+  {
+    "number": 62,
+    "branch": "palette/topbar-accessibility-12768565705540992136",
+    "status": "clean",
+    "mergeOutput": "Already up to date.\n"
+  },
+  {
+    "number": 61,
+    "branch": "sentinel-fix-weak-random-ids-4607639377235026399",
+    "status": "clean",
+    "mergeOutput": "Already up to date.\n"
+  },
+  {
+    "number": 60,
+    "branch": "codex/investigate-lesson-generation-quality-and-tests",
+    "status": "clean",
+    "mergeOutput": "Already up to date.\n"
+  },
+  {
+    "number": 59,
+    "branch": "sentinel/fix-hardcoded-nvidia-key-15999701295688394101",
+    "status": "conflict",
+    "mergeOutput": "Auto-merging api/ai-analyst.ts\nCONFLICT (content): Merge conflict in api/ai-analyst.ts\nAuto-merging package.json\nAutomatic merge failed; fix conflicts and then commit the result.\n"
+  },
+  {
+    "number": 58,
+    "branch": "bolt/memoize-live-query-derived-data-6835807004151322704",
+    "status": "conflict",
+    "mergeOutput": "Auto-merging src/pages/ClassroomView.tsx\nCONFLICT (content): Merge conflict in src/pages/ClassroomView.tsx\nAuto-merging src/pages/Dashboard.tsx\nAuto-merging src/pages/LessonView.tsx\nAuto-merging src/pages/Modules.tsx\nAutomatic merge failed; fix conflicts and then commit the result.\n"
+  },
+  {
+    "number": 57,
+    "branch": "palette-topbar-a11y-2800266621582839836",
+    "status": "clean"
+  },
+  {
+    "number": 56,
+    "branch": "bolt-uselivequery-memoization-9127005693374234036",
+    "status": "conflict",
+    "mergeOutput": "Auto-merging src/pages/ClassroomView.tsx\nCONFLICT (content): Merge conflict in src/pages/ClassroomView.tsx\nAuto-merging src/pages/Dashboard.tsx\nAuto-merging src/pages/LessonView.tsx\nAuto-merging src/pages/Modules.tsx\nAutomatic merge failed; fix conflicts and then commit the result.\n"
+  },
+  {
+    "number": 55,
+    "branch": "palette-topbar-accessibility-8729395399035198307",
+    "status": "clean"
+  },
+  {
+    "number": 54,
+    "branch": "codex/audit-and-upgrade-pdf-combinermaxx",
+    "status": "conflict",
+    "mergeOutput": "Auto-merging src/pages/Modules.tsx\nCONFLICT (content): Merge conflict in src/pages/Modules.tsx\nAutomatic merge failed; fix conflicts and then commit the result.\n"
+  },
+  {
+    "number": 53,
+    "branch": "bolt/memoize-dexie-livequeries-17654266245891430824",
+    "status": "conflict",
+    "mergeOutput": "Auto-merging src/pages/ClassroomView.tsx\nCONFLICT (content): Merge conflict in src/pages/ClassroomView.tsx\nAuto-merging src/pages/Dashboard.tsx\nAuto-merging src/pages/LessonView.tsx\nAuto-merging src/pages/Modules.tsx\nAutomatic merge failed; fix conflicts and then commit the result.\n"
+  },
+  {
+    "number": 52,
+    "branch": "sentinel-fix-hardcoded-api-key-24648503584211226",
+    "status": "conflict",
+    "mergeOutput": "Auto-merging api/ai-analyst.ts\nCONFLICT (content): Merge conflict in api/ai-analyst.ts\nAutomatic merge failed; fix conflicts and then commit the result.\n"
+  },
+  {
+    "number": 51,
+    "branch": "palette-topbar-a11y-6194112837694417098",
+    "status": "clean"
+  },
+  {
+    "number": 50,
+    "branch": "codex/fix-classroom-flow-and-ai-integration",
+    "status": "conflict",
+    "mergeOutput": "Auto-merging src/db/supabase.ts\nAuto-merging src/pages/Modules.tsx\nCONFLICT (content): Merge conflict in src/pages/Modules.tsx\nAutomatic merge failed; fix conflicts and then commit the result.\n"
+  },
+  {
+    "number": 49,
+    "branch": "codex/conduct-ui/ux-content-and-brand-audit",
+    "status": "conflict",
+    "mergeOutput": "Auto-merging src/components/Sidebar.tsx\nCONFLICT (content): Merge conflict in src/components/Sidebar.tsx\nAuto-merging src/pages/Admin.tsx\nAuto-merging src/pages/AiCommandCenter.jsx\nAuto-merging src/pages/ClassroomView.tsx\nAuto-merging src/pages/LessonView.tsx\nAuto-merging src/pages/Modules.tsx\nCONFLICT (content): Merge conflict in src/pages/Modules.tsx\nAutomatic merge failed; fix conflicts and then commit the result.\n"
+  },
+  {
+    "number": 47,
+    "branch": "codex/implement-classroom-updates-and-tests",
+    "status": "conflict",
+    "mergeOutput": "Auto-merging src/pages/Modules.tsx\nCONFLICT (content): Merge conflict in src/pages/Modules.tsx\nAutomatic merge failed; fix conflicts and then commit the result.\n"
+  },
+  {
+    "number": 46,
+    "branch": "jules-713513340720929759-d9f36163",
+    "status": "clean",
+    "mergeOutput": "Auto-merging src/db/supabase.ts\n"
+  },
+  {
+    "number": 45,
+    "branch": "jules-bolt-dexie-usememo-optimization-3222218612148441142",
+    "status": "clean",
+    "mergeOutput": "Auto-merging src/pages/ClassroomView.tsx\nAuto-merging src/pages/Dashboard.tsx\nAuto-merging src/pages/LessonView.tsx\nAuto-merging src/pages/Modules.tsx\n"
+  },
+  {
+    "number": 44,
+    "branch": "palette/topbar-accessibility-14747110258534138572",
+    "status": "clean"
+  },
+  {
+    "number": 43,
+    "branch": "sentinel-fix-hardcoded-key-5554527809047709480",
+    "status": "conflict",
+    "mergeOutput": "Auto-merging api/ai-analyst.ts\nCONFLICT (content): Merge conflict in api/ai-analyst.ts\nAutomatic merge failed; fix conflicts and then commit the result.\n"
+  },
+  {
+    "number": 42,
+    "branch": "fix-admin-405-error-7824542208557707248",
+    "status": "conflict",
+    "mergeOutput": "Auto-merging src/pages/Admin.tsx\nCONFLICT (content): Merge conflict in src/pages/Admin.tsx\nAutomatic merge failed; fix conflicts and then commit the result.\n"
+  },
+  {
+    "number": 41,
+    "branch": "fix-ai-dependency-1662555244813303414",
+    "status": "conflict",
+    "mergeOutput": "Auto-merging src/pages/ClassroomView.tsx\nCONFLICT (content): Merge conflict in src/pages/ClassroomView.tsx\nAuto-merging src/pages/Modules.tsx\nCONFLICT (content): Merge conflict in src/pages/Modules.tsx\nAutomatic merge failed; fix conflicts and then commit the result.\n"
+  },
+  {
+    "number": 39,
+    "branch": "palette-topbar-a11y-2668385863952702212",
+    "status": "clean"
+  }
+]

@@ -113,9 +113,52 @@ export interface AiRecoveryDashboardKpis {
   rejectedRecoveredLessons: number;
 }
 
+export interface TopicRepairSummary {
+  scannedLessons: number;
+  lessonsAlreadyLinked: number;
+  lessonsLinked: number;
+  topicsCreated: number;
+  skippedMissingGrade: number;
+  skippedMissingSubject: number;
+  skippedMissingTitle: number;
+  skippedMissingGradeMapping: number;
+  skippedMissingSubjectMapping: number;
+  unresolvedLessons: Array<{
+    lesson_id: string;
+    grade: string | null;
+    subject: string | null;
+    title: string | null;
+    reason: string;
+  }>;
+}
+
 const ensureConfigured = () => {
   if (!isSupabaseConfigured) {
     throw new Error("Supabase is not configured for the admin dashboard. Add valid Supabase environment variables before loading live metrics.");
+  }
+};
+
+const getAdminApiHeaders = async () => {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  const { data } = await supabase.auth.getSession();
+  const accessToken = data?.session?.access_token;
+
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
+
+  return headers;
+};
+
+const parseApiError = async (response: Response) => {
+  try {
+    const payload = await response.json();
+    return payload.error || `Request failed with status ${response.status}`;
+  } catch {
+    return `Request failed with status ${response.status}`;
   }
 };
 
@@ -456,4 +499,19 @@ export const loadAiRecoveryDashboardKpis = async (): Promise<AiRecoveryDashboard
     approvedRecoveredLessons,
     rejectedRecoveredLessons,
   };
+};
+
+export const repairTopicsFromLessons = async (): Promise<TopicRepairSummary> => {
+  const headers = await getAdminApiHeaders();
+  const response = await fetch("/api/admin/topics/repair", {
+    method: "POST",
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new Error(await parseApiError(response));
+  }
+
+  const payload = await response.json() as { summary: TopicRepairSummary };
+  return payload.summary;
 };
