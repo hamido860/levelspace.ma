@@ -55,6 +55,7 @@ export interface Lesson {
   reviewed_by?: string;
   reviewed_at?: string;
   is_ai_generated?: boolean;
+  track_id?: string;
 }
 
 export interface Note {

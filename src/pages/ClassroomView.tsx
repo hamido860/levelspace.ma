@@ -27,6 +27,8 @@ const normalizeLessonTitle = (title: string | null | undefined) =>
 
 type SupabaseLessonRow = {
   id?: string;
+  topic_id?: string | null;
+  track_id?: string | null;
   lesson_title: string;
   content?: string | null;
   blocks?: any[] | null;
@@ -85,6 +87,27 @@ const resolveCurriculumIds = async (grade: string, subject: string, category?: s
   };
 };
 
+const resolveTrackId = async (trackValue: string | null | undefined) => {
+  const raw = String(trackValue || '').trim();
+  if (!raw) return null;
+
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw);
+  if (isUuid) return raw;
+
+  const { data, error } = await supabase
+    .from('bac_tracks')
+    .select('id')
+    .eq('name', raw)
+    .maybeSingle();
+
+  if (error) {
+    console.warn('[ClassroomView] Failed to resolve selected bac track:', error);
+    return null;
+  }
+
+  return data?.id ?? null;
+};
+
 type ClassroomSupabaseLesson = {
   id?: string;
   lesson_title?: string;
@@ -120,18 +143,49 @@ export const ClassroomView: React.FC = () => {
 
   const module = useLiveQuery(() => id ? db.modules.get(id) : undefined, [id]);
   const allLessons = useLiveQuery(() => id ? db.lessons.where('moduleId').equals(id).sortBy('createdAt') : [], [id]);
-  const storedLessons = useMemo(
-    () => (allLessons?.filter((lesson) => lesson.status !== 'suggested') || []).sort(compareCurriculumValidationForStudents),
-    [allLessons],
-  );
   const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
   const settingsMap = Object.fromEntries(dbSettings.map(s => [s.key, s.value]));
 
   const currentGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
   const currentCountry = settingsMap['selected_country'] || localStorage.getItem('selected_country') || '';
+  const selectedBacTrack = settingsMap['selected_bac_track'] || localStorage.getItem('selected_bac_track') || '';
+  const [currentTrackId, setCurrentTrackId] = useState<string | null>(null);
+  const gradeCandidates = useMemo(() => getGradeCandidates(currentGrade), [currentGrade]);
+  const normalizedGradeCandidates = useMemo(
+    () => new Set(gradeCandidates.map((grade) => String(grade || '').trim().toLocaleLowerCase())),
+    [gradeCandidates],
+  );
+  const normalizedCurrentCountry = String(currentCountry || '').trim().toLocaleLowerCase();
+  const filteredScopeLessons = useMemo(
+    () =>
+      (allLessons || []).filter((lesson) => {
+        if (lesson.status === 'suggested') return false;
+
+        const lessonGrade = String(lesson.grade || '').trim().toLocaleLowerCase();
+        if (lessonGrade && !normalizedGradeCandidates.has(lessonGrade)) {
+          return false;
+        }
+
+        const lessonCountry = String(lesson.country || '').trim().toLocaleLowerCase();
+        if (normalizedCurrentCountry && lessonCountry && lessonCountry !== normalizedCurrentCountry) {
+          return false;
+        }
+
+        if (currentTrackId && lesson.track_id && lesson.track_id !== currentTrackId) {
+          return false;
+        }
+
+        return true;
+      }),
+    [allLessons, currentTrackId, normalizedCurrentCountry, normalizedGradeCandidates],
+  );
   const studentVisibleLessons = useMemo(
-    () => filterStudentVisibleLessons(storedLessons),
-    [storedLessons],
+    () => filterStudentVisibleLessons(filteredScopeLessons),
+    [filteredScopeLessons],
+  );
+  const storedLessons = useMemo(
+    () => [...filteredScopeLessons].sort(compareCurriculumValidationForStudents),
+    [filteredScopeLessons],
   );
   const studentLessonSelection = useMemo(
     () => selectStudentFacingValidatedContent(studentVisibleLessons),
@@ -154,7 +208,22 @@ export const ClassroomView: React.FC = () => {
   const showSetupState = !hasLessons && suggestions.length === 0;
   const showValidationWarningBanner = !isAdmin && lessons.length > 0 && !studentLessonSelection.hasPreferred;
   const cloudHydrationKeyRef = useRef<string | null>(null);
-  const classroomScopeKey = `${id || ''}:${module?.name || ''}:${module?.category || ''}:${currentGrade}:${currentCountry}`;
+  const classroomScopeKey = `${id || ''}:${module?.name || ''}:${module?.category || ''}:${currentGrade}:${currentCountry}:${selectedBacTrack}:${currentTrackId || ''}`;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      const resolved = await resolveTrackId(selectedBacTrack);
+      if (!cancelled) {
+        setCurrentTrackId(resolved);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedBacTrack]);
 
   useEffect(() => {
     if (!id) return;
@@ -192,19 +261,79 @@ export const ClassroomView: React.FC = () => {
     if (!module) return [] as SupabaseLessonRow[];
 
     const subjectCandidates = getSubjectCandidates(module.name, module.category);
-    const gradeCandidates = getGradeCandidates(currentGrade);
+    const { gradeId, subjectId } = await resolveCurriculumIds(currentGrade, module.name, module.category);
+    const trackId = currentTrackId ?? await resolveTrackId(selectedBacTrack);
+    const selectColumns = 'id, topic_id, track_id, lesson_title, content, blocks, subtitle, status, grade, country, subject, validation_status, source_confidence, source_name, source_url, review_notes, reviewed_by, reviewed_at, is_ai_generated, teaching_contract';
 
-    let query = supabase
+    if (gradeId && subjectId) {
+      const { data: topicRows, error: topicsError } = await supabase
+        .from('topics')
+        .select('id, title')
+        .eq('grade_id', gradeId)
+        .eq('subject_id', subjectId);
+
+      if (topicsError) throw topicsError;
+
+      const topicIds = (topicRows || []).map((topic) => topic.id).filter(Boolean);
+      if (topicIds.length > 0) {
+        let topicLessonQuery = supabase
+          .from('lessons')
+          .select(selectColumns)
+          .in('topic_id', topicIds);
+
+        if (currentCountry) {
+          topicLessonQuery = topicLessonQuery.eq('country', currentCountry);
+        }
+
+        if (trackId) {
+          topicLessonQuery = topicLessonQuery.or(`track_id.is.null,track_id.eq.${trackId}`);
+        }
+
+        const { data: topicLessons, error: topicLessonsError } = await topicLessonQuery;
+        if (topicLessonsError) throw topicLessonsError;
+
+        if ((topicLessons || []).length > 0) {
+          return (topicLessons || []) as SupabaseLessonRow[];
+        }
+      }
+    }
+
+    let exactGradeQuery = supabase
       .from('lessons')
-      .select('id, lesson_title, content, blocks, subtitle, status, grade, country, subject, validation_status, source_confidence, source_name, source_url, review_notes, reviewed_by, reviewed_at, is_ai_generated, teaching_contract')
+      .select(selectColumns)
+      .in('subject', subjectCandidates)
+      .eq('grade', currentGrade);
+
+    if (currentCountry) {
+      exactGradeQuery = exactGradeQuery.eq('country', currentCountry);
+    }
+
+    if (trackId) {
+      exactGradeQuery = exactGradeQuery.or(`track_id.is.null,track_id.eq.${trackId}`);
+    }
+
+    const { data: exactGradeLessons, error: exactGradeError } = await exactGradeQuery;
+    if (exactGradeError) throw exactGradeError;
+
+    if ((exactGradeLessons || []).length > 0) {
+      return (exactGradeLessons || []) as SupabaseLessonRow[];
+    }
+
+    let fallbackQuery = supabase
+      .from('lessons')
+      .select(selectColumns)
       .in('subject', subjectCandidates)
       .in('grade', gradeCandidates);
 
     if (currentCountry) {
-      query = query.eq('country', currentCountry);
+      fallbackQuery = fallbackQuery.eq('country', currentCountry);
     }
 
-    const { data, error } = await query;
+    if (trackId) {
+      fallbackQuery = fallbackQuery.or(`track_id.is.null,track_id.eq.${trackId}`);
+    }
+
+    const { data, error } = await fallbackQuery;
     if (error) throw error;
 
     return (data || []) as SupabaseLessonRow[];
@@ -235,6 +364,7 @@ export const ClassroomView: React.FC = () => {
         grade: lesson.grade ?? existing?.grade,
         country: lesson.country ?? existing?.country,
         subject: lesson.subject ?? existing?.subject ?? module.name,
+        track_id: lesson.track_id ?? existing?.track_id,
         sourceLessonId: lesson.id ?? existing?.sourceLessonId,
         teaching_contract: lesson.teaching_contract ?? existing?.teaching_contract,
         validation_status: lesson.validation_status ?? existing?.validation_status,
@@ -275,7 +405,7 @@ export const ClassroomView: React.FC = () => {
         console.warn('[ClassroomView] Supabase classroom hydration failed:', err);
       }
     })();
-  }, [allLessons, classroomScopeKey, currentCountry, currentGrade, id, module]);
+  }, [allLessons, classroomScopeKey, currentCountry, currentGrade, id, module, selectedBacTrack, currentTrackId]);
 
   useEffect(() => {
     const fetchExtraData = async () => {
@@ -334,7 +464,25 @@ export const ClassroomView: React.FC = () => {
       }
 
       // Check database first
-      const existingSuggestions = allLessons?.filter((lesson) => lesson.status === 'suggested') || [];
+      const existingSuggestions = (allLessons || []).filter((lesson) => {
+        if (lesson.status !== 'suggested') return false;
+
+        const lessonGrade = String(lesson.grade || '').trim().toLocaleLowerCase();
+        if (lessonGrade && !normalizedGradeCandidates.has(lessonGrade)) {
+          return false;
+        }
+
+        const lessonCountry = String(lesson.country || '').trim().toLocaleLowerCase();
+        if (normalizedCurrentCountry && lessonCountry && lessonCountry !== normalizedCurrentCountry) {
+          return false;
+        }
+
+        if (currentTrackId && lesson.track_id && lesson.track_id !== currentTrackId) {
+          return false;
+        }
+
+        return true;
+      });
         
       if (existingSuggestions.length > 0) {
         setSuggestions(existingSuggestions.map(s => ({ title: s.title, description: s.content })));
@@ -373,7 +521,7 @@ export const ClassroomView: React.FC = () => {
     const includedTitles = new Set<string>();
 
     // 1. Local lessons (IndexedDB)
-    const localLessons = allLessons?.filter(l => l.status !== 'suggested') || [];
+    const localLessons = storedLessons;
     for (const l of localLessons) {
       includedTitles.add(normalizeLessonTitle(l.title));
       parts.push(`Title: ${l.title}\nContent: ${l.content || (l.blocks ? l.blocks.map((b: any) => b.content).join('\n') : '')}`);
@@ -414,6 +562,10 @@ export const ClassroomView: React.FC = () => {
           content: '',
           blocks: seedLesson.blocks,
           subtitle: seedLesson.subtitle,
+          grade: currentGrade,
+          country: currentCountry || undefined,
+          subject: module.name,
+          track_id: currentTrackId || undefined,
           validation_status: 'ai_generated',
           source_confidence: 0,
           is_ai_generated: true,
@@ -463,6 +615,10 @@ export const ClassroomView: React.FC = () => {
             content: '',
             blocks: seedLesson.blocks,
             subtitle: seedLesson.subtitle,
+            grade: currentGrade,
+            country: currentCountry || undefined,
+            subject: module.name,
+            track_id: currentTrackId || undefined,
             validation_status: 'ai_generated',
             source_confidence: 0,
             is_ai_generated: true,
@@ -506,6 +662,10 @@ export const ClassroomView: React.FC = () => {
             content: '',
             blocks: seedLesson.blocks,
             subtitle: seedLesson.subtitle,
+            grade: currentGrade,
+            country: currentCountry || undefined,
+            subject: module.name,
+            track_id: currentTrackId || undefined,
             validation_status: 'ai_generated',
             source_confidence: 0,
             is_ai_generated: true,
@@ -556,6 +716,10 @@ export const ClassroomView: React.FC = () => {
                 moduleId: module.id,
                 title: topic.title,
                 content: '',
+                grade: currentGrade,
+                country: currentCountry || undefined,
+                subject: module.name,
+                track_id: currentTrackId || undefined,
                 validation_status: 'source_matched',
                 source_confidence: 0.65,
                 source_name: 'Curriculum Outline',

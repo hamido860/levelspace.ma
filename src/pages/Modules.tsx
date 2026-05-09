@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { generateCurriculum, checkAIProvider } from '../services/geminiService';
 import { getClassroomLoadPlan, mapSubjectsToModules, mergeModulesWithAiSuggestions, shouldRequestAiCurriculumSuggestions } from '../services/classroomLoader';
+import { getSubjectCandidates, normalizeCurriculumValue } from '../services/curriculumMatching';
 import { supabase } from '../db/supabase';
 import { useSearch } from '../context/SearchContext';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -40,6 +41,74 @@ const getIconForCategory = (category: string) => {
   return <Library className="w-5 h-5" />;
 };
 
+const MOROCCAN_SCOPE_SUBJECTS: Record<string, string[]> = {
+  'tronc commun::tronc commun scientifique': [
+    'Mathématiques',
+    'Physique-Chimie',
+    'Sciences de la Vie et de la Terre (SVT)',
+    'Français',
+    'Informatique',
+    'Arabe',
+    'Education Islamique',
+    'Histoire-Géographie',
+  ],
+  'tronc commun::tronc commun litteraire': [
+    'Arabe',
+    'Français',
+    'Histoire-Géographie',
+    'Education Islamique',
+    'Mathématiques',
+    'Informatique',
+  ],
+  'tronc commun::tronc commun technologique': [
+    'Mathématiques',
+    'Physique-Chimie',
+    "Sciences de l'Ingénieur",
+    'Français',
+    'Informatique',
+  ],
+};
+
+const buildTrustedSubjectNames = (country: string, grade: string, track: string) => {
+  if (normalizeCurriculumValue(country) !== 'morocco') return [];
+  return MOROCCAN_SCOPE_SUBJECTS[`${normalizeCurriculumValue(grade)}::${normalizeCurriculumValue(track)}`] || [];
+};
+
+const buildTrustedSubjectSet = (subjectNames: string[]) =>
+  new Set(
+    subjectNames
+      .flatMap((name) => getSubjectCandidates(name))
+      .map((name) => normalizeCurriculumValue(name)),
+  );
+
+const moduleMatchesTrustedSubjects = (
+  module: { name: string; category: string; code: string },
+  trustedSubjects: Set<string>,
+) => {
+  if (trustedSubjects.size === 0) return true;
+
+  const candidates = new Set(
+    [
+      ...getSubjectCandidates(module.name, module.category),
+      module.code,
+    ].map((value) => normalizeCurriculumValue(String(value || ''))),
+  );
+
+  return Array.from(candidates).some((candidate) => trustedSubjects.has(candidate));
+};
+
+const buildFallbackTrustedModules = (subjectNames: string[]) =>
+  subjectNames.map((name) => ({
+    id: `trusted-${normalizeCurriculumValue(name).replace(/\s+/g, '-')}`,
+    name,
+    code: name,
+    description: 'Trusted Moroccan curriculum subject',
+    category: name,
+    progress: 0,
+    selected: false,
+    createdAt: Date.now(),
+  }));
+
 export const Modules: React.FC = () => {
   const { t } = useLanguage();
   const { isPro } = useAuth();
@@ -50,11 +119,6 @@ export const Modules: React.FC = () => {
   const aiUnavailableMsg = 'AI curriculum suggestions require an API key.';
 
   const dbModules = useLiveQuery(() => db.modules.toArray());
-  const modules = (dbModules || []).map(m => ({
-    ...m,
-    icon: getIconForCategory(m.category)
-  }));
-  const selectedCount = modules.filter(m => m.selected).length;
 
   const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
   const settingsMap = Object.fromEntries(dbSettings.map(s => [s.key, s.value]));
@@ -66,6 +130,15 @@ export const Modules: React.FC = () => {
 
   const [bacTrackName, setBacTrackName] = useState<string>('');
   const [bacIntOptionName, setBacIntOptionName] = useState<string>('');
+  const trustedSubjectNames = buildTrustedSubjectNames(country, grade, bacTrackName || selectedBacTrackId);
+  const trustedSubjectSet = buildTrustedSubjectSet(trustedSubjectNames);
+  const modules = (dbModules || [])
+    .filter((module) => moduleMatchesTrustedSubjects(module, trustedSubjectSet))
+    .map(m => ({
+      ...m,
+      icon: getIconForCategory(m.category)
+    }));
+  const selectedCount = modules.filter(m => m.selected).length;
 
   useEffect(() => {
     const fetchBacDetails = async () => {
@@ -98,12 +171,12 @@ export const Modules: React.FC = () => {
 
   useEffect(() => {
     if (dbModules === undefined) return;
-    if (dbModules.length > 0) return;
     if (!country) return;
+    if (modules.length > 0) return;
 
     const plan = getClassroomLoadPlan({ action: 'create_classroom', isPro });
     fetchCurriculum(plan.includeAiSuggestions);
-  }, [country, dbModules, grade, isPro]);
+  }, [country, dbModules, grade, isPro, modules.length]);
 
   const fetchCurriculum = async (includeAiSuggestions = false, bypassAiCache = false) => {
     setIsLoading(true);
@@ -113,6 +186,13 @@ export const Modules: React.FC = () => {
 
       const supabaseModules = mapSubjectsToModules((subjectRows || []) as any[]);
       let modulesToStore = supabaseModules;
+
+      if (trustedSubjectSet.size > 0) {
+        const scopedSupabaseModules = supabaseModules.filter((module) => moduleMatchesTrustedSubjects(module, trustedSubjectSet));
+        modulesToStore = scopedSupabaseModules.length > 0
+          ? scopedSupabaseModules
+          : buildFallbackTrustedModules(trustedSubjectNames);
+      }
 
       if (shouldRequestAiCurriculumSuggestions({ includeAiSuggestions, aiAvailable })) {
         let fullGrade = grade;
@@ -136,11 +216,19 @@ export const Modules: React.FC = () => {
               selected: false,
               createdAt: Date.now()
             }));
-            modulesToStore = mergeModulesWithAiSuggestions(supabaseModules, formattedAiModules);
+            if (trustedSubjectSet.size > 0) {
+              modulesToStore = mergeModulesWithAiSuggestions(modulesToStore, formattedAiModules);
+            } else {
+              modulesToStore = mergeModulesWithAiSuggestions(supabaseModules, formattedAiModules);
+            }
           }
         } catch (aiError) {
           console.warn('AI curriculum suggestions failed; keeping Supabase curriculum:', aiError);
         }
+      }
+
+      if (trustedSubjectSet.size > 0) {
+        modulesToStore = modulesToStore.filter((module) => moduleMatchesTrustedSubjects(module, trustedSubjectSet));
       }
 
       if (modulesToStore.length > 0) {
