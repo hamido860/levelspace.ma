@@ -99,8 +99,9 @@ export const Topbar: React.FC<{ isCollapsed?: boolean; gradeOverride?: string }>
                 e.stopPropagation();
                 refreshDbConnection();
               }}
-              className="p-1 hover:bg-ink/5 rounded-full text-muted/40 hover:text-accent transition-all"
+              className="p-1 hover:bg-ink/5 rounded-full text-muted/40 hover:text-accent transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
               title="Refresh Connection"
+              aria-label="Refresh Connection"
             >
               <RefreshCw className={`w-2.5 h-2.5 ${dbConnected === null ? 'animate-spin' : ''}`} />
             </button>
@@ -127,7 +128,8 @@ export const Topbar: React.FC<{ isCollapsed?: boolean; gradeOverride?: string }>
           <button
             onClick={toggleTheme}
             title={theme === 'light' ? 'Dark Mode' : 'Light Mode'}
-            className="text-muted hover:text-accent hover:bg-surface-mid transition-all p-2 rounded-full"
+            aria-label={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+            className="text-muted hover:text-accent hover:bg-surface-mid transition-all p-2 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
           >
             {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
           </button>
@@ -137,7 +139,7 @@ export const Topbar: React.FC<{ isCollapsed?: boolean; gradeOverride?: string }>
             }}
             title={languageTooltip}
             aria-label={languageTooltip}
-            className="text-muted hover:text-accent hover:bg-surface-mid transition-all px-2.5 py-2 rounded-full flex items-center gap-1.5"
+            className="text-muted hover:text-accent hover:bg-surface-mid transition-all px-2.5 py-2 rounded-full flex items-center gap-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
           >
             <Globe size={18} />
             <span className="text-[10px] font-black uppercase tracking-widest">
@@ -147,7 +149,8 @@ export const Topbar: React.FC<{ isCollapsed?: boolean; gradeOverride?: string }>
           <button
             onClick={() => navigate('/settings')}
             title={t('settings')}
-            className={`text-muted hover:text-accent hover:bg-surface-mid transition-all p-2 rounded-full ${location.pathname === '/settings' ? 'text-accent bg-accent/5' : ''}`}
+            aria-label={t('settings')}
+            className={`text-muted hover:text-accent hover:bg-surface-mid transition-all p-2 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 ${location.pathname === '/settings' ? 'text-accent bg-accent/5' : ''}`}
           >
             <Settings size={18} />
           </button>
@@ -156,7 +159,10 @@ export const Topbar: React.FC<{ isCollapsed?: boolean; gradeOverride?: string }>
         <div className="h-8 w-px bg-ink/5 mx-1 hidden md:block" />
 
         <div className="flex items-center">
-          <button className="text-muted hover:text-accent p-2 rounded-full hover:bg-ink/5 transition-all relative">
+          <button
+            aria-label="Notifications"
+            className="text-muted hover:text-accent p-2 rounded-full hover:bg-ink/5 transition-all relative focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
+          >
             <Bell size={18} />
             <span className="absolute top-2 right-2 w-2 h-2 bg-accent rounded-full border-2 border-surface-low"></span>
           </button>
