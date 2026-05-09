@@ -53,7 +53,13 @@ export interface AdminGradeRow {
   grade: string;
   grade_order: number;
   total_topics: number;
+  lesson_rows: number;
   lessons_covered: number;
+  topic_coverage: number;
+  linked_lessons: number;
+  unlinked_lessons: number;
+  coverage_source: "none" | "topic_id" | "lesson_grade" | "mixed";
+  data_notes: string[];
   q_done: number;
   q_pending: number;
   q_failed: number;
@@ -185,6 +191,46 @@ const countStatus = (rows: Array<{ status?: string | null }>, status: string) =>
 const isNeedsReviewLesson = (lesson: { teaching_contract?: unknown }) =>
   parseObject(lesson.teaching_contract)?.status === "needs_review";
 
+const normalizeMetricText = (value: unknown) =>
+  String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[’'`]/g, "")
+    .replace(/[^a-z0-9\u0600-\u06ff]+/g, " ")
+    .trim();
+
+const GRADE_TEXT_ALIASES_BY_KEY: Record<string, string[]> = {
+  "tronc commun": [
+    "Tronc Commun Scientifique",
+    "Tronc Commun Sciences",
+    "Common Core",
+    "Common Core Science",
+    "TCS",
+  ],
+  "1ere annee bac": [
+    "Premiere",
+    "1ere Bac",
+    "1 Bac",
+    "Grade 11",
+  ],
+  "2eme annee bac": [
+    "Terminale",
+    "2eme Bac",
+    "2 Bac",
+    "Baccalaureat",
+    "Grade 12",
+  ],
+};
+
+const gradeMatchKeys = (gradeName: string) =>
+  new Set([gradeName, ...(GRADE_TEXT_ALIASES_BY_KEY[normalizeMetricText(gradeName)] || [])].map(normalizeMetricText).filter(Boolean));
+
+const rowMatchesGradeName = (rowGrade: unknown, keys: Set<string>) => {
+  const normalized = normalizeMetricText(rowGrade);
+  return normalized ? keys.has(normalized) : false;
+};
+
 const isMissingTableError = (error: { code?: string; message?: string } | null) => {
   const message = String(error?.message || "");
   return (
@@ -300,7 +346,7 @@ export const loadAdminGradeMetrics = async (): Promise<AdminGradeRow[]> => {
   const [grades, topics, lessons, queue] = await Promise.all([
     readRows<any>("grades", supabase.from("grades").select("id, name, grade_order, cycles(name, cycle_order)")),
     readRows<any>("topics", supabase.from("topics").select("id, grade_id")),
-    readRows<any>("lessons", supabase.from("lessons").select("id, topic_id, teaching_contract")),
+    readRows<any>("lessons", supabase.from("lessons").select("id, topic_id, grade, teaching_contract")),
     readRows<any>("lesson_gen_queue", supabase.from("lesson_gen_queue").select("id, topic_id, status")),
   ]);
 
@@ -308,9 +354,35 @@ export const loadAdminGradeMetrics = async (): Promise<AdminGradeRow[]> => {
     .map((grade) => {
       const gradeTopics = topics.filter((topic) => topic.grade_id === grade.id);
       const topicIds = new Set(gradeTopics.map((topic) => topic.id));
-      const gradeLessons = lessons.filter((lesson) => lesson.topic_id && topicIds.has(lesson.topic_id));
+      const matchKeys = gradeMatchKeys(grade.name);
+      const linkedLessons = lessons.filter((lesson) => lesson.topic_id && topicIds.has(lesson.topic_id));
+      const gradeTextLessons = lessons.filter((lesson) => rowMatchesGradeName(lesson.grade, matchKeys));
+      const gradeLessonsById = new Map<string, any>();
+
+      for (const lesson of linkedLessons) gradeLessonsById.set(lesson.id, lesson);
+      for (const lesson of gradeTextLessons) gradeLessonsById.set(lesson.id, lesson);
+
+      const gradeLessons = Array.from(gradeLessonsById.values());
+      const coveredTopicIds = new Set(linkedLessons.map((lesson) => lesson.topic_id).filter(Boolean));
+      const linkedLessonIds = new Set(linkedLessons.map((lesson) => lesson.id));
+      const unlinkedLessons = gradeLessons.filter((lesson) => !lesson.topic_id || !topicIds.has(lesson.topic_id));
       const gradeQueue = queue.filter((job) => job.topic_id && topicIds.has(job.topic_id));
       const cycle = grade.cycles;
+      const coverageSource =
+        linkedLessons.length > 0 && gradeTextLessons.length > linkedLessons.length
+          ? "mixed"
+          : linkedLessons.length > 0
+            ? "topic_id"
+            : gradeTextLessons.length > 0
+              ? "lesson_grade"
+              : "none";
+      const dataNotes: string[] = [];
+
+      if (gradeTopics.length === 0 && gradeLessons.length > 0) {
+        dataNotes.push("No topic rows for this grade; showing direct lesson.grade matches.");
+      } else if (unlinkedLessons.length > 0) {
+        dataNotes.push(`${unlinkedLessons.length} lesson rows are not linked to this grade through topics.`);
+      }
 
       return {
         id: grade.id,
@@ -319,7 +391,13 @@ export const loadAdminGradeMetrics = async (): Promise<AdminGradeRow[]> => {
         grade: grade.name,
         grade_order: grade.grade_order ?? 0,
         total_topics: gradeTopics.length,
-        lessons_covered: new Set(gradeLessons.map((lesson) => lesson.topic_id)).size,
+        lesson_rows: gradeLessons.length,
+        lessons_covered: gradeLessons.length,
+        topic_coverage: coveredTopicIds.size,
+        linked_lessons: linkedLessonIds.size,
+        unlinked_lessons: unlinkedLessons.length,
+        coverage_source: coverageSource,
+        data_notes: dataNotes,
         q_done: countStatus(gradeQueue, "done"),
         q_pending: countStatus(gradeQueue, "pending"),
         q_failed: countStatus(gradeQueue, "failed"),
@@ -332,7 +410,7 @@ export const loadAdminGradeMetrics = async (): Promise<AdminGradeRow[]> => {
 export const loadAdminQueueMetrics = async (): Promise<{ stats: QueueStatusBreakdown; failedJobs: FailedQueueJob[] }> => {
   ensureConfigured();
 
-  const [queueRows, failedJobs] = await Promise.all([
+  const [queueRows, failedJobs, topics] = await Promise.all([
     readRows<any>("queue statuses", supabase.from("lesson_gen_queue").select("status, topic_id")),
     readRows<any>(
       "recent failed queue jobs",
@@ -343,6 +421,7 @@ export const loadAdminQueueMetrics = async (): Promise<{ stats: QueueStatusBreak
         .order("created_at", { ascending: false })
         .limit(10)
     ),
+    readRows<any>("queue topic anchors", supabase.from("topics").select("id")),
   ]);
 
   const countsByStatus = queueRows.reduce<Record<string, number>>((acc, row) => {
@@ -356,11 +435,12 @@ export const loadAdminQueueMetrics = async (): Promise<{ stats: QueueStatusBreak
     .map(([status, count]) => ({ status, count }))
     .sort((left, right) => right.count - left.count || left.status.localeCompare(right.status));
 
-  const topicIds = Array.from(new Set(failedJobs.map((job) => job.topic_id).filter(Boolean)));
+  const knownTopicIds = new Set(topics.map((topic) => topic.id).filter(Boolean));
+  const failedTopicIds = Array.from(new Set(failedJobs.map((job) => job.topic_id).filter(Boolean)));
   let topicsById = new Map<string, string>();
 
-  if (topicIds.length > 0) {
-    const topicRows = await readRows<any>("failed job topics", supabase.from("topics").select("id, title").in("id", topicIds));
+  if (failedTopicIds.length > 0) {
+    const topicRows = await readRows<any>("failed job topics", supabase.from("topics").select("id, title").in("id", failedTopicIds));
     topicsById = new Map(topicRows.map((topic) => [topic.id, topic.title]));
   }
 
@@ -371,7 +451,7 @@ export const loadAdminQueueMetrics = async (): Promise<{ stats: QueueStatusBreak
       failed: countsByStatus.failed || 0,
       processing: countsByStatus.processing || 0,
       other: otherStatuses.reduce((sum, entry) => sum + entry.count, 0),
-      unresolvedTopicJobs: queueRows.filter((row) => !row.topic_id).length,
+      unresolvedTopicJobs: queueRows.filter((row) => !row.topic_id || !knownTopicIds.has(row.topic_id)).length,
       otherStatuses,
     },
     failedJobs: failedJobs.map((job) => ({

@@ -472,11 +472,13 @@ export const Admin: React.FC = () => {
     setAiError("");
 
     // Build a compact metrics snapshot from live state
+    const lessonRowsTotal = gradeData.reduce((sum, grade) => sum + (grade.lesson_rows ?? grade.lessons_covered), 0);
+    const topicCoverageTotal = gradeData.reduce((sum, grade) => sum + (grade.topic_coverage ?? grade.lessons_covered), 0);
     const metricsSnapshot: any = {
       totalTopics: kpis.topics,
-      lessonsGenerated: gradeData.reduce((sum, grade) => sum + grade.lessons_covered, 0),
+      lessonsGenerated: lessonRowsTotal,
       completedJobs: kpis.completedJobs,
-      lessonCoverage: `${pct(gradeData.reduce((sum, grade) => sum + grade.lessons_covered, 0), kpis.topics)}%`,
+      lessonCoverage: `${pct(topicCoverageTotal, kpis.topics)}%`,
       queuePending: kpis.pendingJobs,
       failedJobs: kpis.failedJobs,
       ragChunksTotal: kpis.ragTotal,
@@ -490,9 +492,10 @@ export const Admin: React.FC = () => {
         grade: g.grade,
         cycle: g.cycle,
         topics: g.total_topics,
-        lessons: g.lessons_covered,
+        lessons: g.lesson_rows ?? g.lessons_covered,
+        topicCoverage: g.topic_coverage ?? g.lessons_covered,
         completedJobs: g.q_done,
-        coverage: `${pct(g.lessons_covered, g.total_topics)}%`,
+        coverage: `${pct(g.topic_coverage ?? g.lessons_covered, g.total_topics)}%`,
         queueFailed: g.q_failed,
         queuePending: g.q_pending,
         recoveredLessons: g.needs_review,
@@ -855,6 +858,16 @@ export const Admin: React.FC = () => {
             <BookOpen className="w-4 h-4 text-gray-400" />
             <h2 className="font-bold text-sm">Grade-by-Grade Content Coverage</h2>
           </div>
+          {topicsTableCount === 0 && lessonsTableCount > 0 && (
+            <div className="mx-5 mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              Supabase has {lessonsTableCount} lesson rows but 0 topic rows. Grade coverage now shows direct lesson-grade matches, and topic coverage remains unavailable until topics are repaired.
+            </div>
+          )}
+          {queueStats.unresolvedTopicJobs > 0 && (
+            <div className="mx-5 mt-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+              {queueStats.unresolvedTopicJobs} queue jobs have missing or orphan topic anchors, so they cannot be assigned safely to a grade row.
+            </div>
+          )}
           {loading ? <Spinner /> : gradeData.length === 0 ? (
             <div className="p-5 text-sm text-gray-500">No grade rows were returned from Supabase.</div>
           ) : (
@@ -864,8 +877,8 @@ export const Admin: React.FC = () => {
                   <tr>
                     <th className="px-4 py-2 text-left">Grade</th>
                     <th className="px-4 py-2 text-left">Topics</th>
-                    <th className="px-4 py-2 text-left">Lesson Coverage</th>
-                    <th className="px-4 py-2 text-left">Coverage</th>
+                    <th className="px-4 py-2 text-left">Lessons</th>
+                    <th className="px-4 py-2 text-left">Topic Coverage</th>
                     <th className="px-4 py-2 text-left">Completed Jobs</th>
                     <th className="px-4 py-2 text-left">Pending Jobs</th>
                     <th className="px-4 py-2 text-left">Failed Jobs</th>
@@ -890,8 +903,16 @@ export const Admin: React.FC = () => {
                           <tr className="border-t border-gray-50 hover:bg-gray-50/40">
                             <td className="px-4 py-2">{row.grade}</td>
                             <td className="px-4 py-2">{row.total_topics}</td>
-                            <td className="px-4 py-2">{row.lessons_covered}</td>
-                            <td className="px-4 py-2"><ProgressBar val={row.lessons_covered} total={row.total_topics} /></td>
+                            <td className="px-4 py-2">
+                              <div className="font-medium">{row.lesson_rows ?? row.lessons_covered}</div>
+                              {row.coverage_source === "lesson_grade" && (
+                                <div className="text-[11px] text-amber-600">matched by lesson.grade</div>
+                              )}
+                              {(row.unlinked_lessons ?? 0) > 0 && row.coverage_source !== "lesson_grade" && (
+                                <div className="text-[11px] text-amber-600">{row.unlinked_lessons} unlinked</div>
+                              )}
+                            </td>
+                            <td className="px-4 py-2"><ProgressBar val={row.topic_coverage ?? row.lessons_covered} total={row.total_topics} /></td>
                             <td className="px-4 py-2"><Pill status="done" label={row.q_done} /></td>
                             <td className="px-4 py-2"><Pill status="pending" label={row.q_pending} /></td>
                             <td className="px-4 py-2">
