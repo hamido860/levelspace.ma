@@ -13,7 +13,9 @@
     "fn:secrets": "supabase secrets set GEMINI_KEY_0=$GEMINI_KEY_0 SR_KEY=$SR_KEY NVIDIA_API_KEY=$NVIDIA_API_KEY --project-ref pimojkivimygenhygsto",
     "fn:deploy": "supabase functions deploy generate-lessons --project-ref pimojkivimygenhygsto --no-verify-jwt",
     "fn:invoke": "supabase functions invoke generate-lessons --project-ref pimojkivimygenhygsto",
-    "fn:logs": "supabase functions logs generate-lessons --project-ref pimojkivimygenhygsto"
+    "fn:logs": "supabase functions logs generate-lessons --project-ref pimojkivimygenhygsto",
+    "lessons:seed-starter:dry": "tsx scripts/seed-starter-lessons-from-topics.ts --dry-run",
+    "lessons:seed-starter": "tsx scripts/seed-starter-lessons-from-topics.ts --commit"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",

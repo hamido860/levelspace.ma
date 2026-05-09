@@ -51,7 +51,22 @@ type SupabaseLessonRow = {
   reviewed_by?: string | null;
   reviewed_at?: string | null;
   is_ai_generated?: boolean | null;
+  tags?: string[] | null;
   teaching_contract?: unknown;
+};
+
+type SupabaseTopicRow = {
+  id: string;
+  title: string;
+  outlines: SupabaseTopicOutlineRow[];
+};
+
+type SupabaseTopicOutlineRow = {
+  id: string;
+  topic_id: string;
+  title: string;
+  description: string;
+  outline_order: number;
 };
 
 const CLASSROOM_TAB_CONFIG = {
@@ -118,6 +133,9 @@ export const ClassroomView: React.FC = () => {
   const [generatingTitle, setGeneratingTitle] = useState<string | null>(null);
   const [isFetchingGallery, setIsFetchingGallery] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
+  const [isGeneratingStarterLessons, setIsGeneratingStarterLessons] = useState(false);
+  const [isHydratingSupabase, setIsHydratingSupabase] = useState(false);
+  const [topicFallbackRows, setTopicFallbackRows] = useState<SupabaseTopicRow[]>([]);
   const [suggestions, setSuggestions] = useState<LessonSuggestion[]>([]);
   const [selectedSuggestions, setSelectedSuggestions] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'lessons' | 'quizzes' | 'exercises'>('lessons');
@@ -182,10 +200,11 @@ export const ClassroomView: React.FC = () => {
     [isAdmin, storedLessons, studentLessonSelection],
   );
   const hasLessons = lessons.length > 0;
+  const hasTopicFallback = !hasLessons && topicFallbackRows.length > 0;
   const hasSupplementalContent = quizzes.length > 0 || exercises.length > 0;
-  const showStats = module?.progress > 0 || hasLessons;
-  const showTabs = hasLessons || hasSupplementalContent || isLoadingExtra;
-  const showSetupState = !hasLessons && suggestions.length === 0;
+  const showStats = module?.progress > 0 || hasLessons || hasTopicFallback;
+  const showTabs = hasLessons || hasTopicFallback || hasSupplementalContent || isLoadingExtra;
+  const showSetupState = !hasLessons && !hasTopicFallback && !isHydratingSupabase && suggestions.length === 0;
   const showValidationWarningBanner = !isAdmin && lessons.length > 0 && !studentLessonSelection.hasPreferred;
   const cloudHydrationKeyRef = useRef<string | null>(null);
   const classroomScopeKey = `${id || ''}:${module?.name || ''}:${module?.category || ''}:${currentGrade}:${currentCountry}:${selectedBacTrack}`;
@@ -228,7 +247,7 @@ export const ClassroomView: React.FC = () => {
     const subjectCandidates = getSubjectCandidates(module.name, module.category);
     const { gradeId, subjectId } = await resolveCurriculumIds(currentGrade, module.name, module.category);
     const fetchAttempt = async (includeValidation: boolean) => {
-      const selectColumns = getLessonSelectColumns({ includeValidation });
+      const selectColumns = getLessonSelectColumns({ includeValidation, includeTags: true });
 
       if (gradeId && subjectId) {
         const { data: topicRows, error: topicsError } = await supabase
@@ -304,6 +323,69 @@ export const ClassroomView: React.FC = () => {
     }
   };
 
+  const fetchSupabaseTopics = async () => {
+    if (!module) return [] as SupabaseTopicRow[];
+
+    const { gradeId, subjectId } = await resolveCurriculumIds(currentGrade, module.name, module.category);
+    if (!gradeId || !subjectId) return [] as SupabaseTopicRow[];
+
+    const { data, error } = await supabase
+      .from('topics')
+      .select('id, title')
+      .eq('grade_id', gradeId)
+      .eq('subject_id', subjectId)
+      .order('title', { ascending: true });
+
+    if (error) throw error;
+
+    const topics = (data || [])
+      .map((topic) => ({
+        id: String(topic.id),
+        title: String(topic.title || '').trim(),
+        outlines: [] as SupabaseTopicOutlineRow[],
+      }))
+      .filter((topic) => topic.id && topic.title);
+
+    if (topics.length === 0) return topics;
+
+    const outlinesByTopicId = new Map<string, SupabaseTopicOutlineRow[]>();
+    const topicIds = topics.map((topic) => topic.id);
+
+    for (let start = 0; start < topicIds.length; start += 100) {
+      const batch = topicIds.slice(start, start + 100);
+      const { data: outlineRows, error: outlinesError } = await supabase
+        .from('topic_outlines')
+        .select('id, topic_id, title, description, outline_order')
+        .in('topic_id', batch)
+        .order('outline_order', { ascending: true });
+
+      if (outlinesError) {
+        console.warn('[ClassroomView] topic_outlines unavailable for topic fallback:', outlinesError);
+        continue;
+      }
+
+      for (const outline of outlineRows || []) {
+        const topicId = String(outline.topic_id || '');
+        if (!topicId) continue;
+
+        const list = outlinesByTopicId.get(topicId) || [];
+        list.push({
+          id: String(outline.id),
+          topic_id: topicId,
+          title: String(outline.title || '').trim(),
+          description: String(outline.description || '').trim(),
+          outline_order: Number(outline.outline_order || list.length + 1),
+        });
+        outlinesByTopicId.set(topicId, list);
+      }
+    }
+
+    return topics.map((topic) => ({
+      ...topic,
+      outlines: (outlinesByTopicId.get(topic.id) || []).sort((left, right) => left.outline_order - right.outline_order),
+    }));
+  };
+
   const hydrateLessonCache = async (cloudLessons: SupabaseLessonRow[]) => {
     if (!module) return;
 
@@ -318,6 +400,8 @@ export const ClassroomView: React.FC = () => {
         Boolean(lesson.content?.trim()) ||
         (Array.isArray(lesson.blocks) && lesson.blocks.length > 0);
       const normalizedStatus = String(lesson.status || '').toLowerCase();
+      const tags = Array.isArray(lesson.tags) ? lesson.tags : existing?.tags || [];
+      const isStarterNeedsReview = tags.includes('starter') || tags.includes('needs_review');
 
       const inferredValidationStatus =
         lesson.validation_status ??
@@ -354,10 +438,12 @@ export const ClassroomView: React.FC = () => {
         reviewed_by: lesson.reviewed_by ?? existing?.reviewed_by,
         reviewed_at: lesson.reviewed_at ?? existing?.reviewed_at,
         is_ai_generated: Boolean(lesson.is_ai_generated ?? existing?.is_ai_generated),
-        status: (hasStoredContent || normalizedStatus === 'published' || normalizedStatus === 'done' || normalizedStatus === 'draft')
+        status: isStarterNeedsReview
+          ? 'pending' as const
+          : (hasStoredContent || normalizedStatus === 'published' || normalizedStatus === 'done' || normalizedStatus === 'draft')
           ? 'done' as const
           : (existing?.status || 'pending') as 'suggested' | 'pending' | 'active' | 'done',
-        tags: existing?.tags || [],
+        tags,
         createdAt: existing?.createdAt || Date.now(),
       };
     });
@@ -375,13 +461,23 @@ export const ClassroomView: React.FC = () => {
     cloudHydrationKeyRef.current = classroomScopeKey;
 
     (async () => {
+      setIsHydratingSupabase(true);
       try {
-        const cloudLessons = await fetchSupabaseLessons();
-        if (cloudLessons.length === 0) return;
+        const [cloudLessons, topics] = await Promise.all([
+          fetchSupabaseLessons(),
+          fetchSupabaseTopics(),
+        ]);
+        if (cloudLessons.length === 0) {
+          setTopicFallbackRows(topics);
+          return;
+        }
+        setTopicFallbackRows([]);
         await hydrateLessonCache(cloudLessons);
       } catch (err) {
         cloudHydrationKeyRef.current = null;
         console.warn('[ClassroomView] Supabase classroom hydration failed:', err);
+      } finally {
+        setIsHydratingSupabase(false);
       }
     })();
   }, [allLessons, classroomScopeKey, currentCountry, currentGrade, id, module, selectedBacTrack]);
@@ -518,6 +614,16 @@ export const ClassroomView: React.FC = () => {
 
     const combined = parts.join('\n\n');
     return combined.length > maxChars ? combined.substring(0, maxChars) + '...' : combined;
+  };
+
+  const getAdminApiHeaders = async () => {
+    const { data } = await supabase.auth.getSession();
+    const accessToken = data?.session?.access_token;
+
+    return {
+      'Content-Type': 'application/json',
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    };
   };
 
   const handleGenerateLesson = async (title?: string, autoNavigate = false) => {
@@ -672,40 +778,13 @@ export const ClassroomView: React.FC = () => {
       const dbLessons = await fetchSupabaseLessons();
 
       if (!dbLessons || dbLessons.length === 0) {
-        // Fallback: load lesson titles from curriculum topics outline
-        const { gradeId, subjectId } = await resolveCurriculumIds(currentGrade, module.name, module.category);
+        const topics = await fetchSupabaseTopics();
 
-        if (gradeId && subjectId) {
-          const { data: topics } = await supabase
-            .from('topics').select('id, title')
-            .eq('grade_id', gradeId).eq('subject_id', subjectId);
-
-          if (topics && topics.length > 0) {
-            const toAdd = topics
-              .filter((topic) => !existingTitles.has(normalizeLessonTitle(topic.title)))
-              .map((topic) => ({
-                id: crypto.randomUUID(),
-                moduleId: module.id,
-                title: topic.title,
-                content: '',
-                topic_id: topic.id,
-                grade: currentGrade,
-                country: currentCountry || undefined,
-                subject: module.name,
-                validation_status: 'source_matched',
-                source_confidence: 0.65,
-                source_name: 'Curriculum Outline',
-                status: 'pending' as const,
-                createdAt: Date.now(),
-              }));
-
-            if (toAdd.length > 0) {
-              await db.lessons.bulkAdd(toAdd);
-            }
-            toast.success(`Loaded ${topics.length} lesson titles from curriculum outline.`);
-            setIsSeeding(false);
-            return;
-          }
+        if (topics.length > 0) {
+          setTopicFallbackRows(topics.filter((topic) => !existingTitles.has(normalizeLessonTitle(topic.title))));
+          toast.info(`Topics found, but lessons are not generated yet. ${topics.length} topics available.`);
+          setIsSeeding(false);
+          return;
         }
 
         toast.info("No existing lessons found in Supabase for this curriculum.");
@@ -714,6 +793,7 @@ export const ClassroomView: React.FC = () => {
       }
 
       await hydrateLessonCache(dbLessons);
+      setTopicFallbackRows([]);
       cloudHydrationKeyRef.current = classroomScopeKey;
 
       // Enforce strict RAG mode for this module by default as requested
@@ -725,6 +805,37 @@ export const ClassroomView: React.FC = () => {
       toast.error('Failed to seed from Supabase: ' + err.message);
     } finally {
       setIsSeeding(false);
+    }
+  };
+
+  const handleGenerateStarterLessons = async () => {
+    if (!module || topicFallbackRows.length === 0) return;
+
+    setIsGeneratingStarterLessons(true);
+    try {
+      const res = await fetch('/api/admin/lessons/seed-starter', {
+        method: 'POST',
+        headers: await getAdminApiHeaders(),
+        body: JSON.stringify({ topic_ids: topicFallbackRows.map((topic) => topic.id) }),
+      });
+
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload.error || `Request failed with status ${res.status}`);
+
+      const inserted = Number(payload.summary?.insertedLessons ?? 0);
+      const skipped = Number(payload.summary?.skippedLessons ?? 0);
+      toast.success(`Generated ${inserted} starter lessons. Skipped ${skipped} existing topics.`);
+
+      const cloudLessons = await fetchSupabaseLessons();
+      await hydrateLessonCache(cloudLessons);
+      setTopicFallbackRows([]);
+      cloudHydrationKeyRef.current = classroomScopeKey;
+      await db.modules.update(module.id, { strictRAG: false });
+    } catch (err: any) {
+      console.error(err);
+      toast.error(`Failed to generate starter lessons: ${err.message}`);
+    } finally {
+      setIsGeneratingStarterLessons(false);
     }
   };
 
@@ -862,6 +973,39 @@ export const ClassroomView: React.FC = () => {
         )}
 
         {/* Stats Grid */}
+        {isHydratingSupabase && !hasLessons && !hasTopicFallback && (
+          <div className="bg-surface-low/50 border border-ink/5 rounded-3xl p-6 flex items-center gap-3 text-sm text-muted">
+            <Loader2 className="h-4 w-4 animate-spin text-accent" />
+            Checking Supabase for existing lessons, topics, and outlines...
+          </div>
+        )}
+
+        {hasTopicFallback && (
+          <div className="rounded-3xl border border-blue-200 bg-blue-50 px-5 py-4 text-blue-950">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-start gap-3">
+                <BookOpen className="mt-0.5 h-5 w-5 shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold">Topics found, but lessons are not generated yet.</p>
+                  <p className="mt-1 text-sm text-blue-800">
+                    {topicFallbackRows.length} curriculum topics are available from Supabase. Outlines are shown below when available; starter lessons stay out of RAG until reviewed.
+                  </p>
+                </div>
+              </div>
+              {isAdmin && (
+                <button
+                  onClick={handleGenerateStarterLessons}
+                  disabled={isGeneratingStarterLessons}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-white transition-colors hover:bg-blue-800 disabled:opacity-60"
+                >
+                  {isGeneratingStarterLessons ? <Loader2 size={14} className="animate-spin" /> : <Database size={14} />}
+                  {isGeneratingStarterLessons ? 'Generating...' : 'Generate starter lessons'}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         {showStats && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-paper border border-ink/5 rounded-2xl p-6 space-y-2">
@@ -877,8 +1021,8 @@ export const ClassroomView: React.FC = () => {
             <div className="bg-paper border border-ink/5 rounded-2xl p-6 space-y-2">
               <p className="text-[10px] font-bold text-muted uppercase tracking-widest">Lessons</p>
               <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-bold text-ink">{lessons.length}</span>
-                <span className="text-xs text-muted">Units Curated</span>
+                <span className="text-3xl font-bold text-ink">{hasLessons ? lessons.length : topicFallbackRows.length}</span>
+                <span className="text-xs text-muted">{hasLessons ? 'Units Curated' : 'Topics need starter lessons'}</span>
               </div>
             </div>
           </div>
@@ -968,7 +1112,7 @@ export const ClassroomView: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-bold text-ink flex items-center gap-2">
                     <BookOpen size={20} className="text-accent" />
-                    Curriculum Units
+                    {hasTopicFallback ? 'Curriculum Topics' : 'Curriculum Units'}
                   </h3>
                   {lessons.length > 0 && suggestions.length === 0 && (
                     <button
@@ -1036,6 +1180,53 @@ export const ClassroomView: React.FC = () => {
                           </div>
                         </div>
                         <ChevronRight size={20} className="text-muted/30 group-hover:text-accent group-hover:translate-x-1 transition-all" />
+                      </motion.div>
+                    ))
+                  ) : hasTopicFallback ? (
+                    topicFallbackRows.map((topic, i) => (
+                      <motion.div
+                        key={topic.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.03 }}
+                        className="bg-paper border border-dashed border-ink/10 p-5 rounded-2xl"
+                      >
+                        <div className="flex items-start gap-4">
+                          <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center">
+                            <Clock size={22} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <h4 className="text-base font-bold text-ink">{topic.title}</h4>
+                            <div className="mt-2 flex flex-wrap items-center gap-2">
+                              <span className="pill pill--warn">needs lesson generation</span>
+                              <span className="pill pill--neutral">topic from Supabase</span>
+                              <span className="pill pill--neutral">RAG disabled until reviewed</span>
+                            </div>
+                            {topic.outlines.length > 0 ? (
+                              <div className="mt-4 rounded-2xl border border-ink/5 bg-surface-low/60 p-3">
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-muted">Available outline</p>
+                                <div className="mt-2 space-y-2">
+                                  {topic.outlines.slice(0, 3).map((outline) => (
+                                    <div key={outline.id} className="rounded-xl bg-paper/70 px-3 py-2">
+                                      <p className="text-sm font-semibold text-ink">{outline.title || 'Untitled outline item'}</p>
+                                      {outline.description && (
+                                        <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted">{outline.description}</p>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                                {topic.outlines.length > 3 && (
+                                  <p className="mt-2 text-xs font-medium text-muted">+{topic.outlines.length - 3} more outline items</p>
+                                )}
+                              </div>
+                            ) : (
+                              <p className="mt-3 text-xs text-muted">No outline rows available yet for this topic.</p>
+                            )}
+                            <div className="flex items-center gap-3 mt-2">
+                              <span className="text-[10px] font-mono uppercase tracking-widest text-muted/60">Topic {i + 1}</span>
+                            </div>
+                          </div>
+                        </div>
                       </motion.div>
                     ))
                   ) : null}

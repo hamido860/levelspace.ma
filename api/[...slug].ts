@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import axios from "axios";
 import { backfillTopicsFromLessons } from "../lib/topicSync";
+import { seedStarterLessonsFromTopics } from "../src/server/curriculum/starterLessons";
 import {
   AiCommandCenterHttpError,
   type AiRecoveryRecoveredLessonStatus,
@@ -875,6 +876,33 @@ async function handleTopicsRepair(req: VercelRequest, res: VercelResponse) {
   }
 }
 
+async function handleSeedStarterLessons(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  try {
+    await requireAdminUser(req);
+    const body = getBody(req);
+    const topicIds = Array.isArray(body.topic_ids)
+      ? body.topic_ids.filter((id: unknown): id is string => typeof id === "string" && id.trim().length > 0)
+      : [];
+
+    if (topicIds.length === 0) {
+      return res.status(400).json({ error: "topic_ids is required." });
+    }
+
+    const summary = await seedStarterLessonsFromTopics(getServerSupabase(), {
+      topicIds,
+      commit: true,
+    });
+
+    return res.status(200).json({ summary });
+  } catch (error) {
+    return sendError(res, error, "Unable to generate starter lessons.");
+  }
+}
+
 async function handleAiRecovery(req: VercelRequest, res: VercelResponse, segments: string[]) {
   const supabase = getServerSupabase();
 
@@ -1047,6 +1075,7 @@ const rootRoutes: Record<string, RouteHandler> = {
   "admin/curriculum-review-detail": handleCurriculumReviewDetail,
   "admin/curriculum-review-action": handleCurriculumReviewAction,
   "admin/topics/repair": handleTopicsRepair,
+  "admin/lessons/seed-starter": handleSeedStarterLessons,
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
