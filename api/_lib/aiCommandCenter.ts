@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import type { User } from "@supabase/supabase-js";
+import type { AuthUser as User } from "@supabase/supabase-js";
 import type { VercelRequest } from "@vercel/node";
 import postgres from "postgres";
 
@@ -429,7 +429,8 @@ async function getAuthenticatedUser(req: VercelRequest): Promise<User> {
   }
 
   const authSupabase = getPublicSupabaseForAuth();
-  const { data, error } = await authSupabase.auth.getUser(token);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (authSupabase.auth as any).getUser(token) as { data: { user: User | null }; error: unknown };
 
   if (error || !data.user) {
     throw new AiCommandCenterHttpError(401, "Invalid or expired authentication token.");
@@ -2940,7 +2941,7 @@ export async function generateAiRecoveryRepairSql(
   const generation = await generateSqlWithConfiguredProvider(prompt);
   const generatedAt = nowIso();
 
-  const nextMetadata = {
+  const nextMetadata: JsonRecord = {
     ...detail.task.metadata,
     generated_sql: generation.sql,
     generated_sql_at: generatedAt,
