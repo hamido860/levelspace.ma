@@ -140,6 +140,7 @@ const createDummyClient = () => {
     from: noop,
     rpc: (fn: string, params?: any) => proxyRequest(null as any, 'rpc', params, { fn }),
     channel: () => ({ on: () => ({ subscribe: () => ({ unsubscribe: () => {} }) }) }),
+    removeChannel: () => {},
     auth: {
       signInWithPassword: () => Promise.resolve({ data: null, error: null }),
       signUp: () => Promise.resolve({ data: null, error: null }),
