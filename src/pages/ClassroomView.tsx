@@ -14,7 +14,7 @@ import { getExercisesByLesson } from '../services/exerciseService';
 import { filterStudentVisibleLessons } from '../services/lessonRecovery';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
-import { getGradeCandidates, getSubjectCandidates, pickBestCurriculumMatch } from '../services/curriculumMatching';
+import { getGradeCandidates, getSubjectCandidates, normalizeCurriculumValue, pickBestCurriculumMatch } from '../services/curriculumMatching';
 import {
   getLessonSelectColumns,
   inferLegacyLessonSourceConfidence,
@@ -101,10 +101,15 @@ const resolveCurriculumIds = async (grade: string, subject: string, category?: s
 
   const matchedGrade = pickBestCurriculumMatch<{ id: string; name?: string | null }>(grades as any, gradeCandidates);
   const matchedSubject = pickBestCurriculumMatch<{ id: string; name?: string | null }>(subjects as any, subjectCandidates);
+  const normalizedSubjectCandidates = new Set(subjectCandidates.map(normalizeCurriculumValue));
+  const subjectIds = ((subjects || []) as Array<{ id: string; name?: string | null }>)
+    .filter((row) => normalizedSubjectCandidates.has(normalizeCurriculumValue(String(row.name || ''))))
+    .map((row) => row.id);
 
   return {
     gradeId: matchedGrade?.id ?? null,
     subjectId: matchedSubject?.id ?? null,
+    subjectIds: Array.from(new Set([matchedSubject?.id, ...subjectIds].filter(Boolean) as string[])),
   };
 };
 
@@ -245,16 +250,16 @@ export const ClassroomView: React.FC = () => {
     if (!module) return [] as SupabaseLessonRow[];
 
     const subjectCandidates = getSubjectCandidates(module.name, module.category);
-    const { gradeId, subjectId } = await resolveCurriculumIds(currentGrade, module.name, module.category);
+    const { gradeId, subjectId, subjectIds } = await resolveCurriculumIds(currentGrade, module.name, module.category);
     const fetchAttempt = async (includeValidation: boolean) => {
       const selectColumns = getLessonSelectColumns({ includeValidation, includeTags: true });
 
-      if (gradeId && subjectId) {
+      if (gradeId && (subjectIds.length > 0 || subjectId)) {
         const { data: topicRows, error: topicsError } = await supabase
           .from('topics')
           .select('id, title')
           .eq('grade_id', gradeId)
-          .eq('subject_id', subjectId);
+          .in('subject_id', subjectIds.length > 0 ? subjectIds : [subjectId]);
 
         if (topicsError) throw topicsError;
 
@@ -326,14 +331,14 @@ export const ClassroomView: React.FC = () => {
   const fetchSupabaseTopics = async () => {
     if (!module) return [] as SupabaseTopicRow[];
 
-    const { gradeId, subjectId } = await resolveCurriculumIds(currentGrade, module.name, module.category);
-    if (!gradeId || !subjectId) return [] as SupabaseTopicRow[];
+    const { gradeId, subjectId, subjectIds } = await resolveCurriculumIds(currentGrade, module.name, module.category);
+    if (!gradeId || (!subjectId && subjectIds.length === 0)) return [] as SupabaseTopicRow[];
 
     const { data, error } = await supabase
       .from('topics')
       .select('id, title')
       .eq('grade_id', gradeId)
-      .eq('subject_id', subjectId)
+      .in('subject_id', subjectIds.length > 0 ? subjectIds : [subjectId])
       .order('title', { ascending: true });
 
     if (error) throw error;
@@ -522,14 +527,14 @@ export const ClassroomView: React.FC = () => {
       // Fetch existing topics from Supabase if they exist
       let existingTopics: string[] = [];
       try {
-        const { gradeId, subjectId } = await resolveCurriculumIds(currentGrade, module.name, module.category);
+        const { gradeId, subjectId, subjectIds } = await resolveCurriculumIds(currentGrade, module.name, module.category);
 
-        if (gradeId && subjectId) {
+        if (gradeId && (subjectIds.length > 0 || subjectId)) {
           const { data: topics } = await supabase
             .from('topics')
             .select('title')
             .eq('grade_id', gradeId)
-            .eq('subject_id', subjectId);
+            .in('subject_id', subjectIds.length > 0 ? subjectIds : [subjectId]);
           if (topics) {
             existingTopics = topics.map(t => t.title);
           }

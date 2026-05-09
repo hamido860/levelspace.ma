@@ -39,7 +39,7 @@ const SUBJECT_EQUIVALENTS: Record<string, string[]> = {
   accounting: ["Comptabilité", "Finance", "Business"],
   comptabilite: ["Comptabilité", "Accounting", "Finance", "Business"],
   french: ["Langue Française", "Français", "French Language"],
-  francais: ["Langue Française", "French", "French Language"],
+  francais: ["Langue Française", "Français", "French", "French Language"],
   arabic: ["Langue Arabe", "Arabe", "Arabic Language"],
   arabe: ["Langue Arabe", "Arabic", "Arabic Language"],
   english: ["Anglais", "English Language"],
@@ -79,6 +79,10 @@ export const isGenericCurriculumCategory = (value: string | null | undefined) =>
 export const getSubjectCandidates = (name: string, category?: string | null) => {
   const normalizedName = normalizeCurriculumValue(name);
   const normalizedCategory = normalizeCurriculumValue(String(category || ""));
+  const inferredCandidates =
+    normalizedName.includes("fran") || normalizedCategory.includes("fran")
+      ? SUBJECT_EQUIVALENTS.francais || []
+      : [];
   const categoryCandidates = isGenericCurriculumCategory(category)
     ? []
     : [String(category || ""), ...((SUBJECT_EQUIVALENTS[normalizedCategory] || []) as string[])];
@@ -86,6 +90,7 @@ export const getSubjectCandidates = (name: string, category?: string | null) => 
   return uniqueValues([
     name,
     ...((SUBJECT_EQUIVALENTS[normalizedName] || []) as string[]),
+    ...inferredCandidates,
     ...categoryCandidates,
   ]);
 };
