@@ -118,7 +118,7 @@ const TABLE_BY_CONTENT_TYPE: Record<CurriculumContentType, string> = {
 };
 
 const LESSON_SELECT =
-  "id, lesson_title, title, content, blocks, grade, subject, country, topic_id, track_id, validation_status, source_confidence, source_name, source_url, review_notes, reviewed_by, reviewed_at, created_at";
+  "id, lesson_title, title, content, blocks, grade, subject, country, topic_id, validation_status, source_confidence, source_name, source_url, review_notes, reviewed_by, reviewed_at, created_at";
 const TOPIC_SELECT =
   "id, title, grade_id, subject_id, validation_status, source_confidence, source_name, source_url, review_notes, reviewed_by, reviewed_at, created_at";
 const RAG_CHUNK_SELECT =
@@ -220,7 +220,7 @@ async function fetchLessonsByIds(supabase: SupabaseClient, lessonIds: string[]) 
   if (lessonIds.length === 0) return new Map<string, any>();
   const { data, error } = await supabase
     .from("lessons")
-    .select("id, lesson_title, title, grade, subject, country, topic_id, track_id, source_name, source_url, validation_status, source_confidence")
+    .select("id, lesson_title, title, grade, subject, country, topic_id, source_name, source_url, validation_status, source_confidence")
     .in("id", lessonIds);
 
   if (error) throw error;
@@ -413,11 +413,7 @@ async function applySourceMatchIfNeeded(
 
 async function buildLessonContexts(supabase: SupabaseClient, lessonRows: ReviewRow[]) {
   const topicIds = Array.from(new Set(lessonRows.map((row) => asString(row.topic_id)).filter(Boolean))) as string[];
-  const trackIds = Array.from(new Set(lessonRows.map((row) => asString(row.track_id)).filter(Boolean))) as string[];
-  const [topicsById, tracksById] = await Promise.all([
-    fetchTopicsByIds(supabase, topicIds),
-    fetchNamesByIds(supabase, "bac_tracks", trackIds),
-  ]);
+  const topicsById = await fetchTopicsByIds(supabase, topicIds);
 
   return lessonRows.map((row) => {
     const topic = asString(row.topic_id) ? topicsById.get(String(row.topic_id)) : null;
@@ -431,7 +427,7 @@ async function buildLessonContexts(supabase: SupabaseClient, lessonRows: ReviewR
       country: asString(row.country),
       grade: asString(row.grade),
       subject: asString(row.subject),
-      track: asString(row.track_id) ? tracksById.get(String(row.track_id)) || null : null,
+      track: null,
       topicTitle: asString(topic?.title),
       title,
       preview,
@@ -498,17 +494,6 @@ async function buildRagChunkContexts(supabase: SupabaseClient, chunkRows: Review
       ),
     ) as string[],
   );
-  const tracksById = await fetchNamesByIds(
-    supabase,
-    "bac_tracks",
-    Array.from(
-      new Set(
-        Array.from(lessonsById.values())
-          .map((lesson) => asString(lesson.track_id))
-          .filter(Boolean),
-      ),
-    ) as string[],
-  );
 
   return chunkRows.map((row) => {
     const lesson = asString(row.lesson_id) ? lessonsById.get(String(row.lesson_id)) : null;
@@ -526,7 +511,7 @@ async function buildRagChunkContexts(supabase: SupabaseClient, chunkRows: Review
       country: asString(lesson?.country) || "Morocco",
       grade: asString(lesson?.grade) || (asString(row.grade_id) ? gradesById.get(String(row.grade_id)) || null : null),
       subject: asString(lesson?.subject) || asString(metadata.subject),
-      track: asString(lesson?.track_id) ? tracksById.get(String(lesson.track_id)) || null : null,
+      track: null,
       topicTitle: asString(topic?.title) || asString(metadata.topic_title),
       title,
       preview: compactText(row.content) || title,

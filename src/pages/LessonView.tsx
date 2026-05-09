@@ -63,6 +63,13 @@ import { indexLessonContent } from '../services/ragService';
 import { getSubjectCandidates } from '../services/curriculumMatching';
 import { isStudentVisibleLesson, normalizeLessonBlockUiType } from '../services/lessonRecovery';
 import {
+  getLessonSelectColumns,
+  inferLegacyLessonSourceConfidence,
+  inferLegacyLessonSourceName,
+  inferLegacyLessonValidationStatus,
+  isMissingLessonValidationColumnError,
+} from '../services/lessonSupabase';
+import {
   getCurriculumValidationBadgeClass,
   getCurriculumValidationLabel,
   getCurriculumValidationStatus,
@@ -438,36 +445,52 @@ export const LessonView: React.FC = () => {
     let isCancelled = false;
 
     const hydrateSupabaseLesson = async () => {
-      const directMatch = await supabase
-        .from('lessons')
-        .select('id, topic_id, lesson_title, content, blocks, subtitle, tags, status, grade, country, subject, validation_status, source_confidence, source_name, source_url, review_notes, reviewed_by, reviewed_at, is_ai_generated, teaching_contract')
-        .or(`id.eq.${id},topic_id.eq.${id}`)
-        .maybeSingle();
+      const fetchAttempt = async (includeValidation: boolean) => {
+        const selectColumns = getLessonSelectColumns({ includeTags: true, includeValidation });
 
-      if (isCancelled) return;
-      if (directMatch.data) {
-        setSupabaseLesson(directMatch.data as SupabaseLessonRecord);
-        return;
-      }
+        const directMatch = await supabase
+          .from('lessons')
+          .select(selectColumns)
+          .or(`id.eq.${id},topic_id.eq.${id}`)
+          .maybeSingle();
 
-      if (!lesson?.title) return;
+        if (isCancelled) return;
+        if (directMatch.data) {
+          setSupabaseLesson(directMatch.data as SupabaseLessonRecord);
+          return;
+        }
 
-      let titleQuery = supabase
-        .from('lessons')
-        .select('id, topic_id, lesson_title, content, blocks, subtitle, tags, status, grade, country, subject, validation_status, source_confidence, source_name, source_url, review_notes, reviewed_by, reviewed_at, is_ai_generated, teaching_contract')
-        .eq('lesson_title', lesson.title);
+        if (!lesson?.title) return;
 
-      const subjectCandidates = module ? getSubjectCandidates(module.name, module.category) : [];
-      if (subjectCandidates.length > 0) {
-        titleQuery = titleQuery.in('subject', subjectCandidates);
-      }
+        let titleQuery = supabase
+          .from('lessons')
+          .select(selectColumns)
+          .eq('lesson_title', lesson.title);
 
-      const { data: titleMatches } = await titleQuery.limit(5);
-      if (isCancelled) return;
+        const subjectCandidates = module ? getSubjectCandidates(module.name, module.category) : [];
+        if (subjectCandidates.length > 0) {
+          titleQuery = titleQuery.in('subject', subjectCandidates);
+        }
 
-      const fallbackMatch = (titleMatches || [])[0] as SupabaseLessonRecord | undefined;
-      if (fallbackMatch) {
-        setSupabaseLesson(fallbackMatch);
+        const { data: titleMatches } = await titleQuery.limit(5);
+        if (isCancelled) return;
+
+        const fallbackMatch = (titleMatches || [])[0] as SupabaseLessonRecord | undefined;
+        if (fallbackMatch) {
+          setSupabaseLesson(fallbackMatch);
+        }
+      };
+
+      try {
+        await fetchAttempt(true);
+      } catch (error) {
+        if (isMissingLessonValidationColumnError(error)) {
+          console.warn('[LessonView] Lesson validation columns are missing in Supabase; retrying with legacy lesson schema.');
+          await fetchAttempt(false);
+          return;
+        }
+
+        throw error;
       }
     };
 
@@ -483,14 +506,29 @@ export const LessonView: React.FC = () => {
   useEffect(() => {
     if (!lesson || !supabaseLesson) return;
 
+    const inferredValidationStatus =
+      lesson.validation_status ||
+      supabaseLesson.validation_status ||
+      inferLegacyLessonValidationStatus(supabaseLesson);
+    const inferredSourceConfidence =
+      lesson.source_confidence ??
+      supabaseLesson.source_confidence ??
+      inferLegacyLessonSourceConfidence(supabaseLesson) ??
+      undefined;
+    const inferredSourceName =
+      lesson.source_name ||
+      supabaseLesson.source_name ||
+      inferLegacyLessonSourceName(supabaseLesson);
+
     const nextPatch = {
       grade: lesson.grade || supabaseLesson.grade || undefined,
       country: lesson.country || supabaseLesson.country || undefined,
       subject: lesson.subject || supabaseLesson.subject || module?.name || undefined,
+      topic_id: lesson.topic_id || supabaseLesson.topic_id || undefined,
       sourceLessonId: lesson.sourceLessonId || supabaseLesson.id || undefined,
-      validation_status: lesson.validation_status || supabaseLesson.validation_status || undefined,
-      source_confidence: lesson.source_confidence ?? supabaseLesson.source_confidence ?? undefined,
-      source_name: lesson.source_name || supabaseLesson.source_name || undefined,
+      validation_status: inferredValidationStatus,
+      source_confidence: inferredSourceConfidence,
+      source_name: inferredSourceName,
       source_url: lesson.source_url || supabaseLesson.source_url || undefined,
       review_notes: lesson.review_notes || supabaseLesson.review_notes || undefined,
       reviewed_by: lesson.reviewed_by || supabaseLesson.reviewed_by || undefined,
@@ -503,6 +541,7 @@ export const LessonView: React.FC = () => {
       nextPatch.grade !== lesson.grade ||
       nextPatch.country !== lesson.country ||
       nextPatch.subject !== lesson.subject ||
+      nextPatch.topic_id !== lesson.topic_id ||
       nextPatch.sourceLessonId !== lesson.sourceLessonId ||
       nextPatch.validation_status !== lesson.validation_status ||
       nextPatch.source_confidence !== lesson.source_confidence ||
@@ -525,10 +564,20 @@ export const LessonView: React.FC = () => {
         grade: lesson.grade || supabaseLesson?.grade || undefined,
         country: lesson.country || supabaseLesson?.country || undefined,
         subject: lesson.subject || supabaseLesson?.subject || module?.name || undefined,
+        topic_id: lesson.topic_id || supabaseLesson?.topic_id || undefined,
         sourceLessonId: lesson.sourceLessonId || supabaseLesson?.id || undefined,
-        validation_status: lesson.validation_status || supabaseLesson?.validation_status || undefined,
-        source_confidence: lesson.source_confidence ?? supabaseLesson?.source_confidence ?? undefined,
-        source_name: lesson.source_name || supabaseLesson?.source_name || undefined,
+        validation_status:
+          lesson.validation_status ||
+          supabaseLesson?.validation_status ||
+          (supabaseLesson ? inferLegacyLessonValidationStatus(supabaseLesson) : undefined),
+        source_confidence:
+          lesson.source_confidence ??
+          supabaseLesson?.source_confidence ??
+          (supabaseLesson ? inferLegacyLessonSourceConfidence(supabaseLesson) : undefined),
+        source_name:
+          lesson.source_name ||
+          supabaseLesson?.source_name ||
+          (supabaseLesson ? inferLegacyLessonSourceName(supabaseLesson) : undefined),
         source_url: lesson.source_url || supabaseLesson?.source_url || undefined,
         review_notes: lesson.review_notes || supabaseLesson?.review_notes || undefined,
         reviewed_by: lesson.reviewed_by || supabaseLesson?.reviewed_by || undefined,
@@ -546,13 +595,14 @@ export const LessonView: React.FC = () => {
         blocks: supabaseLesson.blocks || [],
         subtitle: supabaseLesson.subtitle,
         tags: supabaseLesson.tags || [],
+        topic_id: supabaseLesson.topic_id || undefined,
         grade: supabaseLesson.grade || undefined,
         country: supabaseLesson.country || undefined,
         subject: supabaseLesson.subject || undefined,
         sourceLessonId: supabaseLesson.id || undefined,
-        validation_status: supabaseLesson.validation_status || undefined,
-        source_confidence: supabaseLesson.source_confidence ?? undefined,
-        source_name: supabaseLesson.source_name || undefined,
+        validation_status: inferLegacyLessonValidationStatus(supabaseLesson),
+        source_confidence: supabaseLesson.source_confidence ?? inferLegacyLessonSourceConfidence(supabaseLesson) ?? undefined,
+        source_name: supabaseLesson.source_name || inferLegacyLessonSourceName(supabaseLesson) || undefined,
         source_url: supabaseLesson.source_url || undefined,
         review_notes: supabaseLesson.review_notes || undefined,
         reviewed_by: supabaseLesson.reviewed_by || undefined,

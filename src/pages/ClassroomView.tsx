@@ -16,6 +16,13 @@ import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { getGradeCandidates, getSubjectCandidates, pickBestCurriculumMatch } from '../services/curriculumMatching';
 import {
+  getLessonSelectColumns,
+  inferLegacyLessonSourceConfidence,
+  inferLegacyLessonSourceName,
+  inferLegacyLessonValidationStatus,
+  isMissingLessonValidationColumnError,
+} from '../services/lessonSupabase';
+import {
   compareCurriculumValidationForStudents,
   getCurriculumValidationBadgeClass,
   getCurriculumValidationLabel,
@@ -28,7 +35,6 @@ const normalizeLessonTitle = (title: string | null | undefined) =>
 type SupabaseLessonRow = {
   id?: string;
   topic_id?: string | null;
-  track_id?: string | null;
   lesson_title: string;
   content?: string | null;
   blocks?: any[] | null;
@@ -87,27 +93,6 @@ const resolveCurriculumIds = async (grade: string, subject: string, category?: s
   };
 };
 
-const resolveTrackId = async (trackValue: string | null | undefined) => {
-  const raw = String(trackValue || '').trim();
-  if (!raw) return null;
-
-  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw);
-  if (isUuid) return raw;
-
-  const { data, error } = await supabase
-    .from('bac_tracks')
-    .select('id')
-    .eq('name', raw)
-    .maybeSingle();
-
-  if (error) {
-    console.warn('[ClassroomView] Failed to resolve selected bac track:', error);
-    return null;
-  }
-
-  return data?.id ?? null;
-};
-
 type ClassroomSupabaseLesson = {
   id?: string;
   lesson_title?: string;
@@ -149,7 +134,6 @@ export const ClassroomView: React.FC = () => {
   const currentGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
   const currentCountry = settingsMap['selected_country'] || localStorage.getItem('selected_country') || '';
   const selectedBacTrack = settingsMap['selected_bac_track'] || localStorage.getItem('selected_bac_track') || '';
-  const [currentTrackId, setCurrentTrackId] = useState<string | null>(null);
   const gradeCandidates = useMemo(() => getGradeCandidates(currentGrade), [currentGrade]);
   const normalizedGradeCandidates = useMemo(
     () => new Set(gradeCandidates.map((grade) => String(grade || '').trim().toLocaleLowerCase())),
@@ -171,13 +155,9 @@ export const ClassroomView: React.FC = () => {
           return false;
         }
 
-        if (currentTrackId && lesson.track_id && lesson.track_id !== currentTrackId) {
-          return false;
-        }
-
         return true;
       }),
-    [allLessons, currentTrackId, normalizedCurrentCountry, normalizedGradeCandidates],
+    [allLessons, normalizedCurrentCountry, normalizedGradeCandidates],
   );
   const studentVisibleLessons = useMemo(
     () => filterStudentVisibleLessons(filteredScopeLessons),
@@ -208,22 +188,7 @@ export const ClassroomView: React.FC = () => {
   const showSetupState = !hasLessons && suggestions.length === 0;
   const showValidationWarningBanner = !isAdmin && lessons.length > 0 && !studentLessonSelection.hasPreferred;
   const cloudHydrationKeyRef = useRef<string | null>(null);
-  const classroomScopeKey = `${id || ''}:${module?.name || ''}:${module?.category || ''}:${currentGrade}:${currentCountry}:${selectedBacTrack}:${currentTrackId || ''}`;
-
-  useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      const resolved = await resolveTrackId(selectedBacTrack);
-      if (!cancelled) {
-        setCurrentTrackId(resolved);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedBacTrack]);
+  const classroomScopeKey = `${id || ''}:${module?.name || ''}:${module?.category || ''}:${currentGrade}:${currentCountry}:${selectedBacTrack}`;
 
   useEffect(() => {
     if (!id) return;
@@ -262,81 +227,81 @@ export const ClassroomView: React.FC = () => {
 
     const subjectCandidates = getSubjectCandidates(module.name, module.category);
     const { gradeId, subjectId } = await resolveCurriculumIds(currentGrade, module.name, module.category);
-    const trackId = currentTrackId ?? await resolveTrackId(selectedBacTrack);
-    const selectColumns = 'id, topic_id, track_id, lesson_title, content, blocks, subtitle, status, grade, country, subject, validation_status, source_confidence, source_name, source_url, review_notes, reviewed_by, reviewed_at, is_ai_generated, teaching_contract';
+    const fetchAttempt = async (includeValidation: boolean) => {
+      const selectColumns = getLessonSelectColumns({ includeValidation });
 
-    if (gradeId && subjectId) {
-      const { data: topicRows, error: topicsError } = await supabase
-        .from('topics')
-        .select('id, title')
-        .eq('grade_id', gradeId)
-        .eq('subject_id', subjectId);
+      if (gradeId && subjectId) {
+        const { data: topicRows, error: topicsError } = await supabase
+          .from('topics')
+          .select('id, title')
+          .eq('grade_id', gradeId)
+          .eq('subject_id', subjectId);
 
-      if (topicsError) throw topicsError;
+        if (topicsError) throw topicsError;
 
-      const topicIds = (topicRows || []).map((topic) => topic.id).filter(Boolean);
-      if (topicIds.length > 0) {
-        let topicLessonQuery = supabase
-          .from('lessons')
-          .select(selectColumns)
-          .in('topic_id', topicIds);
+        const topicIds = (topicRows || []).map((topic) => topic.id).filter(Boolean);
+        if (topicIds.length > 0) {
+          let topicLessonQuery = supabase
+            .from('lessons')
+            .select(selectColumns)
+            .in('topic_id', topicIds);
 
-        if (currentCountry) {
-          topicLessonQuery = topicLessonQuery.eq('country', currentCountry);
-        }
+          if (currentCountry) {
+            topicLessonQuery = topicLessonQuery.eq('country', currentCountry);
+          }
 
-        if (trackId) {
-          topicLessonQuery = topicLessonQuery.or(`track_id.is.null,track_id.eq.${trackId}`);
-        }
+          const { data: topicLessons, error: topicLessonsError } = await topicLessonQuery;
+          if (topicLessonsError) throw topicLessonsError;
 
-        const { data: topicLessons, error: topicLessonsError } = await topicLessonQuery;
-        if (topicLessonsError) throw topicLessonsError;
-
-        if ((topicLessons || []).length > 0) {
-          return (topicLessons || []) as SupabaseLessonRow[];
+          if ((topicLessons || []).length > 0) {
+            return (topicLessons || []) as SupabaseLessonRow[];
+          }
         }
       }
+
+      let exactGradeQuery = supabase
+        .from('lessons')
+        .select(selectColumns)
+        .in('subject', subjectCandidates)
+        .eq('grade', currentGrade);
+
+      if (currentCountry) {
+        exactGradeQuery = exactGradeQuery.eq('country', currentCountry);
+      }
+
+      const { data: exactGradeLessons, error: exactGradeError } = await exactGradeQuery;
+      if (exactGradeError) throw exactGradeError;
+
+      if ((exactGradeLessons || []).length > 0) {
+        return (exactGradeLessons || []) as SupabaseLessonRow[];
+      }
+
+      let fallbackQuery = supabase
+        .from('lessons')
+        .select(selectColumns)
+        .in('subject', subjectCandidates)
+        .in('grade', gradeCandidates);
+
+      if (currentCountry) {
+        fallbackQuery = fallbackQuery.eq('country', currentCountry);
+      }
+
+      const { data, error } = await fallbackQuery;
+      if (error) throw error;
+
+      return (data || []) as SupabaseLessonRow[];
+    };
+
+    try {
+      return await fetchAttempt(true);
+    } catch (error) {
+      if (isMissingLessonValidationColumnError(error)) {
+        console.warn('[ClassroomView] Lesson validation columns are missing in Supabase; retrying with legacy lesson schema.');
+        return fetchAttempt(false);
+      }
+
+      throw error;
     }
-
-    let exactGradeQuery = supabase
-      .from('lessons')
-      .select(selectColumns)
-      .in('subject', subjectCandidates)
-      .eq('grade', currentGrade);
-
-    if (currentCountry) {
-      exactGradeQuery = exactGradeQuery.eq('country', currentCountry);
-    }
-
-    if (trackId) {
-      exactGradeQuery = exactGradeQuery.or(`track_id.is.null,track_id.eq.${trackId}`);
-    }
-
-    const { data: exactGradeLessons, error: exactGradeError } = await exactGradeQuery;
-    if (exactGradeError) throw exactGradeError;
-
-    if ((exactGradeLessons || []).length > 0) {
-      return (exactGradeLessons || []) as SupabaseLessonRow[];
-    }
-
-    let fallbackQuery = supabase
-      .from('lessons')
-      .select(selectColumns)
-      .in('subject', subjectCandidates)
-      .in('grade', gradeCandidates);
-
-    if (currentCountry) {
-      fallbackQuery = fallbackQuery.eq('country', currentCountry);
-    }
-
-    if (trackId) {
-      fallbackQuery = fallbackQuery.or(`track_id.is.null,track_id.eq.${trackId}`);
-    }
-
-    const { data, error } = await fallbackQuery;
-    if (error) throw error;
-
-    return (data || []) as SupabaseLessonRow[];
   };
 
   const hydrateLessonCache = async (cloudLessons: SupabaseLessonRow[]) => {
@@ -354,6 +319,20 @@ export const ClassroomView: React.FC = () => {
         (Array.isArray(lesson.blocks) && lesson.blocks.length > 0);
       const normalizedStatus = String(lesson.status || '').toLowerCase();
 
+      const inferredValidationStatus =
+        lesson.validation_status ??
+        existing?.validation_status ??
+        inferLegacyLessonValidationStatus(lesson);
+      const inferredSourceConfidence =
+        lesson.source_confidence ??
+        existing?.source_confidence ??
+        inferLegacyLessonSourceConfidence(lesson) ??
+        0;
+      const inferredSourceName =
+        lesson.source_name ??
+        existing?.source_name ??
+        inferLegacyLessonSourceName(lesson);
+
       return {
         id: existing?.id || lesson.id || crypto.randomUUID(),
         moduleId: module.id,
@@ -364,12 +343,12 @@ export const ClassroomView: React.FC = () => {
         grade: lesson.grade ?? existing?.grade,
         country: lesson.country ?? existing?.country,
         subject: lesson.subject ?? existing?.subject ?? module.name,
-        track_id: lesson.track_id ?? existing?.track_id,
+        topic_id: lesson.topic_id ?? existing?.topic_id,
         sourceLessonId: lesson.id ?? existing?.sourceLessonId,
         teaching_contract: lesson.teaching_contract ?? existing?.teaching_contract,
-        validation_status: lesson.validation_status ?? existing?.validation_status,
-        source_confidence: Number(lesson.source_confidence ?? existing?.source_confidence ?? 0),
-        source_name: lesson.source_name ?? existing?.source_name,
+        validation_status: inferredValidationStatus,
+        source_confidence: Number(inferredSourceConfidence),
+        source_name: inferredSourceName,
         source_url: lesson.source_url ?? existing?.source_url,
         review_notes: lesson.review_notes ?? existing?.review_notes,
         reviewed_by: lesson.reviewed_by ?? existing?.reviewed_by,
@@ -405,7 +384,7 @@ export const ClassroomView: React.FC = () => {
         console.warn('[ClassroomView] Supabase classroom hydration failed:', err);
       }
     })();
-  }, [allLessons, classroomScopeKey, currentCountry, currentGrade, id, module, selectedBacTrack, currentTrackId]);
+  }, [allLessons, classroomScopeKey, currentCountry, currentGrade, id, module, selectedBacTrack]);
 
   useEffect(() => {
     const fetchExtraData = async () => {
@@ -474,10 +453,6 @@ export const ClassroomView: React.FC = () => {
 
         const lessonCountry = String(lesson.country || '').trim().toLocaleLowerCase();
         if (normalizedCurrentCountry && lessonCountry && lessonCountry !== normalizedCurrentCountry) {
-          return false;
-        }
-
-        if (currentTrackId && lesson.track_id && lesson.track_id !== currentTrackId) {
           return false;
         }
 
@@ -565,7 +540,6 @@ export const ClassroomView: React.FC = () => {
           grade: currentGrade,
           country: currentCountry || undefined,
           subject: module.name,
-          track_id: currentTrackId || undefined,
           validation_status: 'ai_generated',
           source_confidence: 0,
           is_ai_generated: true,
@@ -618,7 +592,6 @@ export const ClassroomView: React.FC = () => {
             grade: currentGrade,
             country: currentCountry || undefined,
             subject: module.name,
-            track_id: currentTrackId || undefined,
             validation_status: 'ai_generated',
             source_confidence: 0,
             is_ai_generated: true,
@@ -665,7 +638,6 @@ export const ClassroomView: React.FC = () => {
             grade: currentGrade,
             country: currentCountry || undefined,
             subject: module.name,
-            track_id: currentTrackId || undefined,
             validation_status: 'ai_generated',
             source_confidence: 0,
             is_ai_generated: true,
@@ -716,10 +688,10 @@ export const ClassroomView: React.FC = () => {
                 moduleId: module.id,
                 title: topic.title,
                 content: '',
+                topic_id: topic.id,
                 grade: currentGrade,
                 country: currentCountry || undefined,
                 subject: module.name,
-                track_id: currentTrackId || undefined,
                 validation_status: 'source_matched',
                 source_confidence: 0.65,
                 source_name: 'Curriculum Outline',

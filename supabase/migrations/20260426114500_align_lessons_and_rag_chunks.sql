@@ -1,6 +1,5 @@
 alter table public.lessons
   add column if not exists topic_id uuid,
-  add column if not exists track_id uuid,
   add column if not exists title text,
   add column if not exists subtitle text,
   add column if not exists blocks jsonb,
@@ -18,33 +17,17 @@ begin
       add constraint lessons_topic_id_fkey
       foreign key (topic_id) references public.topics(id) on delete set null;
   end if;
-
-  if not exists (
-    select 1
-    from pg_constraint
-    where conname = 'lessons_track_id_fkey'
-  ) then
-    alter table public.lessons
-      add constraint lessons_track_id_fkey
-      foreign key (track_id) references public.bac_tracks(id) on delete set null;
-  end if;
 end
 $$;
 
 create index if not exists lessons_topic_id_idx
   on public.lessons (topic_id);
 
-create index if not exists lessons_track_id_idx
-  on public.lessons (track_id);
-
 comment on column public.lessons.title is
   'DEPRECATED compatibility mirror. Prefer lesson_title for canonical Supabase lesson naming.';
 
 comment on column public.lessons.topic_id is
   'Optional normalized topic reference for generated lessons. Preserves legacy grade/subject/title lookups.';
-
-comment on column public.lessons.track_id is
-  'Optional academic track scope for lessons generated for a specific bac track.';
 
 comment on column public.lessons.blocks is
   'Canonical structured lesson blocks used by the current UI. Legacy flat content remains preserved in content.';

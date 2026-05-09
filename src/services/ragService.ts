@@ -1,6 +1,8 @@
 import { supabase } from "../db/supabase";
 import { ai, handleApiError, LessonTemplate } from "./geminiService";
 import { resolveTopicForLesson } from "../../lib/topicSync";
+import { deriveCycleFromGrade } from "./curriculumMatching";
+import { isMissingLessonValidationColumnError, stripLessonValidationFields } from "./lessonSupabase";
 
 export const generateEmbedding = async (text: string): Promise<number[]> => {
   try {
@@ -192,10 +194,12 @@ export const saveLesson = async (
     );
 
     const topicId = topicResolution.status === "skipped" ? null : topicResolution.topicId;
+    const cycle = deriveCycleFromGrade(lesson.grade);
 
     // 1. Insert the lesson and get its ID
-    const { data: insertedLesson, error: lessonError } = await supabase.from("lessons").insert({
+    const lessonInsertPayload = {
       country: lesson.country,
+      cycle,
       grade: lesson.grade,
       subject: lesson.subject,
       topic_id: topicId,
@@ -211,7 +215,25 @@ export const saveLesson = async (
       is_ai_generated: isAiGenerated,
       validation_status: isAiGenerated ? 'ai_generated' : 'unverified',
       source_confidence: 0,
-    }).select('id').single();
+    };
+
+    let insertedLesson: { id: string } | null = null;
+    let lessonError: any = null;
+
+    const firstInsert = await supabase.from("lessons").insert(lessonInsertPayload).select('id').single();
+    insertedLesson = firstInsert.data;
+    lessonError = firstInsert.error;
+
+    if (lessonError && isMissingLessonValidationColumnError(lessonError)) {
+      const legacyInsert = await supabase
+        .from("lessons")
+        .insert(stripLessonValidationFields(lessonInsertPayload))
+        .select('id')
+        .single();
+
+      insertedLesson = legacyInsert.data;
+      lessonError = legacyInsert.error;
+    }
 
     if (lessonError) throw lessonError;
     

@@ -16,6 +16,41 @@ const getCanonicalTopicTitle = (topic: string, lessonTitle?: string | null) => {
   return generatedTitle || null;
 };
 
+const deriveCycleFromGrade = (grade: string) => {
+  const normalizedGrade = normalizeValue(grade).toLowerCase();
+
+  if (
+    normalizedGrade.includes("primaire") ||
+    normalizedGrade.startsWith("primary") ||
+    normalizedGrade.includes("elementary")
+  ) {
+    return "primary";
+  }
+
+  if (
+    normalizedGrade.includes("college") ||
+    normalizedGrade.includes("collège") ||
+    normalizedGrade.startsWith("middle")
+  ) {
+    return "college";
+  }
+
+  if (
+    normalizedGrade.includes("tronc commun") ||
+    normalizedGrade.includes("bac") ||
+    normalizedGrade.includes("seconde") ||
+    normalizedGrade.includes("premiere") ||
+    normalizedGrade.includes("terminale") ||
+    normalizedGrade.startsWith("grade 10") ||
+    normalizedGrade.startsWith("grade 11") ||
+    normalizedGrade.startsWith("grade 12")
+  ) {
+    return "lycee";
+  }
+
+  return "higher";
+};
+
 async function resolveTopicContext(
   supabaseAdmin: any,
   lessonContext: { grade: string; subject: string; topic: string; lessonTitle?: string | null }
@@ -131,11 +166,13 @@ Deno.serve(async (req) => {
       topic,
       lessonTitle: lesson.lesson_title,
     });
+    const cycle = deriveCycleFromGrade(grade);
 
     const { data: inserted, error: lessonErr } = await supabaseAdmin
       .from("lessons")
       .insert({
         country,
+        cycle,
         grade,
         subject,
         topic_id: topicContext?.topicId ?? null,

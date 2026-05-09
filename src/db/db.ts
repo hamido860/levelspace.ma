@@ -45,6 +45,7 @@ export interface Lesson {
   grade?: string;
   country?: string;
   subject?: string;
+  topic_id?: string;
   sourceLessonId?: string;
   teaching_contract?: unknown;
   validation_status?: string;
@@ -55,7 +56,6 @@ export interface Lesson {
   reviewed_by?: string;
   reviewed_at?: string;
   is_ai_generated?: boolean;
-  track_id?: string;
 }
 
 export interface Note {

@@ -95,6 +95,41 @@ export const getGradeCandidates = (grade: string) => {
   return uniqueValues([grade, ...((GRADE_EQUIVALENTS[normalizedGrade] || []) as string[])]);
 };
 
+export const deriveCycleFromGrade = (grade: string) => {
+  const normalizedGrade = normalizeCurriculumValue(grade);
+
+  if (
+    normalizedGrade.includes("primaire") ||
+    normalizedGrade.startsWith("primary") ||
+    normalizedGrade.includes("elementary")
+  ) {
+    return "primary";
+  }
+
+  if (
+    normalizedGrade.includes("college") ||
+    normalizedGrade.includes("collège") ||
+    normalizedGrade.startsWith("middle")
+  ) {
+    return "college";
+  }
+
+  if (
+    normalizedGrade.includes("tronc commun") ||
+    normalizedGrade.includes("bac") ||
+    normalizedGrade.includes("seconde") ||
+    normalizedGrade.includes("premiere") ||
+    normalizedGrade.includes("terminale") ||
+    normalizedGrade.startsWith("grade 10") ||
+    normalizedGrade.startsWith("grade 11") ||
+    normalizedGrade.startsWith("grade 12")
+  ) {
+    return "lycee";
+  }
+
+  return "higher";
+};
+
 export const pickBestCurriculumMatch = <T extends { name?: string | null }>(
   rows: T[] | null | undefined,
   requestedCandidates: string[],
