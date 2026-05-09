@@ -1,4 +1,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  buildFallbackBlocksFromOutlines,
+  normalizeLessonBlocks,
+  type NormalizedLessonBlock,
+  type TopicOutlineInput,
+} from "./lessonBlocks.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -116,14 +122,129 @@ async function resolveTopicContext(
   return { topicId: createdTopicId, gradeId, subjectId, topicTitle };
 }
 
+const getRequestQueueJobId = (body: Record<string, unknown>) =>
+  normalizeValue(
+    typeof body.queueJobId === "string" ? body.queueJobId
+      : typeof body.queue_job_id === "string" ? body.queue_job_id
+        : typeof body.jobId === "string" ? body.jobId
+          : typeof body.job_id === "string" ? body.job_id
+            : ""
+  ) || null;
+
+const formatDbError = (error: any) =>
+  [
+    error?.message,
+    error?.details,
+    error?.hint,
+    error?.code ? `code=${error.code}` : null,
+  ].filter(Boolean).join(" | ") || "Unknown database error";
+
+async function fetchTopicOutlines(supabaseAdmin: any, topicId: string | null): Promise<TopicOutlineInput[]> {
+  if (!topicId) return [];
+
+  const { data, error } = await supabaseAdmin
+    .from("topic_outlines")
+    .select("title, description, outline_order")
+    .eq("topic_id", topicId)
+    .order("outline_order", { ascending: true });
+
+  if (error) throw new Error(`topic_outlines lookup failed: ${formatDbError(error)}`);
+  return (data || []) as TopicOutlineInput[];
+}
+
+async function writeGenerationLog(
+  supabaseAdmin: any,
+  input: {
+    lessonId?: string | null;
+    topicId?: string | null;
+    blocksCount?: number | null;
+    success: boolean;
+    error?: string | null;
+    durationMs: number;
+  }
+) {
+  const { error } = await supabaseAdmin.from("lesson_gen_log").insert({
+    lesson_id: input.lessonId ?? null,
+    topic_id: input.topicId ?? null,
+    api_key_idx: 0,
+    blocks_count: input.blocksCount ?? null,
+    duration_ms: input.durationMs,
+    success: input.success,
+    error: input.error ?? null,
+  });
+
+  if (error) console.error("lesson_gen_log insert error:", error);
+}
+
+async function saveQueueError(supabaseAdmin: any, queueJobId: string | null, detailedError: string) {
+  if (!queueJobId) return;
+
+  const now = new Date().toISOString();
+  const { error: lastErrorUpdateError } = await supabaseAdmin
+    .from("lesson_gen_queue")
+    .update({ last_error: detailedError })
+    .eq("id", queueJobId);
+
+  if (lastErrorUpdateError) {
+    console.error("lesson_gen_queue last_error update error:", lastErrorUpdateError);
+    return;
+  }
+
+  const { error: failedUpdateError } = await supabaseAdmin
+    .from("lesson_gen_queue")
+    .update({ status: "failed", last_error: detailedError, completed_at: now, claimed_at: null })
+    .eq("id", queueJobId);
+
+  if (failedUpdateError) console.error("lesson_gen_queue failed status update error:", failedUpdateError);
+}
+
+async function saveQueueSuccess(supabaseAdmin: any, queueJobId: string | null) {
+  if (!queueJobId) return;
+
+  const { error } = await supabaseAdmin
+    .from("lesson_gen_queue")
+    .update({
+      status: "done",
+      last_error: null,
+      completed_at: new Date().toISOString(),
+      claimed_at: null,
+    })
+    .eq("id", queueJobId);
+
+  if (error) console.error("lesson_gen_queue success update error:", error);
+}
+
+async function persistLessonBlocks(
+  supabaseAdmin: any,
+  lessonId: string,
+  blocks: NormalizedLessonBlock[]
+) {
+  const rows = blocks.map((block, index) => ({
+    lesson_id: lessonId,
+    type: block.type,
+    content: block.content,
+    order_index: index + 1,
+  }));
+
+  const { error } = await supabaseAdmin.from("lesson_blocks").insert(rows);
+  if (error) throw new Error(`lesson_blocks insert failed: ${formatDbError(error)}`);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  let startedAt = Date.now();
+  let queueJobId: string | null = null;
+  let supabaseAdmin: any = null;
+  let activeTopicId: string | null = null;
+
   try {
+    startedAt = Date.now();
     const body = await req.json();
     const { topic, country, grade, subject, moduleName, userId, referenceUrls, existingContext } = body;
+    queueJobId = getRequestQueueJobId(body);
 
     if (!topic || !country || !grade || !subject) {
       return new Response(
@@ -134,7 +255,7 @@ Deno.serve(async (req) => {
 
     // Use service role key for all DB writes — this bypasses RLS intentionally
     // SUPABASE_SERVICE_ROLE_KEY is auto-injected by Supabase into every edge function
-    const supabaseAdmin = createClient(
+    supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
@@ -153,8 +274,18 @@ Deno.serve(async (req) => {
     const lesson = await generateLesson({ topic, country, grade, subject, moduleName, referenceUrls, existingContext, geminiKey, nvidiaKey });
 
     if (!lesson) {
+      const detailedError = "Block generation failed: AI returned no parseable lesson JSON";
+      await writeGenerationLog(supabaseAdmin, {
+        topicId: null,
+        blocksCount: null,
+        success: false,
+        error: detailedError,
+        durationMs: Date.now() - startedAt,
+      });
+      await saveQueueError(supabaseAdmin, queueJobId, detailedError);
+
       return new Response(
-        JSON.stringify({ success: false, error: "Block generation failed: AI returned no content" }),
+        JSON.stringify({ success: false, error: detailedError }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -166,7 +297,17 @@ Deno.serve(async (req) => {
       topic,
       lessonTitle: lesson.lesson_title,
     });
+    activeTopicId = topicContext?.topicId ?? null;
     const cycle = deriveCycleFromGrade(grade);
+    const outlines = await fetchTopicOutlines(supabaseAdmin, topicContext?.topicId ?? null);
+    let lessonBlocks = normalizeLessonBlocks(lesson.blocks);
+
+    if (lessonBlocks.length === 0) {
+      lessonBlocks = buildFallbackBlocksFromOutlines(topicContext?.topicTitle ?? topic, outlines);
+    }
+
+    const normalizedContent = normalizeValue(lesson.content)
+      || lessonBlocks.map((block) => block.content).join("\n\n");
 
     const { data: inserted, error: lessonErr } = await supabaseAdmin
       .from("lessons")
@@ -177,30 +318,62 @@ Deno.serve(async (req) => {
         subject,
         topic_id: topicContext?.topicId ?? null,
         lesson_title: lesson.lesson_title,
-        content: lesson.content,
+        content: normalizedContent,
         exercises: lesson.exercises ?? [],
         quizzes: lesson.quizzes ?? [],
         mod: lesson.mod ?? null,
         exam: lesson.exam ?? null,
         author_id: userId ?? null,
         is_ai_generated: true,
+        blocks: lessonBlocks,
       })
       .select("id")
       .single();
 
     if (lessonErr) {
+      const detailedError = `lessons insert failed: ${formatDbError(lessonErr)}`;
       console.error("Failed to insert lesson:", lessonErr);
+      await writeGenerationLog(supabaseAdmin, {
+        topicId: topicContext?.topicId ?? null,
+        blocksCount: lessonBlocks.length,
+        success: false,
+        error: detailedError,
+        durationMs: Date.now() - startedAt,
+      });
+      await saveQueueError(supabaseAdmin, queueJobId, detailedError);
+
       return new Response(
-        JSON.stringify({ success: false, error: "Block generation failed: DB insert error", detail: lessonErr.message }),
+        JSON.stringify({ success: false, error: detailedError }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     const lessonId = inserted.id;
 
+    try {
+      await persistLessonBlocks(supabaseAdmin, lessonId, lessonBlocks);
+    } catch (blockErr: any) {
+      const detailedError = blockErr?.message || "lesson_blocks insert failed: unknown error";
+      console.error("Failed to insert lesson blocks:", blockErr);
+      await writeGenerationLog(supabaseAdmin, {
+        lessonId,
+        topicId: topicContext?.topicId ?? null,
+        blocksCount: lessonBlocks.length,
+        success: false,
+        error: detailedError,
+        durationMs: Date.now() - startedAt,
+      });
+      await saveQueueError(supabaseAdmin, queueJobId, detailedError);
+
+      return new Response(
+        JSON.stringify({ success: false, error: detailedError, lessonId }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // ── Index content chunks into rag_chunks (service role) ───────────────────
-    if (lesson.content) {
-      const chunks = lesson.content.split("\n\n").filter((c: string) => c.trim().length > 50);
+    if (normalizedContent) {
+      const chunks = normalizedContent.split("\n\n").filter((c: string) => c.trim().length > 50);
       for (const chunk of chunks) {
         const embedding = await generateEmbedding(chunk, geminiKey);
         if (embedding.length > 0) {
@@ -226,14 +399,37 @@ Deno.serve(async (req) => {
       }
     }
 
+    await writeGenerationLog(supabaseAdmin, {
+      lessonId,
+      topicId: topicContext?.topicId ?? null,
+      blocksCount: lessonBlocks.length,
+      success: true,
+      error: null,
+      durationMs: Date.now() - startedAt,
+    });
+    await saveQueueSuccess(supabaseAdmin, queueJobId);
+
     return new Response(
-      JSON.stringify({ success: true, lessonId }),
+      JSON.stringify({ success: true, lessonId, blocksCount: lessonBlocks.length }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err: any) {
+    const detailedError = err?.message || "generate-lessons unhandled error: unknown error";
     console.error("generate-lessons unhandled error:", err);
+
+    if (supabaseAdmin) {
+      await writeGenerationLog(supabaseAdmin, {
+        topicId: activeTopicId,
+        blocksCount: null,
+        success: false,
+        error: detailedError,
+        durationMs: Date.now() - startedAt,
+      });
+      await saveQueueError(supabaseAdmin, queueJobId, detailedError);
+    }
+
     return new Response(
-      JSON.stringify({ success: false, error: err?.message ?? "Unknown error" }),
+      JSON.stringify({ success: false, error: detailedError }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
@@ -333,6 +529,7 @@ Return ONLY valid JSON matching this exact schema:
 {
   "lesson_title": "string",
   "content": "string (markdown, min 300 words)",
+  "blocks": [{"type": "text|example|formula|summary", "content": "string"}],
   "exercises": [{"question": "string", "solution": "string"}],
   "quizzes": [{"question": "string", "options": ["A","B","C","D"], "correctAnswer": "A", "explanation": "string"}],
   "exam": {"question": "string", "hint": "string", "solution": "string"}
