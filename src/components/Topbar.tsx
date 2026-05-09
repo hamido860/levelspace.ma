@@ -46,8 +46,17 @@ export const Topbar: React.FC<{ isCollapsed?: boolean; gradeOverride?: string }>
       }`}
     >
       <div
+        role="button"
+        tabIndex={0}
         onClick={() => navigate('/profile')}
-        className="flex items-center gap-3 min-w-0 cursor-pointer hover:opacity-80 transition-opacity"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            navigate('/profile');
+          }
+        }}
+        aria-label="View Profile"
+        className="flex items-center gap-3 min-w-0 cursor-pointer hover:opacity-80 transition-opacity rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 p-1 -ml-1"
       >
         <div className="w-7 h-7 rounded-full bg-accent/10 flex items-center justify-center shrink-0 border border-accent/20 overflow-hidden shadow-sm">
           {profile?.avatar_url ? (
