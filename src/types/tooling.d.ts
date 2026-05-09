@@ -7,9 +7,11 @@ declare module "@vercel/node" {
   }
 
   export interface VercelResponse {
+    setHeader(name: string, value: string | readonly string[]): VercelResponse;
     status(code: number): VercelResponse;
     json(body: any): VercelResponse;
     send(body: any): VercelResponse;
+    end(body?: any): VercelResponse;
   }
 }
 
