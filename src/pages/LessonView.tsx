@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Layout } from '../components/Layout';
+import { SEO } from '../components/SEO';
 import {
   AlertCircle,
   ArrowLeft,
@@ -105,6 +106,12 @@ const stripMarkdown = (text: string) =>
 
 const truncateText = (text: string, max = 110) =>
   text.length <= max ? text : `${text.slice(0, max).trim()}...`;
+
+const buildMetaDescription = (text: string, fallback: string) => {
+  const cleanDescription = stripMarkdown(text).replace(/\s+/g, ' ').trim();
+  const value = cleanDescription || fallback;
+  return value.length <= 155 ? value : `${value.slice(0, 152).trim()}...`;
+};
 
 const getBlockTitle = (block: any, index: number) => {
   const config = getBlockTypeConfig(block?.type || '');
@@ -700,6 +707,23 @@ export const LessonView: React.FC = () => {
   const lessonGrade = effectiveLesson?.grade || supabaseLesson?.grade || selectedGrade;
   const lessonCountry = effectiveLesson?.country || supabaseLesson?.country || selectedCountry;
   const lessonSubject = effectiveLesson?.subject || supabaseLesson?.subject || module?.name || '';
+  const lessonMetaTitle = effectiveLesson?.title || supabaseLesson?.lesson_title || 'Lesson';
+  const lessonMetaDescription = buildMetaDescription(
+    effectiveLesson?.subtitle ||
+      effectiveLesson?.content ||
+      effectiveLesson?.blocks?.map((block: any) => block.content || block.title || block.question || '').join(' ') ||
+      '',
+    `${lessonSubject || 'Curriculum'} lesson for ${lessonGrade || 'students'} on LevelSpace.`,
+  );
+  const lessonMetaKeywords = [
+    lessonMetaTitle,
+    lessonSubject,
+    lessonGrade,
+    lessonCountry,
+    'lesson',
+    'curriculum',
+    'LevelSpace',
+  ].filter(Boolean).join(', ');
 
   // Initialize first block open
   useEffect(() => {
@@ -1061,6 +1085,13 @@ export const LessonView: React.FC = () => {
 
   return (
     <Layout fullWidth topbarGradeOverride={lessonGrade}>
+      <SEO
+        title={lessonMetaTitle}
+        description={lessonMetaDescription}
+        keywords={lessonMetaKeywords}
+        type="article"
+        image={`https://picsum.photos/seed/${encodeURIComponent(lessonMetaTitle.toLowerCase().replace(/\s+/g, '-'))}/1200/630`}
+      />
       {/* Fixed Progress Bar */}
       <div className="fixed top-0 left-0 right-0 h-1.5 z-40 bg-ink/5 pointer-events-none">
         <motion.div 

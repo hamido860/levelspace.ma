@@ -8,6 +8,7 @@ interface SEOProps {
   image?: string;
   url?: string;
   type?: string;
+  canonical?: string;
 }
 
 export const SEO: React.FC<SEOProps> = ({
@@ -16,9 +17,10 @@ export const SEO: React.FC<SEOProps> = ({
   keywords = "learning, education, academic, curriculum, study, focus, deep work",
   image = "https://picsum.photos/seed/learning/1200/630",
   url = window.location.href,
-  type = "website"
+  type = "website",
+  canonical = url,
 }) => {
-  const siteTitle = "My Space";
+  const siteTitle = "LevelSpace";
   const fullTitle = title ? `${title} | ${siteTitle}` : siteTitle;
 
   return (
@@ -27,8 +29,10 @@ export const SEO: React.FC<SEOProps> = ({
       <title>{fullTitle}</title>
       <meta name="description" content={description} />
       <meta name="keywords" content={keywords} />
+      <link rel="canonical" href={canonical} />
 
       {/* Open Graph / Facebook */}
+      <meta property="og:site_name" content={siteTitle} />
       <meta property="og:type" content={type} />
       <meta property="og:url" content={url} />
       <meta property="og:title" content={fullTitle} />
