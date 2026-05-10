@@ -149,7 +149,19 @@ export function getPedagogyRules(input: { grade: string; subject: string }): Get
 export interface LessonToValidate {
   title: string;
   content: string;
-  blocks?: Array<{ type: string; content?: string; rules?: string[] }>;
+  blocks?: Array<{
+    type: string;
+    title?: string;
+    label?: string;
+    content?: string;
+    rules?: string[];
+    points?: string[];
+    question?: string;
+    options?: string[];
+    correctAnswer?: string;
+    solution?: string;
+    hint?: string;
+  }>;
   exercises?: Array<{ question: string; solution: string }>;
   quizzes?: Array<{ question: string; options: string[]; correctAnswer: string }>;
 }
@@ -169,11 +181,23 @@ export function validateLesson(input: {
 }): ValidateLessonResult {
   const { lesson, country, grade, subject } = input;
   const violations: string[] = [];
+  const blocks = lesson.blocks || [];
 
   // Language check
   const allContent = [
     lesson.title, lesson.content,
-    ...(lesson.blocks?.map(b => (b.content || "") + " " + (b.rules || []).join(" ")) || []),
+    ...blocks.map(b => [
+      b.title,
+      b.label,
+      b.content,
+      ...(b.rules || []),
+      ...(b.points || []),
+      b.question,
+      ...(b.options || []),
+      b.correctAnswer,
+      b.solution,
+      b.hint,
+    ].filter(Boolean).join(" ")),
     ...(lesson.exercises?.map(e => e.question + " " + e.solution) || []),
     ...(lesson.quizzes?.map(q => q.question + " " + q.options.join(" ")) || []),
   ].join("\n");
@@ -182,18 +206,23 @@ export function validateLesson(input: {
   violations.push(...langCheck.violations);
 
   // Structure checks
-  if (lesson.blocks && lesson.blocks.length < 3) {
-    violations.push(`Too few blocks: ${lesson.blocks.length}, need at least 3.`);
+  if (blocks.length > 0 && blocks.length < 3) {
+    violations.push(`Too few blocks: ${blocks.length}, need at least 3.`);
   }
-  const hasContent = lesson.blocks?.some(b => ["definition", "content"].includes(b.type));
+  const hasContent = blocks.length === 0 || blocks.some(b => ["intro", "theory", "definition", "content", "text", "formula"].includes(b.type));
   if (!hasContent) violations.push("Missing definition or content block.");
-  const hasExamples = lesson.blocks?.some(b => b.type === "examples") || (lesson.exercises?.length ?? 0) > 0;
+  const hasExamples = blocks.some(b => ["example", "examples", "exercise", "exam"].includes(b.type)) || (lesson.exercises?.length ?? 0) > 0;
   if (!hasExamples) violations.push("Missing examples or exercises.");
 
   // Quiz options
   lesson.quizzes?.forEach((q, i) => {
     if ((q.options?.length ?? 0) < 4) violations.push(`Quiz ${i + 1}: need 4 options, has ${q.options?.length ?? 0}.`);
   });
+  blocks
+    .filter((b) => b.type === "quiz")
+    .forEach((q, i) => {
+      if ((q.options?.length ?? 0) < 4) violations.push(`Quiz block ${i + 1}: need 4 options, has ${q.options?.length ?? 0}.`);
+    });
 
   // Wall of text
   const longParagraphs = (lesson.content || "").split("\n\n")

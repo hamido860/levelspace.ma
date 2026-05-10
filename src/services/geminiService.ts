@@ -1229,6 +1229,27 @@ export const generateFullLesson = async (
             description: "Main lesson content in Markdown",
           },
           mod: { type: Type.STRING, description: "Module name" },
+          blocks: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                type: { type: Type.STRING },
+                title: { type: Type.STRING },
+                label: { type: Type.STRING },
+                content: { type: Type.STRING },
+                solution: { type: Type.STRING },
+                hint: { type: Type.STRING },
+                question: { type: Type.STRING },
+                options: { type: Type.ARRAY, items: { type: Type.STRING } },
+                correctAnswer: { type: Type.STRING },
+                explanation: { type: Type.STRING },
+                source: { type: Type.STRING },
+                points: { type: Type.ARRAY, items: { type: Type.STRING } },
+              },
+              required: ["type"],
+            },
+          },
           exercises: {
             type: Type.ARRAY,
             items: {
@@ -1275,6 +1296,7 @@ export const generateFullLesson = async (
               "lesson_title",
               "content",
               "mod",
+              "blocks",
               "exercises",
               "quizzes",
               "exam",
@@ -1308,6 +1330,7 @@ export const generateFullLesson = async (
           {
             title:     parsed.lesson_title || topic,
             content:   parsed.content || "",
+            blocks:    parsed.blocks,
             exercises: parsed.exercises,
             quizzes:   parsed.quizzes,
           },

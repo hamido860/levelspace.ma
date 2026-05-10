@@ -4,7 +4,21 @@ import { PEDAGOGY_RULES, getMinimumBloomLevel } from "../data/pedagogy.js";
 export interface LessonToValidate {
   title: string;
   content: string;
-  blocks?: Array<{ type: string; content?: string; rules?: string[]; examples?: any[]; quiz?: any }>;
+  blocks?: Array<{
+    type: string;
+    title?: string;
+    label?: string;
+    content?: string;
+    rules?: string[];
+    points?: string[];
+    examples?: any[];
+    quiz?: any;
+    question?: string;
+    options?: string[];
+    correctAnswer?: string;
+    solution?: string;
+    hint?: string;
+  }>;
   exercises?: Array<{ question: string; solution: string }>;
   quizzes?: Array<{ question: string; options: string[]; correctAnswer: string }>;
 }
@@ -31,12 +45,24 @@ export function validateLesson(input: ValidateLessonInput): ValidateLessonResult
 
   const structureViolations: string[] = [];
   const pedagogyViolations: string[] = [];
+  const blocks = lesson.blocks || [];
 
   // 1. Language check on all text content
   const allContent = [
     lesson.title,
     lesson.content,
-    ...(lesson.blocks?.map(b => [b.content || "", ...(b.rules || [])].join(" ")) || []),
+    ...blocks.map(b => [
+      b.title,
+      b.label,
+      b.content,
+      ...(b.rules || []),
+      ...(b.points || []),
+      b.question,
+      ...(b.options || []),
+      b.correctAnswer,
+      b.solution,
+      b.hint,
+    ].filter(Boolean).join(" ")),
     ...(lesson.exercises?.map(e => e.question + " " + e.solution) || []),
     ...(lesson.quizzes?.map(q => q.question + " " + q.options.join(" ")) || []),
   ].join("\n\n");
@@ -46,20 +72,20 @@ export function validateLesson(input: ValidateLessonInput): ValidateLessonResult
   // 2. Structure checks
   const schema = PEDAGOGY_RULES.structureSchema;
 
-  if (lesson.blocks && lesson.blocks.length < schema.minBlocks) {
+  if (blocks.length > 0 && blocks.length < schema.minBlocks) {
     structureViolations.push(
-      `Too few blocks: ${lesson.blocks.length} found, minimum ${schema.minBlocks} required.`
+      `Too few blocks: ${blocks.length} found, minimum ${schema.minBlocks} required.`
     );
   }
 
-  const hasDefinitionOrContent = lesson.blocks?.some(
-    b => b.type === "definition" || b.type === "content"
+  const hasDefinitionOrContent = blocks.length === 0 || blocks.some(
+    b => ["intro", "theory", "definition", "content", "text", "formula"].includes(b.type)
   );
   if (!hasDefinitionOrContent) {
     structureViolations.push("Missing required definition or content block.");
   }
 
-  const hasExamples = lesson.blocks?.some(b => b.type === "examples") ||
+  const hasExamples = blocks.some(b => ["example", "examples", "exercise", "exam"].includes(b.type)) ||
     (lesson.exercises && lesson.exercises.length > 0);
   if (!hasExamples) {
     structureViolations.push("Missing examples or exercises block.");
@@ -73,6 +99,15 @@ export function validateLesson(input: ValidateLessonInput): ValidateLessonResult
       );
     }
   });
+  blocks
+    .filter((b) => b.type === "quiz")
+    .forEach((q, i) => {
+      if (!q.options || q.options.length < schema.quizMinOptions) {
+        structureViolations.push(
+          `Quiz block ${i + 1}: only ${q.options?.length || 0} options, minimum ${schema.quizMinOptions} required.`
+        );
+      }
+    });
 
   // 3. Pedagogy checks
   const minBloom = getMinimumBloomLevel(grade);
