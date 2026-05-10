@@ -873,24 +873,33 @@ export const ClassroomView: React.FC = () => {
 
     setIsGeneratingStarterLessons(true);
     try {
-      const res = await fetch('/api/admin/lessons/seed-starter', {
-        method: 'POST',
-        headers: await getAdminApiHeaders(),
-        body: JSON.stringify({ topic_ids: topicFallbackRows.map((topic) => topic.id) }),
-      });
+      const topicIds = topicFallbackRows.map((topic) => topic.id).filter(Boolean);
+      const headers = await getAdminApiHeaders();
+      let inserted = 0;
+      let skipped = 0;
 
-      const responseText = await res.text();
-      const payload = responseText ? (() => {
-        try {
-          return JSON.parse(responseText);
-        } catch {
-          return {};
-        }
-      })() : {};
-      if (!res.ok) throw new Error(payload.error || responseText || `Request failed with status ${res.status}`);
+      for (let start = 0; start < topicIds.length; start += 25) {
+        const batch = topicIds.slice(start, start + 25);
+        const res = await fetch('/api/admin/lessons/seed-starter', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ topic_ids: batch }),
+        });
 
-      const inserted = Number(payload.summary?.insertedLessons ?? 0);
-      const skipped = Number(payload.summary?.skippedLessons ?? 0);
+        const responseText = await res.text();
+        const payload = responseText ? (() => {
+          try {
+            return JSON.parse(responseText);
+          } catch {
+            return {};
+          }
+        })() : {};
+        if (!res.ok) throw new Error(payload.error || responseText || `Request failed with status ${res.status}`);
+
+        inserted += Number(payload.summary?.insertedLessons ?? 0);
+        skipped += Number(payload.summary?.skippedLessons ?? 0);
+      }
+
       toast.success(`Generated ${inserted} starter lessons. Skipped ${skipped} existing topics.`);
 
       const cloudLessons = await fetchSupabaseLessons();

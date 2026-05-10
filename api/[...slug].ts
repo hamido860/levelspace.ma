@@ -52,6 +52,7 @@ import {
 
 type JsonBody = Record<string, any>;
 type RouteHandler = (req: VercelRequest, res: VercelResponse, segments: string[]) => Promise<VercelResponse | void>;
+const MAX_STARTER_TOPIC_IDS_PER_REQUEST = 25;
 
 function getSegments(req: VercelRequest) {
   const slug = req.query?.slug;
@@ -890,6 +891,12 @@ async function handleSeedStarterLessons(req: VercelRequest, res: VercelResponse)
 
     if (topicIds.length === 0) {
       return res.status(400).json({ error: "topic_ids is required." });
+    }
+
+    if (topicIds.length > MAX_STARTER_TOPIC_IDS_PER_REQUEST) {
+      return res.status(413).json({
+        error: `Too many topic_ids. Send at most ${MAX_STARTER_TOPIC_IDS_PER_REQUEST} per request.`,
+      });
     }
 
     const summary = await seedStarterLessonsFromTopics(getServerSupabase(), {

@@ -6,6 +6,8 @@ import {
   requireAdminUser,
 } from "../../../src/server/api/aiCommandCenter";
 
+const MAX_TOPIC_IDS_PER_REQUEST = 25;
+
 const getBody = (req: VercelRequest) =>
   req.body && typeof req.body === "object" ? (req.body as Record<string, unknown>) : {};
 
@@ -33,6 +35,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (topicIds.length === 0) {
       return res.status(400).json({ error: "topic_ids is required." });
+    }
+
+    if (topicIds.length > MAX_TOPIC_IDS_PER_REQUEST) {
+      return res.status(413).json({
+        error: `Too many topic_ids. Send at most ${MAX_TOPIC_IDS_PER_REQUEST} per request.`,
+      });
     }
 
     const summary = await seedStarterLessonsFromTopics(getServerSupabase(), {
