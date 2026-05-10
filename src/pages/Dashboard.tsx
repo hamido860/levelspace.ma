@@ -101,6 +101,32 @@ export const Dashboard: React.FC = () => {
   const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
   const settingsMap = useMemo(() => Object.fromEntries(dbSettings.map(s => [s.key, s.value])), [dbSettings]);
 
+  // ⚡ Bolt: Memoize filtered and sorted exams to prevent O(N log N) re-computation on every 1s timer tick
+  const upcomingExams = useMemo(() => {
+    return reminders
+      .filter(r => (r.type === 'exam' || r.type === 'controle') && !r.completed)
+      .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
+      .slice(0, 3);
+  }, [reminders]);
+
+  // ⚡ Bolt: Compute existence directly from memoized array instead of re-iterating over reminders
+  const hasPendingExams = upcomingExams.length > 0;
+
+  // ⚡ Bolt: Memoize general reminders filter to avoid allocating new arrays on every render tick
+  const generalReminders = useMemo(() => {
+    return reminders
+      .filter(r => r.type !== 'exam' && r.type !== 'controle' && !r.completed)
+      .slice(0, 3);
+  }, [reminders]);
+
+  // ⚡ Bolt: Removed useMemo for schedule.slice(0, 3) as slicing 3 items is faster than useMemo overhead
+  const upcomingSchedule = schedule.slice(0, 3);
+
+  // ⚡ Bolt: Memoize average completion reduction to avoid O(N) math operations on every render tick
+  const averageCompletion = useMemo(() => {
+    return Math.round(activeModules.reduce((acc, m) => acc + m.progress, 0) / (activeModules.length || 1));
+  }, [activeModules]);
+
   const selectedGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
   const selectedCountry = settingsMap['selected_country'] || localStorage.getItem('selected_country') || '';
   const currentSession = settingsMap['current_session'] || localStorage.getItem('current_session') || 'Fall 2024';
@@ -565,7 +591,7 @@ export const Dashboard: React.FC = () => {
                 <div className="space-y-1">
                   <p className="text-[9px] font-bold text-muted uppercase tracking-widest">{t('avg_completion')}</p>
                   <span className="text-2xl font-bold text-ink">
-                    {Math.round(activeModules.reduce((acc, m) => acc + m.progress, 0) / (activeModules.length || 1))}%
+                    {averageCompletion}%
                   </span>
                 </div>
               </div>
@@ -588,11 +614,7 @@ export const Dashboard: React.FC = () => {
                   </button>
                 </div>
                 <div className="space-y-2">
-                  {reminders
-                    .filter(r => (r.type === 'exam' || r.type === 'controle') && !r.completed)
-                    .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
-                    .slice(0, 3)
-                    .map((reminder) => (
+                  {upcomingExams.map((reminder) => (
                       <div key={reminder.id} className="flex items-center gap-3 p-3 bg-accent/5 border border-accent/10 rounded-xl">
                         <div className="w-8 h-8 bg-accent/10 rounded-lg flex items-center justify-center shrink-0">
                           <Brain className="w-4 h-4 text-accent" />
@@ -611,7 +633,7 @@ export const Dashboard: React.FC = () => {
                         </button>
                       </div>
                     ))}
-                  {reminders.filter(r => (r.type === 'exam' || r.type === 'controle') && !r.completed).length === 0 && (
+                  {!hasPendingExams && (
                     <p className="text-[10px] text-muted italic px-2">{t('no_pending_reminders')}</p>
                   )}
                 </div>
@@ -624,10 +646,7 @@ export const Dashboard: React.FC = () => {
                   <button className="text-[9px] font-bold text-accent uppercase tracking-widest">{t('view_all')}</button>
                 </div>
                 <div className="space-y-2">
-                  {reminders
-                    .filter(r => r.type !== 'exam' && r.type !== 'controle' && !r.completed)
-                    .slice(0, 3)
-                    .map((reminder) => (
+                  {generalReminders.map((reminder) => (
                       <div key={reminder.id} onClick={() => toggleReminder(reminder.id)} className="flex items-center gap-3 p-3 bg-paper border border-ink/5 rounded-xl cursor-pointer hover:border-accent/20 transition-all">
                         <div className={`w-4 h-4 rounded border flex items-center justify-center ${reminder.completed ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-ink/10'}`}>
                           {reminder.completed && <Check size={10} />}
@@ -654,7 +673,7 @@ export const Dashboard: React.FC = () => {
               </div>
               <div className="space-y-4">
                 {schedule.length > 0 ? (
-                  schedule.slice(0, 3).map((event) => (
+                  upcomingSchedule.map((event) => (
                     <div key={event.id} className="flex gap-4">
                       <div className="flex flex-col items-center justify-center w-12 h-12 bg-surface-low rounded-xl shrink-0">
                         <span className="text-[10px] font-bold text-muted uppercase">{event.month.slice(0, 3)}</span>
