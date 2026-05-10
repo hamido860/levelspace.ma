@@ -1,4 +1,5 @@
 import type { Module } from '../db/db';
+import { canonicalModuleKey, getCanonicalSubjectName, shouldShowAsDashboardSubject } from './curriculumStructure';
 
 export type SupabaseSubjectRecord = {
   id: string;
@@ -32,13 +33,25 @@ export const mapSubjectsToModules = (subjects: SupabaseSubjectRecord[], now = Da
 
   for (const subject of subjects) {
     if (!subject?.id || typeof subject.name !== 'string' || !subject.name.trim()) continue;
-    const key = `${normalize(subject.name)}::${normalize(subject.code || '')}`;
-    if (!deduped.has(key)) deduped.set(key, subject);
+    if (!shouldShowAsDashboardSubject(subject)) continue;
+
+    const canonicalName = getCanonicalSubjectName(subject.name);
+    const key = normalize(canonicalName);
+    const existing = deduped.get(key);
+
+    if (!existing) {
+      deduped.set(key, subject);
+      continue;
+    }
+
+    if (normalize(existing.name || '') !== key && normalize(subject.name || '') === key) {
+      deduped.set(key, subject);
+    }
   }
 
   return Array.from(deduped.values()).map((subject) => ({
     id: String(subject.id),
-    name: subject.name!.trim(),
+    name: getCanonicalSubjectName(subject.name),
     code: (subject.code || subject.name || 'SUBJ').toString().trim().toUpperCase(),
     description: deriveDescription(subject),
     category: deriveCategory(subject),
@@ -52,7 +65,7 @@ export const mergeModulesWithAiSuggestions = (base: Module[], ai: Module[]): Mod
   const byKey = new Map<string, Module>();
 
   for (const module of [...base, ...ai]) {
-    const key = `${normalize(module.name)}::${normalize(module.code || '')}`;
+    const key = canonicalModuleKey(module);
     if (!byKey.has(key)) byKey.set(key, module);
   }
 

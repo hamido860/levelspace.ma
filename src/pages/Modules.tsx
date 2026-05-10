@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { generateCurriculum, checkAIProvider } from '../services/geminiService';
 import { getClassroomLoadPlan, mapSubjectsToModules, mergeModulesWithAiSuggestions, shouldRequestAiCurriculumSuggestions } from '../services/classroomLoader';
-import { getSubjectCandidates, normalizeCurriculumValue } from '../services/curriculumMatching';
+import { getGradeCandidates, getSubjectCandidates, normalizeCurriculumValue } from '../services/curriculumMatching';
 import { supabase } from '../db/supabase';
 import { useSearch } from '../context/SearchContext';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -40,6 +40,8 @@ const getIconForCategory = (category: string) => {
   if (cat.includes('psych') || cat.includes('phil') || cat.includes('socio')) return <Brain className="w-5 h-5" />;
   return <Library className="w-5 h-5" />;
 };
+
+const MODULES_SCOPE_VERSION = 'v2';
 
 const MOROCCAN_SCOPE_SUBJECTS: Record<string, string[]> = {
   'tronc commun::tronc commun scientifique': [
@@ -109,6 +111,110 @@ const buildFallbackTrustedModules = (subjectNames: string[]) =>
     createdAt: Date.now(),
   }));
 
+const getNestedSingle = <T,>(value: T | T[] | null | undefined): T | null => {
+  if (Array.isArray(value)) return value[0] || null;
+  return value || null;
+};
+
+const inferGradeOrder = (grade: string) => {
+  const normalized = normalizeCurriculumValue(grade);
+  const numeric = normalized.match(/\d+/)?.[0];
+  if (!numeric) return null;
+
+  const value = Number(numeric);
+  if (!Number.isFinite(value)) return null;
+  return value;
+};
+
+const inferCycleKey = (grade: string) => {
+  const normalized = normalizeCurriculumValue(grade);
+
+  if (normalized.includes('primaire') || normalized.includes('primary')) return 'primary';
+  if (normalized.includes('college') || normalized.includes('middle')) return 'college';
+  if (
+    normalized.includes('tronc commun') ||
+    normalized.includes('bac') ||
+    normalized.includes('lycee') ||
+    normalized.includes('seconde') ||
+    normalized.includes('premiere') ||
+    normalized.includes('terminale')
+  ) {
+    return 'lycee';
+  }
+
+  return null;
+};
+
+const cycleMatchesKey = (cycleName: string, cycleKey: string | null) => {
+  if (!cycleKey) return true;
+
+  const normalized = normalizeCurriculumValue(cycleName);
+  if (cycleKey === 'primary') return normalized.includes('primaire') || normalized.includes('primary') || cycleName.includes('الإبتدائي');
+  if (cycleKey === 'college') return normalized.includes('college') || normalized.includes('middle') || cycleName.includes('الإعدادي');
+  if (cycleKey === 'lycee') return normalized.includes('lycee') || normalized.includes('high') || cycleName.includes('التأهيلي');
+  return true;
+};
+
+type SupabaseGradeRow = {
+  id: string;
+  name?: string | null;
+  grade_order?: number | null;
+  cycles?: {
+    name?: string | null;
+    curricula?: { country?: string | null } | Array<{ country?: string | null }> | null;
+  } | Array<{
+    name?: string | null;
+    curricula?: { country?: string | null } | Array<{ country?: string | null }> | null;
+  }> | null;
+};
+
+const findScopedGrade = (grades: SupabaseGradeRow[], country: string, grade: string) => {
+  const gradeCandidates = getGradeCandidates(grade);
+  const normalizedGradeCandidates = new Set(gradeCandidates.map(normalizeCurriculumValue));
+  const normalizedCountry = normalizeCurriculumValue(country);
+  const inferredGradeOrder = inferGradeOrder(grade);
+  const inferredCycleKey = inferCycleKey(grade);
+
+  const countryGrades = grades.filter((row) => {
+    const cycle = getNestedSingle(row.cycles);
+    const curriculum = getNestedSingle(cycle?.curricula);
+    const rowCountry = normalizeCurriculumValue(String(curriculum?.country || ''));
+    return !normalizedCountry || rowCountry === normalizedCountry;
+  });
+
+  const exact = countryGrades.find((row) => normalizedGradeCandidates.has(normalizeCurriculumValue(String(row.name || ''))));
+  if (exact) return exact;
+
+  if (inferredGradeOrder === null) return null;
+
+  return countryGrades.find((row) => {
+    const cycle = getNestedSingle(row.cycles);
+    return row.grade_order === inferredGradeOrder && cycleMatchesKey(String(cycle?.name || ''), inferredCycleKey);
+  }) || null;
+};
+
+const fetchSubjectsForCurrentGrade = async (country: string, grade: string) => {
+  const { data: grades, error: gradeError } = await supabase
+    .from('grades')
+    .select('id, name, grade_order, cycles(name, curricula(country))');
+
+  if (gradeError) throw gradeError;
+
+  const matchedGrade = findScopedGrade((grades || []) as SupabaseGradeRow[], country, grade);
+  if (!matchedGrade) return null;
+
+  const { data: gradeSubjects, error: gradeSubjectError } = await supabase
+    .from('grade_subjects')
+    .select('subjects(*)')
+    .eq('grade_id', matchedGrade.id);
+
+  if (gradeSubjectError) throw gradeSubjectError;
+
+  return (gradeSubjects || [])
+    .map((row: any) => getNestedSingle(row.subjects))
+    .filter(Boolean);
+};
+
 export const Modules: React.FC = () => {
   const { t } = useLanguage();
   const { isPro } = useAuth();
@@ -127,6 +233,15 @@ export const Modules: React.FC = () => {
   const grade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
   const selectedBacTrackId = settingsMap['selected_bac_track'] || localStorage.getItem('selected_bac_track') || '';
   const selectedBacIntOptionId = settingsMap['selected_bac_int_option'] || localStorage.getItem('selected_bac_int_option') || '';
+  const classroomScopeKey = [
+    'modules',
+    MODULES_SCOPE_VERSION,
+    normalizeCurriculumValue(country),
+    normalizeCurriculumValue(grade),
+    normalizeCurriculumValue(String(selectedBacTrackId || '')),
+    normalizeCurriculumValue(String(selectedBacIntOptionId || '')),
+  ].join(':');
+  const storedClassroomScopeKey = settingsMap['modules_scope_key'] || localStorage.getItem('modules_scope_key') || '';
 
   const [bacTrackName, setBacTrackName] = useState<string>('');
   const [bacIntOptionName, setBacIntOptionName] = useState<string>('');
@@ -172,17 +287,23 @@ export const Modules: React.FC = () => {
   useEffect(() => {
     if (dbModules === undefined) return;
     if (!country) return;
-    if (modules.length > 0) return;
+    if (storedClassroomScopeKey === classroomScopeKey && modules.length > 0) return;
 
     const plan = getClassroomLoadPlan({ action: 'create_classroom', isPro });
     fetchCurriculum(plan.includeAiSuggestions);
-  }, [country, dbModules, grade, isPro, modules.length]);
+  }, [classroomScopeKey, country, dbModules, grade, isPro, modules.length, storedClassroomScopeKey]);
 
   const fetchCurriculum = async (includeAiSuggestions = false, bypassAiCache = false) => {
     setIsLoading(true);
     try {
-      const { data: subjectRows, error: subjectError } = await supabase.from('subjects').select('*').limit(500);
-      if (subjectError) throw subjectError;
+      const scopedSubjectRows = await fetchSubjectsForCurrentGrade(country, grade);
+      let subjectRows = scopedSubjectRows;
+
+      if (subjectRows === null) {
+        const { data, error } = await supabase.from('subjects').select('*').limit(500);
+        if (error) throw error;
+        subjectRows = data || [];
+      }
 
       const supabaseModules = mapSubjectsToModules((subjectRows || []) as any[]);
       let modulesToStore = supabaseModules;
@@ -247,7 +368,20 @@ export const Modules: React.FC = () => {
           };
         });
 
+        if (scopedSubjectRows !== null) {
+          const nextIds = new Set(mergedModules.map((module) => module.id));
+          const staleModuleIds = (dbModules || [])
+            .filter((module) => !nextIds.has(module.id))
+            .map((module) => module.id);
+
+          if (staleModuleIds.length > 0) {
+            await db.modules.bulkDelete(staleModuleIds);
+          }
+        }
+
         await db.modules.bulkPut(mergedModules);
+        localStorage.setItem('modules_scope_key', classroomScopeKey);
+        await db.settings.put({ key: 'modules_scope_key', value: classroomScopeKey });
       }
     } catch (error) {
       console.error('Failed to fetch classroom curriculum:', error);

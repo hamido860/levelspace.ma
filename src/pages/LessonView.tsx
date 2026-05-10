@@ -60,7 +60,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { useAppSettings } from '../context/AppSettingsContext';
 import { indexLessonContent } from '../services/ragService';
-import { getSubjectCandidates } from '../services/curriculumMatching';
+import { getSubjectCandidates, normalizeCurriculumValue } from '../services/curriculumMatching';
 import { isStudentVisibleLesson, normalizeLessonBlockUiType } from '../services/lessonRecovery';
 import {
   getLessonSelectColumns,
@@ -76,6 +76,7 @@ import {
   isDraftValidationStatus,
   isStudentPreferredValidationStatus,
 } from '../services/curriculumValidation';
+import { FRENCH_SUBJECT_DOMAINS } from '../services/curriculumStructure';
 
 const BLOCK_TYPE_CONFIG: Record<string, { icon: React.ElementType; colorClass: string; label: string }> = {
   text:     { icon: FileText,      colorClass: 'text-accent',   label: 'Text'         },
@@ -154,6 +155,49 @@ const getBlockPreview = (block: any) => {
   if (block?.quiz?.question) return truncateText(stripMarkdown(String(block.quiz.question)));
   if (block?.exercise?.prompt) return truncateText(stripMarkdown(String(block.exercise.prompt)));
   return '';
+};
+
+type LessonMainTab = 'content' | 'quizzes' | 'exercises';
+
+const FRENCH_DOMAIN_KEYWORDS: Record<string, string[]> = {
+  GRAMMAIRE: ['grammaire', 'phrase', 'sujet', 'verbe', 'complement', 'adjectif', 'nom', 'determinant', 'pronom', 'accord'],
+  CONJUGAISON: ['conjugaison', 'conjuguer', 'verbe', 'temps', 'present', 'passe', 'futur', 'imparfait', 'conditionnel', 'subjonctif'],
+  ORTHOGRAPHE: ['orthographe', 'orthograph', 'dictee', 'accent', 'homophone', 'accord', 'pluriel', 'singulier', 'majuscule'],
+  LEXIQUE: ['lexique', 'vocabulaire', 'synonyme', 'antonyme', 'champ lexical', 'famille de mots', 'mot'],
+  LECTURE: ['lecture', 'texte', 'comprehension', 'auteur', 'narrateur', 'recit', 'poeme', 'roman', 'extrait'],
+  EXPRESSION_ECRITE: ['expression ecrite', 'production ecrite', 'redaction', 'paragraphe', 'introduction', 'conclusion', 'argument'],
+  COMMUNICATION_ORALE: ['communication orale', 'oral', 'expose', 'debat', 'discussion', 'prendre la parole'],
+};
+
+const normalizeLessonSearchText = (value: string) =>
+  normalizeCurriculumValue(value)
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const getBlockSearchText = (block: any) =>
+  normalizeLessonSearchText([
+    block?.title,
+    block?.label,
+    block?.type,
+    block?.content,
+    block?.question,
+    ...(Array.isArray(block?.rules) ? block.rules : []),
+    ...(Array.isArray(block?.points) ? block.points : []),
+    ...(Array.isArray(block?.examples)
+      ? block.examples.flatMap((example: any) => [example?.question, example?.answer, ...(Array.isArray(example?.steps) ? example.steps : [])])
+      : []),
+  ].filter(Boolean).join(' '));
+
+const getFrenchDomainForBlock = (block: any) => {
+  const explicitDomain = String(block?.domain_code || block?.domain || block?.subject_domain || '').trim().toUpperCase();
+  if (explicitDomain && FRENCH_SUBJECT_DOMAINS.some((domain) => domain.code === explicitDomain)) return explicitDomain;
+
+  const text = getBlockSearchText(block);
+  return FRENCH_SUBJECT_DOMAINS.find((domain) => {
+    const domainName = normalizeLessonSearchText(domain.name);
+    const keywords = FRENCH_DOMAIN_KEYWORDS[domain.code] || [];
+    return text.includes(domainName) || keywords.some((keyword) => text.includes(normalizeLessonSearchText(keyword)));
+  })?.code || 'LECTURE';
 };
 
 const Timer = () => {
@@ -287,7 +331,8 @@ export const LessonView: React.FC = () => {
   const aiAvailable = checkAIProvider();
 
   const [openBlocks, setOpenBlocks] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState<'content' | 'quizzes' | 'exercises'>('content');
+  const [activeTab, setActiveTab] = useState<LessonMainTab>('content');
+  const [activeFrenchDomain, setActiveFrenchDomain] = useState<string>('all');
   const [quizzes, setQuizzes] = useState<any[]>([]);
   const [exercises, setExercises] = useState<any[]>([]);
   const [isLoadingExtra, setIsLoadingExtra] = useState(false);
@@ -956,6 +1001,27 @@ export const LessonView: React.FC = () => {
   }
 
   const blocks = effectiveLesson.blocks || [];
+  const isFrenchLesson = (() => {
+    const candidates = [lessonSubject, module?.name, effectiveLesson.subject, effectiveLesson.title];
+    return candidates.some((candidate) => {
+      const normalized = normalizeCurriculumValue(String(candidate || ''));
+      return normalized === 'francais' || normalized === 'langue francaise' || normalized.includes('francais');
+    });
+  })();
+  const indexedBlocks = blocks.map((block: any, index: number) => ({
+    block,
+    index,
+    domainCode: getFrenchDomainForBlock(block),
+  }));
+  const frenchDomainStats = FRENCH_SUBJECT_DOMAINS.map((domain) => ({
+    ...domain,
+    count: indexedBlocks.filter((item) => item.domainCode === domain.code).length,
+  }));
+  const visibleIndexedBlocks =
+    isFrenchLesson && activeFrenchDomain !== 'all'
+      ? indexedBlocks.filter((item) => item.domainCode === activeFrenchDomain)
+      : indexedBlocks;
+  const selectedFrenchDomain = frenchDomainStats.find((domain) => domain.code === activeFrenchDomain);
   const totalBlocks = blocks.length > 0 ? blocks.length : 1;
   const openCount = openBlocks.length;
   const progressPct = Math.round((openCount / totalBlocks) * 100);
@@ -985,6 +1051,9 @@ export const LessonView: React.FC = () => {
       isOpen,
     };
   });
+  const visibleBlockCards = activeFrenchDomain === 'all'
+    ? blockCards
+    : blockCards.filter((card) => indexedBlocks[card.index]?.domainCode === activeFrenchDomain);
   const nextBlockCard = blockCards.find((card) => !card.isOpen) || blockCards[0];
   const outlinePreviewCards = nextBlockCard
     ? [nextBlockCard, ...blockCards.filter((card) => card.id !== nextBlockCard.id).slice(0, 2)]
@@ -1545,6 +1614,70 @@ export const LessonView: React.FC = () => {
           </button>
         </div>
 
+        {isFrenchLesson && blocks.length > 0 && (
+          <section className="mb-8 rounded-3xl border border-surface-mid bg-paper p-4 shadow-sm">
+            <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">French study domains</p>
+                <h2 className="text-lg font-bold text-ink">
+                  {selectedFrenchDomain ? selectedFrenchDomain.name : 'All domains'}
+                </h2>
+              </div>
+              <p className="max-w-xl text-xs leading-relaxed text-muted">
+                Use these tabs to isolate the exact strand you are studying, then jump through the outline without losing your place in the full lesson.
+              </p>
+            </div>
+
+            <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+              <button
+                onClick={() => setActiveFrenchDomain('all')}
+                className={`shrink-0 rounded-xl px-4 py-2 text-[10px] font-bold uppercase tracking-widest transition-all ${
+                  activeFrenchDomain === 'all'
+                    ? 'bg-ink text-paper shadow-sm'
+                    : 'bg-surface-low text-muted hover:bg-accent/10 hover:text-accent'
+                }`}
+              >
+                Tous
+                <span className="ml-2 rounded-full bg-paper/20 px-1.5 py-0.5">{blocks.length}</span>
+              </button>
+              {frenchDomainStats.map((domain) => (
+                <button
+                  key={domain.code}
+                  onClick={() => setActiveFrenchDomain(domain.code)}
+                  className={`shrink-0 rounded-xl px-4 py-2 text-[10px] font-bold uppercase tracking-widest transition-all ${
+                    activeFrenchDomain === domain.code
+                      ? 'bg-accent text-paper shadow-sm'
+                      : 'bg-surface-low text-muted hover:bg-accent/10 hover:text-accent'
+                  }`}
+                >
+                  {domain.name}
+                  <span className="ml-2 rounded-full bg-paper/20 px-1.5 py-0.5">{domain.count}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-4 grid gap-2 md:grid-cols-3">
+              {visibleBlockCards.slice(0, 3).map((card) => (
+                <button
+                  key={card.id}
+                  onClick={() => focusBlock(card.id)}
+                  className="rounded-2xl border border-surface-mid bg-surface-low/70 p-3 text-left transition-all hover:border-accent/30 hover:bg-accent/5"
+                >
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Section {card.index + 1}</span>
+                  <strong className="mt-1 block text-sm text-ink">{card.title}</strong>
+                  {card.preview && <span className="mt-1 block text-[11px] leading-relaxed text-muted">{card.preview}</span>}
+                </button>
+              ))}
+              {visibleBlockCards.length === 0 && (
+                <div className="rounded-2xl border border-dashed border-ink/10 bg-surface-low/70 p-4 md:col-span-3">
+                  <p className="text-sm font-semibold text-ink">No sections tagged for this domain yet.</p>
+                  <p className="mt-1 text-xs text-muted">The lesson still opens normally in Tous; future generated content can attach clearer domain metadata.</p>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
         {/* Main Content Grid */}
         {activeTab === 'content' && (
           <>
@@ -1569,8 +1702,8 @@ export const LessonView: React.FC = () => {
 
             {/* Lesson Blocks */}
             <div className="space-y-2">
-              {blocks.length > 0 ? (
-                blocks.map((block, index) => {
+              {visibleIndexedBlocks.length > 0 ? (
+                visibleIndexedBlocks.map(({ block, index }) => {
                   const blockId = `block-${index}`;
                   const isOpen = openBlocks.includes(blockId);
                   const uiBlockType = normalizeLessonBlockUiType(block.type || '');
@@ -2211,8 +2344,14 @@ export const LessonView: React.FC = () => {
                   <BookOpen size={32} />
                 </div>
                 <div>
-                  <h3 className="font-bold text-ink">No blocks found</h3>
-                  <p className="text-sm text-muted">This lesson doesn't have any content blocks yet.</p>
+                  <h3 className="font-bold text-ink">
+                    {blocks.length > 0 ? 'No sections in this domain' : 'No blocks found'}
+                  </h3>
+                  <p className="text-sm text-muted">
+                    {blocks.length > 0
+                      ? 'Switch to Tous or another French study tab to keep moving.'
+                      : "This lesson doesn't have any content blocks yet."}
+                  </p>
                 </div>
               </div>
             )}
@@ -2321,8 +2460,8 @@ export const LessonView: React.FC = () => {
         <div className="space-y-4">
           <div className="outline-summary">
             <div className="outline-summary__stat">
-              <span className="outline-summary__label">Sections</span>
-              <strong className="outline-summary__value">{totalBlocks}</strong>
+              <span className="outline-summary__label">Visible</span>
+              <strong className="outline-summary__value">{visibleIndexedBlocks.length}</strong>
             </div>
             <div className="outline-summary__stat">
               <span className="outline-summary__label">Concepts</span>
@@ -2334,6 +2473,30 @@ export const LessonView: React.FC = () => {
             </div>
           </div>
 
+          {isFrenchLesson && (
+            <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+              <button
+                onClick={() => setActiveFrenchDomain('all')}
+                className={`shrink-0 rounded-xl px-3 py-2 text-[10px] font-bold uppercase tracking-widest ${
+                  activeFrenchDomain === 'all' ? 'bg-ink text-paper' : 'bg-surface-low text-muted'
+                }`}
+              >
+                Tous
+              </button>
+              {frenchDomainStats.map((domain) => (
+                <button
+                  key={domain.code}
+                  onClick={() => setActiveFrenchDomain(domain.code)}
+                  className={`shrink-0 rounded-xl px-3 py-2 text-[10px] font-bold uppercase tracking-widest ${
+                    activeFrenchDomain === domain.code ? 'bg-accent text-paper' : 'bg-surface-low text-muted'
+                  }`}
+                >
+                  {domain.name} ({domain.count})
+                </button>
+              ))}
+            </div>
+          )}
+
           <div className="p-4 bg-accent/5 rounded-xl border border-accent/10 space-y-2">
             <h3 className="font-bold text-accent">Jump or listen</h3>
             <p className="text-sm text-muted">
@@ -2342,7 +2505,7 @@ export const LessonView: React.FC = () => {
           </div>
 
           <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
-            {effectiveLesson?.blocks?.map((block, index) => {
+            {visibleIndexedBlocks.map(({ block, index }) => {
               const isReading = readingBlockIndex === index;
               const preview = getBlockPreview(block);
               const label = getBlockTypeConfig(block.type || '').label;
@@ -2385,9 +2548,9 @@ export const LessonView: React.FC = () => {
               );
             })}
 
-            {(!effectiveLesson?.blocks || effectiveLesson.blocks.length === 0) && (
+            {visibleIndexedBlocks.length === 0 && (
               <div className="text-center p-8 text-muted">
-                No sections found in this lesson.
+                No sections found for this outline view.
               </div>
             )}
           </div>

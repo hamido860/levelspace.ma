@@ -58,6 +58,10 @@ type SupabaseLessonRow = {
 type SupabaseTopicRow = {
   id: string;
   title: string;
+  domain_id?: string | null;
+  domain_code?: string | null;
+  domain_name?: string | null;
+  domain_order?: number | null;
   outlines: SupabaseTopicOutlineRow[];
 };
 
@@ -148,6 +152,7 @@ export const ClassroomView: React.FC = () => {
   const [exercises, setExercises] = useState<any[]>([]);
   const [isLoadingExtra, setIsLoadingExtra] = useState(false);
   const aiAvailable = checkAIProvider();
+  const [activeDomainKey, setActiveDomainKey] = useState<string>('all');
 
   const module = useLiveQuery(() => id ? db.modules.get(id) : undefined, [id]);
   const allLessons = useLiveQuery(() => id ? db.lessons.where('moduleId').equals(id).sortBy('createdAt') : [], [id]);
@@ -206,6 +211,33 @@ export const ClassroomView: React.FC = () => {
   );
   const hasLessons = lessons.length > 0;
   const hasTopicFallback = !hasLessons && topicFallbackRows.length > 0;
+  const topicFallbackDomains = useMemo(() => {
+    const domains = new Map<string, { key: string; code: string; name: string; order: number }>();
+    for (const topic of topicFallbackRows) {
+      const key = topic.domain_id || topic.domain_code || topic.domain_name;
+      if (!key || !topic.domain_name) continue;
+      domains.set(key, {
+        key,
+        code: topic.domain_code || "DOMAIN",
+        name: topic.domain_name,
+        order: topic.domain_order ?? 999,
+      });
+    }
+    return Array.from(domains.values()).sort((left, right) => left.order - right.order || left.name.localeCompare(right.name));
+  }, [topicFallbackRows]);
+  const isFrenchClassroom = useMemo(() => {
+    const normalizedName = normalizeCurriculumValue(module?.name || '');
+    return normalizedName === 'francais' || normalizedName === 'langue francaise' || normalizedName === 'french';
+  }, [module?.name]);
+  const showDomainTabs = isFrenchClassroom && topicFallbackDomains.length > 0;
+  const visibleTopicFallbackRows = useMemo(() => {
+    if (!showDomainTabs || activeDomainKey === 'all') return topicFallbackRows;
+
+    return topicFallbackRows.filter((topic) => {
+      const key = topic.domain_id || topic.domain_code || topic.domain_name;
+      return key === activeDomainKey;
+    });
+  }, [activeDomainKey, showDomainTabs, topicFallbackRows]);
   const hasSupplementalContent = quizzes.length > 0 || exercises.length > 0;
   const showStats = module?.progress > 0 || hasLessons || hasTopicFallback;
   const showTabs = hasLessons || hasTopicFallback || hasSupplementalContent || isLoadingExtra;
@@ -334,12 +366,20 @@ export const ClassroomView: React.FC = () => {
     const { gradeId, subjectId, subjectIds } = await resolveCurriculumIds(currentGrade, module.name, module.category);
     if (!gradeId || (!subjectId && subjectIds.length === 0)) return [] as SupabaseTopicRow[];
 
-    const { data, error } = await supabase
+    const fetchTopics = async (includeDomains: boolean) => supabase
       .from('topics')
-      .select('id, title')
+      .select(includeDomains ? 'id, title, domain_id, subject_domains(code, name, domain_order)' : 'id, title')
       .eq('grade_id', gradeId)
       .in('subject_id', subjectIds.length > 0 ? subjectIds : [subjectId])
       .order('title', { ascending: true });
+
+    let { data, error } = await fetchTopics(true);
+    if (error) {
+      console.warn('[ClassroomView] topic domain metadata unavailable for fallback:', error);
+      const fallback = await fetchTopics(false);
+      data = fallback.data;
+      error = fallback.error;
+    }
 
     if (error) throw error;
 
@@ -347,6 +387,10 @@ export const ClassroomView: React.FC = () => {
       .map((topic) => ({
         id: String(topic.id),
         title: String(topic.title || '').trim(),
+        domain_id: 'domain_id' in topic ? String(topic.domain_id || '') || null : null,
+        domain_code: String((topic as any).subject_domains?.code || '').trim() || null,
+        domain_name: String((topic as any).subject_domains?.name || '').trim() || null,
+        domain_order: Number((topic as any).subject_domains?.domain_order ?? 999),
         outlines: [] as SupabaseTopicOutlineRow[],
       }))
       .filter((topic) => topic.id && topic.title);
@@ -486,6 +530,17 @@ export const ClassroomView: React.FC = () => {
       }
     })();
   }, [allLessons, classroomScopeKey, currentCountry, currentGrade, id, module, selectedBacTrack]);
+
+  useEffect(() => {
+    if (!showDomainTabs) {
+      setActiveDomainKey('all');
+      return;
+    }
+
+    if (activeDomainKey !== 'all' && !topicFallbackDomains.some((domain) => domain.key === activeDomainKey)) {
+      setActiveDomainKey('all');
+    }
+  }, [activeDomainKey, showDomainTabs, topicFallbackDomains]);
 
   useEffect(() => {
     const fetchExtraData = async () => {
@@ -995,6 +1050,15 @@ export const ClassroomView: React.FC = () => {
                   <p className="mt-1 text-sm text-blue-800">
                     {topicFallbackRows.length} curriculum topics are available from Supabase. Outlines are shown below when available; starter lessons stay out of RAG until reviewed.
                   </p>
+                  {topicFallbackDomains.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {topicFallbackDomains.map((domain) => (
+                        <span key={domain.key} className="rounded-full bg-blue-100 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-blue-800">
+                          {domain.name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
               {isAdmin && (
@@ -1131,6 +1195,36 @@ export const ClassroomView: React.FC = () => {
                     </button>
                   )}
                 </div>
+
+                {showDomainTabs && (
+                  <div className="rounded-2xl border border-ink/5 bg-paper p-2">
+                    <div className="flex gap-2 overflow-x-auto">
+                      <button
+                        onClick={() => setActiveDomainKey('all')}
+                        className={`shrink-0 rounded-xl px-4 py-2 text-[10px] font-bold uppercase tracking-widest transition-all ${
+                          activeDomainKey === 'all'
+                            ? 'bg-accent text-paper shadow-sm'
+                            : 'text-muted hover:bg-surface-low hover:text-ink'
+                        }`}
+                      >
+                        Tous
+                      </button>
+                      {topicFallbackDomains.map((domain) => (
+                        <button
+                          key={domain.key}
+                          onClick={() => setActiveDomainKey(domain.key)}
+                          className={`shrink-0 rounded-xl px-4 py-2 text-[10px] font-bold uppercase tracking-widest transition-all ${
+                            activeDomainKey === domain.key
+                              ? 'bg-accent text-paper shadow-sm'
+                              : 'text-muted hover:bg-surface-low hover:text-ink'
+                          }`}
+                        >
+                          {domain.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 
                 <div className="grid grid-cols-1 gap-3">
                   {Array.isArray(lessons) && lessons.length > 0 ? (
@@ -1188,7 +1282,7 @@ export const ClassroomView: React.FC = () => {
                       </motion.div>
                     ))
                   ) : hasTopicFallback ? (
-                    topicFallbackRows.map((topic, i) => (
+                    visibleTopicFallbackRows.map((topic, i) => (
                       <motion.div
                         key={topic.id}
                         initial={{ opacity: 0, y: 10 }}
@@ -1205,6 +1299,7 @@ export const ClassroomView: React.FC = () => {
                             <div className="mt-2 flex flex-wrap items-center gap-2">
                               <span className="pill pill--warn">needs lesson generation</span>
                               <span className="pill pill--neutral">topic from Supabase</span>
+                              {topic.domain_name && <span className="pill pill--neutral">{topic.domain_name}</span>}
                               <span className="pill pill--neutral">RAG disabled until reviewed</span>
                             </div>
                             {topic.outlines.length > 0 ? (

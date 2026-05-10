@@ -14,7 +14,7 @@ import {
   Brain,
   GraduationCap,
   BookMarked,
-  Sparkles,
+  Database,
   Wrench
 } from 'lucide-react';
 
@@ -51,6 +51,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
 
   const toolNavItems: NavItem[] = isAdmin ? [
     { label: 'Admin', icon: <ShieldCheck size={20} />, path: '/admin', matchPrefix: false },
+    { label: 'Curriculum', icon: <Database size={20} />, path: '/admin/curriculum-debug', matchPrefix: true },
     { label: 'AI Ops', icon: <Brain size={20} />, path: '/admin/ai-command-center', matchPrefix: true },
     { label: 'AI Recovery', icon: <Wrench size={20} />, path: '/admin/ai-recovery', matchPrefix: true },
   ] : [];

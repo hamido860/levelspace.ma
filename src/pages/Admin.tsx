@@ -320,21 +320,21 @@ export const Admin: React.FC = () => {
     const coveredTopicsCount = countDistinctIds(lessonTopicLinks as Array<{ topic_id?: string | null }> | null);
     const queueTopicCount = countDistinctIds(queueRows as Array<{ topic_id?: string | null }> | null);
     const normalizedTopicsCount = Math.max(topicsCount ?? 0, coveredTopicsCount, queueTopicCount);
-    const topicSource =
-      (topicsCount ?? 0) > 0 ? "topics" : queueTopicCount > 0 ? "queue" : coveredTopicsCount > 0 ? "lessons" : "topics";
     const normalizedQueueRows = (queueRows || []) as Array<{ status?: string | null }>;
+    const completedCount = normalizedQueueRows.filter((row) => row.status === "done").length;
     const pendingCount = normalizedQueueRows.filter((row) => row.status === "pending").length;
     const failedCount = normalizedQueueRows.filter((row) => row.status === "failed").length;
 
     setKpis({
-          topics: normalizedTopicsCount,
-          topicSource,
-          lessons: coveredTopicsCount,
-          pending: pendingCount,
-          failed: failedCount,
-          ragTotal: ragTotal ?? 0,
-          ragDone: ragDone ?? 0,
-          users: usersCount ?? 0,
+      topics: normalizedTopicsCount,
+      completedJobs: completedCount,
+      pendingJobs: pendingCount,
+      failedJobs: failedCount,
+      recoveredLessonsNeedsReview: 0,
+      studentPublishReadyLessons: 0,
+      ragTotal: ragTotal ?? 0,
+      ragDone: ragDone ?? 0,
+      users: usersCount ?? 0,
     });
   }, []);
 
@@ -352,7 +352,11 @@ export const Admin: React.FC = () => {
     const results = await Promise.all(
       tableNames.map(async (t) => {
         const { count } = await supabase.from(t as any).select("*", { count: "exact", head: true });
-        return { table_name: t, row_count: count };
+        return {
+          table_name: t,
+          row_count: count,
+          health_status: (count ?? 0) > 0 ? "present" : "empty",
+        } satisfies AdminTableHealth;
       })
     );
     setTableHealth(results.sort((a, b) => (b.row_count ?? -1) - (a.row_count ?? -1)));
@@ -377,7 +381,7 @@ export const Admin: React.FC = () => {
 
     if (!grades) return;
 
-    const rows: GradeRow[] = grades.map((g: any) => {
+    const rows: AdminGradeRow[] = grades.map((g: any) => {
       const gradeTopics = (topics || []).filter((t: any) => t.grade_id === g.id);
       const topicIds = new Set(gradeTopics.map((t: any) => t.id));
       const coveredTopicIds = new Set(
@@ -394,10 +398,17 @@ export const Admin: React.FC = () => {
         grade: g.name,
         grade_order: g.grade_order,
         total_topics: gradeTopics.length,
-        lessons_generated: coveredTopicIds.size,
+        lesson_rows: coveredTopicIds.size,
+        lessons_covered: coveredTopicIds.size,
+        topic_coverage: coveredTopicIds.size,
+        linked_lessons: coveredTopicIds.size,
+        unlinked_lessons: 0,
+        coverage_source: coveredTopicIds.size > 0 ? "topic_id" : "none",
+        data_notes: [],
         q_done: gradeQueue.filter((q: any) => q.status === "done").length,
         q_pending: gradeQueue.filter((q: any) => q.status === "pending").length,
         q_failed: gradeQueue.filter((q: any) => q.status === "failed").length,
+        needs_review: 0,
       };
     });
     rows.sort((a, b) => a.cycle_order - b.cycle_order || a.grade_order - b.grade_order);
@@ -406,7 +417,15 @@ export const Admin: React.FC = () => {
 
   const loadQueue = useCallback(async () => {
     const { data: qAll } = await supabase.from("lesson_gen_queue").select("status");
-    const stats = { done: 0, pending: 0, failed: 0, processing: 0 };
+    const stats: QueueStatusBreakdown = {
+      done: 0,
+      pending: 0,
+      failed: 0,
+      processing: 0,
+      other: 0,
+      unresolvedTopicJobs: 0,
+      otherStatuses: [],
+    };
     (qAll || []).forEach((r: any) => { if (r.status in stats) (stats as any)[r.status]++; });
     setQueueStats(stats);
 

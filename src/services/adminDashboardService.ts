@@ -1,11 +1,13 @@
 import { supabase, isSupabaseConfigured } from "../db/supabase";
 
 export const ADMIN_CANONICAL_QUEUE_STATUSES = ["done", "pending", "failed", "processing"] as const;
+const ADMIN_CANONICAL_RAG_STATUSES = ["done", "pending", "processing", "failed"] as const;
 
 const CONFIRMED_ADMIN_TABLES = [
   "profiles",
   "lessons",
   "topics",
+  "subject_domains",
   "grades",
   "subjects",
   "cycles",
@@ -464,43 +466,58 @@ export const loadAdminQueueMetrics = async (): Promise<{ stats: QueueStatusBreak
 export const loadAdminRagMetrics = async (): Promise<{ ragStats: RagMetrics; ragByGrade: RagByGrade[] }> => {
   ensureConfigured();
 
-  const [chunks, grades] = await Promise.all([
-    readRows<any>("rag chunks", supabase.from("rag_chunks").select("embedding_status, grade_id")),
+  const [total, done, pending, processing, failed, grades] = await Promise.all([
+    // Use exact head counts here. Plain selects are page-limited by PostgREST and cap dashboard metrics at ~1,000 rows.
+    readCount("rag chunk count", supabase.from("rag_chunks").select("*", { count: "exact", head: true })),
+    readCount("done rag chunk count", supabase.from("rag_chunks").select("*", { count: "exact", head: true }).eq("embedding_status", "done")),
+    readCount("pending rag chunk count", supabase.from("rag_chunks").select("*", { count: "exact", head: true }).eq("embedding_status", "pending")),
+    readCount("processing rag chunk count", supabase.from("rag_chunks").select("*", { count: "exact", head: true }).eq("embedding_status", "processing")),
+    readCount("failed rag chunk count", supabase.from("rag_chunks").select("*", { count: "exact", head: true }).eq("embedding_status", "failed")),
     readRows<any>("grades for rag", supabase.from("grades").select("id, name, grade_order, cycles(cycle_order)")),
   ]);
 
-  const byStatus = chunks.reduce<Record<string, number>>((acc, chunk) => {
-    const status = String(chunk.embedding_status || "unknown");
-    acc[status] = (acc[status] || 0) + 1;
-    return acc;
-  }, {});
+  const byStatus: Record<string, number> = {
+    done,
+    pending,
+    processing,
+    failed,
+  };
+  const knownStatusTotal = ADMIN_CANONICAL_RAG_STATUSES.reduce((sum, status) => sum + (byStatus[status] || 0), 0);
 
   const ragStats: RagMetrics = {
-    total: chunks.length,
-    done: byStatus.done || 0,
-    pending: byStatus.pending || 0,
-    other: chunks.length - (byStatus.done || 0) - (byStatus.pending || 0),
+    total,
+    done,
+    pending,
+    other: Math.max(0, total - knownStatusTotal),
     byStatus,
   };
 
-  const ragByGrade = grades
-    .map((grade) => {
-      const gradeChunks = chunks.filter((chunk) => chunk.grade_id === grade.id);
+  const ragByGrade = await Promise.all(
+    grades.map(async (grade) => {
+      const [gradeTotal, gradeDone, gradePending, gradeProcessing, gradeFailed] = await Promise.all([
+        readCount("rag chunks by grade", supabase.from("rag_chunks").select("*", { count: "exact", head: true }).eq("grade_id", grade.id)),
+        readCount("done rag chunks by grade", supabase.from("rag_chunks").select("*", { count: "exact", head: true }).eq("grade_id", grade.id).eq("embedding_status", "done")),
+        readCount("pending rag chunks by grade", supabase.from("rag_chunks").select("*", { count: "exact", head: true }).eq("grade_id", grade.id).eq("embedding_status", "pending")),
+        readCount("processing rag chunks by grade", supabase.from("rag_chunks").select("*", { count: "exact", head: true }).eq("grade_id", grade.id).eq("embedding_status", "processing")),
+        readCount("failed rag chunks by grade", supabase.from("rag_chunks").select("*", { count: "exact", head: true }).eq("grade_id", grade.id).eq("embedding_status", "failed")),
+      ]);
       const cycle = grade.cycles;
-      const done = gradeChunks.filter((chunk) => chunk.embedding_status === "done").length;
-      const pending = gradeChunks.filter((chunk) => chunk.embedding_status === "pending").length;
+      const gradeKnownStatusTotal = gradeDone + gradePending + gradeProcessing + gradeFailed;
 
       return {
         id: grade.id,
         grade: grade.name,
         grade_order: grade.grade_order ?? 0,
         cycle_order: cycle?.cycle_order ?? 0,
-        total: gradeChunks.length,
-        done,
-        pending,
-        other: gradeChunks.length - done - pending,
+        total: gradeTotal,
+        done: gradeDone,
+        pending: gradePending,
+        other: Math.max(0, gradeTotal - gradeKnownStatusTotal),
       } satisfies RagByGrade;
     })
+  );
+
+  ragByGrade
     .sort((left, right) => left.cycle_order - right.cycle_order || left.grade_order - right.grade_order);
 
   return { ragStats, ragByGrade };

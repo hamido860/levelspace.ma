@@ -14,10 +14,16 @@ for(const s of skipped){ if(!all.find(a=>a.number===s.number)) all.push({number:
 const posted = [];
 for(const pr of all){ const bodyFile = `pr_conflicts/pr-${pr.number}.md`; if(!fs.existsSync(bodyFile)){ console.warn('Missing body file for', pr.number); continue; }
  const title = `PR #${pr.number} has merge conflicts with main`;
- const body = fs.readFileSync(bodyFile,'utf8') + '\n\n---\nAutomated detection details:\n```
-' + (pr.details||'') + '\n```\n';
- const cmd = `curl -s -X POST -H \"Authorization: token ${token}\" -H \"Accept: application/vnd.github+json\" https://api.github.com/repos/${repo}/issues -d ${JSON.stringify(JSON.stringify({title, body}))}`;
- try{ const out = cp.execSync(cmd, {encoding:'utf8'}); const j = JSON.parse(out); posted.push({number:pr.number, issueUrl:j.html_url}); console.log('Posted issue for PR', pr.number, j.html_url); }catch(e){ console.error('Failed to post for', pr.number, e.message || e); }
+ const body = fs.readFileSync(bodyFile,'utf8') + '\n\n---\nAutomated detection details:\n```\n' + (pr.details||'') + '\n```\n';
+ const args = [
+   '-s',
+   '-X', 'POST',
+   '-H', `Authorization: token ${token}`,
+   '-H', 'Accept: application/vnd.github+json',
+   `https://api.github.com/repos/${repo}/issues`,
+   '-d', JSON.stringify({ title, body }),
+ ];
+ try{ const out = cp.execFileSync('curl', args, {encoding:'utf8'}); const j = JSON.parse(out); posted.push({number:pr.number, issueUrl:j.html_url}); console.log('Posted issue for PR', pr.number, j.html_url); }catch(e){ console.error('Failed to post for', pr.number, e.message || e); }
 }
 fs.writeFileSync('posted_issues.json', JSON.stringify(posted,null,2));
 console.log('Done.');

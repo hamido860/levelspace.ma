@@ -38,6 +38,35 @@ test('mapSubjectsToModules keeps UUID ids and does not require AI services', () 
   assert.strictEqual(modules[1].description, 'Supabase curriculum subject');
 });
 
+test('mapSubjectsToModules canonicalizes French aliases and excludes French domains', () => {
+  const modules = mapSubjectsToModules([
+    {
+      id: '365f9068-99a0-4875-8699-3c12d4f69775',
+      name: 'Français',
+      code: 'FR',
+    },
+    {
+      id: '85b33e27-f493-4803-a10e-5762ee435c93',
+      name: 'Langue Française',
+      code: 'FR_ALIAS',
+    },
+    {
+      id: '9cfa4d3d-4904-497d-a362-03737dd78104',
+      name: 'Grammaire',
+      code: 'GRAMMAIRE',
+    },
+    {
+      id: '50666429-29cc-49b8-abfb-dbbb59316555',
+      name: 'Conjugaison',
+      code: 'CONJUGAISON',
+    },
+  ], 123);
+
+  assert.strictEqual(modules.length, 1);
+  assert.strictEqual(modules[0].id, '365f9068-99a0-4875-8699-3c12d4f69775');
+  assert.strictEqual(modules[0].name, 'Français');
+});
+
 test('mergeModulesWithAiSuggestions keeps Supabase modules and appends unique AI suggestions', () => {
   const merged = mergeModulesWithAiSuggestions(
     [
@@ -45,6 +74,16 @@ test('mergeModulesWithAiSuggestions keeps Supabase modules and appends unique AI
         id: 'supabase-1',
         name: 'Mathematics',
         code: 'MATH',
+        description: 'From Supabase',
+        category: 'General',
+        progress: 0,
+        selected: false,
+        createdAt: 1,
+      },
+      {
+        id: 'supabase-fr',
+        name: 'Français',
+        code: 'FR',
         description: 'From Supabase',
         category: 'General',
         progress: 0,
@@ -73,12 +112,23 @@ test('mergeModulesWithAiSuggestions keeps Supabase modules and appends unique AI
         selected: false,
         createdAt: 2,
       },
+      {
+        id: 'ai-fr-alias',
+        name: 'Langue Française',
+        code: 'FR_ALIAS',
+        description: 'AI duplicate',
+        category: 'General',
+        progress: 0,
+        selected: false,
+        createdAt: 2,
+      },
     ]
   );
 
-  assert.strictEqual(merged.length, 2);
+  assert.strictEqual(merged.length, 3);
   assert.strictEqual(merged[0].id, 'supabase-1');
-  assert.strictEqual(merged[1].id, 'ai-2');
+  assert.strictEqual(merged[1].id, 'supabase-fr');
+  assert.strictEqual(merged[2].id, 'ai-2');
 });
 
 test('shouldRequestAiCurriculumSuggestions keeps classroom loading Supabase-first', () => {
