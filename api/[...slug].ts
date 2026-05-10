@@ -16,6 +16,7 @@ import {
   fetchTaskBundle,
   generateAiRecoveryRepairSql,
   getServerSupabase,
+  getAuthenticatedUser,
   isWriteMode,
   loadAiRecoveryFailedJobs,
   loadAiRecoveryJobDiagnostics,
@@ -131,11 +132,19 @@ async function handleNvidiaProxy(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const authorizationHeader = Array.isArray(req.headers.authorization)
-    ? req.headers.authorization[0]
-    : req.headers.authorization;
+  // Ensure the user is authenticated to prevent unauthenticated proxy abuse (SSRF)
+  try {
+    await getAuthenticatedUser(req);
+  } catch (error) {
+    return sendError(res, error, "Authentication required for proxy.");
+  }
+
+  const apiKeyHeader = Array.isArray(req.headers["x-nvidia-api-key"])
+    ? req.headers["x-nvidia-api-key"][0]
+    : req.headers["x-nvidia-api-key"];
+
   const apiKey =
-    authorizationHeader?.replace(/^Bearer\s+/i, "") ||
+    apiKeyHeader ||
     process.env.NVIDIA_API_KEY ||
     process.env.VITE_NVIDIA_API_KEY;
 
