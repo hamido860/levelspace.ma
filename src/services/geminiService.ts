@@ -3,6 +3,7 @@ import { jsonrepair } from "jsonrepair";
 import { moroccanAcademicDb } from "../data/moroccan_academic_db";
 import { toast } from "sonner";
 import { db } from "../db/db";
+import { supabase } from "../db/supabase";
 import { searchContextForGeneration } from "./ragService";
 import { transformersService } from "./transformersService";
 import { mcpClient } from "./mcpClient";
@@ -111,13 +112,25 @@ export async function callNvidiaAPI(params: {
   }
 
   // Use our local proxy to avoid CORS errors when called from browser
-  const endpoint = typeof window !== 'undefined' ? '/api/nvidia-proxy' : 'https://integrate.api.nvidia.com/v1/chat/completions';
+  const isBrowser = typeof window !== 'undefined';
+  const endpoint = isBrowser ? '/api/nvidia-proxy' : 'https://integrate.api.nvidia.com/v1/chat/completions';
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  if (isBrowser) {
+    headers["X-Nvidia-Api-Key"] = apiKey;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      headers.Authorization = `Bearer ${session.access_token}`;
+    }
+  } else {
+    headers.Authorization = `Bearer ${apiKey}`;
+  }
+
   const response = await fetch(endpoint, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
+    headers,
     body: JSON.stringify(body),
   });
 
