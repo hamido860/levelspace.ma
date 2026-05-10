@@ -68,6 +68,7 @@ const GRADE_EQUIVALENTS: Record<string, string[]> = {
   "1ere bac": ["1ère Bac", "1ere Bac", "1ère année Bac", "1ere annee Bac", "Première", "Bac 1"],
   "grade 10": ["Tronc Commun", "Seconde", "TC"],
   "tronc commun": ["Tronc Commun", "Seconde", "TC", "Grade 10"],
+  "tronc commun scientifique": ["Tronc Commun", "Tronc Commun Scientifique", "Seconde", "TC", "Grade 10"],
   seconde: ["Seconde", "Tronc Commun", "TC", "Grade 10"],
 };
 
@@ -97,7 +98,14 @@ export const getSubjectCandidates = (name: string, category?: string | null) => 
 
 export const getGradeCandidates = (grade: string) => {
   const normalizedGrade = normalizeCurriculumValue(grade);
-  return uniqueValues([grade, ...((GRADE_EQUIVALENTS[normalizedGrade] || []) as string[])]);
+  const inferredCandidates = normalizedGrade.includes("tronc commun")
+    ? GRADE_EQUIVALENTS["tronc commun"] || []
+    : [];
+  return uniqueValues([
+    grade,
+    ...((GRADE_EQUIVALENTS[normalizedGrade] || []) as string[]),
+    ...inferredCandidates,
+  ]);
 };
 
 export const deriveCycleFromGrade = (grade: string) => {
