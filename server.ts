@@ -45,6 +45,7 @@ const apiRouteTable = [
   ["/api/admin/ai-recovery/tasks/:taskId/reject-sql", "./api/admin/ai-recovery/tasks/[taskId]/reject-sql.ts"],
   ["/api/admin/ai-recovery/tasks/:taskId/reset", "./api/admin/ai-recovery/tasks/[taskId]/reset.ts"],
   ["/api/admin/ai-recovery/tasks/:taskId/safety-check", "./api/admin/ai-recovery/tasks/[taskId]/safety-check.ts"],
+  ["/api/admin/lessons/seed-starter", "./api/admin/lessons/seed-starter.ts"],
   ["/api/admin/topics/repair", "./api/admin/topics/repair.ts"],
 ] as const;
 

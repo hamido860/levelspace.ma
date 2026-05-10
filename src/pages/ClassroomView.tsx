@@ -879,8 +879,15 @@ export const ClassroomView: React.FC = () => {
         body: JSON.stringify({ topic_ids: topicFallbackRows.map((topic) => topic.id) }),
       });
 
-      const payload = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(payload.error || `Request failed with status ${res.status}`);
+      const responseText = await res.text();
+      const payload = responseText ? (() => {
+        try {
+          return JSON.parse(responseText);
+        } catch {
+          return {};
+        }
+      })() : {};
+      if (!res.ok) throw new Error(payload.error || responseText || `Request failed with status ${res.status}`);
 
       const inserted = Number(payload.summary?.insertedLessons ?? 0);
       const skipped = Number(payload.summary?.skippedLessons ?? 0);

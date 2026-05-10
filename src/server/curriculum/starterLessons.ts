@@ -29,6 +29,16 @@ type TopicRow = {
   subjects?: NestedRow<{ name?: string | null }>;
 };
 
+const OPTIONAL_LESSON_INSERT_COLUMNS = [
+  "teaching_contract",
+  "status",
+  "tags",
+  "is_ai_generated",
+  "topic_id",
+  "blocks",
+  "subtitle",
+] as const;
+
 const first = <T>(value: NestedRow<T>): T | null =>
   Array.isArray(value) ? value[0] ?? null : value ?? null;
 
@@ -45,6 +55,39 @@ const buildStarterContent = (topicTitle: string, grade: string, subject: string)
     "",
     "This is not a final lesson. A teacher or curriculum admin must add reviewed instructional content before student use or RAG embedding.",
   ].join("\n");
+
+const getMissingColumnName = (error: unknown) => {
+  const code = String((error as { code?: string } | null)?.code || "");
+  const message = String((error as { message?: string } | null)?.message || "");
+  if (code !== "42703" && !/column .* does not exist|could not find .* column/i.test(message)) return null;
+
+  return OPTIONAL_LESSON_INSERT_COLUMNS.find((column) => message.toLowerCase().includes(column.toLowerCase())) || null;
+};
+
+const withoutColumn = (rows: any[], column: string) =>
+  rows.map((row) => {
+    const next = { ...row };
+    delete next[column];
+    return next;
+  });
+
+const insertStarterLessonBatch = async (supabase: SupabaseLike, rows: any[]) => {
+  let remainingRows = rows;
+  const strippedColumns = new Set<string>();
+
+  for (let attempt = 0; attempt <= OPTIONAL_LESSON_INSERT_COLUMNS.length; attempt += 1) {
+    const { error } = await supabase.from("lessons").insert(remainingRows);
+    if (!error) return;
+
+    const missingColumn = getMissingColumnName(error);
+    if (!missingColumn || strippedColumns.has(missingColumn)) {
+      throw error;
+    }
+
+    strippedColumns.add(missingColumn);
+    remainingRows = withoutColumn(remainingRows, missingColumn);
+  }
+};
 
 export async function seedStarterLessonsFromTopics(
   supabase: SupabaseLike,
@@ -127,8 +170,7 @@ export async function seedStarterLessonsFromTopics(
   if (options.commit && rowsToInsert.length > 0) {
     for (let start = 0; start < rowsToInsert.length; start += 100) {
       const batch = rowsToInsert.slice(start, start + 100);
-      const { error: insertError } = await supabase.from("lessons").insert(batch);
-      if (insertError) throw insertError;
+      await insertStarterLessonBatch(supabase, batch);
     }
   }
 
