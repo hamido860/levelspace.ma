@@ -225,11 +225,7 @@ export const ClassroomView: React.FC = () => {
     }
     return Array.from(domains.values()).sort((left, right) => left.order - right.order || left.name.localeCompare(right.name));
   }, [topicFallbackRows]);
-  const isFrenchClassroom = useMemo(() => {
-    const normalizedName = normalizeCurriculumValue(module?.name || '');
-    return normalizedName === 'francais' || normalizedName === 'langue francaise' || normalizedName === 'french';
-  }, [module?.name]);
-  const showDomainTabs = isFrenchClassroom && topicFallbackDomains.length > 0;
+  const showDomainTabs = topicFallbackDomains.length > 0;
   const visibleTopicFallbackRows = useMemo(() => {
     if (!showDomainTabs || activeDomainKey === 'all') return topicFallbackRows;
 

@@ -165,6 +165,7 @@ const getBlockPreview = (block: any) => {
 };
 
 type LessonMainTab = 'content' | 'quizzes' | 'exercises';
+type LessonDomain = { code: string; name: string };
 
 const FRENCH_DOMAIN_KEYWORDS: Record<string, string[]> = {
   GRAMMAIRE: ['grammaire', 'phrase', 'sujet', 'verbe', 'complement', 'adjectif', 'nom', 'determinant', 'pronom', 'accord'],
@@ -195,16 +196,49 @@ const getBlockSearchText = (block: any) =>
       : []),
   ].filter(Boolean).join(' '));
 
-const getFrenchDomainForBlock = (block: any) => {
-  const explicitDomain = String(block?.domain_code || block?.domain || block?.subject_domain || '').trim().toUpperCase();
-  if (explicitDomain && FRENCH_SUBJECT_DOMAINS.some((domain) => domain.code === explicitDomain)) return explicitDomain;
+const formatDomainName = (value: string) =>
+  value
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
+const normalizeDomainCode = (value: string) =>
+  normalizeLessonSearchText(value)
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .toUpperCase();
+
+const getExplicitBlockDomain = (block: any): LessonDomain | null => {
+  const rawCode = String(block?.domain_code || block?.subject_domain_code || '').trim();
+  const rawName = String(block?.domain_name || block?.subject_domain_name || block?.domain || block?.subject_domain || '').trim();
+  const rawValue = rawCode || rawName;
+  if (!rawValue) return null;
+
+  const code = normalizeDomainCode(rawCode || rawName);
+  if (!code) return null;
+
+  const knownFrenchDomain = FRENCH_SUBJECT_DOMAINS.find((domain) => domain.code === code);
+  return {
+    code,
+    name: rawName || knownFrenchDomain?.name || formatDomainName(rawCode || code),
+  };
+};
+
+const getBlockDomain = (block: any, isFrenchLesson: boolean): LessonDomain | null => {
+  const explicitDomain = getExplicitBlockDomain(block);
+  if (explicitDomain) return explicitDomain;
+
+  if (!isFrenchLesson) return null;
 
   const text = getBlockSearchText(block);
-  return FRENCH_SUBJECT_DOMAINS.find((domain) => {
+  const matchedDomain = FRENCH_SUBJECT_DOMAINS.find((domain) => {
     const domainName = normalizeLessonSearchText(domain.name);
     const keywords = FRENCH_DOMAIN_KEYWORDS[domain.code] || [];
     return text.includes(domainName) || keywords.some((keyword) => text.includes(normalizeLessonSearchText(keyword)));
-  })?.code || 'LECTURE';
+  }) || FRENCH_SUBJECT_DOMAINS.find((domain) => domain.code === 'LECTURE') || FRENCH_SUBJECT_DOMAINS[0];
+
+  return matchedDomain ? { code: matchedDomain.code, name: matchedDomain.name } : null;
 };
 
 const Timer = () => {
@@ -1035,17 +1069,33 @@ export const LessonView: React.FC = () => {
   const indexedBlocks = blocks.map((block: any, index: number) => ({
     block,
     index,
-    domainCode: getFrenchDomainForBlock(block),
+    domain: getBlockDomain(block, isFrenchLesson),
   }));
-  const frenchDomainStats = FRENCH_SUBJECT_DOMAINS.map((domain) => ({
-    ...domain,
-    count: indexedBlocks.filter((item) => item.domainCode === domain.code).length,
-  }));
+  const lessonDomainStats = (() => {
+    if (isFrenchLesson) {
+      return FRENCH_SUBJECT_DOMAINS.map((domain) => ({
+        ...domain,
+        count: indexedBlocks.filter((item) => item.domain?.code === domain.code).length,
+      }));
+    }
+
+    const domains = new Map<string, LessonDomain & { count: number }>();
+    for (const item of indexedBlocks) {
+      if (!item.domain) continue;
+      const existing = domains.get(item.domain.code);
+      domains.set(item.domain.code, {
+        ...item.domain,
+        count: (existing?.count || 0) + 1,
+      });
+    }
+    return Array.from(domains.values()).sort((left, right) => left.name.localeCompare(right.name));
+  })();
+  const showLessonDomainTabs = lessonDomainStats.length > 0;
   const visibleIndexedBlocks =
-    isFrenchLesson && activeFrenchDomain !== 'all'
-      ? indexedBlocks.filter((item) => item.domainCode === activeFrenchDomain)
+    showLessonDomainTabs && activeFrenchDomain !== 'all'
+      ? indexedBlocks.filter((item) => item.domain?.code === activeFrenchDomain)
       : indexedBlocks;
-  const selectedFrenchDomain = frenchDomainStats.find((domain) => domain.code === activeFrenchDomain);
+  const selectedLessonDomain = lessonDomainStats.find((domain) => domain.code === activeFrenchDomain);
   const totalBlocks = blocks.length > 0 ? blocks.length : 1;
   const openCount = openBlocks.length;
   const progressPct = Math.round((openCount / totalBlocks) * 100);
@@ -1075,9 +1125,9 @@ export const LessonView: React.FC = () => {
       isOpen,
     };
   });
-  const visibleBlockCards = activeFrenchDomain === 'all'
+  const visibleBlockCards = !showLessonDomainTabs || activeFrenchDomain === 'all'
     ? blockCards
-    : blockCards.filter((card) => indexedBlocks[card.index]?.domainCode === activeFrenchDomain);
+    : blockCards.filter((card) => indexedBlocks[card.index]?.domain?.code === activeFrenchDomain);
   const nextBlockCard = blockCards.find((card) => !card.isOpen) || blockCards[0];
   const outlinePreviewCards = nextBlockCard
     ? [nextBlockCard, ...blockCards.filter((card) => card.id !== nextBlockCard.id).slice(0, 2)]
@@ -1645,13 +1695,13 @@ export const LessonView: React.FC = () => {
           </button>
         </div>
 
-        {isFrenchLesson && blocks.length > 0 && (
+        {showLessonDomainTabs && blocks.length > 0 && (
           <section className="mb-8 rounded-3xl border border-surface-mid bg-paper p-4 shadow-sm">
             <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">French study domains</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Study domains</p>
                 <h2 className="text-lg font-bold text-ink">
-                  {selectedFrenchDomain ? selectedFrenchDomain.name : 'All domains'}
+                  {selectedLessonDomain ? selectedLessonDomain.name : 'All domains'}
                 </h2>
               </div>
               <p className="max-w-xl text-xs leading-relaxed text-muted">
@@ -1671,7 +1721,7 @@ export const LessonView: React.FC = () => {
                 Tous
                 <span className="ml-2 rounded-full bg-paper/20 px-1.5 py-0.5">{blocks.length}</span>
               </button>
-              {frenchDomainStats.map((domain) => (
+              {lessonDomainStats.map((domain) => (
                 <button
                   key={domain.code}
                   onClick={() => setActiveFrenchDomain(domain.code)}
@@ -2504,7 +2554,7 @@ export const LessonView: React.FC = () => {
             </div>
           </div>
 
-          {isFrenchLesson && (
+          {showLessonDomainTabs && (
             <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
               <button
                 onClick={() => setActiveFrenchDomain('all')}
@@ -2514,7 +2564,7 @@ export const LessonView: React.FC = () => {
               >
                 Tous
               </button>
-              {frenchDomainStats.map((domain) => (
+              {lessonDomainStats.map((domain) => (
                 <button
                   key={domain.code}
                   onClick={() => setActiveFrenchDomain(domain.code)}
