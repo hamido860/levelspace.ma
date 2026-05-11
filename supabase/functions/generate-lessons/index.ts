@@ -139,6 +139,18 @@ const formatDbError = (error: any) =>
     error?.code ? `code=${error.code}` : null,
   ].filter(Boolean).join(" | ") || "Unknown database error";
 
+type RagChunkInput = {
+  content?: string | null;
+  source_name?: string | null;
+  source_url?: string | null;
+  metadata?: Record<string, unknown> | null;
+};
+
+type TopicData = {
+  outlines: TopicOutlineInput[];
+  ragChunks: RagChunkInput[];
+};
+
 async function fetchTopicOutlines(supabaseAdmin: any, topicId: string | null): Promise<TopicOutlineInput[]> {
   if (!topicId) return [];
 
@@ -151,6 +163,69 @@ async function fetchTopicOutlines(supabaseAdmin: any, topicId: string | null): P
   if (error) throw new Error(`topic_outlines lookup failed: ${formatDbError(error)}`);
   return (data || []) as TopicOutlineInput[];
 }
+
+async function fetchTopicData(supabaseAdmin: any, topicId: string | null): Promise<TopicData> {
+  const outlines = await fetchTopicOutlines(supabaseAdmin, topicId);
+  if (!topicId) {
+    console.warn("generate-lessons source fallback: no resolved topic_id; cannot fetch rag_chunks");
+    return { outlines, ragChunks: [] };
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("rag_chunks")
+    .select("content, source_name, source_url, metadata")
+    .eq("topic_id", topicId)
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  if (error) throw new Error(`rag_chunks lookup by topic_id failed: ${formatDbError(error)}`);
+
+  const ragChunks = ((data || []) as RagChunkInput[]).filter((chunk) => normalizeValue(chunk.content).length > 0);
+  if (ragChunks.length === 0) {
+    console.warn(`generate-lessons source fallback: no rag_chunks for topic_id=${topicId}; using topic_outlines count=${outlines.length}`);
+  }
+
+  return { outlines, ragChunks };
+}
+
+const buildSourceContext = (topicData: TopicData) => {
+  if (topicData.ragChunks.length > 0) {
+    return [
+      "Certified RAG chunks for this exact topic:",
+      ...topicData.ragChunks.map((chunk, index) => `Chunk ${index + 1}:\n${normalizeValue(chunk.content)}`),
+    ].join("\n\n");
+  }
+
+  if (topicData.outlines.length > 0) {
+    return [
+      "No RAG chunks exist for this topic. Use these topic_outlines as the lesson skeleton:",
+      ...topicData.outlines.map((outline, index) => {
+        const title = normalizeValue(String(outline.title ?? ""));
+        const description = normalizeValue(String(outline.description ?? ""));
+        return `Outline ${index + 1}: ${[title, description].filter(Boolean).join(" - ")}`;
+      }),
+    ].join("\n");
+  }
+
+  return "No RAG chunks or topic_outlines were found for this topic. Generate a cautious draft using the exact grade, country, subject, and topic only.";
+};
+
+const buildFallbackLessonFromOutlines = (
+  topicTitle: string,
+  outlines: TopicOutlineInput[],
+  reason: string
+) => {
+  const blocks = buildFallbackBlocksFromOutlines(topicTitle, outlines);
+  return {
+    lesson_title: normalizeValue(topicTitle) || "Generated lesson",
+    content: blocks.map((block) => block.content).join("\n\n"),
+    blocks,
+    exercises: [],
+    quizzes: [],
+    exam: null,
+    fallback_reason: reason,
+  };
+};
 
 async function writeGenerationLog(
   supabaseAdmin: any,
@@ -219,6 +294,9 @@ async function persistLessonBlocks(
   lessonId: string,
   blocks: NormalizedLessonBlock[]
 ) {
+  const { error: deleteError } = await supabaseAdmin.from("lesson_blocks").delete().eq("lesson_id", lessonId);
+  if (deleteError) throw new Error(`lesson_blocks cleanup failed: ${formatDbError(deleteError)}`);
+
   const rows = blocks.map((block, index) => ({
     lesson_id: lessonId,
     type: block.type,
@@ -266,52 +344,56 @@ Deno.serve(async (req) => {
     if (!geminiKey && !nvidiaKey) {
       return new Response(
         JSON.stringify({ success: false, error: "No AI API key configured (GEMINI_KEY_0 or NVIDIA_API_KEY)" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     // ── Generate lesson ────────────────────────────────────────────────────────
-    const lesson = await generateLesson({ topic, country, grade, subject, moduleName, referenceUrls, existingContext, geminiKey, nvidiaKey });
-
-    if (!lesson) {
-      const detailedError = "Block generation failed: AI returned no parseable lesson JSON";
-      await writeGenerationLog(supabaseAdmin, {
-        topicId: null,
-        blocksCount: null,
-        success: false,
-        error: detailedError,
-        durationMs: Date.now() - startedAt,
-      });
-      await saveQueueError(supabaseAdmin, queueJobId, detailedError);
-
-      return new Response(
-        JSON.stringify({ success: false, error: detailedError }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // ── Persist to Supabase (service role — no RLS restriction) ───────────────
     const topicContext = await resolveTopicContext(supabaseAdmin, {
       grade,
       subject,
       topic,
-      lessonTitle: lesson.lesson_title,
     });
     activeTopicId = topicContext?.topicId ?? null;
+    const topicData = await fetchTopicData(supabaseAdmin, activeTopicId);
+    const hasRagChunks = topicData.ragChunks.length > 0;
+    const sourceName = hasRagChunks ? "rag_chunks" : "topic_outlines";
+    const sourceContext = [
+      existingContext ? `Existing lessons for context:\n${existingContext}` : "",
+      buildSourceContext(topicData),
+    ].filter(Boolean).join("\n\n");
+
+    let lesson = await generateLesson({ topic, country, grade, subject, moduleName, referenceUrls, existingContext: sourceContext, geminiKey, nvidiaKey });
+    let fallbackUsed = false;
+
+    if (!lesson) {
+      fallbackUsed = true;
+      const reason = hasRagChunks
+        ? "JSON parse failure: AI returned empty or invalid JSON; fallback used"
+        : "Block generation fallback used: no chunks and AI returned empty or invalid JSON";
+      console.warn(`generate-lessons fallback used for topic_id=${activeTopicId ?? "unresolved"}: ${reason}`);
+      lesson = buildFallbackLessonFromOutlines(topicContext?.topicTitle ?? topic, topicData.outlines, reason);
+    }
+
+    // ── Persist to Supabase (service role — no RLS restriction) ───────────────
     const cycle = deriveCycleFromGrade(grade);
-    const outlines = await fetchTopicOutlines(supabaseAdmin, topicContext?.topicId ?? null);
     let lessonBlocks = normalizeLessonBlocks(lesson.blocks);
 
     if (lessonBlocks.length === 0) {
-      lessonBlocks = buildFallbackBlocksFromOutlines(topicContext?.topicTitle ?? topic, outlines);
+      fallbackUsed = true;
+      console.warn(`generate-lessons fallback used for topic_id=${activeTopicId ?? "unresolved"}: AI blocks empty or invalid; using topic_outlines count=${topicData.outlines.length}`);
+      lessonBlocks = buildFallbackBlocksFromOutlines(topicContext?.topicTitle ?? topic, topicData.outlines);
     }
 
     const normalizedContent = normalizeValue(lesson.content)
       || lessonBlocks.map((block) => block.content).join("\n\n");
 
+    const qualityScore = fallbackUsed || !hasRagChunks ? 0.65 : 0.85;
+    const sourceConfidence = hasRagChunks ? 0.75 : 0.45;
+
     const { data: inserted, error: lessonErr } = await supabaseAdmin
       .from("lessons")
-      .insert({
+      .upsert({
         country,
         cycle,
         grade,
@@ -319,6 +401,11 @@ Deno.serve(async (req) => {
         topic_id: topicContext?.topicId ?? null,
         lesson_title: lesson.lesson_title,
         content: normalizedContent,
+        status: "draft",
+        validation_status: "needs_review",
+        quality_score: qualityScore,
+        source_confidence: sourceConfidence,
+        source_name: sourceName,
         exercises: lesson.exercises ?? [],
         quizzes: lesson.quizzes ?? [],
         mod: lesson.mod ?? null,
@@ -326,13 +413,13 @@ Deno.serve(async (req) => {
         author_id: userId ?? null,
         is_ai_generated: true,
         blocks: lessonBlocks,
-      })
+      }, { onConflict: "topic_id,lesson_title" })
       .select("id")
       .single();
 
     if (lessonErr) {
-      const detailedError = `lessons insert failed: ${formatDbError(lessonErr)}`;
-      console.error("Failed to insert lesson:", lessonErr);
+      const detailedError = `save error: lessons upsert failed: ${formatDbError(lessonErr)}`;
+      console.error("generate-lessons save error:", lessonErr);
       await writeGenerationLog(supabaseAdmin, {
         topicId: topicContext?.topicId ?? null,
         blocksCount: lessonBlocks.length,
@@ -344,7 +431,7 @@ Deno.serve(async (req) => {
 
       return new Response(
         JSON.stringify({ success: false, error: detailedError }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -367,7 +454,7 @@ Deno.serve(async (req) => {
 
       return new Response(
         JSON.stringify({ success: false, error: detailedError, lessonId }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -380,8 +467,13 @@ Deno.serve(async (req) => {
           const { error: chunkErr } = await supabaseAdmin.from("rag_chunks").insert({
             source_id: lessonId,
             source_type: "lesson_block",
+            lesson_id: lessonId,
+            topic_id: topicContext?.topicId ?? null,
+            grade_id: topicContext?.gradeId ?? null,
             content: chunk,
             embedding,
+            source_name: "generated_lesson",
+            source_confidence: sourceConfidence,
             metadata: {
               user_id: userId ?? null,
               subject,
@@ -410,7 +502,15 @@ Deno.serve(async (req) => {
     await saveQueueSuccess(supabaseAdmin, queueJobId);
 
     return new Response(
-      JSON.stringify({ success: true, lessonId, blocksCount: lessonBlocks.length }),
+      JSON.stringify({
+        success: true,
+        lessonId,
+        blocksCount: lessonBlocks.length,
+        fallbackUsed,
+        sourceName,
+        sourceConfidence,
+        qualityScore,
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err: any) {
@@ -430,7 +530,7 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({ success: false, error: detailedError }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
@@ -463,7 +563,15 @@ async function generateLesson(params: {
       if (res.ok) {
         const data = await res.json();
         const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) return safeJsonParse(text);
+        if (text) {
+          const parsed = safeJsonParse(text);
+          if (parsed) return parsed;
+          console.warn("Gemini JSON parse failure: response was not valid lesson JSON");
+        } else {
+          console.warn("Gemini empty response: no candidate text returned");
+        }
+      } else {
+        console.warn(`Gemini request failed: status=${res.status} body=${await res.text()}`);
       }
     } catch (e) {
       console.warn("Gemini failed:", e);
@@ -488,7 +596,15 @@ async function generateLesson(params: {
       if (res.ok) {
         const data = await res.json();
         const text = data?.choices?.[0]?.message?.content;
-        if (text) return safeJsonParse(text);
+        if (text) {
+          const parsed = safeJsonParse(text);
+          if (parsed) return parsed;
+          console.warn("NVIDIA JSON parse failure: response was not valid lesson JSON");
+        } else {
+          console.warn("NVIDIA empty response: no message content returned");
+        }
+      } else {
+        console.warn(`NVIDIA request failed: status=${res.status} body=${await res.text()}`);
       }
     } catch (e) {
       console.warn("NVIDIA fallback failed:", e);
@@ -524,6 +640,8 @@ Generate a complete lesson for:
 - Country: ${country}
 - Grade: ${grade}
 - Subject: ${subject}${moduleName ? `\n- Module: ${moduleName}` : ""}${existingContext ? `\n\nExisting lessons for context:\n${existingContext}` : ""}${referenceUrls?.length ? `\n\nReference URLs: ${referenceUrls.join(", ")}` : ""}
+
+Adapt to the exact grade above. Do not assume the learner is a Bac student unless the grade explicitly says Bac. Adjust vocabulary, pacing, examples, exercises, and exam style for primary, college, Tronc Commun, 1ere Bac, or 2eme Bac as appropriate.
 
 Return ONLY valid JSON matching this exact schema:
 {
