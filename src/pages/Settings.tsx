@@ -69,6 +69,13 @@ const TONE_OPTIONS = ['Encouraging', 'Calm', 'Direct', 'Coach-like'] as const;
 const EXPLANATION_STYLES = ['Step by step', 'Simple', 'Exam-focused', 'Real-world'] as const;
 const MOTIVATION_FOCUS_OPTIONS = ['Confidence', 'Career', 'Grades', 'Discipline'] as const;
 
+const ACADEMIC_SETTING_KEYS = [
+  'selected_country',
+  'selected_grade',
+  'selected_bac_section',
+  'selected_bac_track',
+  'selected_bac_int_option',
+] as const;
 
 
 export const Settings: React.FC = () => {
@@ -257,6 +264,23 @@ export const Settings: React.FC = () => {
   const selectedSectionName = dbBacSections.find((section) => section.id === bacSection)?.name || '';
   const selectedTrackName = dbBacTracks.find((track) => track.id === bacTrack)?.name || '';
   const selectedOptionName = dbBacIntOptions.find((option) => option.id === bacIntOption)?.name || '';
+  const lockedAcademicValues = useMemo(() => ({
+    selected_country: String(settingsMap.selected_country || 'Morocco'),
+    selected_grade: String(profile?.selected_grade || settingsMap.selected_grade || selectedGrade),
+    selected_bac_section: String(settingsMap.selected_bac_section || ''),
+    selected_bac_track: String(profile?.selected_bac_track || settingsMap.selected_bac_track || ''),
+    selected_bac_int_option: String(settingsMap.selected_bac_int_option || ''),
+  }), [
+    profile?.selected_bac_track,
+    profile?.selected_grade,
+    selectedGrade,
+    settingsMap.selected_bac_int_option,
+    settingsMap.selected_bac_section,
+    settingsMap.selected_bac_track,
+    settingsMap.selected_country,
+    settingsMap.selected_grade,
+  ]);
+  const lockedAcademicSyncKey = useRef('');
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -268,14 +292,49 @@ export const Settings: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    if (!isLocked || isAdmin) return;
+
+    const nextSyncKey = JSON.stringify(lockedAcademicValues);
+    if (lockedAcademicSyncKey.current === nextSyncKey) return;
+    lockedAcademicSyncKey.current = nextSyncKey;
+
+    setSelectedCountry(lockedAcademicValues.selected_country);
+    setSelectedGrade(lockedAcademicValues.selected_grade);
+    setBacSection(lockedAcademicValues.selected_bac_section);
+    setBacTrack(lockedAcademicValues.selected_bac_track);
+    setBacIntOption(lockedAcademicValues.selected_bac_int_option);
+
+    for (const key of ACADEMIC_SETTING_KEYS) {
+      localStorage.setItem(key, lockedAcademicValues[key]);
+    }
+
+    db.settings.bulkPut(ACADEMIC_SETTING_KEYS.map((key) => ({
+      key,
+      value: lockedAcademicValues[key],
+    }))).catch((err) => {
+      console.error('Failed to restore locked academic settings:', err);
+    });
+  }, [isAdmin, isLocked, lockedAcademicValues]);
+
   const handleSave = async () => {
-    localStorage.setItem('selected_country', selectedCountry);
-    localStorage.setItem('selected_grade', selectedGrade);
+    const academicValues = isLocked && !isAdmin
+      ? lockedAcademicValues
+      : {
+        selected_country: selectedCountry,
+        selected_grade: selectedGrade,
+        selected_bac_section: bacSection,
+        selected_bac_track: bacTrack,
+        selected_bac_int_option: bacIntOption,
+      };
+
+    localStorage.setItem('selected_country', academicValues.selected_country);
+    localStorage.setItem('selected_grade', academicValues.selected_grade);
     localStorage.setItem('current_session', currentSession);
     localStorage.setItem('default_session_duration', defaultDuration.toString());
-    localStorage.setItem('selected_bac_section', bacSection);
-    localStorage.setItem('selected_bac_track', bacTrack);
-    localStorage.setItem('selected_bac_int_option', bacIntOption);
+    localStorage.setItem('selected_bac_section', academicValues.selected_bac_section);
+    localStorage.setItem('selected_bac_track', academicValues.selected_bac_track);
+    localStorage.setItem('selected_bac_int_option', academicValues.selected_bac_int_option);
     localStorage.setItem('career_goal', careerGoal);
     localStorage.setItem('career_goal_custom', careerGoalCustom);
     localStorage.setItem('hobbies', JSON.stringify(hobbies));
@@ -285,13 +344,13 @@ export const Settings: React.FC = () => {
     localStorage.setItem('motivation_focus', motivationFocus);
 
     await db.settings.bulkPut([
-      { key: 'selected_country', value: selectedCountry },
-      { key: 'selected_grade', value: selectedGrade },
+      { key: 'selected_country', value: academicValues.selected_country },
+      { key: 'selected_grade', value: academicValues.selected_grade },
       { key: 'current_session', value: currentSession },
       { key: 'default_session_duration', value: defaultDuration },
-      { key: 'selected_bac_section', value: bacSection },
-      { key: 'selected_bac_track', value: bacTrack },
-      { key: 'selected_bac_int_option', value: bacIntOption },
+      { key: 'selected_bac_section', value: academicValues.selected_bac_section },
+      { key: 'selected_bac_track', value: academicValues.selected_bac_track },
+      { key: 'selected_bac_int_option', value: academicValues.selected_bac_int_option },
       { key: 'career_goal', value: careerGoal },
       { key: 'career_goal_custom', value: careerGoalCustom },
       { key: 'hobbies', value: hobbies },
@@ -304,8 +363,8 @@ export const Settings: React.FC = () => {
     if (user && (!isLocked || isAdmin)) {
       try {
         await updateProfile(user.id, {
-          selected_grade: selectedGrade,
-          selected_bac_track: bacTrack || null,
+          selected_grade: academicValues.selected_grade,
+          selected_bac_track: academicValues.selected_bac_track || null,
         });
       } catch (err: any) {
         console.error('Failed to save academic profile:', err.message);
