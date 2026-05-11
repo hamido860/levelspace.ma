@@ -245,15 +245,35 @@ export const Modules: React.FC = () => {
 
   const [bacTrackName, setBacTrackName] = useState<string>('');
   const [bacIntOptionName, setBacIntOptionName] = useState<string>('');
-  const trustedSubjectNames = buildTrustedSubjectNames(country, grade, bacTrackName || selectedBacTrackId);
-  const trustedSubjectSet = buildTrustedSubjectSet(trustedSubjectNames);
-  const modules = (dbModules || [])
-    .filter((module) => moduleMatchesTrustedSubjects(module, trustedSubjectSet))
-    .map(m => ({
-      ...m,
-      icon: getIconForCategory(m.category)
-    }));
-  const selectedCount = modules.filter(m => m.selected).length;
+
+  // ⚡ Bolt: Memoize derived data arrays and structures from useLiveQuery results
+  // Impact: Prevents O(n) re-computation of trusted subjects and filtering mapping arrays on every render.
+  // This solves a known Dexie useLiveQuery issue where returning primitive structures creates new references
+  // causing cascading re-renders in children on every tick.
+  const trustedSubjectNames = useMemo(() =>
+    buildTrustedSubjectNames(country, grade, bacTrackName || selectedBacTrackId),
+    [country, grade, bacTrackName, selectedBacTrackId]
+  );
+
+  const trustedSubjectSet = useMemo(() =>
+    buildTrustedSubjectSet(trustedSubjectNames),
+    [trustedSubjectNames]
+  );
+
+  const modules = useMemo(() =>
+    (dbModules || [])
+      .filter((module) => moduleMatchesTrustedSubjects(module, trustedSubjectSet))
+      .map(m => ({
+        ...m,
+        icon: getIconForCategory(m.category)
+      })),
+    [dbModules, trustedSubjectSet]
+  );
+
+  const selectedCount = useMemo(() =>
+    modules.filter(m => m.selected).length,
+    [modules]
+  );
 
   useEffect(() => {
     const fetchBacDetails = async () => {
@@ -408,9 +428,14 @@ export const Modules: React.FC = () => {
     await db.modules.bulkPut(updates);
   };
 
-  const filteredModules = modules.filter(m => 
-    m.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    m.code.toLowerCase().includes(searchQuery.toLowerCase())
+  // ⚡ Bolt: Memoize module filtering against search query
+  // Impact: Eliminates expensive string `.includes` operations inside `.filter` loops during renders that don't change search inputs or modules.
+  const filteredModules = useMemo(() =>
+    modules.filter(m =>
+      m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      m.code.toLowerCase().includes(searchQuery.toLowerCase())
+    ),
+    [modules, searchQuery]
   );
 
   return (
