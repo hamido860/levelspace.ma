@@ -18,6 +18,7 @@ import { Library } from './pages/Library';
 import { Admin } from './pages/Admin';
 import { AdminCurriculumDebug } from './pages/AdminCurriculumDebug';
 import { AdminCurriculumReview } from './pages/AdminCurriculumReview';
+import { AdminMcpLessons } from './pages/AdminMcpLessons';
 import { AiCommandCenter } from './pages/AiCommandCenter';
 import { AdminAiRecovery } from './pages/AdminAiRecovery';
 import { AdminAiRecoveryTaskDetail } from './pages/AdminAiRecoveryTaskDetail';
@@ -58,6 +59,7 @@ export default function App() {
                 <Route path="/admin" element={<ProtectedRoute requireAdmin><Admin /></ProtectedRoute>} />
                 <Route path="/admin/curriculum-debug" element={<ProtectedRoute requireAdmin><AdminCurriculumDebug /></ProtectedRoute>} />
                 <Route path="/admin/curriculum-review" element={<ProtectedRoute requireAdmin><AdminCurriculumReview /></ProtectedRoute>} />
+                <Route path="/admin/mcp-lessons" element={<ProtectedRoute requireAdmin><AdminMcpLessons /></ProtectedRoute>} />
                 <Route path="/admin/ai-command-center" element={<ProtectedRoute requireAdmin><AiCommandCenter /></ProtectedRoute>} />
                 <Route path="/admin/ai-recovery" element={<ProtectedRoute requireAdmin><AdminAiRecovery /></ProtectedRoute>} />
                 <Route path="/admin/ai-recovery/failed-jobs" element={<ProtectedRoute requireAdmin><AdminAiRecovery /></ProtectedRoute>} />
