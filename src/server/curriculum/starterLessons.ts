@@ -29,6 +29,12 @@ type TopicRow = {
   subjects?: NestedRow<{ name?: string | null }>;
 };
 
+type ExistingLessonRow = {
+  topic_id?: string | null;
+  lesson_title?: string | null;
+  title?: string | null;
+};
+
 const OPTIONAL_LESSON_INSERT_COLUMNS = [
   "teaching_contract",
   "status",
@@ -43,6 +49,7 @@ const first = <T>(value: NestedRow<T>): T | null =>
   Array.isArray(value) ? value[0] ?? null : value ?? null;
 
 const clean = (value: unknown) => String(value || "").trim().replace(/\s+/g, " ");
+const normalizeKey = (value: unknown) => clean(value).toLocaleLowerCase();
 
 const buildStarterContent = (topicTitle: string, grade: string, subject: string) =>
   [
@@ -62,6 +69,19 @@ const getMissingColumnName = (error: unknown) => {
   if (code !== "42703" && !/column .* does not exist|could not find .* column/i.test(message)) return null;
 
   return OPTIONAL_LESSON_INSERT_COLUMNS.find((column) => message.toLowerCase().includes(column.toLowerCase())) || null;
+};
+
+const isMissingColumnError = (error: unknown, column?: string) => {
+  const code = String((error as { code?: string } | null)?.code || "");
+  const message = String((error as { message?: string } | null)?.message || "").toLowerCase();
+  if (code !== "42703" && !/column .* does not exist|could not find .* column/i.test(message)) return false;
+  return column ? message.includes(column.toLowerCase()) : true;
+};
+
+const isMissingRelationshipError = (error: unknown) => {
+  const code = String((error as { code?: string } | null)?.code || "");
+  const message = String((error as { message?: string } | null)?.message || "").toLowerCase();
+  return code === "PGRST200" || /relationship|schema cache|foreign key/i.test(message);
 };
 
 const withoutColumn = (rows: any[], column: string) =>
@@ -89,41 +109,96 @@ const insertStarterLessonBatch = async (supabase: SupabaseLike, rows: any[]) => 
   }
 };
 
+const fetchTopicRows = async (supabase: SupabaseLike, topicIds: string[]) => {
+  const applyTopicFilter = (query: any) => (topicIds.length > 0 ? query.in("id", topicIds) : query);
+
+  let richTopicQuery = applyTopicFilter(
+    supabase
+      .from("topics")
+      .select("id, title, grades(name, cycles(name)), subjects(name)")
+      .order("title", { ascending: true }),
+  );
+
+  const richResult = await richTopicQuery;
+  if (!richResult.error) return (richResult.data || []) as TopicRow[];
+
+  if (!isMissingRelationshipError(richResult.error)) {
+    throw richResult.error;
+  }
+
+  let fallbackTopicQuery = applyTopicFilter(
+    supabase
+      .from("topics")
+      .select("id, title")
+      .order("title", { ascending: true }),
+  );
+  const fallbackResult = await fallbackTopicQuery;
+  if (fallbackResult.error) throw fallbackResult.error;
+
+  return (fallbackResult.data || []) as TopicRow[];
+};
+
+const fetchExistingLessonRows = async (supabase: SupabaseLike, topicIds: string[]) => {
+  const existingTopicIds = new Set<string>();
+  const existingTitleKeys = new Set<string>();
+
+  for (let start = 0; start < topicIds.length; start += 100) {
+    const batch = topicIds.slice(start, start + 100);
+    if (batch.length === 0) continue;
+
+    const byTopic = await supabase
+      .from("lessons")
+      .select("topic_id, lesson_title, title")
+      .in("topic_id", batch);
+
+    if (!byTopic.error) {
+      for (const lesson of (byTopic.data || []) as ExistingLessonRow[]) {
+        if (lesson.topic_id) existingTopicIds.add(lesson.topic_id);
+        const titleKey = normalizeKey(lesson.lesson_title || lesson.title);
+        if (titleKey) existingTitleKeys.add(titleKey);
+      }
+      continue;
+    }
+
+    if (!isMissingColumnError(byTopic.error, "topic_id")) {
+      throw byTopic.error;
+    }
+
+    const byTitle = await supabase
+      .from("lessons")
+      .select("lesson_title, title");
+
+    if (byTitle.error) {
+      if (isMissingColumnError(byTitle.error, "title")) {
+        const legacyByTitle = await supabase.from("lessons").select("lesson_title");
+        if (legacyByTitle.error) throw legacyByTitle.error;
+        for (const lesson of (legacyByTitle.data || []) as ExistingLessonRow[]) {
+          const titleKey = normalizeKey(lesson.lesson_title);
+          if (titleKey) existingTitleKeys.add(titleKey);
+        }
+        continue;
+      }
+
+      throw byTitle.error;
+    }
+
+    for (const lesson of (byTitle.data || []) as ExistingLessonRow[]) {
+      const titleKey = normalizeKey(lesson.lesson_title || lesson.title);
+      if (titleKey) existingTitleKeys.add(titleKey);
+    }
+  }
+
+  return { existingTopicIds, existingTitleKeys };
+};
+
 export async function seedStarterLessonsFromTopics(
   supabase: SupabaseLike,
   options: StarterLessonSeedOptions = {},
 ): Promise<StarterLessonSeedSummary> {
   const topicIds = Array.from(new Set((options.topicIds || []).map(clean).filter(Boolean)));
-  let topicQuery = supabase
-    .from("topics")
-    .select("id, title, grades(name, cycles(name)), subjects(name)")
-    .order("title", { ascending: true });
-
-  if (topicIds.length > 0) {
-    topicQuery = topicQuery.in("id", topicIds);
-  }
-
-  const { data: topics, error: topicsError } = await topicQuery;
-  if (topicsError) throw topicsError;
-
-  const topicRows = (topics || []) as TopicRow[];
+  const topicRows = await fetchTopicRows(supabase, topicIds);
   const allTopicIds = topicRows.map((topic) => topic.id).filter(Boolean);
-  const existingTopicIds = new Set<string>();
-
-  for (let start = 0; start < allTopicIds.length; start += 100) {
-    const batch = allTopicIds.slice(start, start + 100);
-    if (batch.length === 0) continue;
-
-    const { data: lessons, error: lessonsError } = await supabase
-      .from("lessons")
-      .select("topic_id")
-      .in("topic_id", batch);
-
-    if (lessonsError) throw lessonsError;
-    for (const lesson of lessons || []) {
-      if (lesson.topic_id) existingTopicIds.add(lesson.topic_id);
-    }
-  }
+  const { existingTopicIds, existingTitleKeys } = await fetchExistingLessonRows(supabase, allTopicIds);
 
   const rowsToInsert: any[] = [];
   const inserted: StarterLessonSeedSummary["inserted"] = [];
@@ -138,6 +213,11 @@ export async function seedStarterLessonsFromTopics(
 
     if (existingTopicIds.has(topic.id)) {
       skipped.push({ topic_id: topic.id, title: topicTitle, reason: "lesson already exists for topic_id" });
+      continue;
+    }
+
+    if (existingTitleKeys.has(normalizeKey(topicTitle))) {
+      skipped.push({ topic_id: topic.id, title: topicTitle, reason: "lesson already exists for title" });
       continue;
     }
 
