@@ -538,7 +538,8 @@ export const LessonView: React.FC = () => {
           .from('lessons')
           .select(selectColumns)
           .or(`id.eq.${id},topic_id.eq.${id}`)
-          .maybeSingle();
+          .maybeSingle()
+          .throwOnError();
 
         if (isCancelled) return;
         if (directMatch.data) {
@@ -558,7 +559,7 @@ export const LessonView: React.FC = () => {
           titleQuery = titleQuery.in('subject', subjectCandidates);
         }
 
-        const { data: titleMatches } = await titleQuery.limit(5);
+        const { data: titleMatches } = await titleQuery.limit(5).throwOnError();
         if (isCancelled) return;
 
         const fallbackMatch = (titleMatches || [])[0] as SupabaseLessonRecord | undefined;
@@ -647,6 +648,11 @@ export const LessonView: React.FC = () => {
   const effectiveLesson = lesson
     ? {
         ...lesson,
+        title: supabaseLesson?.lesson_title || lesson.title,
+        content: supabaseLesson?.content || lesson.content,
+        blocks: supabaseLesson?.blocks ?? lesson.blocks,
+        subtitle: supabaseLesson?.subtitle ?? lesson.subtitle,
+        tags: supabaseLesson?.tags || lesson.tags,
         grade: lesson.grade || supabaseLesson?.grade || undefined,
         country: lesson.country || supabaseLesson?.country || undefined,
         subject: lesson.subject || supabaseLesson?.subject || module?.name || undefined,

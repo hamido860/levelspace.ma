@@ -1086,6 +1086,12 @@ const rootRoutes: Record<string, RouteHandler> = {
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.setHeader("CDN-Cache-Control", "no-store");
+  res.setHeader("Vercel-CDN-Cache-Control", "no-store");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+
   const segments = getSegments(req);
   const key = routeKey(segments);
 
