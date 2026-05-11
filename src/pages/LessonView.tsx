@@ -1033,8 +1033,8 @@ export const LessonView: React.FC = () => {
       <Layout fullWidth topbarGradeOverride={lessonGrade}>
         <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
           <AlertCircle className="w-12 h-12 text-error" />
-          <p className="text-ink font-medium">Lesson not found.</p>
-          <button onClick={() => navigate('/dashboard')} className="text-accent hover:underline">Return to Dashboard</button>
+          <p className="text-ink font-medium">{t('lesson_not_found')}</p>
+          <button onClick={() => navigate('/dashboard')} className="text-accent hover:underline">{t('return_to_dashboard')}</button>
         </div>
       </Layout>
     );
@@ -1045,9 +1045,9 @@ export const LessonView: React.FC = () => {
       <Layout fullWidth topbarGradeOverride={lessonGrade}>
         <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4 px-6 text-center">
           <ShieldAlert className="w-12 h-12 text-error" />
-          <p className="text-ink font-medium">This lesson is not available to students.</p>
-          <p className="max-w-lg text-sm text-muted">It is currently blocked by curriculum review rules or has been rejected during validation.</p>
-          <button onClick={() => navigate('/dashboard')} className="text-accent hover:underline">Return to Dashboard</button>
+          <p className="text-ink font-medium">{t('lesson_unavailable')}</p>
+          <p className="max-w-lg text-sm text-muted">{t('lesson_unavailable_desc')}</p>
+          <button onClick={() => navigate('/dashboard')} className="text-accent hover:underline">{t('return_to_dashboard')}</button>
         </div>
       </Layout>
     );
@@ -1429,7 +1429,7 @@ export const LessonView: React.FC = () => {
             className="flex items-center gap-2 text-sm font-medium text-ink-muted hover:text-ink transition-colors mb-6"
           >
             <ArrowLeft className="w-4 h-4" />
-            Back to Dashboard
+            {t('back_to_dashboard')}
           </button>
 
           {/* Lesson Header */}
@@ -1618,11 +1618,11 @@ export const LessonView: React.FC = () => {
         <section className="lesson-cockpit">
           <div className="lesson-cockpit__stats">
             <div className="lesson-cockpit__stat">
-              <span className="lesson-cockpit__stat-label">Concepts</span>
+              <span className="lesson-cockpit__stat-label">{t('concepts')}</span>
               <strong className="lesson-cockpit__stat-value">{conceptBlockCount}</strong>
             </div>
             <div className="lesson-cockpit__stat">
-              <span className="lesson-cockpit__stat-label">Interactive</span>
+              <span className="lesson-cockpit__stat-label">{t('interactive')}</span>
               <strong className="lesson-cockpit__stat-value">{interactiveBlockCount}</strong>
             </div>
             <div className="lesson-cockpit__stat">
@@ -1687,7 +1687,7 @@ export const LessonView: React.FC = () => {
               activeTab === 'quizzes' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-ink'
             }`}
           >
-            Quizzes
+            {t('quizzes')}
             {quizzes.length > 0 && <span className="bg-accent/10 text-accent px-1.5 py-0.5 rounded text-[10px]">{quizzes.length}</span>}
           </button>
           <button
@@ -1696,7 +1696,7 @@ export const LessonView: React.FC = () => {
               activeTab === 'exercises' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-ink'
             }`}
           >
-            Exercises
+            {t('exercises')}
             {exercises.length > 0 && <span className="bg-accent/10 text-accent px-1.5 py-0.5 rounded text-[10px]">{exercises.length}</span>}
           </button>
         </div>
@@ -1705,9 +1705,9 @@ export const LessonView: React.FC = () => {
           <section className="mb-8 rounded-3xl border border-surface-mid bg-paper p-4 shadow-sm">
             <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Study domains</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">{t('study_domains')}</p>
                 <h2 className="text-lg font-bold text-ink">
-                  {selectedLessonDomain ? selectedLessonDomain.name : 'All domains'}
+                  {selectedLessonDomain ? selectedLessonDomain.name : t('all_domains')}
                 </h2>
               </div>
               <p className="max-w-xl text-xs leading-relaxed text-muted">
@@ -1724,7 +1724,7 @@ export const LessonView: React.FC = () => {
                     : 'bg-surface-low text-muted hover:bg-accent/10 hover:text-accent'
                 }`}
               >
-                Tous
+                {t('all')}
                 <span className="ml-2 rounded-full bg-paper/20 px-1.5 py-0.5">{blocks.length}</span>
               </button>
               {lessonDomainStats.map((domain) => (
@@ -2453,13 +2453,13 @@ export const LessonView: React.FC = () => {
             className="flex-1 h-12 bg-paper border border-surface-mid rounded-xl flex items-center justify-center gap-2 text-xs font-bold text-ink-secondary hover:bg-surface-low transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
-            Back
+            {t('back')}
           </button>
           <button 
             onClick={markLessonComplete}
             className="flex-1 h-12 bg-ink text-paper rounded-xl flex items-center justify-center gap-2 text-xs font-bold hover:bg-accent transition-colors"
           >
-            Complete Lesson
+            {t('complete_lesson')}
             <CheckCircle2 className="w-4 h-4" />
           </button>
         </footer>
@@ -2471,7 +2471,7 @@ export const LessonView: React.FC = () => {
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-bold text-ink flex items-center gap-2">
                 <Target size={20} className="text-accent" />
-                Lesson Quizzes
+                {t('lesson_quizzes')}
               </h3>
             </div>
             {isLoadingExtra ? (
@@ -2491,7 +2491,7 @@ export const LessonView: React.FC = () => {
               </div>
             ) : (
               <div className="bg-surface-low/50 border border-dashed border-ink/10 rounded-3xl p-16 text-center">
-                <p className="text-muted">No quizzes available for this lesson yet.</p>
+                <p className="text-muted">{t('no_quizzes_for_lesson')}</p>
               </div>
             )}
           </div>
@@ -2502,7 +2502,7 @@ export const LessonView: React.FC = () => {
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-bold text-ink flex items-center gap-2">
                 <Dumbbell size={20} className="text-accent" />
-                Practice Exercises
+                {t('practice_exercises')}
               </h3>
             </div>
             {isLoadingExtra ? (
@@ -2521,7 +2521,7 @@ export const LessonView: React.FC = () => {
               </div>
             ) : (
               <div className="bg-surface-low/50 border border-dashed border-ink/10 rounded-3xl p-16 text-center">
-                <p className="text-muted">No exercises available for this lesson yet.</p>
+                <p className="text-muted">{t('no_exercises_for_lesson')}</p>
               </div>
             )}
           </div>
@@ -2542,20 +2542,20 @@ export const LessonView: React.FC = () => {
             setReadingBlockIndex(null);
           }
         }}
-        title="Lesson Outline"
+        title={t('lesson_outline')}
       >
         <div className="space-y-4">
           <div className="outline-summary">
             <div className="outline-summary__stat">
-              <span className="outline-summary__label">Visible</span>
+              <span className="outline-summary__label">{t('visible')}</span>
               <strong className="outline-summary__value">{visibleIndexedBlocks.length}</strong>
             </div>
             <div className="outline-summary__stat">
-              <span className="outline-summary__label">Concepts</span>
+              <span className="outline-summary__label">{t('concepts')}</span>
               <strong className="outline-summary__value">{conceptBlockCount}</strong>
             </div>
             <div className="outline-summary__stat">
-              <span className="outline-summary__label">Interactive</span>
+              <span className="outline-summary__label">{t('interactive')}</span>
               <strong className="outline-summary__value">{interactiveBlockCount}</strong>
             </div>
           </div>
@@ -2568,7 +2568,7 @@ export const LessonView: React.FC = () => {
                   activeFrenchDomain === 'all' ? 'bg-ink text-paper' : 'bg-surface-low text-muted'
                 }`}
               >
-                Tous
+                {t('all')}
               </button>
               {lessonDomainStats.map((domain) => (
                 <button

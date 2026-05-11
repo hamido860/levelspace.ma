@@ -482,7 +482,7 @@ export const Settings: React.FC = () => {
               activeTab === 'profile' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-ink'
             }`}
           >
-            Academic Path
+            {t('academic_path')}
           </button>
           <button
             onClick={() => setActiveTab('preferences')}
@@ -490,7 +490,7 @@ export const Settings: React.FC = () => {
               activeTab === 'preferences' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-ink'
             }`}
           >
-            Preferences
+            {t('preferences')}
           </button>
         </div>
 
@@ -507,42 +507,42 @@ export const Settings: React.FC = () => {
                     <GraduationCap className="w-5 h-5" />
                   </div>
                   <div className="space-y-1">
-                    <h2 className="text-lg font-medium text-ink">Academic identity</h2>
+                    <h2 className="text-lg font-medium text-ink">{t('academic_identity')}</h2>
                     <p className="text-xs text-muted leading-relaxed">
-                      This keeps the official curriculum accurate. Normal learners should set it during onboarding and use future goals below to personalize AI explanations.
+                      {t('academic_identity_desc')}
                     </p>
                   </div>
                 </div>
                 <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${isLocked ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-700 border border-amber-500/20'}`}>
-                  {isLocked ? 'Locked after onboarding' : 'Editable for setup'}
+                  {isLocked ? t('locked_after_onboarding') : t('editable_for_setup')}
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div className="p-4 rounded-2xl border border-ink/5 bg-surface-low space-y-1">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-muted">Country</span>
-                  <p className="text-sm font-semibold text-ink">{currentCountryName || 'Not set'}</p>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-muted">{t('country')}</span>
+                  <p className="text-sm font-semibold text-ink">{currentCountryName || t('not_set')}</p>
                 </div>
                 <div className="p-4 rounded-2xl border border-ink/5 bg-surface-low space-y-1">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-muted">Grade</span>
-                  <p className="text-sm font-semibold text-ink">{selectedGrade || 'Not set'}</p>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-muted">{t('grade')}</span>
+                  <p className="text-sm font-semibold text-ink">{selectedGrade || t('not_set')}</p>
                 </div>
                 <div className="p-4 rounded-2xl border border-ink/5 bg-surface-low space-y-1">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-muted">Track</span>
-                  <p className="text-sm font-semibold text-ink">{selectedTrackName || selectedSectionName || 'Not set'}</p>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-muted">{t('track')}</span>
+                  <p className="text-sm font-semibold text-ink">{selectedTrackName || selectedSectionName || t('not_set')}</p>
                   {selectedOptionName && <p className="text-[11px] text-muted">{selectedOptionName}</p>}
                 </div>
               </div>
 
               {isLocked ? (
                 <div className="p-4 bg-background border border-ink/10 rounded-2xl text-xs text-muted leading-relaxed">
-                  Your academic identity now acts as the official curriculum anchor. Change hobbies, goals, tone, and skills below without changing the school program itself.
+                  {t('locked_academic_desc')}
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-muted">Country</label>
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-muted">{t('country')}</label>
                       <div className="relative" ref={dropdownRef}>
                         <button
                           onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -602,7 +602,7 @@ export const Settings: React.FC = () => {
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-muted">Grade</label>
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-muted">{t('grade')}</label>
                       <div key={selectedCountry} className="grid grid-cols-1 gap-2 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
                         {currentGrades.map((grade, index) => (
                           <button
@@ -625,7 +625,7 @@ export const Settings: React.FC = () => {
                   {selectedCountry === 'Morocco' && (selectedGrade.includes('Bac') || selectedGrade.includes('Tronc Commun')) && (
                     <div className="space-y-4">
                       <div className="space-y-2">
-                        <label className="text-[10px] font-bold uppercase tracking-widest text-muted">Section</label>
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-muted">{t('section')}</label>
                         <div className="grid grid-cols-1 gap-2 max-h-[180px] overflow-y-auto pr-2 custom-scrollbar">
                           {dbBacSections.map((section) => (
                             <button
@@ -650,7 +650,7 @@ export const Settings: React.FC = () => {
 
                       {bacSection && !selectedGrade.includes('Tronc Commun') && (
                         <div className="space-y-2">
-                          <label className="text-[10px] font-bold uppercase tracking-widest text-muted">Track</label>
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-muted">{t('track')}</label>
                           <div className="grid grid-cols-1 gap-2 max-h-[180px] overflow-y-auto pr-2 custom-scrollbar">
                             {dbBacTracks.filter((track) => track.section_id === bacSection).map((track) => (
                               <button
@@ -675,7 +675,7 @@ export const Settings: React.FC = () => {
 
                       {bacTrack && !selectedGrade.includes('Tronc Commun') && dbBacTrackIntOptions.some((item) => item.track_id === bacTrack) && (
                         <div className="space-y-2">
-                          <label className="text-[10px] font-bold uppercase tracking-widest text-muted">International option</label>
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-muted">{t('international_option')}</label>
                           <div className="grid grid-cols-1 gap-2 max-h-[180px] overflow-y-auto pr-2 custom-scrollbar">
                             <button
                               onClick={() => setBacIntOption('')}
@@ -685,7 +685,7 @@ export const Settings: React.FC = () => {
                                   : 'bg-background border-ink/5 text-ink hover:border-accent/30'
                               }`}
                             >
-                              <span className="text-xs font-medium text-left pr-2">None</span>
+                              <span className="text-xs font-medium text-left pr-2">{t('none')}</span>
                               {bacIntOption === '' && <CheckCircle2 className="w-3.5 h-3.5 text-paper shrink-0" />}
                             </button>
                             {dbBacTrackIntOptions
@@ -723,14 +723,14 @@ export const Settings: React.FC = () => {
                   <Target className="w-4 h-4" />
                 </div>
                 <div className="space-y-0.5">
-                  <h2 className="text-base font-medium text-ink leading-tight">Future goals</h2>
-                  <p className="text-[10px] text-muted/60 leading-tight">This shapes AI tone, examples, and projects without changing the official curriculum.</p>
+                  <h2 className="text-base font-medium text-ink leading-tight">{t('future_goals')}</h2>
+                  <p className="text-[10px] text-muted/60 leading-tight">{t('future_goals_desc')}</p>
                 </div>
               </div>
 
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted">Career direction</label>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted">{t('career_direction')}</label>
                   <div className="grid grid-cols-2 gap-2">
                     {CAREER_GOALS.map((goal) => (
                       <button
@@ -750,18 +750,18 @@ export const Settings: React.FC = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted">Custom goal</label>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted">{t('custom_goal')}</label>
                   <input
                     type="text"
                     value={careerGoalCustom}
                     onChange={(e) => setCareerGoalCustom(e.target.value)}
-                    placeholder="Pediatric doctor, civil engineer, product designer..."
+                    placeholder={t('custom_goal_placeholder')}
                     className="w-full p-3 bg-background border border-ink/5 rounded-xl text-sm outline-none focus:ring-1 focus:ring-accent/20"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted">Hobbies and interests</label>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted">{t('hobbies_interests')}</label>
                   <div className="flex gap-2">
                     <input
                       type="text"
@@ -773,14 +773,14 @@ export const Settings: React.FC = () => {
                           addToken(hobbyInput, setHobbies, () => setHobbyInput(''));
                         }
                       }}
-                      placeholder="Robotics, football, drawing..."
+                      placeholder={t('hobbies_placeholder')}
                       className="flex-1 p-3 bg-background border border-ink/5 rounded-xl text-sm outline-none focus:ring-1 focus:ring-accent/20"
                     />
                     <button
                       onClick={() => addToken(hobbyInput, setHobbies, () => setHobbyInput(''))}
                       className="px-4 py-3 rounded-xl bg-ink text-paper text-[10px] font-bold uppercase tracking-widest"
                     >
-                      Add
+                      {t('add')}
                     </button>
                   </div>
                   {hobbies.length > 0 && (
@@ -807,14 +807,14 @@ export const Settings: React.FC = () => {
                   <Brain className="w-4 h-4" />
                 </div>
                 <div className="space-y-0.5">
-                  <h2 className="text-base font-medium text-ink leading-tight">Learning style</h2>
-                  <p className="text-[10px] text-muted/60 leading-tight">Guide how the AI explains ideas, motivates you, and connects schoolwork to your future.</p>
+                  <h2 className="text-base font-medium text-ink leading-tight">{t('learning_style')}</h2>
+                  <p className="text-[10px] text-muted/60 leading-tight">{t('learning_style_desc')}</p>
                 </div>
               </div>
 
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted">Target skills</label>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted">{t('target_skills')}</label>
                   <div className="flex gap-2">
                     <input
                       type="text"
@@ -826,14 +826,14 @@ export const Settings: React.FC = () => {
                           addToken(targetSkillInput, setTargetSkills, () => setTargetSkillInput(''));
                         }
                       }}
-                      placeholder="Problem solving, public speaking, writing..."
+                      placeholder={t('target_skills_placeholder')}
                       className="flex-1 p-3 bg-background border border-ink/5 rounded-xl text-sm outline-none focus:ring-1 focus:ring-accent/20"
                     />
                     <button
                       onClick={() => addToken(targetSkillInput, setTargetSkills, () => setTargetSkillInput(''))}
                       className="px-4 py-3 rounded-xl bg-ink text-paper text-[10px] font-bold uppercase tracking-widest"
                     >
-                      Add
+                      {t('add')}
                     </button>
                   </div>
                   {targetSkills.length > 0 && (
@@ -854,7 +854,7 @@ export const Settings: React.FC = () => {
 
                 <div className="grid grid-cols-1 gap-3">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted">Preferred tone</label>
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted">{t('preferred_tone')}</label>
                     <div className="grid grid-cols-2 gap-2">
                       {TONE_OPTIONS.map((option) => (
                         <button
@@ -873,7 +873,7 @@ export const Settings: React.FC = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted">Explanation style</label>
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted">{t('explanation_style')}</label>
                     <div className="grid grid-cols-2 gap-2">
                       {EXPLANATION_STYLES.map((option) => (
                         <button
@@ -892,7 +892,7 @@ export const Settings: React.FC = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted">Motivation focus</label>
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted">{t('motivation_focus')}</label>
                     <div className="grid grid-cols-2 gap-2">
                       {MOTIVATION_FOCUS_OPTIONS.map((option) => (
                         <button
@@ -919,23 +919,23 @@ export const Settings: React.FC = () => {
                   <Cloud className="w-4 h-4" />
                 </div>
                 <div className="space-y-0.5">
-                  <h2 className="text-base font-medium text-ink leading-tight">Cloud and data</h2>
-                  <p className="text-[10px] text-muted/60 leading-tight">Sync your work across devices without treating this page like a database reset.</p>
+                  <h2 className="text-base font-medium text-ink leading-tight">{t('cloud_and_data')}</h2>
+                  <p className="text-[10px] text-muted/60 leading-tight">{t('cloud_and_data_desc')}</p>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4 items-center">
                 <div className="p-4 bg-surface-low rounded-2xl border border-ink/5 flex items-center justify-between gap-4">
                   <div className="space-y-1">
-                    <p className="text-xs font-bold text-ink uppercase tracking-widest">Supabase connection</p>
+                    <p className="text-xs font-bold text-ink uppercase tracking-widest">{t('supabase_connection')}</p>
                     <p className="text-[10px] text-muted">
-                      Status: <span className={dbConnected ? 'text-success font-bold' : 'text-error font-bold'}>{dbConnected ? 'Connected' : 'Disconnected'}</span>
+                      {t('status')}: <span className={dbConnected ? 'text-success font-bold' : 'text-error font-bold'}>{dbConnected ? t('connected') : t('disconnected')}</span>
                     </p>
                   </div>
                   <button
                     onClick={refreshDbConnection}
                     className="p-2 hover:bg-ink/5 rounded-full transition-all"
-                    title="Refresh Connection"
+                    title={t('refresh_connection')}
                   >
                     <RefreshCw className={`w-4 h-4 text-muted ${dbConnected === null ? 'animate-spin' : ''}`} />
                   </button>
@@ -961,7 +961,7 @@ export const Settings: React.FC = () => {
                   className="w-full md:w-auto flex items-center justify-center gap-3 px-6 py-4 bg-accent text-paper rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-accent-hover transition-all shadow-lg shadow-accent/20 disabled:opacity-50"
                 >
                   {isSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Cloud className="w-4 h-4" />}
-                  {isSyncing ? 'Synchronizing...' : 'Sync all data'}
+                  {isSyncing ? t('synchronizing') : t('sync_all_data')}
                 </button>
               </div>
             </section>
@@ -982,7 +982,7 @@ export const Settings: React.FC = () => {
                 </div>
                 <div className="space-y-0.5">
                   <h2 className="text-base font-medium text-ink leading-tight">{t('session_settings')}</h2>
-                  <p className="text-[10px] text-muted/60 leading-tight">Configure study session defaults</p>
+                  <p className="text-[10px] text-muted/60 leading-tight">{t('configure_study_defaults')}</p>
                 </div>
               </div>
               
@@ -1023,8 +1023,8 @@ export const Settings: React.FC = () => {
                   <Key className="w-4 h-4" />
                 </div>
                 <div className="space-y-0.5">
-                  <h2 className="text-base font-medium text-ink leading-tight">AI Provider API Key</h2>
-                  <p className="text-[10px] text-muted/60 leading-tight">Configure your AI key — classroom content works without one</p>
+                  <h2 className="text-base font-medium text-ink leading-tight">{t('ai_provider_api_key')}</h2>
+                  <p className="text-[10px] text-muted/60 leading-tight">{t('ai_provider_api_key_desc')}</p>
                 </div>
               </div>
 
@@ -1040,7 +1040,7 @@ export const Settings: React.FC = () => {
                   />
                 </div>
                 <div className="text-xs text-muted leading-relaxed space-y-1">
-                  <p>Stored locally in your browser — never sent to our servers.</p>
+                  <p>{t('stored_locally')}</p>
                   <p className="text-[10px] font-mono text-muted/60">AI_PROVIDER · AI_API_KEY · AI_MODEL · AI_BASE_URL</p>
                 </div>
               </div>
@@ -1053,7 +1053,7 @@ export const Settings: React.FC = () => {
                   }`}
                 >
                   {isApiKeySaved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-                  {isApiKeySaved ? 'Saved' : 'Save Key'}
+                  {isApiKeySaved ? t('saved') : t('save_key')}
                 </button>
               </div>
             </section>
@@ -1065,8 +1065,8 @@ export const Settings: React.FC = () => {
                   <Key className="w-4 h-4" />
                 </div>
                 <div className="space-y-0.5">
-                  <h2 className="text-base font-medium text-ink leading-tight">NVIDIA NIM API Key</h2>
-                  <p className="text-[10px] text-muted/60 leading-tight">Admin AI features only — Gemma 3 27B via server proxy</p>
+                  <h2 className="text-base font-medium text-ink leading-tight">{t('nvidia_api_key')}</h2>
+                  <p className="text-[10px] text-muted/60 leading-tight">{t('nvidia_api_key_desc')}</p>
                 </div>
               </div>
 
@@ -1082,7 +1082,7 @@ export const Settings: React.FC = () => {
                   />
                 </div>
                 <div className="text-xs text-muted leading-relaxed">
-                  Used for admin bulk generation. Model: <span className="font-mono text-accent">google/gemma-3-27b-it</span>. Get a free key at <span className="font-mono">build.nvidia.com</span>.
+                  {t('nvidia_api_key_help')}
                 </div>
               </div>
 
@@ -1094,7 +1094,7 @@ export const Settings: React.FC = () => {
                   }`}
                 >
                   {isNvidiaKeySaved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-                  {isNvidiaKeySaved ? 'Saved' : 'Save Key'}
+                  {isNvidiaKeySaved ? t('saved') : t('save_key')}
                 </button>
               </div>
             </section>
@@ -1107,15 +1107,15 @@ export const Settings: React.FC = () => {
                     <DatabaseIcon className="w-4 h-4" />
                   </div>
                   <div className="space-y-0.5">
-                    <h2 className="text-base font-medium text-ink leading-tight">Supabase Cloud Sync</h2>
-                    <p className="text-[10px] text-muted/60 leading-tight">Connect to your own database for cross-device sync</p>
+                    <h2 className="text-base font-medium text-ink leading-tight">{t('supabase_cloud_sync')}</h2>
+                    <p className="text-[10px] text-muted/60 leading-tight">{t('supabase_cloud_sync_desc')}</p>
                   </div>
                 </div>
                 <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 ${
                   dbConnected ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'
                 }`}>
                   <div className={`w-1.5 h-1.5 rounded-full ${dbConnected ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`} />
-                  {dbConnected ? 'Connected' : 'Local-Only Mode'}
+                  {dbConnected ? t('connected') : t('local_only_mode')}
                 </div>
               </div>
 
@@ -1124,9 +1124,9 @@ export const Settings: React.FC = () => {
                   <div className="flex items-start gap-3">
                     <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
                     <div className="space-y-2">
-                      <h3 className="text-sm font-bold text-ink">Supabase is not configured</h3>
+                      <h3 className="text-sm font-bold text-ink">{t('supabase_not_configured')}</h3>
                       <p className="text-xs text-muted leading-relaxed">
-                        To enable cloud sync and real-time features, you need to provide your Supabase credentials in the <strong>Secrets</strong> panel of AI Studio.
+                        {t('supabase_not_configured_desc')}
                       </p>
                     </div>
                   </div>
@@ -1144,7 +1144,7 @@ export const Settings: React.FC = () => {
                     onClick={refreshDbConnection}
                     className="w-full py-3 bg-ink text-paper rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-accent transition-all"
                   >
-                    Refresh Connection Status
+                    {t('refresh_connection_status')}
                   </button>
                 </div>
               ) : (
@@ -1154,8 +1154,8 @@ export const Settings: React.FC = () => {
                       <ShieldCheck className="w-6 h-6" />
                     </div>
                     <div className="space-y-1">
-                      <h3 className="text-sm font-bold text-ink">Connection Active</h3>
-                      <p className="text-xs text-muted">Your data is being synced to your Supabase instance.</p>
+                      <h3 className="text-sm font-bold text-ink">{t('connection_active')}</h3>
+                      <p className="text-xs text-muted">{t('data_syncing_supabase')}</p>
                     </div>
                   </div>
                   <CheckCircle2 className="w-6 h-6 text-emerald-500" />

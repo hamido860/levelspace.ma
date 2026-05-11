@@ -14,6 +14,7 @@ import { getExercisesByLesson } from '../services/exerciseService';
 import { filterStudentVisibleLessons } from '../services/lessonRecovery';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { getGradeCandidates, getSubjectCandidates, normalizeCurriculumValue, pickBestCurriculumMatch } from '../services/curriculumMatching';
 import {
   getLessonSelectColumns,
@@ -139,6 +140,7 @@ export const ClassroomView: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
+  const { t } = useLanguage();
   const [generatingTitle, setGeneratingTitle] = useState<string | null>(null);
   const [isFetchingGallery, setIsFetchingGallery] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
@@ -945,8 +947,8 @@ export const ClassroomView: React.FC = () => {
       <Layout>
         <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
           <BookOpen className="w-12 h-12 text-muted/20" />
-          <p className="text-ink font-medium">Classroom not found.</p>
-          <button onClick={() => navigate('/dashboard')} className="text-accent hover:underline">Return to Dashboard</button>
+          <p className="text-ink font-medium">{t('classroom_not_found')}</p>
+          <button onClick={() => navigate('/dashboard')} className="text-accent hover:underline">{t('return_to_dashboard')}</button>
         </div>
       </Layout>
     );
@@ -963,7 +965,7 @@ export const ClassroomView: React.FC = () => {
               className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-muted hover:text-ink transition-colors"
             >
               <ArrowLeft size={14} />
-              Back to Dashboard
+              {t('back_to_dashboard')}
             </button>
             <div className="space-y-2">
               <div className="flex items-center gap-3">
@@ -1169,7 +1171,7 @@ export const ClassroomView: React.FC = () => {
                       }`}
                     >
                       <TabIcon size={16} className={isActive ? tabConfig.iconClass : 'text-muted'} />
-                      {tabConfig.label}
+                      {t(tabKey)}
                     </button>
                   );
                 })}
@@ -1193,7 +1195,7 @@ export const ClassroomView: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-bold text-ink flex items-center gap-2">
                     <BookOpen size={20} className="text-accent" />
-                    {hasTopicFallback ? 'Curriculum Topics' : 'Curriculum Units'}
+                    {hasTopicFallback ? t('curriculum_topics') : t('curriculum_units')}
                   </h3>
                   {lessons.length > 0 && suggestions.length === 0 && (
                     <button
@@ -1219,7 +1221,7 @@ export const ClassroomView: React.FC = () => {
                             : 'text-muted hover:bg-surface-low hover:text-ink'
                         }`}
                       >
-                        Tous
+                        {t('all')}
                       </button>
                       {topicFallbackDomains.map((domain) => (
                         <button
@@ -1353,7 +1355,7 @@ export const ClassroomView: React.FC = () => {
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-bold text-ink flex items-center gap-2">
                 <Target size={20} className="text-accent" />
-                Available Quizzes
+                {t('available_quizzes')}
               </h3>
             </div>
             {isLoadingExtra ? (
@@ -1373,7 +1375,7 @@ export const ClassroomView: React.FC = () => {
               </div>
             ) : (
               <div className="bg-surface-low/50 border border-dashed border-ink/10 rounded-3xl p-16 text-center">
-                <p className="text-muted">No quizzes available for these lessons yet.</p>
+                <p className="text-muted">{t('no_quizzes_for_lessons')}</p>
               </div>
             )}
           </div>
@@ -1384,7 +1386,7 @@ export const ClassroomView: React.FC = () => {
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-bold text-ink flex items-center gap-2">
                 <Dumbbell size={20} className="text-accent" />
-                Practice Exercises
+                {t('practice_exercises')}
               </h3>
             </div>
             {isLoadingExtra ? (
@@ -1403,7 +1405,7 @@ export const ClassroomView: React.FC = () => {
               </div>
             ) : (
               <div className="bg-surface-low/50 border border-dashed border-ink/10 rounded-3xl p-16 text-center">
-                <p className="text-muted">No exercises available for these lessons yet.</p>
+                <p className="text-muted">{t('no_exercises_for_lessons')}</p>
               </div>
             )}
           </div>
