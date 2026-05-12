@@ -1890,6 +1890,166 @@ Return ONLY valid JSON array (no markdown fences):
   }
 };
 
+export type SelectionIntent =
+  | "word_definition"
+  | "short_phrase_explanation"
+  | "sentence_explanation"
+  | "paragraph_explanation"
+  | "full_context_analysis"
+  | "answer_question";
+
+export const getSelectionIntent = (selectedText: string): SelectionIntent => {
+  const text = String(selectedText || "").trim();
+  if (!text) return "full_context_analysis";
+
+  const explicitQuestion =
+    /[?؟]\s*$/.test(text) ||
+    /^(what|why|how|when|where|who|which|is|are|does|do|can|could|would|should|explain|define|tell me|qu(?:'|e)?est|pourquoi|comment|est ce|هل|ما|ماذا|لماذا|كيف|أين|متى)\b/i.test(text);
+  if (explicitQuestion) return "answer_question";
+
+  const tokens = text.match(/[\p{L}\p{N}]+(?:['’-][\p{L}\p{N}]+)?/gu) || [];
+  const sentenceMatches = text.match(/[^.!?؟]+[.!?؟]+/g) || [];
+  const hasSentenceEnding = /[.!?؟]\s*$/.test(text);
+
+  if (tokens.length <= 1) return "word_definition";
+  if (tokens.length <= 8 && sentenceMatches.length === 0) return "short_phrase_explanation";
+  if ((sentenceMatches.length === 1 || hasSentenceEnding) && tokens.length <= 40) return "sentence_explanation";
+  if (sentenceMatches.length > 1 || tokens.length <= 180) return "paragraph_explanation";
+  return "full_context_analysis";
+};
+
+export type ExplainTextMetadata = {
+  mode?: SelectionIntent;
+  surroundingSentence?: string;
+  surroundingParagraph?: string;
+  lessonTitle?: string;
+  lessonSubject?: string;
+  lessonTopic?: string;
+  gradeLevel?: string;
+  userRequest?: string;
+};
+
+const buildExplanationPrompt = (
+  text: string,
+  context: string,
+  grade: string,
+  country: string,
+  userLanguage: string | undefined,
+  strictRAG: boolean | undefined,
+  metadata: ExplainTextMetadata,
+) => {
+  const mode = metadata.mode || getSelectionIntent(text);
+  const ragInstruction = strictRAG ? `\nSTRICT RAG MODE IS ENABLED: Your answer MUST be derived entirely from the provided lesson context and selection context. Do not introduce outside concepts unless they are logically deducible directly from the text.` : "";
+
+  const sharedContext = `Selected text: "${text}"
+Mode: ${mode}
+User request: ${metadata.userRequest || "default explanation"}
+Lesson title: ${metadata.lessonTitle || "Unknown"}
+Lesson subject: ${metadata.lessonSubject || "Unknown"}
+Lesson topic: ${metadata.lessonTopic || metadata.lessonTitle || "Unknown"}
+Grade / level: ${metadata.gradeLevel || grade}
+Country: ${country}
+User language: ${userLanguage || "unknown"}
+Surrounding sentence: "${metadata.surroundingSentence || ""}"
+Surrounding paragraph: "${metadata.surroundingParagraph || ""}"
+Lesson context: "${context.slice(0, 12000)}"${ragInstruction}`;
+
+  return `You are a context-aware educational assistant.
+
+Before answering, classify the selected text:
+- Single word: dictionary/vocabulary help
+- Short phrase: phrase explanation
+- Sentence: sentence simplification
+- Paragraph: contextual explanation
+- User question: direct answer
+
+If the selected text is a single word:
+Act as a smart dictionary assistant.
+Use the lesson subject, topic, title, grade, surrounding sentence, and surrounding paragraph to detect whether the word has a subject-specific meaning.
+If a technical meaning exists, explain both:
+- general meaning
+- meaning in this lesson context
+
+Return the dictionary result in three languages:
+- French
+- Arabic
+- English
+
+Keep the answer compact.
+Do not explain the full lesson.
+Do not write long paragraphs.
+Do not ignore subject-specific meanings.
+
+Examples:
+- In mathematics, "fonction" means a mathematical function, not only a role.
+- In economics, "capital" means economic resources or money/assets, not only a city.
+- In accounting, "compte" means an accounting account, not only "count".
+- In financial mathematics, "intérêt" means interest on money, not only curiosity or benefit.
+
+If the selected text has more than one word, do not use dictionary mode unless the user explicitly asks for vocabulary definitions.
+
+${sharedContext}
+
+Output rules by mode:
+
+word_definition:
+Use exactly this compact structure:
+# Word Help
+Selected word: [WORD]
+Detected language: [language]
+Part of speech: [part of speech if detectable]
+Context: [Subject] > [Topic or Lesson Title]
+Meaning in this lesson: [short context-specific meaning]
+General meaning: [short general meaning]
+French:
+- Type: [part of speech]
+- Sens: [simple French meaning]
+- Exemple: [short French example]
+Arabic:
+- النوع: [part of speech in Arabic if possible]
+- المعنى: [Arabic meaning]
+- مثال: [short Arabic example]
+English:
+- Type: [part of speech]
+- Meaning: [English meaning]
+- Example: [short English example]
+Optional if true:
+Multiple meanings detected: This word can mean different things depending on the subject. In this lesson, use the context meaning above.
+
+short_phrase_explanation:
+Use this structure only:
+# Phrase Help
+Phrase: [phrase]
+Literal meaning: [literal meaning]
+Simple meaning: [simple explanation]
+Context note: [short note]
+Example: [short example if useful]
+
+sentence_explanation:
+Use this structure only:
+# Sentence Explanation
+Main idea: [main idea]
+Important terms: [terms]
+Simplified version: [simple version]
+Context note: [short note]
+
+paragraph_explanation or full_context_analysis:
+Use this structure only:
+# Contextual Explanation
+Main idea: [main idea]
+Key concepts: [key concepts]
+Why it matters: [why it matters]
+Simplified explanation: [simple explanation]
+Examples: [optional examples]
+
+answer_question:
+Use this structure only:
+# AI Answer
+Answer: [direct answer grounded in the lesson]
+Evidence from lesson: [brief evidence]
+Keep it concise.`;
+};
+
 export const explainText = async (
   text: string,
   context: string,
@@ -1897,6 +2057,7 @@ export const explainText = async (
   country: string,
   userLanguage?: string,
   strictRAG?: boolean,
+  metadata: ExplainTextMetadata = {},
 ): Promise<string> => {
   try {
     // 1. Check Cache
@@ -1907,7 +2068,8 @@ export const explainText = async (
       grade,
       country,
       userLanguage,
-      strictRAG
+      strictRAG,
+      JSON.stringify(metadata)
     );
     const cachedResponse = await responseCache.get(cacheKey);
     if (cachedResponse) {
@@ -1919,23 +2081,12 @@ export const explainText = async (
     const modelToUse = determineModel(text, context.length);
     console.log(`Pipeline: Using model ${modelToUse} for explainText`);
 
-    const ragInstruction = strictRAG ? `\nSTRICT RAG MODE IS ENABLED: Your explanation MUST be derived entirely from the provided Lesson Context. Do not introduce outside concepts, formulas, or history unless it is logically deducible directly from the text.` : "";
-
     const response = await generateContentWithFallback(
       {
         model: modelToUse,
-        contents: `Explain the following highlighted text from an academic lesson.
-      
-      Highlighted Text: "${text}"
-      
-      Lesson Context: "${context}"
-      
-      Target Audience: A student in ${country} at the ${grade} level.
-      ${ragInstruction}
-      
-      Provide a clear, concise, and academic explanation. If the text is in a specific language (like Arabic or French), provide the explanation in that same language. ${userLanguage ? `The user's preferred language is ${userLanguage}. If it helps their understanding, you may provide the explanation or a summary in ${userLanguage}.` : ""}`,
+        contents: buildExplanationPrompt(text, context, grade, country, userLanguage, strictRAG, metadata),
         config: {
-          maxOutputTokens: 2048,
+          maxOutputTokens: metadata.mode === "word_definition" ? 900 : 1600,
         },
       },
       "explainText",

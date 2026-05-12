@@ -35,6 +35,7 @@ import {
   FileText,
   FlaskConical,
   GraduationCap,
+  Languages,
 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { supabase } from '../db/supabase';
@@ -47,6 +48,8 @@ import {
   auditLessonLanguage,
   AuditResult,
   explainText,
+  getSelectionIntent,
+  SelectionIntent,
   generateInteractiveContent,
   generateAnotherExample,
   checkAIProvider
@@ -88,6 +91,41 @@ const BLOCK_TYPE_CONFIG: Record<string, { icon: React.ElementType; colorClass: s
 
 const getBlockTypeConfig = (type: string) =>
   BLOCK_TYPE_CONFIG[normalizeLessonBlockUiType(type)] ?? { icon: FileText, colorClass: 'text-muted', label: 'Text' };
+
+type SelectionContext = {
+  surroundingSentence: string;
+  surroundingParagraph: string;
+};
+
+const getExplanationTitle = (mode: SelectionIntent) => {
+  const titles: Record<SelectionIntent, string> = {
+    word_definition: 'Word Help',
+    short_phrase_explanation: 'Phrase Help',
+    sentence_explanation: 'Sentence Explanation',
+    paragraph_explanation: 'Contextual Explanation',
+    full_context_analysis: 'Lesson Analysis',
+    answer_question: 'AI Answer',
+  };
+  return titles[mode];
+};
+
+const extractSelectionContext = (selection: Selection | null): SelectionContext => {
+  const selected = selection?.toString().trim() || '';
+  const anchor = selection?.anchorNode;
+  const element = anchor?.nodeType === Node.TEXT_NODE ? anchor.parentElement : (anchor as Element | null);
+  const paragraph = element?.closest('p, li, section, article, div')?.textContent?.replace(/\s+/g, ' ').trim()
+    || anchor?.textContent?.replace(/\s+/g, ' ').trim()
+    || selected;
+  const escaped = selected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const sentenceMatch = escaped
+    ? paragraph.match(new RegExp(`[^.!?؟]*${escaped}[^.!?؟]*[.!?؟]?`, 'i'))
+    : null;
+
+  return {
+    surroundingSentence: (sentenceMatch?.[0] || selected).trim(),
+    surroundingParagraph: paragraph,
+  };
+};
 
 const isRTL = (text: string) => {
   const rtlChars = /[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
@@ -437,6 +475,8 @@ export const LessonView: React.FC = () => {
   // AI Explanation state
   const [selectedText, setSelectedText] = useState<string | null>(null);
   const [explanation, setExplanation] = useState<string | null>(null);
+  const [explanationMode, setExplanationMode] = useState<SelectionIntent>('paragraph_explanation');
+  const [selectionContext, setSelectionContext] = useState<SelectionContext>({ surroundingSentence: '', surroundingParagraph: '' });
   const [isExplaining, setIsExplaining] = useState(false);
 
 
@@ -495,8 +535,12 @@ export const LessonView: React.FC = () => {
     if ((e.target as HTMLElement).closest('.explain-btn')) return;
 
     const selection = window.getSelection();
-    if (selection && selection.toString().trim().length > 0) {
-      setSelectedText(selection.toString().trim());
+    const selectionText = selection?.toString().trim() || '';
+    if (selection && selectionText.length > 0) {
+      setSelectedText(selectionText);
+      setExplanationMode(getSelectionIntent(selectionText));
+      setSelectionContext(extractSelectionContext(selection));
+      setExplanation(null);
     } else {
       if (!explanation && !isExplaining) {
         setSelectedText(null);
@@ -504,13 +548,24 @@ export const LessonView: React.FC = () => {
     }
   };
 
-  const handleExplain = async () => {
+  const handleExplain = async (options: { mode?: SelectionIntent; userRequest?: string } = {}) => {
     if (!selectedText || !lesson || !hasAiAccess || !aiAvailable) return;
+    const mode = options.mode || getSelectionIntent(selectedText);
+    setExplanationMode(mode);
     setIsExplaining(true);
     setExplanation(null);
     try {
       const context = effectiveLesson.blocks?.map(b => b.content || '').join('\n') || effectiveLesson.content || '';
-      const result = await explainText(selectedText, context, lessonGrade, lessonCountry, language, module?.strictRAG);
+      const result = await explainText(selectedText, context, lessonGrade, lessonCountry, language, module?.strictRAG, {
+        mode,
+        surroundingSentence: selectionContext.surroundingSentence,
+        surroundingParagraph: selectionContext.surroundingParagraph,
+        lessonTitle: effectiveLesson.title,
+        lessonSubject: effectiveLesson.subject || module?.name || '',
+        lessonTopic: module?.name || effectiveLesson.title,
+        gradeLevel: lessonGrade,
+        userRequest: options.userRequest,
+      });
       setExplanation(result);
     } catch (error) {
       console.error("Failed to explain text:", error);
@@ -747,6 +802,8 @@ export const LessonView: React.FC = () => {
   const lessonGrade = effectiveLesson?.grade || supabaseLesson?.grade || selectedGrade;
   const lessonCountry = effectiveLesson?.country || supabaseLesson?.country || selectedCountry;
   const lessonSubject = effectiveLesson?.subject || supabaseLesson?.subject || module?.name || '';
+  const lessonTopic = module?.name || effectiveLesson?.title || '';
+  const explanationContextLabel = [lessonSubject || 'Lesson', lessonTopic].filter(Boolean).join(' > ');
   const lessonMetaTitle = effectiveLesson?.title || supabaseLesson?.lesson_title || 'Lesson';
   const lessonMetaDescription = buildMetaDescription(
     effectiveLesson?.subtitle ||
@@ -1214,8 +1271,8 @@ export const LessonView: React.FC = () => {
                   title={!aiAvailable ? "AI help requires API key" : undefined}
                   className="explain-btn shrink-0 bg-accent text-paper px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-accent"
                 >
-                  <Brain size={14} />
-                  Explain
+                  {explanationMode === 'word_definition' ? <Languages size={14} /> : <Brain size={14} />}
+                  {getExplanationTitle(explanationMode)}
                 </button>
               </div>
             </motion.div>
@@ -1234,51 +1291,75 @@ export const LessonView: React.FC = () => {
           title={
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center text-accent shadow-sm">
-                <Brain size={22} />
+                {explanationMode === 'word_definition' ? <Languages size={22} /> : <Brain size={22} />}
               </div>
               <div>
-                <h3 className="text-sm font-bold uppercase tracking-widest text-ink">AI Contextual Explanation</h3>
-                <p className="text-[10px] text-muted font-medium">Grounded in this lesson's content</p>
+                <h3 className="text-sm font-bold uppercase tracking-widest text-ink">{getExplanationTitle(explanationMode)}</h3>
+                <p className="text-[10px] text-muted font-medium">
+                  {explanationMode === 'word_definition'
+                    ? 'Compact vocabulary help grounded in this lesson'
+                    : 'Grounded in this lesson\'s content'}
+                </p>
               </div>
             </div>
           }
         >
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            <div className="lg:col-span-4 space-y-4">
-              <div className="p-4 bg-surface-low rounded-2xl border border-ink/5 space-y-3">
-                <div className="flex items-center gap-2 text-accent">
-                  <Sparkles size={14} />
-                  <span className="text-[10px] font-bold uppercase tracking-widest">Source Context</span>
+          {explanationMode === 'word_definition' ? (
+            <div className="space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="p-4 bg-surface-low rounded-2xl border border-ink/5">
+                  <div className="flex items-center gap-2 text-accent mb-2">
+                    <Languages size={14} />
+                    <span className="text-[10px] font-bold uppercase tracking-widest">Selected Word</span>
+                  </div>
+                  <p className="text-xl font-bold text-ink break-words">{selectedText}</p>
                 </div>
-                <p className="text-sm font-medium text-ink italic leading-relaxed border-l-2 border-accent/30 pl-4 py-1">
-                  "{selectedText}"
-                </p>
-              </div>
-              <div className="p-4 bg-accent/5 rounded-2xl border border-accent/10">
-                <p className="text-[10px] text-accent font-medium leading-relaxed">
-                  The AI analyzes this specific snippet within the context of the entire lesson to provide the most relevant explanation.
-                </p>
-              </div>
-            </div>
-            
-            <div className="lg:col-span-8 space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-muted">
-                  <BookOpen size={14} />
-                  <span className="text-[10px] font-bold uppercase tracking-widest">AI Analysis</span>
+                <div className="p-4 bg-surface-low rounded-2xl border border-ink/5">
+                  <div className="flex items-center gap-2 text-accent mb-2">
+                    <BookOpen size={14} />
+                    <span className="text-[10px] font-bold uppercase tracking-widest">Context</span>
+                  </div>
+                  <p className="text-sm font-medium text-ink leading-relaxed">{explanationContextLabel}</p>
                 </div>
-                {!isExplaining && (
-                  <span className="text-[9px] font-mono text-muted/40 uppercase">v3.1-FLASH-LITE</span>
-                )}
               </div>
-              <div className="bg-paper p-6 rounded-2xl border border-ink/5 shadow-sm min-h-[200px]">
+
+              {!isExplaining && (
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => handleExplain({ userRequest: 'Explain this word in Arabic only, using the same lesson context. Keep it compact.' })}
+                    className="explain-btn px-3 py-2 bg-surface-low border border-ink/10 rounded-xl text-[10px] font-bold uppercase tracking-widest text-ink hover:border-accent/40 hover:text-accent transition-colors"
+                  >
+                    Explain in Arabic
+                  </button>
+                  <button
+                    onClick={() => handleExplain({ userRequest: 'Give one different short example sentence for this word in the lesson context.' })}
+                    className="explain-btn px-3 py-2 bg-surface-low border border-ink/10 rounded-xl text-[10px] font-bold uppercase tracking-widest text-ink hover:border-accent/40 hover:text-accent transition-colors"
+                  >
+                    Give another example
+                  </button>
+                  <button
+                    onClick={() => handleExplain({ userRequest: 'Show useful synonyms for this word and note which ones fit this lesson context.' })}
+                    className="explain-btn px-3 py-2 bg-surface-low border border-ink/10 rounded-xl text-[10px] font-bold uppercase tracking-widest text-ink hover:border-accent/40 hover:text-accent transition-colors"
+                  >
+                    Show synonyms
+                  </button>
+                  <button
+                    onClick={() => handleExplain({ mode: 'paragraph_explanation', userRequest: 'Explain this selected word in the broader lesson context with a little more detail.' })}
+                    className="explain-btn px-3 py-2 bg-accent text-paper rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-accent-hover transition-colors"
+                  >
+                    Explain in lesson context
+                  </button>
+                </div>
+              )}
+
+              <div className="bg-paper p-5 rounded-2xl border border-ink/5 shadow-sm min-h-[180px]">
                 <div className="text-sm text-ink leading-relaxed prose prose-sm max-w-none">
                   {isExplaining ? (
-                    <div className="flex flex-col items-center justify-center py-12 space-y-4">
-                      <Loader2 size={32} className="animate-spin text-accent" />
+                    <div className="flex flex-col items-center justify-center py-10 space-y-4">
+                      <Loader2 size={30} className="animate-spin text-accent" />
                       <div className="space-y-1 text-center">
-                        <p className="text-xs font-bold text-ink">Synthesizing Explanation...</p>
-                        <p className="text-[10px] text-muted italic">Connecting concepts and examples</p>
+                        <p className="text-xs font-bold text-ink">Building word help...</p>
+                        <p className="text-[10px] text-muted italic">Checking subject meaning and examples</p>
                       </div>
                     </div>
                   ) : (
@@ -1289,7 +1370,55 @@ export const LessonView: React.FC = () => {
                 </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+              <div className="lg:col-span-4 space-y-4">
+                <div className="p-4 bg-surface-low rounded-2xl border border-ink/5 space-y-3">
+                  <div className="flex items-center gap-2 text-accent">
+                    <Sparkles size={14} />
+                    <span className="text-[10px] font-bold uppercase tracking-widest">Source Context</span>
+                  </div>
+                  <p className="text-sm font-medium text-ink italic leading-relaxed border-l-2 border-accent/30 pl-4 py-1">
+                    "{selectedText}"
+                  </p>
+                </div>
+                <div className="p-4 bg-accent/5 rounded-2xl border border-accent/10">
+                  <p className="text-[10px] text-accent font-medium leading-relaxed">
+                    This answer is scoped to the selected text and the lesson context, not a full-lesson rewrite.
+                  </p>
+                </div>
+              </div>
+
+              <div className="lg:col-span-8 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-muted">
+                    <BookOpen size={14} />
+                    <span className="text-[10px] font-bold uppercase tracking-widest">{getExplanationTitle(explanationMode)}</span>
+                  </div>
+                  {!isExplaining && (
+                    <span className="text-[9px] font-mono text-muted/40 uppercase">v3.1-FLASH-LITE</span>
+                  )}
+                </div>
+                <div className="bg-paper p-6 rounded-2xl border border-ink/5 shadow-sm min-h-[200px]">
+                  <div className="text-sm text-ink leading-relaxed prose prose-sm max-w-none">
+                    {isExplaining ? (
+                      <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                        <Loader2 size={32} className="animate-spin text-accent" />
+                        <div className="space-y-1 text-center">
+                          <p className="text-xs font-bold text-ink">Synthesizing Explanation...</p>
+                          <p className="text-[10px] text-muted italic">Grounding the answer in the selected text</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="markdown-body">
+                        <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{explanation || ''}</Markdown>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {!isExplaining && (
             <div className="mt-8 pt-6 border-t border-ink/5 flex justify-end">
