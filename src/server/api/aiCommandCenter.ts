@@ -422,7 +422,7 @@ function getBearerToken(req: VercelRequest) {
   return match?.[1] || null;
 }
 
-async function getAuthenticatedUser(req: VercelRequest): Promise<User> {
+export async function getAuthenticatedUser(req: VercelRequest): Promise<User> {
   const token = getBearerToken(req);
   if (!token) {
     throw new AiCommandCenterHttpError(401, "Authentication required.");
