@@ -257,12 +257,12 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
                       <div className={`p-3 rounded-2xl max-w-[80%] text-sm relative group ${
                         msg.role === 'user' 
                           ? 'bg-ink text-white rounded-tr-sm' 
-                          : 'bg-paper border border-ink/5 text-ink rounded-tl-sm shadow-sm'
+                          : 'bg-paper border border-ink/5 text-ink rounded-tl-sm shadow-sm pr-10'
                       }`}>
                         {msg.role === 'model' && (
                           <button
                             onClick={() => handleCopy(msg.parts[0].text, i)}
-                            className="absolute -right-8 top-0 p-1.5 text-ink-muted hover:text-accent opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="absolute right-2 top-2 p-1.5 rounded-lg bg-surface-low text-ink-muted opacity-80 hover:opacity-100 hover:text-accent transition-colors"
                             title="Copy message"
                           >
                             {copiedId === i ? <Check size={14} /> : <Copy size={14} />}
