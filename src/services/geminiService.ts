@@ -2273,6 +2273,230 @@ export const validateLearningBlocks = (
   return validated.slice(0, 18);
 };
 
+const splitLearningSentences = (text: string) =>
+  text
+    .replace(/\s+/g, " ")
+    .split(/(?<=[.!?؟])\s+/)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean);
+
+const normalizeLearningText = (text: string) =>
+  text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const includesAny = (text: string, terms: string[]) =>
+  terms.some((term) => text.includes(term));
+
+const pickLearningVocabulary = (text: string, input: StructureLessonInput) => {
+  const normalized = normalizeLearningText(text);
+  const candidates = [
+    "comptabilite",
+    "compte",
+    "capital",
+    "interet",
+    "taux",
+    "operation",
+    "debit",
+    "credit",
+    "fonction",
+    "formule",
+    "montant",
+    "ressources",
+    "actif",
+    "passif",
+  ];
+  const found = candidates.filter((term) => normalized.includes(term));
+  return dedupeTerms([
+    input.subject,
+    input.topic,
+    ...found,
+  ]).slice(0, 8);
+};
+
+export const buildFallbackLearningBlocks = (input: StructureLessonInput): StructuredLearningBlock[] => {
+  const sentences = splitLearningSentences(input.rawContent);
+  const normalized = normalizeLearningText(`${input.subject} ${input.topic} ${input.lessonTitle} ${input.rawContent}`);
+  const firstMeaningful = sentences.find((sentence) => sentence.length > 40) || input.rawContent || input.lessonTitle;
+  const definitionSentence =
+    sentences.find((sentence) => /\b(est|sont|signifie|designe|definit|definition|means|is|are)\b/i.test(normalizeLearningText(sentence))) ||
+    firstMeaningful;
+  const exampleSentence =
+    sentences.find((sentence) => /\b(exemple|par exemple|application|calcul|for example|e\.g\.|مثال)\b/i.test(sentence)) ||
+    sentences.find((sentence) => /\d/.test(sentence));
+  const vocabulary = pickLearningVocabulary(input.rawContent, input);
+
+  const blocks: Partial<StructuredLearningBlock>[] = [
+    {
+      id: "definition-local",
+      type: "definition",
+      emoji: LEARNING_BLOCK_EMOJIS.definition,
+      title: "Definition",
+      content: definitionSentence,
+      shortVersion: compactLearningText(definitionSentence, 140),
+      importance: "high",
+      relatedTerms: vocabulary.slice(0, 4),
+      studentAction: "read",
+      estimatedDifficulty: "easy",
+    },
+    {
+      id: "key-idea-local",
+      type: "key_idea",
+      emoji: LEARNING_BLOCK_EMOJIS.key_idea,
+      title: "Key idea",
+      content: sentences[1] || `The main idea is to understand ${input.lessonTitle || input.topic || "this lesson"} step by step.`,
+      shortVersion: compactLearningText(sentences[1] || input.lessonTitle, 120),
+      importance: "high",
+      relatedTerms: vocabulary.slice(0, 4),
+      studentAction: "remember",
+      estimatedDifficulty: "medium",
+    },
+    {
+      id: "simple-explanation-local",
+      type: "simple_explanation",
+      emoji: LEARNING_BLOCK_EMOJIS.simple_explanation,
+      title: "Simple explanation",
+      content: compactLearningText(sentences.slice(0, 3).join(" "), 520),
+      shortVersion: compactLearningText(firstMeaningful, 140),
+      importance: "medium",
+      relatedTerms: vocabulary.slice(0, 3),
+      studentAction: "read",
+      estimatedDifficulty: "easy",
+    },
+  ];
+
+  if (exampleSentence) {
+    blocks.push({
+      id: "example-local",
+      type: "example",
+      emoji: LEARNING_BLOCK_EMOJIS.example,
+      title: "Example",
+      content: exampleSentence,
+      shortVersion: compactLearningText(exampleSentence, 140),
+      importance: "medium",
+      relatedTerms: vocabulary.slice(0, 3),
+      studentAction: "think",
+      estimatedDifficulty: "medium",
+    });
+  }
+
+  if (includesAny(normalized, ["capital"]) && includesAny(normalized, ["interet", "taux"])) {
+    blocks.push({
+      id: "dont-confuse-capital-interest",
+      type: "dont_confuse",
+      emoji: LEARNING_BLOCK_EMOJIS.dont_confuse,
+      title: "Don't confuse this",
+      content: "Do not confuse capital with interest. Capital is the original amount or resource. Interest is the extra amount earned or paid over time.",
+      shortVersion: "Capital is the base amount. Interest is the extra amount.",
+      importance: "high",
+      relatedTerms: ["capital", "interet"],
+      studentAction: "compare",
+      estimatedDifficulty: "medium",
+    });
+  } else if (includesAny(normalized, ["debit"]) && includesAny(normalized, ["credit"])) {
+    blocks.push({
+      id: "dont-confuse-debit-credit",
+      type: "dont_confuse",
+      emoji: LEARNING_BLOCK_EMOJIS.dont_confuse,
+      title: "Don't confuse this",
+      content: "Do not confuse debit and credit. Their meaning depends on the account type, so always check the accounting rule used in the lesson.",
+      shortVersion: "Debit and credit change meaning depending on the account type.",
+      importance: "high",
+      relatedTerms: ["debit", "credit"],
+      studentAction: "compare",
+      estimatedDifficulty: "medium",
+    });
+  } else if (includesAny(normalized, ["compte"]) && includesAny(normalized, ["comptabilite", "banque"])) {
+    blocks.push({
+      id: "dont-confuse-account-types",
+      type: "dont_confuse",
+      emoji: LEARNING_BLOCK_EMOJIS.dont_confuse,
+      title: "Don't confuse this",
+      content: "Do not confuse an accounting account with only a bank account. In accounting, an account is a record used to organize financial operations.",
+      shortVersion: "An accounting account is a record, not only a bank account.",
+      importance: "high",
+      relatedTerms: ["compte", "comptabilite"],
+      studentAction: "compare",
+      estimatedDifficulty: "easy",
+    });
+  } else if (includesAny(normalized, ["fonction"]) && includesAny(normalized, ["mathematique", "math"])) {
+    blocks.push({
+      id: "dont-confuse-function",
+      type: "dont_confuse",
+      emoji: LEARNING_BLOCK_EMOJIS.dont_confuse,
+      title: "Don't confuse this",
+      content: "Do not confuse a mathematical function with the everyday meaning of function as a role. In math, a function links each input to an output.",
+      shortVersion: "In math, a function links an input to an output.",
+      importance: "high",
+      relatedTerms: ["fonction"],
+      studentAction: "compare",
+      estimatedDifficulty: "medium",
+    });
+  }
+
+  if (includesAny(normalized, ["interet", "taux", "rate", "annuel", "mensuel", "daily", "jour"])) {
+    blocks.push({
+      id: "warning-rate-period",
+      type: "warning",
+      emoji: LEARNING_BLOCK_EMOJIS.warning,
+      title: "Common mistake",
+      content: "Before calculating, check whether the rate is annual, monthly, or daily. Using the wrong period changes the result.",
+      shortVersion: "Always check the rate period before calculating.",
+      importance: "high",
+      relatedTerms: ["taux", "interet"],
+      studentAction: "remember",
+      estimatedDifficulty: "medium",
+    });
+  }
+
+  if (vocabulary.length > 0) {
+    blocks.push({
+      id: "vocabulary-local",
+      type: "vocabulary",
+      emoji: LEARNING_BLOCK_EMOJIS.vocabulary,
+      title: "Key words",
+      content: vocabulary.join(", "),
+      shortVersion: vocabulary.slice(0, 5).join(", "),
+      importance: "medium",
+      relatedTerms: vocabulary,
+      studentAction: "read",
+      estimatedDifficulty: "easy",
+    });
+  }
+
+  blocks.push(
+    {
+      id: "remember-local",
+      type: "remember",
+      emoji: LEARNING_BLOCK_EMOJIS.remember,
+      title: "Remember",
+      content: compactLearningText(sentences.find((sentence) => sentence.length > 60) || firstMeaningful, 360),
+      shortVersion: compactLearningText(firstMeaningful, 120),
+      importance: "high",
+      relatedTerms: vocabulary.slice(0, 3),
+      studentAction: "remember",
+      estimatedDifficulty: "easy",
+    },
+    {
+      id: "checkpoint-local",
+      type: "checkpoint",
+      emoji: LEARNING_BLOCK_EMOJIS.checkpoint,
+      title: "Quick check",
+      content: `Can you explain the main idea of "${input.lessonTitle || input.topic || "this lesson"}" in one sentence?`,
+      shortVersion: "Explain the main idea in one sentence.",
+      importance: "medium",
+      relatedTerms: vocabulary.slice(0, 3),
+      studentAction: "answer",
+      estimatedDifficulty: "easy",
+    },
+  );
+
+  return validateLearningBlocks(blocks, input);
+};
+
 export const structureLessonIntoLearningBlocks = async (
   input: StructureLessonInput,
 ): Promise<StructuredLearningBlock[]> => {

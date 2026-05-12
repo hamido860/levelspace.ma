@@ -48,6 +48,7 @@ import {
   auditLessonLanguage,
   AuditResult,
   explainText,
+  buildFallbackLearningBlocks,
   getSelectionIntent,
   SelectionIntent,
   structureLessonIntoLearningBlocks,
@@ -900,37 +901,45 @@ export const LessonView: React.FC = () => {
     let isCancelled = false;
 
     const buildLearningBlocks = async () => {
-      if (!effectiveLesson?.id || !rawLessonContent || !hasAiAccess || !aiAvailable) {
+      if (!effectiveLesson?.id || !rawLessonContent) {
         setLearningBlocks([]);
         setIsStructuringLesson(false);
+        return;
+      }
+
+      const structureInput = {
+        rawContent: rawLessonContent,
+        lessonTitle: lessonMetaTitle,
+        subject: lessonSubject,
+        topic: lessonTopic || lessonMetaTitle,
+        gradeLevel: lessonGrade,
+        language,
+        curriculumMetadata: {
+          country: lessonCountry,
+          topic_id: effectiveLesson.topic_id,
+          validation_status: effectiveLesson.validation_status,
+          source_name: effectiveLesson.source_name,
+        },
+      };
+
+      setLearningBlocks(buildFallbackLearningBlocks(structureInput));
+      if (!hasAiAccess || !aiAvailable) {
+        setIsStructuringLesson(false);
+        setLearningBlockError(null);
         return;
       }
 
       setIsStructuringLesson(true);
       setLearningBlockError(null);
       try {
-        const structured = await structureLessonIntoLearningBlocks({
-          rawContent: rawLessonContent,
-          lessonTitle: lessonMetaTitle,
-          subject: lessonSubject,
-          topic: lessonTopic || lessonMetaTitle,
-          gradeLevel: lessonGrade,
-          language,
-          curriculumMetadata: {
-            country: lessonCountry,
-            topic_id: effectiveLesson.topic_id,
-            validation_status: effectiveLesson.validation_status,
-            source_name: effectiveLesson.source_name,
-          },
-        });
+        const structured = await structureLessonIntoLearningBlocks(structureInput);
         if (!isCancelled) {
           setLearningBlocks(structured);
         }
       } catch (error) {
         console.error("Failed to structure lesson blocks:", error);
         if (!isCancelled) {
-          setLearningBlocks([]);
-          setLearningBlockError("AI learning blocks are unavailable for this lesson right now.");
+          setLearningBlockError("Using quick structured learning blocks while AI structuring is unavailable.");
         }
       } finally {
         if (!isCancelled) {
