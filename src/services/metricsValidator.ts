@@ -12,6 +12,11 @@ export interface MetricsSnapshot {
   failedJobs: number;
   ragChunksTotal: number;
   ragChunksEmbedded: number;
+  ragChunksLinkedToTopic?: number;
+  ragChunksUsable?: number;
+  lessonQueuePending?: number;
+  lessonQueueFailed?: number;
+  lessonQueueDone?: number;
   ragCoverage: string;
   totalUsers: number;
   gradeBreakdown: Array<{
@@ -100,12 +105,48 @@ export const validateMetrics = (metrics: any): ValidationError[] => {
     });
   }
 
+  if (metrics.ragChunksLinkedToTopic !== undefined && (typeof metrics.ragChunksLinkedToTopic !== "number" || metrics.ragChunksLinkedToTopic < 0)) {
+    errors.push({
+      field: "ragChunksLinkedToTopic",
+      error: "Must be a non-negative number",
+      value: metrics.ragChunksLinkedToTopic,
+      expected: "number >= 0",
+    });
+  }
+
+  if (metrics.ragChunksUsable !== undefined && (typeof metrics.ragChunksUsable !== "number" || metrics.ragChunksUsable < 0)) {
+    errors.push({
+      field: "ragChunksUsable",
+      error: "Must be a non-negative number",
+      value: metrics.ragChunksUsable,
+      expected: "number >= 0",
+    });
+  }
+
   // Embedded can't exceed total
   if (metrics.ragChunksEmbedded > metrics.ragChunksTotal) {
     errors.push({
       field: "ragChunksEmbedded",
       error: `Cannot exceed ragChunksTotal (${metrics.ragChunksTotal})`,
       value: metrics.ragChunksEmbedded,
+      expected: `<= ${metrics.ragChunksTotal}`,
+    });
+  }
+
+  if (metrics.ragChunksLinkedToTopic > metrics.ragChunksTotal) {
+    errors.push({
+      field: "ragChunksLinkedToTopic",
+      error: `Cannot exceed ragChunksTotal (${metrics.ragChunksTotal})`,
+      value: metrics.ragChunksLinkedToTopic,
+      expected: `<= ${metrics.ragChunksTotal}`,
+    });
+  }
+
+  if (metrics.ragChunksUsable > metrics.ragChunksTotal) {
+    errors.push({
+      field: "ragChunksUsable",
+      error: `Cannot exceed ragChunksTotal (${metrics.ragChunksTotal})`,
+      value: metrics.ragChunksUsable,
       expected: `<= ${metrics.ragChunksTotal}`,
     });
   }

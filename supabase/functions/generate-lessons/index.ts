@@ -140,15 +140,47 @@ const formatDbError = (error: any) =>
   ].filter(Boolean).join(" | ") || "Unknown database error";
 
 type RagChunkInput = {
+  id?: string | null;
   content?: string | null;
   source_name?: string | null;
+  source_type?: string | null;
   source_url?: string | null;
+  source_confidence?: number | null;
   metadata?: Record<string, unknown> | null;
 };
 
 type TopicData = {
   outlines: TopicOutlineInput[];
   ragChunks: RagChunkInput[];
+  fallbackReason: string | null;
+};
+
+type LessonGenerationResult = {
+  lesson: any | null;
+  error: string | null;
+};
+
+const APPROVED_OUTLINE_STATUSES = new Set(["approved", "published", "done", "valid", "passed"]);
+
+const isApprovedTopicOutline = (outline: TopicOutlineInput & Record<string, unknown>) => {
+  const hasApprovalFields = [
+    "approved",
+    "is_approved",
+    "status",
+    "validation_status",
+    "review_status",
+  ].some((key) => Object.prototype.hasOwnProperty.call(outline, key));
+
+  if (!hasApprovalFields) return true;
+  if (outline["approved"] === true || outline["is_approved"] === true) return true;
+
+  const statuses = [
+    outline["status"],
+    outline["validation_status"],
+    outline["review_status"],
+  ].map((value) => normalizeValue(String(value || "")).toLowerCase());
+
+  return statuses.some((status) => APPROVED_OUTLINE_STATUSES.has(status));
 };
 
 type MaterialRequirementInput = {
@@ -174,36 +206,41 @@ async function fetchTopicOutlines(supabaseAdmin: any, topicId: string | null): P
 
   const { data, error } = await supabaseAdmin
     .from("topic_outlines")
-    .select("title, description, outline_order")
+    .select("*")
     .eq("topic_id", topicId)
     .order("outline_order", { ascending: true });
 
   if (error) throw new Error(`topic_outlines lookup failed: ${formatDbError(error)}`);
-  return (data || []) as TopicOutlineInput[];
+  return ((data || []) as Array<TopicOutlineInput & Record<string, unknown>>).filter(isApprovedTopicOutline);
 }
 
 async function fetchTopicData(supabaseAdmin: any, topicId: string | null): Promise<TopicData> {
   const outlines = await fetchTopicOutlines(supabaseAdmin, topicId);
   if (!topicId) {
-    console.warn("generate-lessons source fallback: no resolved topic_id; cannot fetch rag_chunks");
-    return { outlines, ragChunks: [] };
+    const fallbackReason = "no resolved topic_id; cannot fetch topic-linked rag_chunks";
+    console.warn(`generate-lessons source fallback: topic_id=unresolved reason=${fallbackReason}`);
+    return { outlines, ragChunks: [], fallbackReason };
   }
 
   const { data, error } = await supabaseAdmin
     .from("rag_chunks")
-    .select("content, source_name, source_url, metadata")
+    .select("id, content, source_name, source_type, source_url, source_confidence, metadata")
     .eq("topic_id", topicId)
+    .eq("embedding_status", "done")
+    .not("embedding", "is", null)
     .order("created_at", { ascending: false })
     .limit(10);
 
   if (error) throw new Error(`rag_chunks lookup by topic_id failed: ${formatDbError(error)}`);
 
   const ragChunks = ((data || []) as RagChunkInput[]).filter((chunk) => normalizeValue(chunk.content).length > 0);
+  let fallbackReason: string | null = null;
   if (ragChunks.length === 0) {
-    console.warn(`generate-lessons source fallback: no rag_chunks for topic_id=${topicId}; using topic_outlines count=${outlines.length}`);
+    fallbackReason = `no usable rag_chunks for topic_id=${topicId} (requires topic_id match, embedding not null, embedding_status=done); approved topic_outlines count=${outlines.length}`;
+    console.warn(`generate-lessons source fallback: topic_id=${topicId} reason=${fallbackReason}`);
   }
 
-  return { outlines, ragChunks };
+  return { outlines, ragChunks, fallbackReason };
 }
 
 async function fetchMaterialRequirements(supabaseAdmin: any, topicId: string | null): Promise<MaterialRequirementInput[]> {
@@ -312,7 +349,7 @@ const buildSourceContext = (topicData: TopicData) => {
     ].join("\n");
   }
 
-  return "No RAG chunks or topic_outlines were found for this topic. Generate a cautious draft using the exact grade, country, subject, and topic only.";
+  return "No usable RAG chunks or approved topic_outlines were found for this topic.";
 };
 
 const buildFallbackLessonFromOutlines = (
@@ -762,6 +799,28 @@ Deno.serve(async (req) => {
     });
     activeTopicId = topicContext?.topicId ?? null;
     const topicData = await fetchTopicData(supabaseAdmin, activeTopicId);
+    if (topicData.ragChunks.length === 0 && topicData.outlines.length === 0) {
+      const detailedError = [
+        "Source grounding failed",
+        `topic_id=${activeTopicId ?? "unresolved"}`,
+        topicData.fallbackReason || "no usable topic-linked RAG and no approved topic_outlines",
+        "Refusing to generate lesson from AI guesses.",
+      ].join(": ");
+      console.error("generate-lessons source grounding error:", detailedError);
+      await writeGenerationLog(supabaseAdmin, {
+        topicId: activeTopicId,
+        blocksCount: 0,
+        success: false,
+        error: detailedError,
+        durationMs: Date.now() - startedAt,
+      });
+      await saveQueueError(supabaseAdmin, queueJobId, detailedError);
+
+      return new Response(
+        JSON.stringify({ success: false, error: detailedError, topicId: activeTopicId }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
     const materialRequirements = await fetchMaterialRequirements(supabaseAdmin, activeTopicId);
     const [mcpProfile, trustedSources] = await Promise.all([
       fetchMcpProfile(supabaseAdmin),
@@ -783,14 +842,15 @@ Deno.serve(async (req) => {
       mcpProfile ? `MCP profile: ${mcpProfile.code || "admin_heavy_curriculum_builder"}\n${mcpProfile.instructions || mcpProfile.description || ""}` : "",
     ].filter(Boolean).join("\n\n");
 
-    let lesson = await generateLesson({ topic, country, grade, subject, moduleName, referenceUrls, existingContext: sourceContext, geminiKey, nvidiaKey });
+    const generation = await generateLesson({ topic, country, grade, subject, moduleName, referenceUrls, existingContext: sourceContext, geminiKey, nvidiaKey });
+    let lesson = generation.lesson;
     let fallbackUsed = false;
 
     if (!lesson) {
       fallbackUsed = true;
       const reason = hasRagChunks
-        ? "JSON parse failure: AI returned empty or invalid JSON; fallback used"
-        : "Block generation fallback used: no chunks and AI returned empty or invalid JSON";
+        ? `Block generation failed: ${generation.error || "AI returned empty or invalid JSON"}; fallback used`
+        : `Block generation failed without linked RAG: ${generation.error || "AI returned empty or invalid JSON"}; using approved topic_outlines count=${topicData.outlines.length}`;
       console.warn(`generate-lessons fallback used for topic_id=${activeTopicId ?? "unresolved"}: ${reason}`);
       lesson = buildFallbackLessonFromOutlines(topicContext?.topicTitle ?? topic, topicData.outlines, reason);
     }
@@ -801,8 +861,34 @@ Deno.serve(async (req) => {
 
     if (lessonBlocks.length === 0) {
       fallbackUsed = true;
-      console.warn(`generate-lessons fallback used for topic_id=${activeTopicId ?? "unresolved"}: AI blocks empty or invalid; using topic_outlines count=${topicData.outlines.length}`);
+      console.warn(`generate-lessons fallback used for topic_id=${activeTopicId ?? "unresolved"}: AI blocks empty or invalid; approved topic_outlines count=${topicData.outlines.length}`);
       lessonBlocks = buildFallbackBlocksFromOutlines(topicContext?.topicTitle ?? topic, topicData.outlines);
+    }
+
+    if (lessonBlocks.length === 0) {
+      const detailedError = [
+        "Block generation failed",
+        `topic_id=${activeTopicId ?? "unresolved"}`,
+        generation.error || "AI returned no valid lesson blocks and no approved topic_outlines could be used as fallback",
+      ].join(": ");
+      console.error("generate-lessons block generation error:", detailedError);
+      await writeGenerationLog(supabaseAdmin, {
+        topicId: topicContext?.topicId ?? null,
+        blocksCount: 0,
+        success: false,
+        error: detailedError,
+        durationMs: Date.now() - startedAt,
+      });
+      await saveQueueError(supabaseAdmin, queueJobId, detailedError);
+      await updateMcpGenerationRun(supabaseAdmin, activeMcpRunId, {
+        status: "failed",
+        output_summary: { error: detailedError, phase: "block_generation" },
+      });
+
+      return new Response(
+        JSON.stringify({ success: false, error: detailedError, topicId: activeTopicId }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const normalizedContent = normalizeValue(lesson.content)
@@ -944,6 +1030,8 @@ Deno.serve(async (req) => {
             grade_id: topicContext?.gradeId ?? null,
             content: chunk,
             embedding,
+            embedding_status: "done",
+            processed_at: new Date().toISOString(),
             source_name: "generated_lesson",
             source_confidence: sourceConfidence,
             metadata: {
@@ -1029,10 +1117,11 @@ async function generateLesson(params: {
   topic: string; country: string; grade: string; subject: string;
   moduleName?: string; referenceUrls?: string[]; existingContext?: string;
   geminiKey?: string; nvidiaKey?: string;
-}): Promise<any | null> {
+}): Promise<LessonGenerationResult> {
   const { topic, country, grade, subject, moduleName, referenceUrls, existingContext, geminiKey, nvidiaKey } = params;
 
   const prompt = buildMcpLessonPrompt(topic, country, grade, subject, moduleName, referenceUrls, existingContext);
+  const errors: string[] = [];
 
   // Primary: Gemini
   if (geminiKey) {
@@ -1053,16 +1142,24 @@ async function generateLesson(params: {
         const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
         if (text) {
           const parsed = safeJsonParse(text);
-          if (parsed) return parsed;
-          console.warn("Gemini JSON parse failure: response was not valid lesson JSON");
+          if (parsed) return { lesson: parsed, error: null };
+          const reason = `Gemini JSON parse failure: response was not valid lesson JSON; excerpt=${text.slice(0, 240)}`;
+          errors.push(reason);
+          console.warn(reason);
         } else {
-          console.warn("Gemini empty response: no candidate text returned");
+          const reason = "Gemini empty response: no candidate text returned";
+          errors.push(reason);
+          console.warn(reason);
         }
       } else {
-        console.warn(`Gemini request failed: status=${res.status} body=${await res.text()}`);
+        const reason = `Gemini request failed: status=${res.status} body=${(await res.text()).slice(0, 500)}`;
+        errors.push(reason);
+        console.warn(reason);
       }
     } catch (e) {
-      console.warn("Gemini failed:", e);
+      const reason = `Gemini failed: ${formatThrownError(e)}`;
+      errors.push(reason);
+      console.warn(reason);
     }
   }
 
@@ -1086,20 +1183,37 @@ async function generateLesson(params: {
         const text = data?.choices?.[0]?.message?.content;
         if (text) {
           const parsed = safeJsonParse(text);
-          if (parsed) return parsed;
-          console.warn("NVIDIA JSON parse failure: response was not valid lesson JSON");
+          if (parsed) return { lesson: parsed, error: null };
+          const reason = `NVIDIA JSON parse failure: response was not valid lesson JSON; excerpt=${text.slice(0, 240)}`;
+          errors.push(reason);
+          console.warn(reason);
         } else {
-          console.warn("NVIDIA empty response: no message content returned");
+          const reason = "NVIDIA empty response: no message content returned";
+          errors.push(reason);
+          console.warn(reason);
         }
       } else {
-        console.warn(`NVIDIA request failed: status=${res.status} body=${await res.text()}`);
+        const reason = `NVIDIA request failed: status=${res.status} body=${(await res.text()).slice(0, 500)}`;
+        errors.push(reason);
+        console.warn(reason);
       }
     } catch (e) {
-      console.warn("NVIDIA fallback failed:", e);
+      const reason = `NVIDIA fallback failed: ${formatThrownError(e)}`;
+      errors.push(reason);
+      console.warn(reason);
     }
   }
 
-  return null;
+  return { lesson: null, error: errors.join(" | ") || "No model provider returned valid lesson JSON" };
+}
+
+function formatThrownError(error: unknown) {
+  if (error instanceof Error) return [error.name, error.message].filter(Boolean).join(": ");
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
 }
 
 async function generateEmbedding(text: string, geminiKey?: string): Promise<number[]> {

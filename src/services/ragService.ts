@@ -40,9 +40,12 @@ export const indexLessonContent = async (
         await supabase.from("rag_chunks").insert({
           source_id: lessonId,
           source_type: 'lesson_block',
+          lesson_id: lessonId,
           content: chunk,
           embedding: embedding,
-          metadata: { user_id: userId },
+          embedding_status: 'done',
+          processed_at: new Date().toISOString(),
+          metadata: { user_id: userId, lesson_id: lessonId },
           validation_status: 'ai_generated',
           source_confidence: 0,
         });

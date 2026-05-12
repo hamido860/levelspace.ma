@@ -34,10 +34,16 @@ export interface AdminOverviewKpis {
   completedJobs: number;
   pendingJobs: number;
   failedJobs: number;
+  lessonQueueDone: number;
+  lessonQueuePending: number;
+  lessonQueueFailed: number;
   recoveredLessonsNeedsReview: number;
   studentPublishReadyLessons: number;
   ragTotal: number;
   ragDone: number;
+  ragEmbedded: number;
+  ragLinkedToTopic: number;
+  ragUsable: number;
   users: number;
 }
 
@@ -102,6 +108,9 @@ export interface RagByGrade {
 export interface RagMetrics {
   total: number;
   done: number;
+  embedded: number;
+  linkedToTopic: number;
+  usable: number;
   pending: number;
   other: number;
   byStatus: Record<string, number>;
@@ -273,7 +282,9 @@ export const loadAdminOverviewKpis = async (): Promise<AdminOverviewKpis> => {
     recoveredLessonsNeedsReview,
     studentPublishReadyLessons,
     ragTotal,
-    ragDone,
+    ragEmbedded,
+    ragLinkedToTopic,
+    ragUsable,
     users,
   ] = await Promise.all([
     readCount("topics count", supabase.from("topics").select("*", { count: "exact", head: true })),
@@ -293,7 +304,9 @@ export const loadAdminOverviewKpis = async (): Promise<AdminOverviewKpis> => {
         .eq("teaching_contract->>student_publish_allowed", "true")
     ),
     readCount("rag chunk count", supabase.from("rag_chunks").select("*", { count: "exact", head: true })),
-    readCount("embedded rag chunk count", supabase.from("rag_chunks").select("*", { count: "exact", head: true }).eq("embedding_status", "done")),
+    readCount("embedded rag chunk count", supabase.from("rag_chunks").select("*", { count: "exact", head: true }).not("embedding", "is", null)),
+    readCount("topic-linked rag chunk count", supabase.from("rag_chunks").select("*", { count: "exact", head: true }).not("topic_id", "is", null)),
+    readCount("usable rag chunk count", supabase.from("rag_chunks").select("*", { count: "exact", head: true }).not("embedding", "is", null).not("topic_id", "is", null).eq("embedding_status", "done")),
     readCount("profile count", supabase.from("profiles").select("*", { count: "exact", head: true })),
   ]);
 
@@ -302,10 +315,16 @@ export const loadAdminOverviewKpis = async (): Promise<AdminOverviewKpis> => {
     completedJobs,
     pendingJobs,
     failedJobs,
+    lessonQueueDone: completedJobs,
+    lessonQueuePending: pendingJobs,
+    lessonQueueFailed: failedJobs,
     recoveredLessonsNeedsReview,
     studentPublishReadyLessons,
     ragTotal,
-    ragDone,
+    ragDone: ragEmbedded,
+    ragEmbedded,
+    ragLinkedToTopic,
+    ragUsable,
     users,
   };
 };
@@ -466,10 +485,13 @@ export const loadAdminQueueMetrics = async (): Promise<{ stats: QueueStatusBreak
 export const loadAdminRagMetrics = async (): Promise<{ ragStats: RagMetrics; ragByGrade: RagByGrade[] }> => {
   ensureConfigured();
 
-  const [total, done, pending, processing, failed, grades] = await Promise.all([
+  const [total, done, embedded, linkedToTopic, usable, pending, processing, failed, grades] = await Promise.all([
     // Use exact head counts here. Plain selects are page-limited by PostgREST and cap dashboard metrics at ~1,000 rows.
     readCount("rag chunk count", supabase.from("rag_chunks").select("*", { count: "exact", head: true })),
     readCount("done rag chunk count", supabase.from("rag_chunks").select("*", { count: "exact", head: true }).eq("embedding_status", "done")),
+    readCount("embedded rag chunk count", supabase.from("rag_chunks").select("*", { count: "exact", head: true }).not("embedding", "is", null)),
+    readCount("topic-linked rag chunk count", supabase.from("rag_chunks").select("*", { count: "exact", head: true }).not("topic_id", "is", null)),
+    readCount("usable rag chunk count", supabase.from("rag_chunks").select("*", { count: "exact", head: true }).not("embedding", "is", null).not("topic_id", "is", null).eq("embedding_status", "done")),
     readCount("pending rag chunk count", supabase.from("rag_chunks").select("*", { count: "exact", head: true }).eq("embedding_status", "pending")),
     readCount("processing rag chunk count", supabase.from("rag_chunks").select("*", { count: "exact", head: true }).eq("embedding_status", "processing")),
     readCount("failed rag chunk count", supabase.from("rag_chunks").select("*", { count: "exact", head: true }).eq("embedding_status", "failed")),
@@ -487,6 +509,9 @@ export const loadAdminRagMetrics = async (): Promise<{ ragStats: RagMetrics; rag
   const ragStats: RagMetrics = {
     total,
     done,
+    embedded,
+    linkedToTopic,
+    usable,
     pending,
     other: Math.max(0, total - knownStatusTotal),
     byStatus,

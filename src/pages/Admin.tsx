@@ -238,10 +238,16 @@ export const Admin: React.FC = () => {
     completedJobs: 0,
     pendingJobs: 0,
     failedJobs: 0,
+    lessonQueueDone: 0,
+    lessonQueuePending: 0,
+    lessonQueueFailed: 0,
     recoveredLessonsNeedsReview: 0,
     studentPublishReadyLessons: 0,
     ragTotal: 0,
     ragDone: 0,
+    ragEmbedded: 0,
+    ragLinkedToTopic: 0,
+    ragUsable: 0,
     users: 0,
   });
   const [tableHealth, setTableHealth] = useState<AdminTableHealth[]>([]);
@@ -263,7 +269,7 @@ export const Admin: React.FC = () => {
   const [failedJobs, setFailedJobs] = useState<FailedQueueJob[]>([]);
 
   // RAG
-  const [ragStats, setRagStats] = useState<RagMetrics>({ total: 0, done: 0, pending: 0, other: 0, byStatus: {} });
+  const [ragStats, setRagStats] = useState<RagMetrics>({ total: 0, done: 0, embedded: 0, linkedToTopic: 0, usable: 0, pending: 0, other: 0, byStatus: {} });
   const [ragByGrade, setRagByGrade] = useState<RagByGrade[]>([]);
 
   // AI Analyst
@@ -306,14 +312,18 @@ export const Admin: React.FC = () => {
       { data: lessonTopicLinks },
       { data: queueRows },
       { count: ragTotal },
-      { count: ragDone },
+      { count: ragEmbedded },
+      { count: ragLinkedToTopic },
+      { count: ragUsable },
       { count: usersCount },
     ] = await Promise.all([
       supabase.from("topics").select("*", { count: "exact", head: true }),
       supabase.from("lessons").select("topic_id"),
       supabase.from("lesson_gen_queue").select("topic_id, status"),
       supabase.from("rag_chunks").select("*", { count: "exact", head: true }),
-      supabase.from("rag_chunks").select("*", { count: "exact", head: true }).eq("embedding_status", "done"),
+      supabase.from("rag_chunks").select("*", { count: "exact", head: true }).not("embedding", "is", null),
+      supabase.from("rag_chunks").select("*", { count: "exact", head: true }).not("topic_id", "is", null),
+      supabase.from("rag_chunks").select("*", { count: "exact", head: true }).not("embedding", "is", null).not("topic_id", "is", null).eq("embedding_status", "done"),
       supabase.from("profiles").select("*", { count: "exact", head: true }),
     ]);
 
@@ -330,10 +340,16 @@ export const Admin: React.FC = () => {
       completedJobs: completedCount,
       pendingJobs: pendingCount,
       failedJobs: failedCount,
+      lessonQueueDone: completedCount,
+      lessonQueuePending: pendingCount,
+      lessonQueueFailed: failedCount,
       recoveredLessonsNeedsReview: 0,
       studentPublishReadyLessons: 0,
       ragTotal: ragTotal ?? 0,
-      ragDone: ragDone ?? 0,
+      ragDone: ragEmbedded ?? 0,
+      ragEmbedded: ragEmbedded ?? 0,
+      ragLinkedToTopic: ragLinkedToTopic ?? 0,
+      ragUsable: ragUsable ?? 0,
       users: usersCount ?? 0,
     });
   }, []);
@@ -463,7 +479,18 @@ export const Admin: React.FC = () => {
     (all || []).forEach((r: any) => {
       byStatus[r.embedding_status] = (byStatus[r.embedding_status] || 0) + 1;
     });
-    setRagStats({ ...byStatus, rqCount: rqCount ?? 0, total: (all || []).length });
+    setRagStats({
+      ...byStatus,
+      rqCount: rqCount ?? 0,
+      total: (all || []).length,
+      done: byStatus.done || 0,
+      embedded: byStatus.done || 0,
+      linkedToTopic: 0,
+      usable: 0,
+      pending: byStatus.pending || 0,
+      other: (all || []).filter((row: any) => !["done", "pending", "processing", "failed"].includes(String(row.embedding_status || ""))).length,
+      byStatus,
+    });
 
     const { data: grades } = await supabase
       .from("grades")
@@ -479,6 +506,8 @@ export const Admin: React.FC = () => {
         cycle_order: cycle?.cycle_order ?? 0,
         total: chunks.length,
         done: chunks.filter((c: any) => c.embedding_status === "done").length,
+        pending: chunks.filter((c: any) => c.embedding_status === "pending").length,
+        other: chunks.filter((c: any) => !["done", "pending"].includes(String(c.embedding_status || ""))).length,
       };
     });
     ragRows.sort((a, b) => a.cycle_order - b.cycle_order || a.grade_order - b.grade_order);
@@ -499,10 +528,15 @@ export const Admin: React.FC = () => {
       completedJobs: kpis.completedJobs,
       lessonCoverage: `${pct(topicCoverageTotal, kpis.topics)}%`,
       queuePending: kpis.pendingJobs,
+      lessonQueuePending: kpis.lessonQueuePending,
+      lessonQueueFailed: kpis.lessonQueueFailed,
+      lessonQueueDone: kpis.lessonQueueDone,
       failedJobs: kpis.failedJobs,
       ragChunksTotal: kpis.ragTotal,
-      ragChunksEmbedded: kpis.ragDone,
-      ragCoverage: `${pct(kpis.ragDone, kpis.ragTotal)}%`,
+      ragChunksEmbedded: kpis.ragEmbedded,
+      ragChunksLinkedToTopic: kpis.ragLinkedToTopic,
+      ragChunksUsable: kpis.ragUsable,
+      ragCoverage: `${pct(kpis.ragUsable, kpis.ragTotal)}%`,
       totalUsers: kpis.users,
       recoveredLessonsNeedingReview: kpis.recoveredLessonsNeedsReview,
       studentPublishReadyLessons: kpis.studentPublishReadyLessons,
@@ -762,7 +796,9 @@ export const Admin: React.FC = () => {
             <KPI label="Queue Failed" value={kpis.failedJobs ?? "—"} sub="lesson_gen_queue status = failed" variant="danger" />
             <KPI label="Needs Review" value={kpis.recoveredLessonsNeedsReview ?? "—"} sub="teaching_contract.status = needs_review" variant="warn" />
             <KPI label="Student Publish Ready" value={kpis.studentPublishReadyLessons ?? "—"} sub="needs_review + student_publish_allowed = true" variant="success" />
-            <KPI label="RAG Chunks" value={kpis.ragTotal ?? "—"} sub={`${pct(kpis.ragDone, kpis.ragTotal)}% embedded`} variant="success" />
+            <KPI label="RAG Chunks" value={kpis.ragTotal ?? "—"} sub={`${pct(kpis.ragUsable, kpis.ragTotal)}% usable`} variant="success" />
+            <KPI label="RAG Linked" value={kpis.ragLinkedToTopic ?? "—"} sub="rag_chunks.topic_id is set" />
+            <KPI label="RAG Usable" value={kpis.ragUsable ?? "—"} sub="embedded + linked + done" variant="success" />
             <KPI label="Users" value={kpis.users ?? "—"} sub="profiles" />
           </div>
 
@@ -1069,9 +1105,11 @@ export const Admin: React.FC = () => {
       {/* ── RAG / EMBEDDINGS ── */}
       {tab === "rag" && (
         <div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
             <KPI label="Total Chunks" value={(ragStats.total ?? 0).toLocaleString()} sub="in rag_chunks" />
-            <KPI label="Embedded" value={(ragStats.done ?? 0).toLocaleString()} sub={`${pct(ragStats.done, ragStats.total)}% done`} variant="success" />
+            <KPI label="Embedded" value={(ragStats.embedded ?? 0).toLocaleString()} sub="embedding is not null" variant="success" />
+            <KPI label="Linked to Topic" value={(ragStats.linkedToTopic ?? 0).toLocaleString()} sub="topic_id is not null" />
+            <KPI label="Usable" value={(ragStats.usable ?? 0).toLocaleString()} sub="embedded + linked + done" variant="success" />
             <KPI label="Pending" value={(ragStats.pending ?? 0).toLocaleString()} sub="embedding_status = pending" variant="warn" />
             <KPI label="Other Statuses" value={(ragStats.other ?? 0).toLocaleString()} sub="non-pending / non-done chunks" variant="warn" />
           </div>
