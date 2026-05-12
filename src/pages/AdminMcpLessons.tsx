@@ -6,6 +6,7 @@ import {
   ExternalLink,
   Eye,
   FileWarning,
+  Filter,
   Layers,
   PackageSearch,
   RefreshCw,
@@ -16,6 +17,8 @@ import {
 import { Layout } from "../components/Layout";
 import { SEO } from "../components/SEO";
 import { supabase } from "../db/supabase";
+import { db } from "../db/db";
+import { useLiveQuery } from "dexie-react-hooks";
 
 type ReviewRow = {
   id: string;
@@ -26,9 +29,15 @@ type ReviewRow = {
   topic_id: string | null;
   generation_pipeline: string | null;
   validation_status: string | null;
+  source_name?: string | null;
   source_confidence: number | null;
   quality_score: number | null;
-  topics?: { id: string; title: string | null } | null;
+  topics?: {
+    id: string;
+    title: string | null;
+    grades?: { id: string; name: string | null } | null;
+    subjects?: { id: string; name: string | null } | null;
+  } | null;
 };
 
 type DetailData = {
@@ -36,6 +45,20 @@ type DetailData = {
   evidence: any[];
   materials: any[];
   requirements: any[];
+};
+
+type TrackRow = { id: string; name: string | null };
+type QueueTrackRow = { topic_id: string | null; track_id: string | null; bac_tracks?: TrackRow | null };
+type FilterState = {
+  allGrades: boolean;
+  academicLevel: string;
+  track: string;
+  subject: string;
+  topic: string;
+  status: string;
+  sourceType: string;
+  qualityScore: string;
+  issuesOnly: boolean;
 };
 
 const statusClass = (value?: string | null) => {
@@ -50,21 +73,87 @@ const score = (value: unknown) => {
   return Number.isFinite(numeric) ? numeric.toFixed(2) : "-";
 };
 
+const normalizeText = (value: unknown) =>
+  String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+const isBacLevel = (value: unknown) => {
+  const normalized = normalizeText(value);
+  return /\bterminale\b|\b2eme\b|\b2e\b|\bbac\b/.test(normalized);
+};
+
+const isLegacySource = (row: ReviewRow) =>
+  !row.generation_pipeline || row.generation_pipeline === "legacy" || row.source_name === "legacy";
+
+const getAcademicLevel = (row: ReviewRow) =>
+  row.topics?.grades?.name || row.grade || "Unknown level";
+
+const getSubjectName = (row: ReviewRow) =>
+  row.topics?.subjects?.name || row.subject || "Unknown subject";
+
+const getTrackName = (row: ReviewRow, trackByTopic: Map<string, TrackRow>) => {
+  const topicTrack = row.topic_id ? trackByTopic.get(row.topic_id)?.name : "";
+  if (topicTrack) return topicTrack;
+  return isBacLevel(getAcademicLevel(row)) ? "Track missing" : "";
+};
+
+const getCurriculumPath = (row: ReviewRow, trackByTopic: Map<string, TrackRow>) => {
+  const level = isBacLevel(getAcademicLevel(row)) && normalizeText(getAcademicLevel(row)) === "terminale"
+    ? "Terminale"
+    : getAcademicLevel(row);
+  const track = getTrackName(row, trackByTopic);
+  const subject = getSubjectName(row);
+  if (track === "Track missing") {
+    return [`${level} - Track missing`, subject].filter(Boolean).join(" > ");
+  }
+  return [level, track, subject].filter(Boolean).join(" > ");
+};
+
 export const AdminMcpLessons: React.FC = () => {
+  const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
+  const settingsMap = useMemo(() => Object.fromEntries(dbSettings.map((setting) => [setting.key, setting.value])), [dbSettings]);
+  const activeGrade = String(settingsMap.selected_grade || localStorage.getItem("selected_grade") || "");
+  const activeTrackId = String(settingsMap.selected_bac_track || localStorage.getItem("selected_bac_track") || "");
+
   const [rows, setRows] = useState<ReviewRow[]>([]);
   const [detail, setDetail] = useState<Record<string, DetailData>>({});
+  const [trackByTopic, setTrackByTopic] = useState<Map<string, TrackRow>>(new Map());
+  const [allTracks, setAllTracks] = useState<TrackRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [filters, setFilters] = useState<FilterState>({
+    allGrades: false,
+    academicLevel: "",
+    track: "",
+    subject: "",
+    topic: "",
+    status: "",
+    sourceType: "",
+    qualityScore: "",
+    issuesOnly: false,
+  });
+
+  useEffect(() => {
+    setFilters((current) => ({
+      ...current,
+      academicLevel: current.allGrades ? current.academicLevel : activeGrade,
+      track: current.allGrades ? current.track : activeTrackId,
+    }));
+  }, [activeGrade, activeTrackId]);
 
   const loadRows = useCallback(async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
         .from("lessons")
-        .select("id, lesson_title, country, grade, subject, topic_id, generation_pipeline, validation_status, source_confidence, quality_score, topics:topic_id(id, title)")
+        .select("id, lesson_title, country, grade, subject, topic_id, generation_pipeline, validation_status, source_name, source_confidence, quality_score, topics:topic_id(id, title, grades:grade_id(id, name), subjects:subject_id(id, name))")
         .order("updated_at", { ascending: false })
-        .limit(80);
+        .limit(300);
 
       if (error) throw error;
       const nextRows = Array.isArray(data) ? data as ReviewRow[] : [];
@@ -73,7 +162,7 @@ export const AdminMcpLessons: React.FC = () => {
       const lessonIds = nextRows.map((row) => row.id);
       const topicIds = Array.from(new Set(nextRows.map((row) => row.topic_id).filter(Boolean))) as string[];
 
-      const [checksResult, evidenceResult, materialsResult, requirementsResult] = await Promise.all([
+      const [checksResult, evidenceResult, materialsResult, requirementsResult, queueTrackResult, tracksResult] = await Promise.all([
         lessonIds.length
           ? supabase.from("mcp_quality_checks").select("*").in("lesson_id", lessonIds)
           : Promise.resolve({ data: [], error: null }),
@@ -86,7 +175,20 @@ export const AdminMcpLessons: React.FC = () => {
         topicIds.length
           ? supabase.from("topic_material_requirements").select("*").in("topic_id", topicIds)
           : Promise.resolve({ data: [], error: null }),
+        topicIds.length
+          ? supabase.from("lesson_gen_queue").select("topic_id, track_id, bac_tracks:track_id(id, name)").in("topic_id", topicIds)
+          : Promise.resolve({ data: [], error: null }),
+        supabase.from("bac_tracks").select("id, name").order("name", { ascending: true }),
       ]);
+
+      const nextTrackByTopic = new Map<string, TrackRow>();
+      ((queueTrackResult.data || []) as QueueTrackRow[]).forEach((item) => {
+        if (item.topic_id && item.bac_tracks?.name && !nextTrackByTopic.has(item.topic_id)) {
+          nextTrackByTopic.set(item.topic_id, item.bac_tracks);
+        }
+      });
+      setTrackByTopic(nextTrackByTopic);
+      setAllTracks(((tracksResult.data || []) as TrackRow[]).filter((track) => track.id && track.name));
 
       const nextDetail: Record<string, DetailData> = {};
       for (const row of nextRows) {
@@ -172,7 +274,71 @@ export const AdminMcpLessons: React.FC = () => {
     }
   }, [loadRows]);
 
-  const tableRows = useMemo(() => rows, [rows]);
+  const filterOptions = useMemo(() => {
+    const levels = new Set<string>();
+    const subjects = new Set<string>();
+    const topics = new Set<string>();
+    const statuses = new Set<string>();
+    rows.forEach((row) => {
+      levels.add(getAcademicLevel(row));
+      subjects.add(getSubjectName(row));
+      if (row.topics?.title) topics.add(row.topics.title);
+      statuses.add(row.validation_status || "needs_review");
+    });
+    return {
+      levels: Array.from(levels).filter(Boolean).sort(),
+      tracks: allTracks,
+      subjects: Array.from(subjects).filter(Boolean).sort(),
+      topics: Array.from(topics).filter(Boolean).sort(),
+      statuses: Array.from(statuses).filter(Boolean).sort(),
+    };
+  }, [allTracks, rows]);
+
+  const tableRows = useMemo(() => {
+    const activeLevelFilter = filters.allGrades ? filters.academicLevel : activeGrade;
+    const activeTrackFilter = filters.allGrades ? filters.track : activeTrackId;
+    const minQuality = filters.qualityScore ? Number(filters.qualityScore) : null;
+
+    return rows.filter((row) => {
+      const rowLevel = getAcademicLevel(row);
+      const rowSubject = getSubjectName(row);
+      const rowTopic = row.topics?.title || "";
+      const rowTrack = row.topic_id ? trackByTopic.get(row.topic_id)?.id || "" : "";
+      const rowTrackName = getTrackName(row, trackByTopic);
+      const matchesActiveTrack = !activeTrackFilter
+        || rowTrack === activeTrackFilter
+        || normalizeText(rowTrackName) === normalizeText(activeTrackFilter);
+      const rowDetail = detail[row.id] || { checks: [], evidence: [], materials: [], requirements: [] };
+      const hasIssues = rowDetail.checks.some((check) => ["warning", "fail"].includes(check.status))
+        || rowDetail.materials.some((item) => item.material_type === "material_request" && item.approved !== true)
+        || rowTrackName === "Track missing";
+
+      if (!filters.allGrades && activeLevelFilter && normalizeText(rowLevel) !== normalizeText(activeLevelFilter)) return false;
+      if (!filters.allGrades && activeTrackFilter && isBacLevel(rowLevel) && !matchesActiveTrack) return false;
+      if (filters.allGrades && filters.academicLevel && normalizeText(rowLevel) !== normalizeText(filters.academicLevel)) return false;
+      if (filters.allGrades && filters.track && rowTrack !== filters.track) return false;
+      if (filters.subject && normalizeText(rowSubject) !== normalizeText(filters.subject)) return false;
+      if (filters.topic && normalizeText(rowTopic) !== normalizeText(filters.topic)) return false;
+      if (filters.status && normalizeText(row.validation_status || "needs_review") !== normalizeText(filters.status)) return false;
+      if (filters.sourceType !== "legacy" && isLegacySource(row)) return false;
+      if (filters.sourceType === "legacy" && !isLegacySource(row)) return false;
+      if (filters.sourceType === "mcp" && isLegacySource(row)) return false;
+      if (minQuality !== null && Number.isFinite(minQuality) && Number(row.quality_score || 0) < minQuality) return false;
+      if (filters.issuesOnly && !hasIssues) return false;
+      return true;
+    });
+  }, [activeGrade, activeTrackId, detail, filters, rows, trackByTopic]);
+
+  const setFilter = <K extends keyof FilterState>(key: K, value: FilterState[K]) => {
+    setFilters((current) => ({ ...current, [key]: value }));
+  };
+
+  const switchToAllGrades = () => setFilters((current) => ({
+    ...current,
+    allGrades: true,
+    academicLevel: "",
+    track: "",
+  }));
 
   return (
     <Layout>
@@ -182,11 +348,26 @@ export const AdminMcpLessons: React.FC = () => {
         <div className="rounded-3xl border border-ink/10 bg-paper p-6 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <div className="text-[11px] font-bold uppercase tracking-[0.24em] text-accent">MCP orchestration</div>
-              <h1 className="mt-2 text-3xl font-black tracking-tight text-ink">Lesson Review Pipeline</h1>
+              <div className="text-[11px] font-bold uppercase tracking-[0.24em] text-accent">Review workspace</div>
+              <h1 className="mt-2 text-3xl font-black tracking-tight text-ink">Curriculum Review Queue</h1>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
                 Inspect admin-heavy lesson runs, source grounding, material gaps, and MCP quality checks before publishing.
               </p>
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                <span className="rounded-full bg-accent/10 px-3 py-1 font-bold text-accent">
+                  Active session: {activeGrade || "No active grade"}
+                </span>
+                {activeTrackId && (
+                  <span className="rounded-full bg-ink/5 px-3 py-1 font-bold text-ink">
+                    Track: {allTracks.find((track) => track.id === activeTrackId)?.name || activeTrackId}
+                  </span>
+                )}
+                {filters.allGrades && (
+                  <span className="rounded-full bg-amber-100 px-3 py-1 font-bold text-amber-800">
+                    Viewing all grades
+                  </span>
+                )}
+              </div>
             </div>
             <button
               onClick={loadRows}
@@ -199,10 +380,76 @@ export const AdminMcpLessons: React.FC = () => {
           </div>
         </div>
 
+        <div className="rounded-3xl border border-ink/10 bg-paper p-4 shadow-sm">
+          <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-muted">
+            <Filter className="h-4 w-4" />
+            Review filters
+          </div>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <label className="space-y-1 text-xs font-bold uppercase tracking-widest text-muted">
+              <span>Academic Level</span>
+              <select
+                value={filters.allGrades ? filters.academicLevel : activeGrade}
+                disabled={!filters.allGrades}
+                onChange={(event) => setFilter("academicLevel", event.target.value)}
+                className="w-full rounded-xl border border-ink/10 bg-surface-low px-3 py-2 text-sm font-medium normal-case tracking-normal text-ink outline-none"
+              >
+                <option value="">All levels</option>
+                {filterOptions.levels.map((level) => <option key={level} value={level}>{level}</option>)}
+              </select>
+            </label>
+            <label className="space-y-1 text-xs font-bold uppercase tracking-widest text-muted">
+              <span>Track / Stream</span>
+              <select
+                value={filters.allGrades ? filters.track : activeTrackId}
+                disabled={!filters.allGrades}
+                onChange={(event) => setFilter("track", event.target.value)}
+                className="w-full rounded-xl border border-ink/10 bg-surface-low px-3 py-2 text-sm font-medium normal-case tracking-normal text-ink outline-none"
+              >
+                <option value="">All tracks</option>
+                {filterOptions.tracks.map((track) => <option key={track.id} value={track.id}>{track.name}</option>)}
+              </select>
+            </label>
+            <FilterSelect label="Subject" value={filters.subject} options={filterOptions.subjects} onChange={(value) => setFilter("subject", value)} />
+            <FilterSelect label="Topic" value={filters.topic} options={filterOptions.topics} onChange={(value) => setFilter("topic", value)} />
+            <FilterSelect label="Status" value={filters.status} options={filterOptions.statuses} onChange={(value) => setFilter("status", value)} />
+            <label className="space-y-1 text-xs font-bold uppercase tracking-widest text-muted">
+              <span>Source Type</span>
+              <select value={filters.sourceType} onChange={(event) => setFilter("sourceType", event.target.value)} className="w-full rounded-xl border border-ink/10 bg-surface-low px-3 py-2 text-sm font-medium normal-case tracking-normal text-ink outline-none">
+                <option value="">All source types</option>
+                <option value="mcp">MCP / reviewed</option>
+                <option value="legacy">Legacy only</option>
+              </select>
+            </label>
+            <label className="space-y-1 text-xs font-bold uppercase tracking-widest text-muted">
+              <span>Quality Score</span>
+              <select value={filters.qualityScore} onChange={(event) => setFilter("qualityScore", event.target.value)} className="w-full rounded-xl border border-ink/10 bg-surface-low px-3 py-2 text-sm font-medium normal-case tracking-normal text-ink outline-none">
+                <option value="">Any quality</option>
+                <option value="0.8">0.80+</option>
+                <option value="0.65">0.65+</option>
+                <option value="0.5">0.50+</option>
+              </select>
+            </label>
+            <div className="flex items-end gap-2">
+              <button
+                onClick={() => setFilter("issuesOnly", !filters.issuesOnly)}
+                className={`flex-1 rounded-xl border px-3 py-2 text-xs font-bold uppercase tracking-widest transition-colors ${filters.issuesOnly ? "border-amber-300 bg-amber-100 text-amber-800" : "border-ink/10 bg-surface-low text-muted"}`}
+              >
+                Issues Only
+              </button>
+              <button
+                onClick={() => setFilter("allGrades", !filters.allGrades)}
+                className={`flex-1 rounded-xl border px-3 py-2 text-xs font-bold uppercase tracking-widest transition-colors ${filters.allGrades ? "border-accent bg-accent text-paper" : "border-ink/10 bg-surface-low text-ink"}`}
+              >
+                {filters.allGrades ? "All Grades On" : "Active Session"}
+              </button>
+            </div>
+          </div>
+        </div>
+
         <div className="overflow-hidden rounded-3xl border border-ink/10 bg-paper shadow-sm">
-          <div className="grid grid-cols-[1.2fr_1.1fr_1.5fr_1fr_0.8fr_0.8fr_1fr] gap-3 border-b border-ink/10 bg-surface-low px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-muted">
-            <span>Grade</span>
-            <span>Subject</span>
+          <div className="grid grid-cols-[1.8fr_1.5fr_1fr_0.8fr_0.8fr_1fr] gap-3 border-b border-ink/10 bg-surface-low px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-muted">
+            <span>Curriculum Path</span>
             <span>Topic / Lesson</span>
             <span>Status</span>
             <span>Source</span>
@@ -216,20 +463,38 @@ export const AdminMcpLessons: React.FC = () => {
               Loading MCP lessons...
             </div>
           ) : tableRows.length === 0 ? (
-            <div className="p-12 text-center text-sm text-muted">No lessons found.</div>
+            <div className="p-12 text-center">
+              <div className="text-base font-bold text-ink">No lesson reviews for this active session.</div>
+              <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-muted">
+                The queue is scoped to {activeGrade || "the current academic level"}. Terminale or legacy lessons stay hidden until you choose All Grades or a matching filter.
+              </p>
+              <div className="mt-5 flex flex-wrap justify-center gap-2">
+                <button onClick={switchToAllGrades} className="rounded-xl bg-ink px-4 py-2 text-xs font-bold uppercase tracking-widest text-paper">View all grades</button>
+                <a href="/admin/curriculum-review" className="rounded-xl bg-surface-low px-4 py-2 text-xs font-bold uppercase tracking-widest text-ink">Import lessons</a>
+                <button onClick={loadRows} className="rounded-xl bg-accent px-4 py-2 text-xs font-bold uppercase tracking-widest text-paper">Generate review queue</button>
+              </div>
+            </div>
           ) : (
             tableRows.map((row) => {
               const rowDetail = detail[row.id] || { checks: [], evidence: [], materials: [], requirements: [] };
               const missingMaterials = rowDetail.materials.filter((item) => item.material_type === "material_request" && item.approved !== true).length;
               const failingChecks = rowDetail.checks.filter((check) => ["warning", "fail"].includes(check.status)).length;
+              const rowTrackName = getTrackName(row, trackByTopic);
+              const missingTrack = rowTrackName === "Track missing";
+              const legacy = isLegacySource(row);
               const isExpanded = expandedId === row.id;
               const busyKey = (name: string) => busy === `${name}:${row.id}`;
 
               return (
                 <div key={row.id} className="border-b border-ink/5 last:border-b-0">
-                  <div className="grid grid-cols-[1.2fr_1.1fr_1.5fr_1fr_0.8fr_0.8fr_1fr] gap-3 px-4 py-4 text-sm">
-                    <div className="font-semibold text-ink">{row.grade || "-"}</div>
-                    <div className="text-ink">{row.subject || "-"}</div>
+                  <div className="grid grid-cols-[1.8fr_1.5fr_1fr_0.8fr_0.8fr_1fr] gap-3 px-4 py-4 text-sm">
+                    <div>
+                      <div className="font-semibold text-ink">{getCurriculumPath(row, trackByTopic)}</div>
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {missingTrack && <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold uppercase text-red-700">Missing track</span>}
+                        {legacy && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-700">Legacy</span>}
+                      </div>
+                    </div>
                     <div>
                       <div className="font-bold text-ink">{row.topics?.title || "Untitled topic"}</div>
                       <div className="mt-1 text-xs text-muted">{row.lesson_title || "No lesson title"}</div>
@@ -268,7 +533,7 @@ export const AdminMcpLessons: React.FC = () => {
                     <span className="inline-flex items-center gap-2"><Layers className="h-3.5 w-3.5" /> Required materials: {rowDetail.requirements.length}</span>
                     <span className="inline-flex items-center gap-2"><FileWarning className="h-3.5 w-3.5" /> Missing materials: {missingMaterials}</span>
                     <span className="inline-flex items-center gap-2"><ShieldCheck className="h-3.5 w-3.5" /> MCP checks: {rowDetail.checks.length}</span>
-                    <span className="inline-flex items-center gap-2"><BookOpen className="h-3.5 w-3.5" /> Issues: {failingChecks}</span>
+                    <span className="inline-flex items-center gap-2"><BookOpen className="h-3.5 w-3.5" /> Issues: {failingChecks + (missingTrack ? 1 : 0)}</span>
                   </div>
 
                   {isExpanded && (
@@ -303,4 +568,25 @@ const DetailPanel: React.FC<{ title: string; rows: any[]; empty: string }> = ({ 
       </div>
     )}
   </div>
+);
+
+const FilterSelect: React.FC<{
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+}> = ({ label, value, options, onChange }) => (
+  <label className="space-y-1 text-xs font-bold uppercase tracking-widest text-muted">
+    <span>{label}</span>
+    <select
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      className="w-full rounded-xl border border-ink/10 bg-surface-low px-3 py-2 text-sm font-medium normal-case tracking-normal text-ink outline-none"
+    >
+      <option value="">All {label.toLowerCase()}</option>
+      {options.map((option) => (
+        <option key={option} value={option}>{option}</option>
+      ))}
+    </select>
+  </label>
 );
