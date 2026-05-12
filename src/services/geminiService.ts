@@ -6,6 +6,7 @@ import { db } from "../db/db";
 import { searchContextForGeneration } from "./ragService";
 import { transformersService } from "./transformersService";
 import { mcpClient } from "./mcpClient";
+import { supabase } from "../db/supabase";
 
 export const getCustomApiKey = () =>
   localStorage.getItem("CUSTOM_GEMINI_API_KEY") || "";
@@ -112,12 +113,23 @@ export async function callNvidiaAPI(params: {
 
   // Use our local proxy to avoid CORS errors when called from browser
   const endpoint = typeof window !== 'undefined' ? '/api/nvidia-proxy' : 'https://integrate.api.nvidia.com/v1/chat/completions';
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  if (typeof window !== 'undefined') {
+    const { data } = await supabase.auth.getSession();
+    if (data.session) {
+      headers["Authorization"] = `Bearer ${data.session.access_token}`;
+    }
+    headers["X-Nvidia-Api-Key"] = apiKey;
+  } else {
+    headers["Authorization"] = `Bearer ${apiKey}`;
+  }
+
   const response = await fetch(endpoint, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
+    headers,
     body: JSON.stringify(body),
   });
 
