@@ -50,6 +50,8 @@ import {
   explainText,
   getSelectionIntent,
   SelectionIntent,
+  structureLessonIntoLearningBlocks,
+  StructuredLearningBlock,
   generateInteractiveContent,
   generateAnotherExample,
   checkAIProvider
@@ -60,6 +62,7 @@ import { Modal } from '../components/Modal';
 import { PedagogicalTools } from '../components/PedagogicalTools';
 import { AIAssistant } from '../components/AIAssistant';
 import { EduWorkspace } from '../components/workspace/EduWorkspace';
+import { LessonBlockRenderer } from '../components/lesson/LessonBlockRenderer';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { useAppSettings } from '../context/AppSettingsContext';
@@ -478,6 +481,9 @@ export const LessonView: React.FC = () => {
   const [explanationMode, setExplanationMode] = useState<SelectionIntent>('paragraph_explanation');
   const [selectionContext, setSelectionContext] = useState<SelectionContext>({ surroundingSentence: '', surroundingParagraph: '' });
   const [isExplaining, setIsExplaining] = useState(false);
+  const [learningBlocks, setLearningBlocks] = useState<StructuredLearningBlock[]>([]);
+  const [isStructuringLesson, setIsStructuringLesson] = useState(false);
+  const [learningBlockError, setLearningBlockError] = useState<string | null>(null);
 
 
   // --- Audio Reading Logic ---
@@ -569,6 +575,42 @@ export const LessonView: React.FC = () => {
       setExplanation(result);
     } catch (error) {
       console.error("Failed to explain text:", error);
+      setExplanation("Failed to generate explanation. Please try again.");
+    } finally {
+      setIsExplaining(false);
+    }
+  };
+
+  const openVocabularyDictionary = async (term: string, sourceBlock?: StructuredLearningBlock) => {
+    if (!effectiveLesson || !hasAiAccess || !aiAvailable) return;
+    const cleanTerm = term.trim();
+    if (!cleanTerm) return;
+
+    const surroundingParagraph = sourceBlock?.content || selectionContext.surroundingParagraph || cleanTerm;
+    setSelectedText(cleanTerm);
+    setExplanationMode('word_definition');
+    setSelectionContext({
+      surroundingSentence: surroundingParagraph,
+      surroundingParagraph,
+    });
+    setIsExplaining(true);
+    setExplanation(null);
+
+    try {
+      const context = effectiveLesson.blocks?.map(b => b.content || '').join('\n') || effectiveLesson.content || '';
+      const result = await explainText(cleanTerm, context, lessonGrade, lessonCountry, language, module?.strictRAG, {
+        mode: 'word_definition',
+        surroundingSentence: surroundingParagraph,
+        surroundingParagraph,
+        lessonTitle: effectiveLesson.title,
+        lessonSubject: effectiveLesson.subject || module?.name || '',
+        lessonTopic: module?.name || effectiveLesson.title,
+        gradeLevel: lessonGrade,
+        userRequest: 'Explain this vocabulary word from a lesson vocabulary block.',
+      });
+      setExplanation(result);
+    } catch (error) {
+      console.error("Failed to explain vocabulary term:", error);
       setExplanation("Failed to generate explanation. Please try again.");
     } finally {
       setIsExplaining(false);
@@ -799,11 +841,29 @@ export const LessonView: React.FC = () => {
 
   const selectedGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
   const selectedCountry = settingsMap['selected_country'] || localStorage.getItem('selected_country') || '';
+  const lazyModeEnabled = String(settingsMap['lazy_mode']) === 'true' || localStorage.getItem('lazy_mode') === 'true';
   const lessonGrade = effectiveLesson?.grade || supabaseLesson?.grade || selectedGrade;
   const lessonCountry = effectiveLesson?.country || supabaseLesson?.country || selectedCountry;
   const lessonSubject = effectiveLesson?.subject || supabaseLesson?.subject || module?.name || '';
   const lessonTopic = module?.name || effectiveLesson?.title || '';
   const explanationContextLabel = [lessonSubject || 'Lesson', lessonTopic].filter(Boolean).join(' > ');
+  const rawLessonContent = useMemo(() => {
+    if (!effectiveLesson) return '';
+    const blockText = Array.isArray(effectiveLesson.blocks)
+      ? effectiveLesson.blocks
+          .map((block: any) => [
+            block?.title,
+            block?.label,
+            block?.content,
+            block?.question,
+            ...(Array.isArray(block?.rules) ? block.rules : []),
+            ...(Array.isArray(block?.points) ? block.points : []),
+          ].filter(Boolean).join('\n'))
+          .filter(Boolean)
+          .join('\n\n')
+      : '';
+    return (blockText || effectiveLesson.content || '').trim();
+  }, [effectiveLesson]);
   const lessonMetaTitle = effectiveLesson?.title || supabaseLesson?.lesson_title || 'Lesson';
   const lessonMetaDescription = buildMetaDescription(
     effectiveLesson?.subtitle ||
@@ -835,6 +895,69 @@ export const LessonView: React.FC = () => {
       db.settings.put({ key: 'last_viewed_lesson_id', value: effectiveLesson.id });
     }
   }, [effectiveLesson?.id, effectiveLesson?.blocks, openBlocks.length]);
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    const buildLearningBlocks = async () => {
+      if (!effectiveLesson?.id || !rawLessonContent || !hasAiAccess || !aiAvailable) {
+        setLearningBlocks([]);
+        setIsStructuringLesson(false);
+        return;
+      }
+
+      setIsStructuringLesson(true);
+      setLearningBlockError(null);
+      try {
+        const structured = await structureLessonIntoLearningBlocks({
+          rawContent: rawLessonContent,
+          lessonTitle: lessonMetaTitle,
+          subject: lessonSubject,
+          topic: lessonTopic || lessonMetaTitle,
+          gradeLevel: lessonGrade,
+          language,
+          curriculumMetadata: {
+            country: lessonCountry,
+            topic_id: effectiveLesson.topic_id,
+            validation_status: effectiveLesson.validation_status,
+            source_name: effectiveLesson.source_name,
+          },
+        });
+        if (!isCancelled) {
+          setLearningBlocks(structured);
+        }
+      } catch (error) {
+        console.error("Failed to structure lesson blocks:", error);
+        if (!isCancelled) {
+          setLearningBlocks([]);
+          setLearningBlockError("AI learning blocks are unavailable for this lesson right now.");
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsStructuringLesson(false);
+        }
+      }
+    };
+
+    buildLearningBlocks();
+    return () => {
+      isCancelled = true;
+    };
+  }, [
+    effectiveLesson?.id,
+    effectiveLesson?.topic_id,
+    effectiveLesson?.validation_status,
+    effectiveLesson?.source_name,
+    rawLessonContent,
+    lessonMetaTitle,
+    lessonSubject,
+    lessonTopic,
+    lessonGrade,
+    lessonCountry,
+    language,
+    hasAiAccess,
+    aiAvailable,
+  ]);
 
   useEffect(() => {
     const fetchExtraData = async () => {
@@ -1916,7 +2039,32 @@ export const LessonView: React.FC = () => {
               </div>
             )}
 
-            {/* Lesson Blocks */}
+            {/* AI-guided semantic learning blocks */}
+            {isStructuringLesson && (
+              <div className="rounded-2xl border border-accent/15 bg-accent/5 p-4 text-sm text-accent">
+                <div className="flex items-center gap-3">
+                  <Loader2 size={18} className="animate-spin" />
+                  <div>
+                    <p className="font-bold">Structuring this lesson into guided learning blocks...</p>
+                    <p className="mt-0.5 text-xs opacity-80">Definitions, examples, warnings, vocabulary, and checkpoints are being prepared.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {learningBlockError && !isStructuringLesson && (
+              <div className="rounded-2xl border border-warning/20 bg-warning/5 p-4 text-xs font-medium text-warning">
+                {learningBlockError} Showing the original lesson blocks instead.
+              </div>
+            )}
+
+            {learningBlocks.length > 0 ? (
+              <LessonBlockRenderer
+                blocks={learningBlocks}
+                lazyMode={lazyModeEnabled}
+                onVocabularyTermClick={openVocabularyDictionary}
+              />
+            ) : (
             <div className="space-y-2">
               {visibleIndexedBlocks.length > 0 ? (
                 visibleIndexedBlocks.map(({ block, index }) => {
@@ -2572,6 +2720,7 @@ export const LessonView: React.FC = () => {
               </div>
             )}
           </div>
+            )}
         </div>
 
 

@@ -809,6 +809,73 @@ export interface AILessonBlock {
   exercise?: { question: string; solution: string };
 }
 
+export type LearningBlockType =
+  | "definition"
+  | "key_idea"
+  | "simple_explanation"
+  | "example"
+  | "question"
+  | "warning"
+  | "dont_confuse"
+  | "note"
+  | "formula"
+  | "remember"
+  | "practice"
+  | "ai_hint"
+  | "vocabulary"
+  | "summary"
+  | "checkpoint";
+
+export type LearningBlockImportance = "low" | "medium" | "high";
+export type LearningBlockAction = "read" | "think" | "answer" | "remember" | "practice" | "compare";
+export type LearningBlockDifficulty = "easy" | "medium" | "hard";
+
+export interface StructuredLearningBlock {
+  id: string;
+  type: LearningBlockType;
+  emoji: string;
+  title: string;
+  content: string;
+  shortVersion?: string;
+  importance: LearningBlockImportance;
+  relatedTerms: string[];
+  studentAction: LearningBlockAction;
+  estimatedDifficulty: LearningBlockDifficulty;
+}
+
+export interface StructureLessonInput {
+  rawContent: string;
+  lessonTitle: string;
+  subject: string;
+  topic: string;
+  gradeLevel: string;
+  language: string;
+  curriculumMetadata?: Record<string, unknown>;
+}
+
+export const LEARNING_BLOCK_EMOJIS: Record<LearningBlockType, string> = {
+  definition: "📘",
+  key_idea: "⭐",
+  simple_explanation: "🧩",
+  example: "💡",
+  question: "❓",
+  warning: "⚠️",
+  dont_confuse: "🚫",
+  note: "📝",
+  formula: "🧮",
+  remember: "✅",
+  practice: "🧪",
+  ai_hint: "🧠",
+  vocabulary: "🔤",
+  summary: "🧾",
+  checkpoint: "🎯",
+};
+
+const SUPPORTED_LEARNING_BLOCK_TYPES = Object.keys(LEARNING_BLOCK_EMOJIS) as LearningBlockType[];
+const SUPPORTED_LEARNING_ACTIONS: LearningBlockAction[] = ["read", "think", "answer", "remember", "practice", "compare"];
+const SUPPORTED_IMPORTANCE: LearningBlockImportance[] = ["low", "medium", "high"];
+const SUPPORTED_DIFFICULTY: LearningBlockDifficulty[] = ["easy", "medium", "hard"];
+
 export interface AILesson {
   title: string;
   subtitle: string;
@@ -2103,6 +2170,194 @@ export const explainText = async (
     handleApiError(error, "explainText");
     return "Failed to connect to the AI service. Please try again.";
   }
+};
+
+const compactLearningText = (value: unknown, maxLength = 520) => {
+  const text = String(value || "").replace(/\s+/g, " ").trim();
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, maxLength - 1).trim()}…`;
+};
+
+const stableLearningBlockId = (type: LearningBlockType, index: number, title: string) => {
+  const slug = String(title || type)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 36);
+  return `${type}-${index + 1}-${slug || "block"}`;
+};
+
+const dedupeTerms = (terms: unknown[]) => {
+  const seen = new Set<string>();
+  return terms
+    .map((term) => String(term || "").replace(/\s+/g, " ").trim())
+    .filter((term) => {
+      const key = term.toLowerCase();
+      if (!term || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, 10);
+};
+
+export const validateLearningBlocks = (
+  rawBlocks: unknown,
+  source: Pick<StructureLessonInput, "rawContent" | "lessonTitle" | "subject" | "topic">,
+): StructuredLearningBlock[] => {
+  const inputBlocks = Array.isArray(rawBlocks) ? rawBlocks : [];
+  const validated = inputBlocks
+    .map((raw, index): StructuredLearningBlock | null => {
+      if (!raw || typeof raw !== "object") return null;
+      const block = raw as Record<string, unknown>;
+      const type = String(block.type || "").trim() as LearningBlockType;
+      if (!SUPPORTED_LEARNING_BLOCK_TYPES.includes(type)) return null;
+
+      const title = compactLearningText(block.title || type.replace(/_/g, " "), 90);
+      const relatedTerms = dedupeTerms(Array.isArray(block.relatedTerms) ? block.relatedTerms : []);
+      return {
+        id: compactLearningText(block.id, 80) || stableLearningBlockId(type, index, title),
+        type,
+        emoji: block.emoji === LEARNING_BLOCK_EMOJIS[type] ? LEARNING_BLOCK_EMOJIS[type] : LEARNING_BLOCK_EMOJIS[type],
+        title,
+        content: compactLearningText(block.content, type === "summary" ? 760 : 560),
+        shortVersion: block.shortVersion ? compactLearningText(block.shortVersion, 180) : undefined,
+        importance: SUPPORTED_IMPORTANCE.includes(block.importance as LearningBlockImportance)
+          ? (block.importance as LearningBlockImportance)
+          : "medium",
+        relatedTerms,
+        studentAction: SUPPORTED_LEARNING_ACTIONS.includes(block.studentAction as LearningBlockAction)
+          ? (block.studentAction as LearningBlockAction)
+          : (type === "question" || type === "checkpoint" ? "answer" : type === "practice" ? "practice" : "read"),
+        estimatedDifficulty: SUPPORTED_DIFFICULTY.includes(block.estimatedDifficulty as LearningBlockDifficulty)
+          ? (block.estimatedDifficulty as LearningBlockDifficulty)
+          : "medium",
+      };
+    })
+    .filter((block): block is StructuredLearningBlock => Boolean(block?.content));
+
+  const hasCoreConcept = validated.some((block) => block.type === "key_idea" || block.type === "definition");
+  if (!hasCoreConcept && source.rawContent.trim()) {
+    validated.unshift({
+      id: "key_idea-1-generated",
+      type: "key_idea",
+      emoji: LEARNING_BLOCK_EMOJIS.key_idea,
+      title: source.lessonTitle || "Key idea",
+      content: compactLearningText(source.rawContent, 420),
+      shortVersion: compactLearningText(source.rawContent, 140),
+      importance: "high",
+      relatedTerms: dedupeTerms([source.subject, source.topic]),
+      studentAction: "read",
+      estimatedDifficulty: "medium",
+    });
+  }
+
+  const isLongLesson = source.rawContent.length > 900;
+  const hasCheckpoint = validated.some((block) => block.type === "checkpoint" || block.type === "question");
+  if (isLongLesson && !hasCheckpoint) {
+    validated.push({
+      id: "checkpoint-generated",
+      type: "checkpoint",
+      emoji: LEARNING_BLOCK_EMOJIS.checkpoint,
+      title: "Quick check",
+      content: `What is the most important idea from "${source.lessonTitle || "this lesson"}"?`,
+      shortVersion: "Can you explain the main idea?",
+      importance: "medium",
+      relatedTerms: [],
+      studentAction: "answer",
+      estimatedDifficulty: "easy",
+    });
+  }
+
+  return validated.slice(0, 18);
+};
+
+export const structureLessonIntoLearningBlocks = async (
+  input: StructureLessonInput,
+): Promise<StructuredLearningBlock[]> => {
+  const rawContent = compactLearningText(input.rawContent, 9000);
+  const cacheKey = getCacheKey(
+    "structureLessonIntoLearningBlocks",
+    input.lessonTitle,
+    input.subject,
+    input.topic,
+    input.gradeLevel,
+    input.language,
+    rawContent,
+  );
+  const cachedResponse = await responseCache.get(cacheKey);
+  if (cachedResponse) {
+    return validateLearningBlocks(safeJsonParse(cachedResponse), input);
+  }
+
+  const prompt = `You are an educational content structuring assistant.
+Your job is to transform raw lesson text into structured learning blocks for a student-friendly lesson UI.
+
+Classify content into semantic block types:
+definition, key_idea, simple_explanation, example, question, warning, dont_confuse, note, formula, remember, practice, ai_hint, vocabulary, summary, checkpoint.
+
+Use learning psychology:
+- reduce cognitive load
+- split long text into small blocks
+- highlight important ideas
+- detect common mistakes
+- add "don't confuse" blocks where terms may be mixed
+- add quick questions after important concepts
+- extract key vocabulary
+- create short versions for lazy mode
+
+Return valid JSON only.
+Do not return Markdown.
+Do not return HTML.
+Do not return CSS.
+Do not invent unsupported block types.
+Do not use long paragraphs.
+Keep each block compact.
+
+Every block must include:
+id, type, emoji, title, content, importance, studentAction, estimatedDifficulty.
+Also include relatedTerms as an array and shortVersion when useful.
+
+Use these exact emoji defaults by type:
+${JSON.stringify(LEARNING_BLOCK_EMOJIS)}
+
+If the lesson includes confusing terms, add a dont_confuse block.
+If the lesson includes a common mistake, add a warning block.
+If the lesson introduces a concept, add a definition block.
+If the lesson gives an application, add an example block.
+If the lesson needs student recall, add a checkpoint block.
+If the lesson has important vocabulary, add a vocabulary block.
+
+Lesson metadata:
+Title: ${input.lessonTitle}
+Subject: ${input.subject}
+Topic: ${input.topic}
+Grade / level: ${input.gradeLevel}
+Language: ${input.language}
+Curriculum metadata: ${JSON.stringify(input.curriculumMetadata || {})}
+
+Raw lesson content:
+${rawContent}
+
+Return ONLY a JSON array of structured learning blocks.`;
+
+  const response = await generateContentWithFallback(
+    {
+      model: modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]),
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        maxOutputTokens: 4096,
+      },
+    },
+    "structureLessonIntoLearningBlocks",
+  );
+
+  const parsed = safeJsonParse(response.text || "[]");
+  const blocks = validateLearningBlocks(parsed, input);
+  await responseCache.set(cacheKey, JSON.stringify(blocks));
+  return blocks;
 };
 
 export const auditLessonLanguage = async (
