@@ -9,7 +9,6 @@ import {
   HelpCircle,
   Lightbulb,
   ListChecks,
-  MessageSquareText,
   NotebookText,
   Sigma,
   Sparkles,
@@ -44,30 +43,39 @@ const BLOCK_STYLES: Record<LearningBlockType, {
   border: string;
   icon: React.ElementType;
 }> = {
-  definition: { accent: 'text-blue-700', panel: 'bg-blue-50/80', border: 'border-blue-200', icon: BookOpen },
-  key_idea: { accent: 'text-indigo-700', panel: 'bg-indigo-50/80', border: 'border-indigo-200', icon: Star },
-  simple_explanation: { accent: 'text-slate-700', panel: 'bg-slate-50/90', border: 'border-slate-200', icon: Sparkles },
-  example: { accent: 'text-yellow-700', panel: 'bg-yellow-50/90', border: 'border-yellow-200', icon: Lightbulb },
-  question: { accent: 'text-purple-700', panel: 'bg-purple-50/80', border: 'border-purple-200', icon: HelpCircle },
-  warning: { accent: 'text-orange-700', panel: 'bg-orange-50/90', border: 'border-orange-200', icon: AlertTriangle },
-  dont_confuse: { accent: 'text-red-700', panel: 'bg-red-50/80', border: 'border-red-200', icon: Ban },
-  note: { accent: 'text-sky-700', panel: 'bg-sky-50/80', border: 'border-sky-200', icon: NotebookText },
-  formula: { accent: 'text-cyan-700', panel: 'bg-cyan-50/80', border: 'border-cyan-200', icon: Sigma },
-  remember: { accent: 'text-green-700', panel: 'bg-green-50/80', border: 'border-green-200', icon: CheckCircle2 },
-  practice: { accent: 'text-teal-700', panel: 'bg-teal-50/80', border: 'border-teal-200', icon: FlaskConical },
-  ai_hint: { accent: 'text-violet-700', panel: 'bg-violet-50/80', border: 'border-violet-200', icon: Brain },
-  vocabulary: { accent: 'text-pink-700', panel: 'bg-pink-50/80', border: 'border-pink-200', icon: Type },
-  summary: { accent: 'text-emerald-700', panel: 'bg-emerald-50/80', border: 'border-emerald-200', icon: ListChecks },
-  checkpoint: { accent: 'text-green-700', panel: 'bg-green-50/90', border: 'border-green-200', icon: Target },
+  definition: { accent: 'text-blue-700', panel: 'bg-blue-50/70', border: 'border-blue-100', icon: BookOpen },
+  key_idea: { accent: 'text-indigo-700', panel: 'bg-indigo-50/70', border: 'border-indigo-100', icon: Star },
+  simple_explanation: { accent: 'text-slate-700', panel: 'bg-transparent', border: 'border-transparent', icon: Sparkles },
+  example: { accent: 'text-yellow-700', panel: 'bg-yellow-50/70', border: 'border-yellow-100', icon: Lightbulb },
+  question: { accent: 'text-purple-700', panel: 'bg-transparent', border: 'border-transparent', icon: HelpCircle },
+  warning: { accent: 'text-orange-700', panel: 'bg-orange-50/80', border: 'border-orange-100', icon: AlertTriangle },
+  dont_confuse: { accent: 'text-red-700', panel: 'bg-red-50/70', border: 'border-red-100', icon: Ban },
+  note: { accent: 'text-sky-700', panel: 'bg-transparent', border: 'border-transparent', icon: NotebookText },
+  formula: { accent: 'text-cyan-700', panel: 'bg-transparent', border: 'border-transparent', icon: Sigma },
+  remember: { accent: 'text-green-700', panel: 'bg-green-50/70', border: 'border-green-100', icon: CheckCircle2 },
+  practice: { accent: 'text-teal-700', panel: 'bg-transparent', border: 'border-transparent', icon: FlaskConical },
+  ai_hint: { accent: 'text-violet-700', panel: 'bg-transparent', border: 'border-transparent', icon: Brain },
+  vocabulary: { accent: 'text-pink-700', panel: 'bg-transparent', border: 'border-transparent', icon: Type },
+  summary: { accent: 'text-emerald-700', panel: 'bg-transparent', border: 'border-transparent', icon: ListChecks },
+  checkpoint: { accent: 'text-green-700', panel: 'bg-green-50/80', border: 'border-green-100', icon: Target },
 };
 
-const ACTION_LABELS: Record<string, string> = {
-  read: 'Read',
-  think: 'Think',
-  answer: 'Answer',
+const TYPE_LABELS: Record<LearningBlockType, string> = {
+  definition: 'Definition',
+  key_idea: 'Key idea',
+  simple_explanation: 'Simple explanation',
+  example: 'Example',
+  question: 'Question',
+  warning: 'Warning',
+  dont_confuse: "Don't confuse",
+  note: 'Note',
+  formula: 'Formula',
   remember: 'Remember',
   practice: 'Practice',
-  compare: 'Compare',
+  ai_hint: 'AI hint',
+  vocabulary: 'Vocabulary',
+  summary: 'Summary',
+  checkpoint: 'Quick check',
 };
 
 const getBlockEmoji = (block: StructuredLearningBlock) =>
@@ -86,32 +94,23 @@ const BaseLearningBlock: React.FC<LessonBlockComponentProps & { children?: React
   const style = BLOCK_STYLES[block.type];
   const Icon = style.icon;
   const content = lazyMode && block.shortVersion ? block.shortVersion : block.content;
+  const hasPanel = style.panel !== 'bg-transparent';
 
   return (
-    <section className={`rounded-2xl border ${style.border} ${style.panel} p-4 shadow-sm`}>
+    <section className={`${hasPanel ? `rounded-xl border ${style.border} ${style.panel}` : 'border-b border-ink/10'} p-4`}>
       <div className="flex items-start gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-paper text-xl shadow-sm">
+        <div className="mt-0.5 shrink-0 text-xl leading-none">
           {getBlockEmoji(block)}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="mb-2 flex flex-wrap items-center gap-2">
+          <div className="mb-1 flex items-center gap-2">
             <Icon size={15} className={style.accent} />
-            <h3 className={`text-sm font-bold ${style.accent}`}>{block.title}</h3>
-            <span className="rounded-full bg-paper/80 px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-muted">
-              {ACTION_LABELS[block.studentAction] || block.studentAction}
+            <span className={`text-[11px] font-bold uppercase tracking-widest ${style.accent}`}>
+              {getBlockEmoji(block)} {TYPE_LABELS[block.type]}
             </span>
-            {block.importance === 'high' && (
-              <span className="rounded-full bg-ink px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-paper">
-                Important
-              </span>
-            )}
-            {lazyMode && block.shortVersion && (
-              <span className="rounded-full bg-paper px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-ink">
-                Lazy mode
-              </span>
-            )}
           </div>
-          <div className="lesson-copy text-sm leading-relaxed text-ink">
+          <h3 className="mb-1 text-base font-bold leading-snug text-ink">{block.title}</h3>
+          <div className="lesson-copy text-sm leading-7 text-ink">
             <Markdown {...markdownPlugins}>{content}</Markdown>
           </div>
           {children}
@@ -160,13 +159,13 @@ export const VocabularyBlock: React.FC<LessonBlockComponentProps> = ({
   return (
     <BaseLearningBlock block={block} lazyMode={lazyMode}>
       {terms.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1.5">
           {terms.map((term) => (
             <button
               key={term}
               type="button"
               onClick={() => onVocabularyTermClick?.(term, block)}
-              className="rounded-full border border-pink-200 bg-paper px-3 py-1.5 text-[11px] font-bold text-pink-700 transition-colors hover:border-pink-400 hover:bg-pink-50"
+              className="text-[12px] font-semibold text-pink-700 underline decoration-pink-300 underline-offset-4 transition-colors hover:text-pink-900"
             >
               {term}
             </button>

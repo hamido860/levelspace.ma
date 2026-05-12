@@ -1963,7 +1963,7 @@ export const LessonView: React.FC = () => {
         </div>
 
         {showLessonDomainTabs && blocks.length > 0 && (
-          <section className="mb-8 rounded-3xl border border-surface-mid bg-paper p-4 shadow-sm">
+          <section className="mb-8 border-b border-ink/10 pb-6">
             <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">{t('study_domains')}</p>
@@ -1979,45 +1979,45 @@ export const LessonView: React.FC = () => {
             <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
               <button
                 onClick={() => setActiveFrenchDomain('all')}
-                className={`shrink-0 rounded-xl px-4 py-2 text-[10px] font-bold uppercase tracking-widest transition-all ${
+                className={`shrink-0 rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest transition-all ${
                   activeFrenchDomain === 'all'
-                    ? 'bg-ink text-paper shadow-sm'
-                    : 'bg-surface-low text-muted hover:bg-accent/10 hover:text-accent'
+                    ? 'bg-ink text-paper'
+                    : 'text-muted hover:bg-surface-low hover:text-accent'
                 }`}
               >
-                {t('all')}
-                <span className="ml-2 rounded-full bg-paper/20 px-1.5 py-0.5">{blocks.length}</span>
+                {t('all')} <span className="ml-1 opacity-70">{blocks.length}</span>
               </button>
               {lessonDomainStats.map((domain) => (
                 <button
                   key={domain.code}
                   onClick={() => setActiveFrenchDomain(domain.code)}
-                  className={`shrink-0 rounded-xl px-4 py-2 text-[10px] font-bold uppercase tracking-widest transition-all ${
+                  className={`shrink-0 rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest transition-all ${
                     activeFrenchDomain === domain.code
-                      ? 'bg-accent text-paper shadow-sm'
-                      : 'bg-surface-low text-muted hover:bg-accent/10 hover:text-accent'
+                      ? 'bg-accent text-paper'
+                      : 'text-muted hover:bg-surface-low hover:text-accent'
                   }`}
                 >
-                  {domain.name}
-                  <span className="ml-2 rounded-full bg-paper/20 px-1.5 py-0.5">{domain.count}</span>
+                  {domain.name} <span className="ml-1 opacity-70">{domain.count}</span>
                 </button>
               ))}
             </div>
 
-            <div className="mt-4 grid gap-2 md:grid-cols-3">
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
               {visibleBlockCards.slice(0, 3).map((card) => (
                 <button
                   key={card.id}
                   onClick={() => focusBlock(card.id)}
-                  className="rounded-2xl border border-surface-mid bg-surface-low/70 p-3 text-left transition-all hover:border-accent/30 hover:bg-accent/5"
+                  className="text-left transition-colors hover:text-accent"
                 >
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Section {card.index + 1}</span>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">
+                    {card.index + 1} · {card.typeLabel}
+                  </span>
                   <strong className="mt-1 block text-sm text-ink">{card.title}</strong>
-                  {card.preview && <span className="mt-1 block text-[11px] leading-relaxed text-muted">{card.preview}</span>}
+                  {card.preview && <span className="mt-1 block text-[12px] leading-relaxed text-muted">{card.preview}</span>}
                 </button>
               ))}
               {visibleBlockCards.length === 0 && (
-                <div className="rounded-2xl border border-dashed border-ink/10 bg-surface-low/70 p-4 md:col-span-3">
+                <div className="py-3 md:col-span-3">
                   <p className="text-sm font-semibold text-ink">No sections tagged for this domain yet.</p>
                   <p className="mt-1 text-xs text-muted">The lesson still opens normally in Tous; future generated content can attach clearer domain metadata.</p>
                 </div>
@@ -2050,7 +2050,7 @@ export const LessonView: React.FC = () => {
 
             {/* AI-guided semantic learning blocks */}
             {isStructuringLesson && (
-              <div className="rounded-2xl border border-accent/15 bg-accent/5 p-4 text-sm text-accent">
+              <div className="py-2 text-sm text-accent">
                 <div className="flex items-center gap-3">
                   <Loader2 size={18} className="animate-spin" />
                   <div>
@@ -2062,7 +2062,7 @@ export const LessonView: React.FC = () => {
             )}
 
             {learningBlockError && !isStructuringLesson && (
-              <div className="rounded-2xl border border-warning/20 bg-warning/5 p-4 text-xs font-medium text-warning">
+              <div className="text-xs font-medium text-warning">
                 {learningBlockError} Showing the original lesson blocks instead.
               </div>
             )}
@@ -2114,7 +2114,6 @@ export const LessonView: React.FC = () => {
                     <div className="block__copy">
                       <div className="block__copy-top">
                         <span className="block__label">{blockHeading}</span>
-                        <span className="pill pill--neutral text-[10px]">{blockTypeLabel}</span>
                       </div>
                       {blockPreview && !isOpen && <p className="block__preview">{blockPreview}</p>}
                     </div>
