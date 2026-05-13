@@ -245,15 +245,31 @@ export const Modules: React.FC = () => {
 
   const [bacTrackName, setBacTrackName] = useState<string>('');
   const [bacIntOptionName, setBacIntOptionName] = useState<string>('');
-  const trustedSubjectNames = buildTrustedSubjectNames(country, grade, bacTrackName || selectedBacTrackId);
-  const trustedSubjectSet = buildTrustedSubjectSet(trustedSubjectNames);
-  const modules = (dbModules || [])
-    .filter((module) => moduleMatchesTrustedSubjects(module, trustedSubjectSet))
-    .map(m => ({
-      ...m,
-      icon: getIconForCategory(m.category)
-    }));
-  const selectedCount = modules.filter(m => m.selected).length;
+
+  // Memoize trusted subjects to avoid re-computation and referential changes on every render loop.
+  const trustedSubjectNames = useMemo(
+    () => buildTrustedSubjectNames(country, grade, bacTrackName || selectedBacTrackId),
+    [country, grade, bacTrackName, selectedBacTrackId]
+  );
+
+  const trustedSubjectSet = useMemo(
+    () => buildTrustedSubjectSet(trustedSubjectNames),
+    [trustedSubjectNames]
+  );
+
+  // Memoize mapped modules to ensure the resulting array keeps the same reference,
+  // preventing cascading re-renders in child components (like the modules grid)
+  // that depend on this object when the live query triggers updates but data hasn't changed.
+  const modules = useMemo(() => {
+    return (dbModules || [])
+      .filter((module) => moduleMatchesTrustedSubjects(module, trustedSubjectSet))
+      .map(m => ({
+        ...m,
+        icon: getIconForCategory(m.category)
+      }));
+  }, [dbModules, trustedSubjectSet]);
+
+  const selectedCount = useMemo(() => modules.filter(m => m.selected).length, [modules]);
 
   useEffect(() => {
     const fetchBacDetails = async () => {
@@ -408,10 +424,14 @@ export const Modules: React.FC = () => {
     await db.modules.bulkPut(updates);
   };
 
-  const filteredModules = modules.filter(m => 
-    m.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    m.code.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Memoize filtered modules to preserve referential equality and avoid filtering on every render
+  const filteredModules = useMemo(() => {
+    const query = searchQuery.toLowerCase();
+    return modules.filter(m =>
+      m.name.toLowerCase().includes(query) ||
+      m.code.toLowerCase().includes(query)
+    );
+  }, [modules, searchQuery]);
 
   return (
     <Layout>

@@ -99,6 +99,19 @@ export const Dashboard: React.FC = () => {
   const reminders = useLiveQuery(() => db.tasks.toArray()) || [];
   const schedule = useLiveQuery(() => db.schedule.toArray()) || [];
   const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
+
+  // Memoize extracted list of upcoming exams to prevent re-filtering and sorting
+  // on every render, keeping reference stable since `reminders` comes from `useLiveQuery`.
+  const upcomingExams = useMemo(() => {
+    return reminders
+      .filter(r => (r.type === 'exam' || r.type === 'controle') && !r.completed)
+      .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''));
+  }, [reminders]);
+
+  // Memoize extracted list of general reminders to avoid filtering overhead on every render
+  const generalReminders = useMemo(() => {
+    return reminders.filter(r => r.type !== 'exam' && r.type !== 'controle' && !r.completed);
+  }, [reminders]);
   const settingsMap = useMemo(() => Object.fromEntries(dbSettings.map(s => [s.key, s.value])), [dbSettings]);
 
   const selectedGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
@@ -588,9 +601,7 @@ export const Dashboard: React.FC = () => {
                   </button>
                 </div>
                 <div className="space-y-2">
-                  {reminders
-                    .filter(r => (r.type === 'exam' || r.type === 'controle') && !r.completed)
-                    .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
+                  {upcomingExams
                     .slice(0, 3)
                     .map((reminder) => (
                       <div key={reminder.id} className="flex items-center gap-3 p-3 bg-accent/5 border border-accent/10 rounded-xl">
@@ -611,7 +622,7 @@ export const Dashboard: React.FC = () => {
                         </button>
                       </div>
                     ))}
-                  {reminders.filter(r => (r.type === 'exam' || r.type === 'controle') && !r.completed).length === 0 && (
+                  {upcomingExams.length === 0 && (
                     <p className="text-[10px] text-muted italic px-2">{t('no_pending_reminders')}</p>
                   )}
                 </div>
@@ -624,8 +635,7 @@ export const Dashboard: React.FC = () => {
                   <button className="text-[9px] font-bold text-accent uppercase tracking-widest">{t('view_all')}</button>
                 </div>
                 <div className="space-y-2">
-                  {reminders
-                    .filter(r => r.type !== 'exam' && r.type !== 'controle' && !r.completed)
+                  {generalReminders
                     .slice(0, 3)
                     .map((reminder) => (
                       <div key={reminder.id} onClick={() => toggleReminder(reminder.id)} className="flex items-center gap-3 p-3 bg-paper border border-ink/5 rounded-xl cursor-pointer hover:border-accent/20 transition-all">
