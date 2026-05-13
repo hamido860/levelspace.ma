@@ -15,10 +15,10 @@ export const getAiApiKey = () =>
   "";
 
 export const getAiProvider = () =>
-  "server";
+  localStorage.getItem("ai_provider") || "";
 
 export const getAiModel = () =>
-  "";
+  localStorage.getItem("ai_model") || "";
 
 export const getAiBaseUrl = () =>
   "";
@@ -659,11 +659,16 @@ export async function generateAIContent(
 ): Promise<any> {
   try {
     const config = params.config || {};
+    const preferredProvider = params.provider || getAiProvider() || undefined;
+    const preferredModel = params.model || getAiModel() || undefined;
+    const fallbackEnabled = localStorage.getItem("ai_fallback_enabled");
     const response = await fetch("/api/ai/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: params.model,
+        provider: preferredProvider,
+        model: preferredModel,
+        fallbackEnabled: fallbackEnabled === null ? undefined : fallbackEnabled === "true",
         contents: params.contents,
         config: {
           responseMimeType: config.responseMimeType,

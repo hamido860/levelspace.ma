@@ -31,6 +31,7 @@ const apiRouteTable = [
   ["/api/ai/explain", "./api/ai/explain.ts"],
   ["/api/ai/lesson-blocks", "./api/ai/lesson-blocks.ts"],
   ["/api/ai/embed", "./api/ai/embed.ts"],
+  ["/api/ai/status", "./api/ai/status.ts"],
   ["/api/admin/ai-recovery/failed-jobs", "./api/admin/ai-recovery/failed-jobs.ts"],
   ["/api/admin/ai-recovery/logs", "./api/admin/ai-recovery/logs.ts"],
   ["/api/admin/ai-recovery/recovered-lessons", "./api/admin/ai-recovery/recovered-lessons.ts"],

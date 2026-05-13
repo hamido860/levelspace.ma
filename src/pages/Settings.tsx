@@ -116,6 +116,17 @@ export const Settings: React.FC = () => {
   const [motivationFocus, setMotivationFocus] = useState<string>('Confidence');
   const [currentSession, setCurrentSession] = useState<string>('Fall 2024');
   const [defaultDuration, setDefaultDuration] = useState<number>(60);
+  const [aiProvider, setAiProvider] = useState<'gemini' | 'nvidia'>('gemini');
+  const [aiModel, setAiModel] = useState('');
+  const [aiFallbackEnabled, setAiFallbackEnabled] = useState(true);
+  const [aiStatus, setAiStatus] = useState<{
+    configured: boolean;
+    providers: { gemini: boolean; nvidia: boolean };
+    defaultProvider: 'gemini' | 'nvidia';
+    fallbackProvider: 'gemini' | 'nvidia' | null;
+    fallbackEnabled: boolean;
+    models: { gemini: string; nvidia: string };
+  } | null>(null);
   
   const [isSaved, setIsSaved] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -149,6 +160,9 @@ export const Settings: React.FC = () => {
     const storedTone = getStoredValue('preferred_tone');
     const storedExplanationStyle = getStoredValue('preferred_explanation_style');
     const storedMotivationFocus = getStoredValue('motivation_focus');
+    const storedAiProvider = getStoredValue('ai_provider');
+    const storedAiModel = getStoredValue('ai_model');
+    const storedAiFallbackEnabled = getStoredValue('ai_fallback_enabled');
 
     if (country) setSelectedCountry(String(country));
     if (grade) setSelectedGrade(String(grade));
@@ -164,7 +178,30 @@ export const Settings: React.FC = () => {
     if (storedTone) setPreferredTone(String(storedTone));
     if (storedExplanationStyle) setPreferredExplanationStyle(String(storedExplanationStyle));
     if (storedMotivationFocus) setMotivationFocus(String(storedMotivationFocus));
+    if (storedAiProvider === 'gemini' || storedAiProvider === 'nvidia') setAiProvider(storedAiProvider);
+    if (storedAiModel) setAiModel(String(storedAiModel));
+    if (storedAiFallbackEnabled !== undefined && storedAiFallbackEnabled !== null) setAiFallbackEnabled(String(storedAiFallbackEnabled) !== 'false');
   }, [settingsMap]);
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/ai/status')
+      .then((response) => response.ok ? response.json() : null)
+      .then((data) => {
+        if (!active || !data) return;
+        setAiStatus(data);
+        if (!localStorage.getItem('ai_provider') && (data.defaultProvider === 'gemini' || data.defaultProvider === 'nvidia')) {
+          setAiProvider(data.defaultProvider);
+        }
+        if (!localStorage.getItem('ai_model')) {
+          setAiModel(data.models?.[data.defaultProvider] || '');
+        }
+      })
+      .catch((err) => console.error('Failed to fetch AI provider status:', err));
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const interests = [
     { id: 'interest_stem', label: t('stem'), icon: <FlaskConical className="w-4 h-4" /> },
@@ -331,6 +368,9 @@ export const Settings: React.FC = () => {
     localStorage.setItem('preferred_tone', preferredTone);
     localStorage.setItem('preferred_explanation_style', preferredExplanationStyle);
     localStorage.setItem('motivation_focus', motivationFocus);
+    localStorage.setItem('ai_provider', aiProvider);
+    localStorage.setItem('ai_model', aiModel);
+    localStorage.setItem('ai_fallback_enabled', String(aiFallbackEnabled));
 
     await db.settings.bulkPut([
       { key: 'selected_country', value: academicValues.selected_country },
@@ -347,6 +387,9 @@ export const Settings: React.FC = () => {
       { key: 'preferred_tone', value: preferredTone },
       { key: 'preferred_explanation_style', value: preferredExplanationStyle },
       { key: 'motivation_focus', value: motivationFocus },
+      { key: 'ai_provider', value: aiProvider },
+      { key: 'ai_model', value: aiModel },
+      { key: 'ai_fallback_enabled', value: aiFallbackEnabled },
     ]);
 
     if (user && (!isLocked || isAdmin)) {
@@ -987,39 +1030,81 @@ export const Settings: React.FC = () => {
             </section>
 
             {/* AI Provider Configuration */}
-            <section className="p-5 bg-paper border border-ink/5 rounded-3xl space-y-5 shadow-sm flex flex-col">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-accent/5 rounded-lg flex items-center justify-center text-accent">
-                  <Key className="w-4 h-4" />
+            <section className="p-5 bg-paper border border-ink/5 rounded-3xl space-y-5 shadow-sm md:col-span-2">
+              <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-accent/5 rounded-lg flex items-center justify-center text-accent">
+                    <Key className="w-4 h-4" />
+                  </div>
+                  <div className="space-y-0.5">
+                    <h2 className="text-base font-medium text-ink leading-tight">AI provider</h2>
+                    <p className="text-[10px] text-muted/60 leading-tight">Choose provider defaults. Raw API keys stay on the server.</p>
+                  </div>
                 </div>
-                <div className="space-y-0.5">
-                  <h2 className="text-base font-medium text-ink leading-tight">AI provider</h2>
-                  <p className="text-[10px] text-muted/60 leading-tight">Keys are configured securely on the server.</p>
+                <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 ${
+                  aiStatus?.configured ? 'bg-emerald-500/10 text-emerald-600' : 'bg-amber-500/10 text-amber-600'
+                }`}>
+                  <div className={`w-1.5 h-1.5 rounded-full ${aiStatus?.configured ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`} />
+                  {aiStatus?.configured ? 'Server configured' : 'Needs server env'}
                 </div>
               </div>
-              <div className="text-xs text-muted leading-relaxed space-y-2">
-                <p>Normal app usage no longer stores Gemini or NVIDIA keys in the browser.</p>
-                <p className="font-mono text-[10px] text-muted/70">Server env: GEMINI_API_KEY · NVIDIA_API_KEY · AI_PROVIDER · AI_FALLBACK_PROVIDER</p>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="space-y-3">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted">Default provider</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(['gemini', 'nvidia'] as const).map((provider) => {
+                      const configured = aiStatus?.providers?.[provider];
+                      return (
+                        <button
+                          key={provider}
+                          type="button"
+                          onClick={() => {
+                            setAiProvider(provider);
+                            setAiModel(aiStatus?.models?.[provider] || (provider === 'gemini' ? 'gemini-2.5-flash' : 'google/gemma-3-27b-it'));
+                          }}
+                          className={`p-3 rounded-xl border text-left transition-all ${
+                            aiProvider === provider
+                              ? 'bg-ink text-paper border-ink'
+                              : 'bg-background border-ink/5 text-ink hover:border-accent/30'
+                          }`}
+                        >
+                          <span className="block text-sm font-bold capitalize">{provider}</span>
+                          <span className={`text-[10px] ${aiProvider === provider ? 'text-paper/60' : configured ? 'text-emerald-600' : 'text-amber-600'}`} >
+                            {configured ? 'Key detected on server' : 'No server key detected'}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted">Default model</label>
+                  <input
+                    type="text"
+                    value={aiModel}
+                    onChange={(e) => setAiModel(e.target.value)}
+                    placeholder={aiProvider === 'gemini' ? 'gemini-2.5-flash' : 'google/gemma-3-27b-it'}
+                    className="w-full p-3 bg-background border border-ink/5 rounded-xl text-sm outline-none focus:ring-1 focus:ring-accent/20"
+                  />
+                  <label className="flex items-center justify-between gap-3 p-3 bg-background border border-ink/5 rounded-xl text-xs font-semibold text-ink">
+                    <span>Use fallback provider when available</span>
+                    <input
+                      type="checkbox"
+                      checked={aiFallbackEnabled}
+                      onChange={(e) => setAiFallbackEnabled(e.target.checked)}
+                      className="accent-accent"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="text-xs text-muted leading-relaxed space-y-1">
+                <p>API keys are not edited here. Add them in Vercel or server environment variables.</p>
+                <p className="font-mono text-[10px] text-muted/70">GEMINI_API_KEY · NVIDIA_API_KEY · AI_PROVIDER · AI_FALLBACK_PROVIDER · AI_FALLBACK_ENABLED</p>
               </div>
             </section>
-
-            {/* Provider Choice */}
-            <section className="p-5 bg-paper border border-ink/5 rounded-3xl space-y-5 shadow-sm flex flex-col">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-success/10 rounded-lg flex items-center justify-center text-success">
-                  <Key className="w-4 h-4" />
-                </div>
-                <div className="space-y-0.5">
-                  <h2 className="text-base font-medium text-ink leading-tight">Provider defaults</h2>
-                  <p className="text-[10px] text-muted/60 leading-tight">Choose defaults in deployment environment variables.</p>
-                </div>
-              </div>
-              <div className="text-xs text-muted leading-relaxed space-y-2">
-                <p>Set <span className="font-mono text-ink">AI_PROVIDER=gemini</span> or <span className="font-mono text-ink">AI_PROVIDER=nvidia</span> on Vercel or your server.</p>
-                <p>Fallback is controlled by <span className="font-mono text-ink">AI_FALLBACK_PROVIDER</span> and <span className="font-mono text-ink">AI_FALLBACK_ENABLED</span>.</p>
-              </div>
-            </section>
-
             {/* Supabase Connection Status */}
             <section className="p-5 bg-paper border border-ink/5 rounded-3xl space-y-5 shadow-sm flex flex-col md:col-span-2">
               <div className="flex items-center justify-between">

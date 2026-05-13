@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import axios from "axios";
-import { handleAIEmbed, handleAIGenerate, handleAIExplain, handleAILessonBlocks } from "./ai/shared";
+import { handleAIEmbed, handleAIGenerate, handleAIExplain, handleAILessonBlocks, handleAIStatus } from "./ai/shared";
 import { backfillTopicsFromLessons } from "../lib/topicSync";
 import { seedStarterLessonsFromTopics } from "../src/server/curriculum/starterLessons";
 import {
@@ -1077,6 +1077,7 @@ const rootRoutes: Record<string, RouteHandler> = {
   "ai/explain": handleAIExplain,
   "ai/lesson-blocks": handleAILessonBlocks,
   "ai/embed": handleAIEmbed,
+  "ai/status": handleAIStatus,
   "admin/curriculum-review": handleCurriculumReviewList,
   "admin/curriculum-review-detail": handleCurriculumReviewDetail,
   "admin/curriculum-review-action": handleCurriculumReviewAction,

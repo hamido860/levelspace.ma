@@ -16,6 +16,35 @@ const readPrompt = (body: Record<string, any>) => {
 
 const readConfig = (body: Record<string, any>) => body.config && typeof body.config === "object" ? body.config : {};
 
+const hasSecret = (value: string | undefined, placeholder: string) =>
+  !!value && value.trim().length > 0 && value !== placeholder;
+
+export async function handleAIStatus(req: ApiRequest, res: ApiResponse) {
+  if (req.method !== "GET") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  const geminiConfigured = hasSecret(process.env.GEMINI_API_KEY || process.env.GEMINI_KEY_0, "MY_GEMINI_API_KEY");
+  const nvidiaConfigured = hasSecret(process.env.NVIDIA_API_KEY, "MY_NVIDIA_API_KEY");
+  const configuredProvider = String(process.env.AI_PROVIDER || "gemini").toLowerCase();
+  const fallbackProvider = String(process.env.AI_FALLBACK_PROVIDER || "").toLowerCase();
+
+  return res.status(200).json({
+    configured: geminiConfigured || nvidiaConfigured,
+    providers: {
+      gemini: geminiConfigured,
+      nvidia: nvidiaConfigured,
+    },
+    defaultProvider: configuredProvider === "nvidia" ? "nvidia" : "gemini",
+    fallbackProvider: fallbackProvider === "gemini" || fallbackProvider === "nvidia" ? fallbackProvider : null,
+    fallbackEnabled: process.env.AI_FALLBACK_ENABLED !== "false",
+    models: {
+      gemini: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+      nvidia: process.env.NVIDIA_MODEL || "google/gemma-3-27b-it",
+    },
+  });
+}
+
 export async function handleAIGenerate(req: ApiRequest, res: ApiResponse) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
