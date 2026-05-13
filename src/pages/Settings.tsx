@@ -37,6 +37,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { updateProfile } from '../db/supabase';
+import { AiKeyManager } from '../components/settings/AiKeyManager';
 
 const parseStoredArray = (value: unknown): string[] => {
   if (Array.isArray(value)) return value.filter((item): item is string => typeof item === 'string');
@@ -90,7 +91,7 @@ export const Settings: React.FC = () => {
     return Object.fromEntries(dbSettings.map(s => [s.key, s.value]));
   }, [dbSettings]);
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'preferences'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'preferences' | 'aiKeys'>('profile');
 
   const [selectedCountry, setSelectedCountry] = useState('');
   const [selectedGrade, setSelectedGrade] = useState<string>('Grade 12');
@@ -504,6 +505,14 @@ export const Settings: React.FC = () => {
             }`}
           >
             {t('preferences')}
+          </button>
+          <button
+            onClick={() => setActiveTab('aiKeys')}
+            className={`px-6 py-3 text-sm font-bold uppercase tracking-widest transition-colors border-b-2 ${
+              activeTab === 'aiKeys' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-ink'
+            }`}
+          >
+            AI Keys
           </button>
         </div>
 
@@ -981,6 +990,14 @@ export const Settings: React.FC = () => {
           </motion.div>
         )}
 
+        {activeTab === 'aiKeys' && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <AiKeyManager />
+          </motion.div>
+        )}
         {activeTab === 'preferences' && (
           <motion.div 
             initial={{ opacity: 0, y: 10 }}
