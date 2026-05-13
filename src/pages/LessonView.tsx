@@ -67,7 +67,6 @@ import { LessonBlockRenderer } from '../components/lesson/LessonBlockRenderer';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { useAppSettings } from '../context/AppSettingsContext';
-import { indexLessonContent } from '../services/ragService';
 import { getSubjectCandidates, normalizeCurriculumValue } from '../services/curriculumMatching';
 import { isStudentVisibleLesson, normalizeLessonBlockUiType } from '../services/lessonRecovery';
 import {
@@ -1025,21 +1024,6 @@ export const LessonView: React.FC = () => {
   const markLessonComplete = async () => {
     if (lesson) {
       await db.lessons.update(effectiveLesson.id, { status: 'done' });
-      
-      // Index lesson content for RAG if user is logged in
-      if (user) {
-        try {
-          const content = effectiveLesson.blocks?.map(b => b.content || '').join('\n') || effectiveLesson.content || '';
-          await indexLessonContent(
-            user.id,
-            effectiveLesson.id,
-            `${effectiveLesson.title}\n\n${content}`
-          );
-          console.log('Lesson content indexed for RAG');
-        } catch (error) {
-          console.error('Failed to index lesson content:', error);
-        }
-      }
       
       navigate('/dashboard');
     }

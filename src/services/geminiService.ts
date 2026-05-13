@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { Type } from "@google/genai";
 import { jsonrepair } from "jsonrepair";
 import { moroccanAcademicDb } from "../data/moroccan_academic_db";
 import { toast } from "sonner";
@@ -8,27 +8,27 @@ import { transformersService } from "./transformersService";
 import { mcpClient } from "./mcpClient";
 
 export const getCustomApiKey = () =>
-  localStorage.getItem("CUSTOM_GEMINI_API_KEY") || "";
+  "";
 
 // Flexible provider keys — users configure these instead of provider-specific ones
 export const getAiApiKey = () =>
-  localStorage.getItem("AI_API_KEY") || import.meta.env.VITE_AI_API_KEY || "";
+  "";
 
 export const getAiProvider = () =>
-  localStorage.getItem("AI_PROVIDER") || import.meta.env.VITE_AI_PROVIDER || "gemini";
+  "server";
 
 export const getAiModel = () =>
-  localStorage.getItem("AI_MODEL") || import.meta.env.VITE_AI_MODEL || "";
+  "";
 
 export const getAiBaseUrl = () =>
-  localStorage.getItem("AI_BASE_URL") || import.meta.env.VITE_AI_BASE_URL || "";
+  "";
 
 export const getEffectiveApiKey = () =>
-  getCustomApiKey() || getAiApiKey() || import.meta.env.VITE_GEMINI_API_KEY || "";
+  "";
 
-// NVIDIA: localStorage only — VITE_NVIDIA_API_KEY removed (browser→NVIDIA is CORS-blocked)
+// NVIDIA keys are server-side only.
 export const getNvidiaApiKey = () =>
-  localStorage.getItem("CUSTOM_NVIDIA_API_KEY") || "";
+  "";
 
 // Once a key fails with 403/PERMISSION_DENIED (e.g. leaked/revoked), record its
 // fingerprint so subsequent checks treat the app as having no AI provider.
@@ -61,24 +61,16 @@ export const markKeyInvalid = (key: string) => {
   }
 };
 
-// Browser-side AI availability:
-// - Gemini key present & not flagged invalid & at least one Gemini model not quota-exhausted
-// - NVIDIA from browser is structurally CORS-blocked, so it is NOT a valid client provider
-//   (admin/server-side flows can still use NVIDIA_API_KEY through a proxy)
+// Browser-side AI calls go through backend routes that validate provider config.
+
+
+
 export const checkAIProvider = (): boolean => {
-  const gKey = getEffectiveApiKey();
-  if (!gKey) return false;
-  if (isKeyInvalid(gKey)) return false;
-  if (modelQuotaTracker.allGeminiExhausted()) return false;
   return true;
 };
 
 export const setNvidiaApiKey = (key: string) => {
-  if (key) {
-    localStorage.setItem("CUSTOM_NVIDIA_API_KEY", key);
-  } else {
-    localStorage.removeItem("CUSTOM_NVIDIA_API_KEY");
-  }
+  localStorage.removeItem("CUSTOM_NVIDIA_API_KEY");
 };
 
 export const NVIDIA_MODEL = "google/gemma-3-27b-it";
@@ -91,34 +83,21 @@ export async function callNvidiaAPI(params: {
   maxTokens?: number;
   model?: string;
 }): Promise<string | null> {
-  const apiKey = getNvidiaApiKey();
-  if (!apiKey) return null;
-
   const { prompt, isJson = false, temperature = 0.7, maxTokens = 4096, model = NVIDIA_MODEL } = params;
 
-  const body: any = {
-    model,
-    messages: [{ role: "user", content: prompt }],
-    temperature,
-    max_tokens: maxTokens,
-    stream: false,
-  };
-
-  if (isJson) {
-    body.response_format = { type: "json_object" };
-    // Reinforce JSON output in prompt for Gemma
-    body.messages[0].content = prompt + "\n\nRespond with valid JSON only.";
-  }
-
-  // Use our local proxy to avoid CORS errors when called from browser
-  const endpoint = typeof window !== 'undefined' ? '/api/nvidia-proxy' : 'https://integrate.api.nvidia.com/v1/chat/completions';
-  const response = await fetch(endpoint, {
+  const response = await fetch("/api/ai/generate", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(body),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      provider: "nvidia",
+      model,
+      contents: isJson ? `${prompt}\n\nRespond with valid JSON only.` : prompt,
+      config: {
+        responseMimeType: isJson ? "application/json" : undefined,
+        maxOutputTokens: maxTokens,
+        temperature,
+      },
+    }),
   });
 
   if (!response.ok) {
@@ -127,23 +106,12 @@ export async function callNvidiaAPI(params: {
   }
 
   const data = await response.json();
-  return data.choices?.[0]?.message?.content || null;
+  return data.text || null;
 }
 
-let currentApiKey = getEffectiveApiKey();
-// Provide a fallback string so the SDK doesn't throw an error immediately on boot if hosted outside AI Studio without a key
-export let ai = new GoogleGenAI({ apiKey: currentApiKey || "missing_api_key" });
-
 export const setCustomApiKey = (key: string) => {
-  if (key) {
-    localStorage.setItem("CUSTOM_GEMINI_API_KEY", key);
-    localStorage.setItem("AI_API_KEY", key);
-  } else {
-    localStorage.removeItem("CUSTOM_GEMINI_API_KEY");
-    localStorage.removeItem("AI_API_KEY");
-  }
-  currentApiKey = getEffectiveApiKey();
-  ai = new GoogleGenAI({ apiKey: currentApiKey || "missing_api_key" });
+  localStorage.removeItem("CUSTOM_GEMINI_API_KEY");
+  localStorage.removeItem("AI_API_KEY");
 };
 
 export class QuotaExceededError extends Error {
@@ -214,11 +182,6 @@ export async function auditCurriculumConfig(
   subject: string,
   referenceUrls?: string[]
 ): Promise<CurriculumAuditResult | null> {
-  if (!currentApiKey) {
-    console.error("Gemini API key is missing. Please configure it in the Secrets panel.");
-    return null;
-  }
-
   let urlContexts = "";
   if (referenceUrls && referenceUrls.length > 0) {
     urlContexts = await fetchAllUrlContexts(referenceUrls);
@@ -263,11 +226,11 @@ Respond strictly in JSON format with the following schema:
       }
     };
 
-    const response = await ai.models.generateContent({
+    const response = await generateAIContent({
       model: modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]),
       contents: prompt,
       config: config
-    });
+    }, "auditCurriculumConfig");
 
     const text = response.text;
     if (!text) return null;
@@ -312,11 +275,8 @@ export const handleApiError = (error: any, context: string) => {
     errorMessage.includes("RESOURCE_EXHAUSTED") ||
     errorMessage.includes("quota")
   ) {
-    const hasCustomKey = !!getCustomApiKey();
     toast.error("AI Quota Exceeded", {
-      description: hasCustomKey
-        ? "Your API key has hit its rate limit. Please wait a moment and try again."
-        : "You've reached the free tier limit. Please add your own API key in Settings.",
+      description: "The configured server-side AI provider hit its rate limit. Please wait a moment and try again.",
       duration: 5000,
     });
     throw new QuotaExceededError("AI Quota Exceeded");
@@ -697,72 +657,41 @@ export async function generateAIContent(
   params: any,
   context: string,
 ): Promise<any> {
-  // Centralized provider-availability gate: covers no key, leaked key, all models exhausted.
-  if (!checkAIProvider()) {
-    const errorMsg = modelQuotaTracker.allGeminiExhausted()
-      ? "All Gemini models are quota-exhausted. Try again later."
-      : "No AI API key configured. Add a key in Settings → AI Provider.";
-    updateAIStatus({ lastError: errorMsg });
-    throw new QuotaExceededError(errorMsg);
-  }
-  // If getBestModel returned null upstream, fall back to a sane default and let the API decide.
-  const primaryModel = params.model || "gemini-2.5-flash";
   try {
     const config = params.config || {};
-    const isJsonMode = config.responseMimeType === "application/json";
-    const tools = params.tools !== undefined ? params.tools : (isJsonMode ? [] : [{ googleSearch: {} }]);
-
-    const result = await ai.models.generateContent({
-      ...params,
-      model: primaryModel,
-      tools: tools,
-      config: config
+    const response = await fetch("/api/ai/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: params.model,
+        contents: params.contents,
+        config: {
+          responseMimeType: config.responseMimeType,
+          maxOutputTokens: config.maxOutputTokens,
+          temperature: config.temperature,
+          systemInstruction: config.systemInstruction,
+        },
+      }),
     });
-    updateAIStatus({ lastModel: primaryModel, isLocal: false, lastError: null });
-    return result;
-  } catch (error: any) {
-    const errorMessage = error?.message || String(error);
-    const isQuotaError =
-      errorMessage.includes("429") ||
-      errorMessage.includes("RESOURCE_EXHAUSTED") ||
-      errorMessage.includes("quota");
 
-    if (isQuotaError) {
-      // Mark this model as exhausted so future calls skip it
-      modelQuotaTracker.markExhausted(primaryModel);
-      updateAIStatus({ lastError: "Quota Exceeded", isLocal: false });
-
-      // Fallback 1: next best Gemini Flash model
-      for (const fallbackModel of GEMINI_FALLBACKS) {
-        if (fallbackModel === primaryModel || modelQuotaTracker.isExhausted(fallbackModel)) continue;
-        try {
-          console.warn(`[Quota] Falling back to ${fallbackModel}`);
-          const result = await ai.models.generateContent({ ...params, model: fallbackModel });
-          updateAIStatus({ lastModel: fallbackModel, isLocal: false, lastError: null });
-          toast.info(`Using ${fallbackModel}`, { description: "Switched model due to quota.", duration: 2000 });
-          return result;
-        } catch (fbErr: any) {
-          const isFbQuota = String(fbErr?.message).includes("429") || String(fbErr?.message).includes("RESOURCE_EXHAUSTED");
-          if (isFbQuota) modelQuotaTracker.markExhausted(fallbackModel);
-          console.warn(`[Quota] ${fallbackModel} also failed:`, fbErr);
-        }
-      }
-
-      // Browser-side NVIDIA / Ollama fallbacks intentionally removed:
-      // - NVIDIA NIM is CORS-blocked from the browser (must go through a server proxy)
-      // - Ollama on localhost:11434 is rarely present in production users' environments
-      // Both produced noisy console errors and never recovered the request. Admin/server-side
-      // flows still call NVIDIA via the backend proxy, not from this client path.
-      updateAIStatus({ lastError: "All Gemini models quota-exceeded" });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data?.error || `AI request failed with status ${response.status}`);
     }
 
+    updateAIStatus({ lastModel: data.model || params.model || "server-default", isLocal: false, lastError: null });
+    return {
+      ...data,
+      response: data.text,
+      text: data.text,
+    };
+  } catch (error: any) {
+    const errorMessage = error?.message || String(error);
     updateAIStatus({ lastError: errorMessage });
-    // If it's still a quota error or something else, let handleApiError deal with it
     handleApiError(error, context);
     throw error;
   }
 }
-
 // Internal alias for backward compatibility within this file
 const generateContentWithFallback = generateAIContent;
 
@@ -2872,12 +2801,8 @@ export const chatWithTutor = async (
       }
     }
 
-    const strictRagInstruction = strictRAG ? `\nSTRICT RAG MODE IS ENABLED: You MUST ONLY answer based on the provided LESSON CONTENT and ADDITIONAL RELEVANT CONTEXT. Do NOT generate content outside this context. Do NOT suggest ideas that are not mathematically or logically derivable strictly from the provided text.` : `SECONDARY RULE: If the user asks a question or requests information that is NOT covered in the provided contexts, you must use the Google Search tool to find the answer from the web. When you use web information, briefly mention that you are bringing in outside knowledge to supplement the lesson.`;
-    const createChat = (model: string) =>
-      ai.chats.create({
-        model: model,
-        config: {
-          systemInstruction: `You are an AI tutor helping a student understand a specific lesson.
+    const strictRagInstruction = strictRAG ? `\nSTRICT RAG MODE IS ENABLED: You MUST ONLY answer based on the provided LESSON CONTENT and ADDITIONAL RELEVANT CONTEXT. Do NOT generate content outside this context. Do NOT suggest ideas that are not mathematically or logically derivable strictly from the provided text.` : `SECONDARY RULE: If the user asks a question or requests information that is NOT covered in the provided contexts, answer carefully and briefly mention when you are bringing in outside knowledge to supplement the lesson.`;
+    const systemInstruction = `You are an AI tutor helping a student understand a specific lesson.
 PRIMARY RULE: You should first try to answer questions, explain concepts, extend ideas, or generate practice questions using ONLY the provided LESSON CONTENT and ADDITIONAL RELEVANT CONTEXT.
 ${strictRagInstruction}
 ${subject ? `SUBJECT: ${subject}` : ""}
@@ -2885,36 +2810,19 @@ ${grade ? `STUDENT LEVEL: ${grade}` : ""}
 ${userLanguage ? `\nThe user's preferred interface language is '${userLanguage}'. If they ask for explanations in another language, or if it helps them understand better, feel free to use their preferred language or any other language they request.` : ""}
 
 LESSON CONTENT:
-${augmentedContext}`,
-          tools: strictRAG ? [] : [{ googleSearch: {} }],
-          toolConfig: { includeServerSideToolInvocations: true },
-        },
-        history: history,
-      });
+${augmentedContext}`;
 
-    let chat = createChat(modelToUse);
-    let response;
-
-    try {
-      response = await chat.sendMessage({ message });
-    } catch (error: any) {
-      const errorMessage = error?.message || String(error);
-      const isQuotaError =
-        errorMessage.includes("429") ||
-        errorMessage.includes("RESOURCE_EXHAUSTED") ||
-        errorMessage.includes("quota");
-
-      if (isQuotaError && modelToUse !== "gemini-2.5-flash-lite") {
-        console.warn(
-          `Pipeline: Quota exceeded for ${modelToUse}. Falling back to gemini-2.5-flash-lite for chat.`,
-        );
-        toast.info("Adjusting response quality...", { duration: 2000 });
-        chat = createChat("gemini-2.5-flash-lite");
-        response = await chat.sendMessage({ message });
-      } else {
-        throw error;
-      }
-    }
+    const historyText = history
+      .map((entry) => `${entry.role === "model" ? "Tutor" : "Student"}: ${entry.parts?.map((part: any) => part.text || "").join(" ")}`)
+      .join("\n");
+    const response = await generateAIContent({
+      model: modelToUse,
+      contents: `${historyText ? `${historyText}\n\n` : ""}Student: ${message}`,
+      config: {
+        systemInstruction,
+        maxOutputTokens: 1600,
+      },
+    }, "chatWithTutor");
 
     const responseText =
       response.text || "I'm sorry, I couldn't generate a response.";

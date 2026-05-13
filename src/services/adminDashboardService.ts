@@ -304,9 +304,9 @@ export const loadAdminOverviewKpis = async (): Promise<AdminOverviewKpis> => {
         .eq("teaching_contract->>student_publish_allowed", "true")
     ),
     readCount("rag chunk count", supabase.from("rag_chunks").select("*", { count: "exact", head: true })),
-    readCount("embedded rag chunk count", supabase.from("rag_chunks").select("*", { count: "exact", head: true }).not("embedding", "is", null)),
+    readCount("embedded rag chunk count", supabase.from("rag_embeddings").select("*", { count: "exact", head: true })),
     readCount("topic-linked rag chunk count", supabase.from("rag_chunks").select("*", { count: "exact", head: true }).not("topic_id", "is", null)),
-    readCount("usable rag chunk count", supabase.from("rag_chunks").select("*", { count: "exact", head: true }).not("embedding", "is", null).not("topic_id", "is", null).eq("embedding_status", "done")),
+    readCount("usable rag chunk count", supabase.from("rag_embeddings").select("chunk_id, rag_chunks!inner(topic_id,status)", { count: "exact", head: true }).not("rag_chunks.topic_id", "is", null).in("rag_chunks.status", ["clean", "embedded"])),
     readCount("profile count", supabase.from("profiles").select("*", { count: "exact", head: true })),
   ]);
 
@@ -489,9 +489,9 @@ export const loadAdminRagMetrics = async (): Promise<{ ragStats: RagMetrics; rag
     // Use exact head counts here. Plain selects are page-limited by PostgREST and cap dashboard metrics at ~1,000 rows.
     readCount("rag chunk count", supabase.from("rag_chunks").select("*", { count: "exact", head: true })),
     readCount("done rag chunk count", supabase.from("rag_chunks").select("*", { count: "exact", head: true }).eq("embedding_status", "done")),
-    readCount("embedded rag chunk count", supabase.from("rag_chunks").select("*", { count: "exact", head: true }).not("embedding", "is", null)),
+    readCount("embedded rag chunk count", supabase.from("rag_embeddings").select("*", { count: "exact", head: true })),
     readCount("topic-linked rag chunk count", supabase.from("rag_chunks").select("*", { count: "exact", head: true }).not("topic_id", "is", null)),
-    readCount("usable rag chunk count", supabase.from("rag_chunks").select("*", { count: "exact", head: true }).not("embedding", "is", null).not("topic_id", "is", null).eq("embedding_status", "done")),
+    readCount("usable rag chunk count", supabase.from("rag_embeddings").select("chunk_id, rag_chunks!inner(topic_id,status)", { count: "exact", head: true }).not("rag_chunks.topic_id", "is", null).in("rag_chunks.status", ["clean", "embedded"])),
     readCount("pending rag chunk count", supabase.from("rag_chunks").select("*", { count: "exact", head: true }).eq("embedding_status", "pending")),
     readCount("processing rag chunk count", supabase.from("rag_chunks").select("*", { count: "exact", head: true }).eq("embedding_status", "processing")),
     readCount("failed rag chunk count", supabase.from("rag_chunks").select("*", { count: "exact", head: true }).eq("embedding_status", "failed")),

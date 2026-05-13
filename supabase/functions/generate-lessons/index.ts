@@ -223,20 +223,48 @@ async function fetchTopicData(supabaseAdmin: any, topicId: string | null): Promi
   }
 
   const { data, error } = await supabaseAdmin
-    .from("rag_chunks")
-    .select("id, content, source_name, source_type, source_url, source_confidence, metadata")
-    .eq("topic_id", topicId)
-    .eq("embedding_status", "done")
-    .not("embedding", "is", null)
-    .order("created_at", { ascending: false })
+    .from("rag_embeddings")
+    .select(`
+      id,
+      embedding_model,
+      rag_chunks!inner(
+        id,
+        content,
+        cleaned_content,
+        source_name,
+        source_type,
+        source_url,
+        source_confidence,
+        metadata,
+        topic_id,
+        status,
+        created_at
+      )
+    `)
+    .eq("rag_chunks.topic_id", topicId)
+    .in("rag_chunks.status", ["clean", "embedded"])
+    .order("created_at", { referencedTable: "rag_chunks", ascending: false })
     .limit(10);
 
-  if (error) throw new Error(`rag_chunks lookup by topic_id failed: ${formatDbError(error)}`);
+  if (error) throw new Error(`rag_embeddings lookup by topic_id failed: ${formatDbError(error)}`);
 
-  const ragChunks = ((data || []) as RagChunkInput[]).filter((chunk) => normalizeValue(chunk.content).length > 0);
+  const ragChunks = ((data || []) as Array<Record<string, any>>)
+    .map((row) => {
+      const chunk = Array.isArray(row.rag_chunks) ? row.rag_chunks[0] : row.rag_chunks;
+      return {
+        ...(chunk || {}),
+        content: chunk?.cleaned_content || chunk?.content,
+        metadata: {
+          ...(chunk?.metadata || {}),
+          embedding_id: row.id,
+          embedding_model: row.embedding_model,
+        },
+      } as RagChunkInput;
+    })
+    .filter((chunk) => normalizeValue(chunk.content).length > 0);
   let fallbackReason: string | null = null;
   if (ragChunks.length === 0) {
-    fallbackReason = `no usable rag_chunks for topic_id=${topicId} (requires topic_id match, embedding not null, embedding_status=done); approved topic_outlines count=${outlines.length}`;
+    fallbackReason = `no usable RAG embeddings for topic_id=${topicId} (requires rag_embeddings row joined to clean/embedded rag_chunks.topic_id); approved topic_outlines count=${outlines.length}`;
     console.warn(`generate-lessons source fallback: topic_id=${topicId} reason=${fallbackReason}`);
   }
 
@@ -781,12 +809,12 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const geminiKey = Deno.env.get("GEMINI_KEY_0");
+    const geminiKey = Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GEMINI_KEY_0");
     const nvidiaKey = Deno.env.get("NVIDIA_API_KEY");
 
     if (!geminiKey && !nvidiaKey) {
       return new Response(
-        JSON.stringify({ success: false, error: "No AI API key configured (GEMINI_KEY_0 or NVIDIA_API_KEY)" }),
+        JSON.stringify({ success: false, error: "No AI API key configured (GEMINI_API_KEY or NVIDIA_API_KEY)" }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -1015,41 +1043,6 @@ Deno.serve(async (req) => {
       runId: activeMcpRunId,
       checks: mcpQualityChecks,
     });
-
-    // ── Index content chunks into rag_chunks (service role) ───────────────────
-    if (normalizedContent) {
-      const chunks = normalizedContent.split("\n\n").filter((c: string) => c.trim().length > 50);
-      for (const chunk of chunks) {
-        const embedding = await generateEmbedding(chunk, geminiKey);
-        if (embedding.length > 0) {
-          const { error: chunkErr } = await supabaseAdmin.from("rag_chunks").insert({
-            source_id: lessonId,
-            source_type: "lesson_block",
-            lesson_id: lessonId,
-            topic_id: topicContext?.topicId ?? null,
-            grade_id: topicContext?.gradeId ?? null,
-            content: chunk,
-            embedding,
-            embedding_status: "done",
-            processed_at: new Date().toISOString(),
-            source_name: "generated_lesson",
-            source_confidence: sourceConfidence,
-            metadata: {
-              user_id: userId ?? null,
-              subject,
-              grade,
-              country,
-              topic,
-              topic_id: topicContext?.topicId ?? null,
-              grade_id: topicContext?.gradeId ?? null,
-              subject_id: topicContext?.subjectId ?? null,
-              lesson_id: lessonId,
-            },
-          });
-          if (chunkErr) console.error("rag_chunks insert error:", chunkErr);
-        }
-      }
-    }
 
     await writeGenerationLog(supabaseAdmin, {
       lessonId,

@@ -1,24 +1,23 @@
 import { supabase } from "../db/supabase";
-import { ai, handleApiError, LessonTemplate } from "./geminiService";
+import { handleApiError, LessonTemplate } from "./geminiService";
 import { resolveTopicForLesson } from "../../lib/topicSync";
 import { deriveCycleFromGrade } from "./curriculumMatching";
 import { isMissingLessonValidationColumnError, stripLessonValidationFields } from "./lessonSupabase";
 
 export const generateEmbedding = async (text: string): Promise<number[]> => {
   try {
-    const response = await ai.models.embedContent({
-      model: "gemini-embedding-2-preview",
-      contents: text,
+    const response = await fetch("/api/ai/embed", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
     });
 
-    if (
-      response.embeddings &&
-      response.embeddings.length > 0 &&
-      response.embeddings[0].values
-    ) {
-      return response.embeddings[0].values;
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data?.error || `Embedding request failed with status ${response.status}`);
     }
-    throw new Error("No embedding returned");
+
+    return Array.isArray(data.embedding) ? data.embedding : [];
   } catch (error) {
     handleApiError(error, "generateEmbedding");
     return [];
@@ -30,32 +29,11 @@ export const indexLessonContent = async (
   lessonId: string,
   content: string,
 ) => {
-  try {
-    // Split content into chunks (simple chunking by paragraphs for now)
-    const chunks = content.split("\n\n").filter((c) => c.trim().length > 50);
-
-    for (const chunk of chunks) {
-      const embedding = await generateEmbedding(chunk);
-      if (embedding.length > 0) {
-        await supabase.from("rag_chunks").insert({
-          source_id: lessonId,
-          source_type: 'lesson_block',
-          lesson_id: lessonId,
-          content: chunk,
-          embedding: embedding,
-          embedding_status: 'done',
-          processed_at: new Date().toISOString(),
-          metadata: { user_id: userId, lesson_id: lessonId },
-          validation_status: 'ai_generated',
-          source_confidence: 0,
-        });
-      }
-    }
-    return true;
-  } catch (error) {
-    console.error("Error indexing lesson content:", error);
-    return false;
-  }
+  console.info(
+    "Skipping lesson RAG indexing: generated lesson content belongs in lessons/lesson_blocks, not rag_chunks.",
+    { userId, lessonId, contentLength: content.length }
+  );
+  return true;
 };
 
 export const retrieveSimilarContent = async (
@@ -67,14 +45,22 @@ export const retrieveSimilarContent = async (
     const queryEmbedding = await generateEmbedding(query);
     if (queryEmbedding.length === 0) return [];
 
-    const { data, error } = await supabase.rpc("match_rag_chunks", {
+    const { data, error } = await supabase.rpc("match_rag_embeddings", {
       query_embedding: queryEmbedding,
       match_threshold: 0.7,
       match_count: matchCount,
-      p_user_id: userId,
     });
 
-    if (error) throw error;
+    if (error) {
+      const legacy = await supabase.rpc("match_rag_chunks", {
+        query_embedding: queryEmbedding,
+        match_threshold: 0.7,
+        match_count: matchCount,
+        p_user_id: userId,
+      });
+      if (legacy.error) throw error;
+      return legacy.data || [];
+    }
     return data || [];
   } catch (error) {
     console.error("Error retrieving similar content:", error);
@@ -97,14 +83,14 @@ export const searchLessons = async (
   matchCount: number = 3,
 ): Promise<LessonTemplate[]> => {
   try {
-    const queryEmbedding = await generateEmbedding(query);
-    if (queryEmbedding.length === 0) return [];
+    const safeQuery = query.trim();
+    if (!safeQuery) return [];
 
-    const { data, error } = await supabase.rpc("match_lessons", {
-      query_embedding: queryEmbedding,
-      match_threshold: 0.7,
-      match_count: matchCount,
-    });
+    const { data, error } = await supabase
+      .from("lessons")
+      .select("*")
+      .or(`lesson_title.ilike.%${safeQuery}%,title.ilike.%${safeQuery}%,subject.ilike.%${safeQuery}%,content.ilike.%${safeQuery}%`)
+      .limit(matchCount);
 
     if (error) throw error;
     return data || [];
@@ -151,19 +137,9 @@ export const updateLesson = async (
   updates: Partial<LessonTemplate>
 ): Promise<boolean> => {
   try {
-    // If content or title changed, we should ideally re-generate the embedding
-    let embedding = undefined;
-    if (updates.content || updates.lesson_title || updates.subject) {
-      const textToEmbed = `${updates.lesson_title || ""}\n${updates.subject || ""}\n${updates.content || ""}`;
-      embedding = await generateEmbedding(textToEmbed);
-    }
-
     const { error } = await supabase
       .from("lessons")
-      .update({
-        ...updates,
-        ...(embedding && embedding.length > 0 ? { embedding } : {}),
-      })
+      .update(updates)
       .eq("id", id);
 
     if (error) throw error;
@@ -180,12 +156,6 @@ export const saveLesson = async (
   isAiGenerated: boolean = false
 ): Promise<boolean> => {
   try {
-    // Generate embedding based on the core content of the lesson
-    const textToEmbed = `${lesson.lesson_title}\n${lesson.subject}\n${lesson.content}`;
-    const embedding = await generateEmbedding(textToEmbed);
-
-    if (embedding.length === 0) return false;
-
     const topicResolution = await resolveTopicForLesson(
       supabase as any,
       {
@@ -213,11 +183,13 @@ export const saveLesson = async (
       quizzes: lesson.quizzes || [],
       mod: lesson.mod,
       exam: lesson.exam || null,
-      embedding: embedding.length > 0 ? embedding : null,
+      embedding: null,
       author_id: userId === "dummy-user-id" ? null : (userId || null),
       is_ai_generated: isAiGenerated,
       validation_status: isAiGenerated ? 'ai_generated' : 'unverified',
       source_confidence: 0,
+      source_mode: isAiGenerated ? 'ai_generated' : 'manual',
+      status: isAiGenerated ? 'review' : 'draft',
     };
 
     let insertedLesson: { id: string } | null = null;

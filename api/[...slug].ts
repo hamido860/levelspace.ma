@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import axios from "axios";
+import { handleAIEmbed, handleAIGenerate, handleAIExplain, handleAILessonBlocks } from "./ai/shared";
 import { backfillTopicsFromLessons } from "../lib/topicSync";
 import { seedStarterLessonsFromTopics } from "../src/server/curriculum/starterLessons";
 import {
@@ -131,13 +132,7 @@ async function handleNvidiaProxy(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const authorizationHeader = Array.isArray(req.headers.authorization)
-    ? req.headers.authorization[0]
-    : req.headers.authorization;
-  const apiKey =
-    authorizationHeader?.replace(/^Bearer\s+/i, "") ||
-    process.env.NVIDIA_API_KEY ||
-    process.env.VITE_NVIDIA_API_KEY;
+  const apiKey = process.env.NVIDIA_API_KEY;
 
   if (!apiKey || apiKey === "MY_NVIDIA_API_KEY") {
     return res.status(503).json({ error: "NVIDIA API key not configured." });
@@ -1078,6 +1073,10 @@ const rootRoutes: Record<string, RouteHandler> = {
   "ai-validate-task": handleAiValidateTask,
   "ai-rag-check": handleAiRagCheck,
   "ai-analyst": handleAiAnalyst,
+  "ai/generate": handleAIGenerate,
+  "ai/explain": handleAIExplain,
+  "ai/lesson-blocks": handleAILessonBlocks,
+  "ai/embed": handleAIEmbed,
   "admin/curriculum-review": handleCurriculumReviewList,
   "admin/curriculum-review-detail": handleCurriculumReviewDetail,
   "admin/curriculum-review-action": handleCurriculumReviewAction,

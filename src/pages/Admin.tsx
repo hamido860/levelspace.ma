@@ -321,9 +321,9 @@ export const Admin: React.FC = () => {
       supabase.from("lessons").select("topic_id"),
       supabase.from("lesson_gen_queue").select("topic_id, status"),
       supabase.from("rag_chunks").select("*", { count: "exact", head: true }),
-      supabase.from("rag_chunks").select("*", { count: "exact", head: true }).not("embedding", "is", null),
+      supabase.from("rag_embeddings").select("*", { count: "exact", head: true }),
       supabase.from("rag_chunks").select("*", { count: "exact", head: true }).not("topic_id", "is", null),
-      supabase.from("rag_chunks").select("*", { count: "exact", head: true }).not("embedding", "is", null).not("topic_id", "is", null).eq("embedding_status", "done"),
+      supabase.from("rag_embeddings").select("chunk_id, rag_chunks!inner(topic_id,status)", { count: "exact", head: true }).not("rag_chunks.topic_id", "is", null).in("rag_chunks.status", ["clean", "embedded"]),
       supabase.from("profiles").select("*", { count: "exact", head: true }),
     ]);
 
@@ -1107,7 +1107,7 @@ export const Admin: React.FC = () => {
         <div>
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
             <KPI label="Total Chunks" value={(ragStats.total ?? 0).toLocaleString()} sub="in rag_chunks" />
-            <KPI label="Embedded" value={(ragStats.embedded ?? 0).toLocaleString()} sub="embedding is not null" variant="success" />
+            <KPI label="Embedded" value={(ragStats.embedded ?? 0).toLocaleString()} sub="in rag_embeddings" variant="success" />
             <KPI label="Linked to Topic" value={(ragStats.linkedToTopic ?? 0).toLocaleString()} sub="topic_id is not null" />
             <KPI label="Usable" value={(ragStats.usable ?? 0).toLocaleString()} sub="embedded + linked + done" variant="success" />
             <KPI label="Pending" value={(ragStats.pending ?? 0).toLocaleString()} sub="embedding_status = pending" variant="warn" />

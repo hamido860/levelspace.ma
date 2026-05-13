@@ -2360,7 +2360,7 @@ async function callGeminiSqlGenerator(prompt: string, apiKey: string): Promise<A
 
 async function generateSqlWithConfiguredProvider(prompt: string) {
   const nvidiaKey = process.env.NVIDIA_API_KEY;
-  const geminiKey = process.env.GEMINI_KEY_0;
+  const geminiKey = process.env.GEMINI_API_KEY || process.env.GEMINI_KEY_0;
   const errors: string[] = [];
 
   if (nvidiaKey && nvidiaKey !== "MY_NVIDIA_API_KEY") {

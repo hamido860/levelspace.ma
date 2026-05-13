@@ -37,7 +37,6 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { updateProfile } from '../db/supabase';
-import { getCustomApiKey, setCustomApiKey, getNvidiaApiKey, setNvidiaApiKey } from '../services/geminiService';
 
 const parseStoredArray = (value: unknown): string[] => {
   if (Array.isArray(value)) return value.filter((item): item is string => typeof item === 'string');
@@ -123,11 +122,6 @@ export const Settings: React.FC = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // API Key State
-  const [apiKey, setApiKey] = useState('');
-  const [isApiKeySaved, setIsApiKeySaved] = useState(false);
-  const [nvidiaKey, setNvidiaKey] = useState('');
-  const [isNvidiaKeySaved, setIsNvidiaKeySaved] = useState(false);
 
   const languages = [
     { id: 'en', name: 'English', flag: '🇺🇸' },
@@ -171,11 +165,6 @@ export const Settings: React.FC = () => {
     if (storedExplanationStyle) setPreferredExplanationStyle(String(storedExplanationStyle));
     if (storedMotivationFocus) setMotivationFocus(String(storedMotivationFocus));
   }, [settingsMap]);
-
-  useEffect(() => {
-    setApiKey(getCustomApiKey());
-    setNvidiaKey(getNvidiaApiKey());
-  }, []);
 
   const interests = [
     { id: 'interest_stem', label: t('stem'), icon: <FlaskConical className="w-4 h-4" /> },
@@ -405,25 +394,6 @@ export const Settings: React.FC = () => {
   ].filter(s => s.completed).length;
 
   const progressPercentage = (setupProgress / 4) * 100;
-
-  const handleSaveNvidiaKey = () => {
-    setNvidiaApiKey(nvidiaKey.trim());
-    setIsNvidiaKeySaved(true);
-    setTimeout(() => setIsNvidiaKeySaved(false), 3000);
-  };
-
-  const handleSaveApiKey = () => {
-    if (apiKey.trim()) {
-      setCustomApiKey(apiKey.trim());
-      setIsApiKeySaved(true);
-      setTimeout(() => setIsApiKeySaved(false), 3000);
-    } else {
-      setCustomApiKey('');
-      setApiKey('');
-      setIsApiKeySaved(true);
-      setTimeout(() => setIsApiKeySaved(false), 3000);
-    }
-  };
 
   return (
     <Layout>
@@ -1016,86 +986,37 @@ export const Settings: React.FC = () => {
               </div>
             </section>
 
-            {/* AI Provider API Key */}
+            {/* AI Provider Configuration */}
             <section className="p-5 bg-paper border border-ink/5 rounded-3xl space-y-5 shadow-sm flex flex-col">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 bg-accent/5 rounded-lg flex items-center justify-center text-accent">
                   <Key className="w-4 h-4" />
                 </div>
                 <div className="space-y-0.5">
-                  <h2 className="text-base font-medium text-ink leading-tight">{t('ai_provider_api_key')}</h2>
-                  <p className="text-[10px] text-muted/60 leading-tight">{t('ai_provider_api_key_desc')}</p>
+                  <h2 className="text-base font-medium text-ink leading-tight">AI provider</h2>
+                  <p className="text-[10px] text-muted/60 leading-tight">Keys are configured securely on the server.</p>
                 </div>
               </div>
-
-              <div className="space-y-4 flex-grow">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted">AI_API_KEY</label>
-                  <input
-                    type="password"
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    placeholder="AIzaSy... or sk-... or nvapi-..."
-                    className="w-full p-3 bg-background border border-ink/5 rounded-xl text-sm outline-none focus:ring-1 focus:ring-accent/20 font-mono"
-                  />
-                </div>
-                <div className="text-xs text-muted leading-relaxed space-y-1">
-                  <p>{t('stored_locally')}</p>
-                  <p className="text-[10px] font-mono text-muted/60">AI_PROVIDER · AI_API_KEY · AI_MODEL · AI_BASE_URL</p>
-                </div>
-              </div>
-
-              <div className="pt-4 border-t border-ink/5 flex justify-end">
-                <button
-                  onClick={handleSaveApiKey}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all flex items-center gap-2 ${
-                    isApiKeySaved ? 'bg-emerald-500 text-paper' : 'bg-ink text-paper hover:bg-accent'
-                  }`}
-                >
-                  {isApiKeySaved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-                  {isApiKeySaved ? t('saved') : t('save_key')}
-                </button>
+              <div className="text-xs text-muted leading-relaxed space-y-2">
+                <p>Normal app usage no longer stores Gemini or NVIDIA keys in the browser.</p>
+                <p className="font-mono text-[10px] text-muted/70">Server env: GEMINI_API_KEY � NVIDIA_API_KEY � AI_PROVIDER � AI_FALLBACK_PROVIDER</p>
               </div>
             </section>
 
-            {/* NVIDIA NIM API Key — Admin AI Features */}
+            {/* Provider Choice */}
             <section className="p-5 bg-paper border border-ink/5 rounded-3xl space-y-5 shadow-sm flex flex-col">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 bg-success/10 rounded-lg flex items-center justify-center text-success">
                   <Key className="w-4 h-4" />
                 </div>
                 <div className="space-y-0.5">
-                  <h2 className="text-base font-medium text-ink leading-tight">{t('nvidia_api_key')}</h2>
-                  <p className="text-[10px] text-muted/60 leading-tight">{t('nvidia_api_key_desc')}</p>
+                  <h2 className="text-base font-medium text-ink leading-tight">Provider defaults</h2>
+                  <p className="text-[10px] text-muted/60 leading-tight">Choose defaults in deployment environment variables.</p>
                 </div>
               </div>
-
-              <div className="space-y-4 flex-grow">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted">NVIDIA_API_KEY</label>
-                  <input
-                    type="password"
-                    value={nvidiaKey}
-                    onChange={(e) => setNvidiaKey(e.target.value)}
-                    placeholder="nvapi-..."
-                    className="w-full p-3 bg-background border border-ink/5 rounded-xl text-sm outline-none focus:ring-1 focus:ring-accent/20 font-mono"
-                  />
-                </div>
-                <div className="text-xs text-muted leading-relaxed">
-                  {t('nvidia_api_key_help')}
-                </div>
-              </div>
-
-              <div className="pt-4 border-t border-ink/5 flex justify-end">
-                <button
-                  onClick={handleSaveNvidiaKey}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all flex items-center gap-2 ${
-                    isNvidiaKeySaved ? 'bg-emerald-500 text-paper' : 'bg-ink text-paper hover:bg-accent'
-                  }`}
-                >
-                  {isNvidiaKeySaved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-                  {isNvidiaKeySaved ? t('saved') : t('save_key')}
-                </button>
+              <div className="text-xs text-muted leading-relaxed space-y-2">
+                <p>Set <span className="font-mono text-ink">AI_PROVIDER=gemini</span> or <span className="font-mono text-ink">AI_PROVIDER=nvidia</span> on Vercel or your server.</p>
+                <p>Fallback is controlled by <span className="font-mono text-ink">AI_FALLBACK_PROVIDER</span> and <span className="font-mono text-ink">AI_FALLBACK_ENABLED</span>.</p>
               </div>
             </section>
 
