@@ -16,7 +16,9 @@ import {
   BookMarked,
   Database,
   Wrench,
-  PackageSearch
+  PackageSearch,
+  KeyRound,
+  Activity
 } from 'lucide-react';
 
 import { useLanguage } from '../context/LanguageContext';
@@ -48,6 +50,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
     { label: t('blueprints'), icon: <Layers3 size={20} />, path: '/blueprints' },
     { label: t('schedule'), icon: <Calendar size={20} />, path: '/schedule' },
     { label: t('progress'), icon: <BarChart3 size={20} />, path: '/progress' },
+    { label: 'AI Keys', icon: <KeyRound size={20} />, path: '/settings/ai-keys', matchPrefix: true },
   ];
 
   const toolNavItems: NavItem[] = isAdmin ? [
@@ -55,6 +58,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
     { label: 'Curriculum', icon: <Database size={20} />, path: '/admin/curriculum-debug', matchPrefix: true },
     { label: 'MCP Lessons', icon: <PackageSearch size={20} />, path: '/admin/mcp-lessons', matchPrefix: true },
     { label: 'AI Ops', icon: <Brain size={20} />, path: '/admin/ai-command-center', matchPrefix: true },
+    { label: 'AI Diagnostics', icon: <Activity size={20} />, path: '/admin/ai-diagnostics', matchPrefix: true },
     { label: 'AI Recovery', icon: <Wrench size={20} />, path: '/admin/ai-recovery', matchPrefix: true },
   ] : [];
 

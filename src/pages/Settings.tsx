@@ -116,16 +116,16 @@ export const Settings: React.FC = () => {
   const [motivationFocus, setMotivationFocus] = useState<string>('Confidence');
   const [currentSession, setCurrentSession] = useState<string>('Fall 2024');
   const [defaultDuration, setDefaultDuration] = useState<number>(60);
-  const [aiProvider, setAiProvider] = useState<'gemini' | 'nvidia'>('gemini');
+  const [aiProvider, setAiProvider] = useState<'gemini' | 'nvidia' | 'openrouter' | 'openai'>('gemini');
   const [aiModel, setAiModel] = useState('');
   const [aiFallbackEnabled, setAiFallbackEnabled] = useState(true);
   const [aiStatus, setAiStatus] = useState<{
     configured: boolean;
-    providers: { gemini: boolean; nvidia: boolean };
-    defaultProvider: 'gemini' | 'nvidia';
-    fallbackProvider: 'gemini' | 'nvidia' | null;
+    providers: { gemini: boolean; nvidia: boolean; openrouter: boolean; openai: boolean };
+    defaultProvider: 'gemini' | 'nvidia' | 'openrouter' | 'openai';
+    fallbackProvider: 'gemini' | 'nvidia' | 'openrouter' | 'openai' | null;
     fallbackEnabled: boolean;
-    models: { gemini: string; nvidia: string };
+    models: { gemini: string; nvidia: string; openrouter: string; openai: string };
   } | null>(null);
   
   const [isSaved, setIsSaved] = useState(false);
@@ -190,7 +190,7 @@ export const Settings: React.FC = () => {
       .then((data) => {
         if (!active || !data) return;
         setAiStatus(data);
-        if (!localStorage.getItem('ai_provider') && (data.defaultProvider === 'gemini' || data.defaultProvider === 'nvidia')) {
+        if (!localStorage.getItem('ai_provider') && ['gemini', 'nvidia', 'openrouter', 'openai'].includes(data.defaultProvider)) {
           setAiProvider(data.defaultProvider);
         }
         if (!localStorage.getItem('ai_model')) {
@@ -1052,8 +1052,8 @@ export const Settings: React.FC = () => {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div className="space-y-3">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-muted">Default provider</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {(['gemini', 'nvidia'] as const).map((provider) => {
+                  <div className="grid grid-cols-2 xl:grid-cols-4 gap-2">
+                    {(['gemini', 'nvidia', 'openrouter', 'openai'] as const).map((provider) => {
                       const configured = aiStatus?.providers?.[provider];
                       return (
                         <button
@@ -1061,7 +1061,7 @@ export const Settings: React.FC = () => {
                           type="button"
                           onClick={() => {
                             setAiProvider(provider);
-                            setAiModel(aiStatus?.models?.[provider] || (provider === 'gemini' ? 'gemini-2.5-flash' : 'google/gemma-3-27b-it'));
+                            setAiModel(aiStatus?.models?.[provider] || ({ gemini: 'gemini-2.5-flash', nvidia: 'google/gemma-3-27b-it', openrouter: 'openai/gpt-4o-mini', openai: 'gpt-4o-mini' } as const)[provider]);
                           }}
                           className={`p-3 rounded-xl border text-left transition-all ${
                             aiProvider === provider
@@ -1085,7 +1085,7 @@ export const Settings: React.FC = () => {
                     type="text"
                     value={aiModel}
                     onChange={(e) => setAiModel(e.target.value)}
-                    placeholder={aiProvider === 'gemini' ? 'gemini-2.5-flash' : 'google/gemma-3-27b-it'}
+                    placeholder={({ gemini: 'gemini-2.5-flash', nvidia: 'google/gemma-3-27b-it', openrouter: 'openai/gpt-4o-mini', openai: 'gpt-4o-mini' } as const)[aiProvider]}
                     className="w-full p-3 bg-background border border-ink/5 rounded-xl text-sm outline-none focus:ring-1 focus:ring-accent/20"
                   />
                   <label className="flex items-center justify-between gap-3 p-3 bg-background border border-ink/5 rounded-xl text-xs font-semibold text-ink">
@@ -1101,8 +1101,9 @@ export const Settings: React.FC = () => {
               </div>
 
               <div className="text-xs text-muted leading-relaxed space-y-1">
-                <p>API keys are not edited here. Add them in Vercel or server environment variables.</p>
-                <p className="font-mono text-[10px] text-muted/70">GEMINI_API_KEY · NVIDIA_API_KEY · AI_PROVIDER · AI_FALLBACK_PROVIDER · AI_FALLBACK_ENABLED</p>
+                <p>Manage learner BYOK keys from the dedicated encrypted API key page, or use platform server keys when credits are available.</p>
+                <button type="button" onClick={() => navigate('/settings/ai-keys')} className="inline-flex items-center gap-2 rounded-xl border border-ink/10 px-3 py-2 text-xs font-bold text-ink hover:bg-ink/5"><Key className="w-3.5 h-3.5" />Manage my AI keys</button>
+                <p className="font-mono text-[10px] text-muted/70">GEMINI_API_KEY · NVIDIA_API_KEY · OPENROUTER_API_KEY · OPENAI_API_KEY · AI_PROVIDER</p>
               </div>
             </section>
             {/* Supabase Connection Status */}
