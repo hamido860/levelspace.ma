@@ -422,7 +422,7 @@ function getBearerToken(req: VercelRequest) {
   return match?.[1] || null;
 }
 
-async function getAuthenticatedUser(req: VercelRequest): Promise<User> {
+export async function requireAuthenticatedUser(req: VercelRequest): Promise<User> {
   const token = getBearerToken(req);
   if (!token) {
     throw new AiCommandCenterHttpError(401, "Authentication required.");
@@ -440,7 +440,7 @@ async function getAuthenticatedUser(req: VercelRequest): Promise<User> {
 }
 
 export async function requireAdminUser(req: VercelRequest) {
-  const user = await getAuthenticatedUser(req);
+  const user = await requireAuthenticatedUser(req);
   const supabase = getServerSupabase();
   const { data: profile, error } = await supabase
     .from("profiles")

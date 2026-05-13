@@ -12,6 +12,7 @@ import { Dashboard } from './pages/Dashboard';
 import { StudyPlanner } from './pages/StudyPlanner';
 import { Progress } from './pages/Progress';
 import { Settings } from './pages/Settings';
+import { AiKeysSettings } from './pages/AiKeysSettings';
 import { BlueprintHub } from './pages/BlueprintHub';
 import { ClassroomView } from './pages/ClassroomView';
 import { Library } from './pages/Library';
@@ -23,6 +24,7 @@ import { AiCommandCenter } from './pages/AiCommandCenter';
 import { AdminAiRecovery } from './pages/AdminAiRecovery';
 import { AdminAiRecoveryTaskDetail } from './pages/AdminAiRecoveryTaskDetail';
 import { AdminRecoveredLessonReview } from './pages/AdminRecoveredLessonReview';
+import { AdminAiDiagnostics } from './pages/AdminAiDiagnostics';
 import { Profile } from './pages/Profile';
 import { SearchProvider } from './context/SearchContext';
 import { LanguageProvider } from './context/LanguageContext';
@@ -55,12 +57,14 @@ export default function App() {
                 <Route path="/progress" element={<ProtectedRoute><Progress /></ProtectedRoute>} />
                 <Route path="/schedule" element={<ProtectedRoute><StudyPlanner /></ProtectedRoute>} />
                 <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+                <Route path="/settings/ai-keys" element={<ProtectedRoute><AiKeysSettings /></ProtectedRoute>} />
                 <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                 <Route path="/admin" element={<ProtectedRoute requireAdmin><Admin /></ProtectedRoute>} />
                 <Route path="/admin/curriculum-debug" element={<ProtectedRoute requireAdmin><AdminCurriculumDebug /></ProtectedRoute>} />
                 <Route path="/admin/curriculum-review" element={<ProtectedRoute requireAdmin><AdminCurriculumReview /></ProtectedRoute>} />
                 <Route path="/admin/mcp-lessons" element={<ProtectedRoute requireAdmin><AdminMcpLessons /></ProtectedRoute>} />
                 <Route path="/admin/ai-command-center" element={<ProtectedRoute requireAdmin><AiCommandCenter /></ProtectedRoute>} />
+                <Route path="/admin/ai-diagnostics" element={<ProtectedRoute requireAdmin><AdminAiDiagnostics /></ProtectedRoute>} />
                 <Route path="/admin/ai-recovery" element={<ProtectedRoute requireAdmin><AdminAiRecovery /></ProtectedRoute>} />
                 <Route path="/admin/ai-recovery/failed-jobs" element={<ProtectedRoute requireAdmin><AdminAiRecovery /></ProtectedRoute>} />
                 <Route path="/admin/ai-recovery/ai-tasks" element={<ProtectedRoute requireAdmin><AdminAiRecovery /></ProtectedRoute>} />

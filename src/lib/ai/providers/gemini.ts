@@ -1,5 +1,6 @@
 export type GeminiGenerateOptions = {
   prompt: string;
+  apiKey?: string;
   model?: string;
   systemInstruction?: string;
   responseMimeType?: string;
@@ -15,7 +16,7 @@ const getGeminiApiKey = () =>
   "";
 
 export async function generateWithGemini(options: GeminiGenerateOptions) {
-  const apiKey = getGeminiApiKey();
+  const apiKey = options.apiKey || getGeminiApiKey();
   if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
     throw new Error("Gemini provider is not configured. Set GEMINI_API_KEY in environment variables.");
   }

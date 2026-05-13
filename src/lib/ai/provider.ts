@@ -1,7 +1,12 @@
 import { embedWithGemini, generateWithGemini } from "./providers/gemini";
 import { generateWithNvidia } from "./providers/nvidia";
+import { generateWithOpenAI } from "./providers/openai";
+import { generateWithOpenRouter } from "./providers/openrouter";
+import { getDecryptedUserAiKey, normalizeUserAiProvider } from "../../server/aiKeys";
+import { getServerSupabase } from "../../server/api/aiCommandCenter";
 
-export type AIProviderName = "gemini" | "nvidia";
+export type AIProviderName = "gemini" | "nvidia" | "openrouter" | "openai";
+export type AICredentialMode = "byok" | "platform";
 
 export type GenerateAIResponseInput = {
   prompt: string;
@@ -12,6 +17,8 @@ export type GenerateAIResponseInput = {
   maxOutputTokens?: number;
   temperature?: number;
   fallbackEnabled?: boolean;
+  credentialMode?: AICredentialMode;
+  userId?: string;
 };
 
 export type GenerateAIResponseResult = {
@@ -21,11 +28,11 @@ export type GenerateAIResponseResult = {
 };
 
 const MISSING_PROVIDER_MESSAGE =
-  "AI provider is not configured. Please set GEMINI_API_KEY or NVIDIA_API_KEY in environment variables.";
+  "AI provider is not configured. Save your own API key or enable platform AI credits.";
 
 const normalizeProvider = (value: unknown): AIProviderName | null => {
   const provider = String(value || "").toLowerCase();
-  if (provider === "gemini" || provider === "nvidia") return provider;
+  if (provider === "gemini" || provider === "nvidia" || provider === "openrouter" || provider === "openai") return provider;
   return null;
 };
 
@@ -38,9 +45,37 @@ const getFallbackProvider = (primary: AIProviderName) =>
 const isMissingProviderError = (error: unknown) =>
   error instanceof Error && /not configured|API_KEY|environment variables/i.test(error.message);
 
-const callProvider = (provider: AIProviderName, input: GenerateAIResponseInput) => {
+const getPlatformKey = (provider: AIProviderName) => {
+  if (provider === "gemini") return process.env.GEMINI_API_KEY || process.env.GEMINI_KEY_0 || "";
+  if (provider === "openrouter") return process.env.OPENROUTER_API_KEY || "";
+  if (provider === "openai") return process.env.OPENAI_API_KEY || "";
+  if (provider === "nvidia") return process.env.NVIDIA_API_KEY || "";
+  return "";
+};
+
+const isPlatformEnabled = () => process.env.AI_PLATFORM_CREDITS_ENABLED !== "false";
+
+const resolveApiKey = async (provider: AIProviderName, input: GenerateAIResponseInput) => {
+  if (input.credentialMode === "byok") {
+    const byokProvider = normalizeUserAiProvider(provider);
+    if (byokProvider && input.userId) {
+      const apiKey = await getDecryptedUserAiKey(getServerSupabase(), input.userId, byokProvider);
+      if (apiKey) return apiKey;
+    }
+  }
+
+  if (!isPlatformEnabled()) {
+    throw new Error(`No saved ${provider} API key was found and platform AI credits are not enabled.`);
+  }
+
+  return getPlatformKey(provider);
+};
+
+const callProvider = async (provider: AIProviderName, input: GenerateAIResponseInput) => {
+  const apiKey = await resolveApiKey(provider, input);
   const options = {
     prompt: input.prompt,
+    apiKey,
     model: input.model,
     systemInstruction: input.systemInstruction,
     responseMimeType: input.responseMimeType,
@@ -48,7 +83,10 @@ const callProvider = (provider: AIProviderName, input: GenerateAIResponseInput) 
     temperature: input.temperature,
   };
 
-  return provider === "gemini" ? generateWithGemini(options) : generateWithNvidia(options);
+  if (provider === "gemini") return generateWithGemini(options);
+  if (provider === "openrouter") return generateWithOpenRouter(options);
+  if (provider === "openai") return generateWithOpenAI(options);
+  return generateWithNvidia(options);
 };
 
 export async function generateAIResponse(input: GenerateAIResponseInput): Promise<GenerateAIResponseResult> {

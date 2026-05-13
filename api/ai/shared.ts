@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { generateAIResponse, generateContextualExplanation, generateEmbedding, generateLessonBlocks } from "../../src/lib/ai/provider";
+import { requireAuthenticatedUser } from "../../src/server/api/aiCommandCenter";
 
 type ApiRequest = VercelRequest;
 type ApiResponse = VercelResponse;
@@ -26,21 +27,28 @@ export async function handleAIStatus(req: ApiRequest, res: ApiResponse) {
 
   const geminiConfigured = hasSecret(process.env.GEMINI_API_KEY || process.env.GEMINI_KEY_0, "MY_GEMINI_API_KEY");
   const nvidiaConfigured = hasSecret(process.env.NVIDIA_API_KEY, "MY_NVIDIA_API_KEY");
+  const openRouterConfigured = hasSecret(process.env.OPENROUTER_API_KEY, "MY_OPENROUTER_API_KEY");
+  const openAiConfigured = hasSecret(process.env.OPENAI_API_KEY, "MY_OPENAI_API_KEY");
   const configuredProvider = String(process.env.AI_PROVIDER || "gemini").toLowerCase();
   const fallbackProvider = String(process.env.AI_FALLBACK_PROVIDER || "").toLowerCase();
 
   return res.status(200).json({
-    configured: geminiConfigured || nvidiaConfigured,
+    configured: geminiConfigured || nvidiaConfigured || openRouterConfigured || openAiConfigured,
     providers: {
       gemini: geminiConfigured,
       nvidia: nvidiaConfigured,
+      openrouter: openRouterConfigured,
+      openai: openAiConfigured,
     },
-    defaultProvider: configuredProvider === "nvidia" ? "nvidia" : "gemini",
-    fallbackProvider: fallbackProvider === "gemini" || fallbackProvider === "nvidia" ? fallbackProvider : null,
+    defaultProvider: ["gemini", "nvidia", "openrouter", "openai"].includes(configuredProvider) ? configuredProvider : "gemini",
+    fallbackProvider: ["gemini", "nvidia", "openrouter", "openai"].includes(fallbackProvider) ? fallbackProvider : null,
     fallbackEnabled: process.env.AI_FALLBACK_ENABLED !== "false",
+    platformCreditsEnabled: process.env.AI_PLATFORM_CREDITS_ENABLED !== "false",
     models: {
       gemini: process.env.GEMINI_MODEL || "gemini-2.5-flash",
       nvidia: process.env.NVIDIA_MODEL || "google/gemma-3-27b-it",
+      openrouter: process.env.OPENROUTER_MODEL || "openai/gpt-4o-mini",
+      openai: process.env.OPENAI_MODEL || "gpt-4o-mini",
     },
   });
 }
@@ -58,6 +66,8 @@ export async function handleAIGenerate(req: ApiRequest, res: ApiResponse) {
   }
 
   try {
+    const credentialMode = body.credentialMode === "byok" ? "byok" : "platform";
+    const user = credentialMode === "byok" ? await requireAuthenticatedUser(req) : null;
     const result = await generateAIResponse({
       prompt,
       provider: body.provider,
@@ -67,6 +77,8 @@ export async function handleAIGenerate(req: ApiRequest, res: ApiResponse) {
       maxOutputTokens: typeof config.maxOutputTokens === "number" ? config.maxOutputTokens : undefined,
       temperature: typeof config.temperature === "number" ? config.temperature : undefined,
       fallbackEnabled: body.fallbackEnabled,
+      credentialMode,
+      userId: user?.id,
     });
     return res.status(200).json(result);
   } catch (error) {
@@ -99,11 +111,15 @@ Surrounding paragraph: ${body.surroundingParagraph || ""}
 Return a concise student-friendly answer.`;
 
   try {
+    const credentialMode = body.credentialMode === "byok" ? "byok" : "platform";
+    const user = credentialMode === "byok" ? await requireAuthenticatedUser(req) : null;
     const result = await generateContextualExplanation({
       prompt,
       provider: body.provider,
       model: body.model,
       maxOutputTokens: 1200,
+      credentialMode,
+      userId: user?.id,
     });
     return res.status(200).json(result);
   } catch (error) {
@@ -124,11 +140,15 @@ export async function handleAILessonBlocks(req: ApiRequest, res: ApiResponse) {
   }
 
   try {
+    const credentialMode = body.credentialMode === "byok" ? "byok" : "platform";
+    const user = credentialMode === "byok" ? await requireAuthenticatedUser(req) : null;
     const result = await generateLessonBlocks({
       prompt,
       provider: body.provider,
       model: body.model,
       maxOutputTokens: 4096,
+      credentialMode,
+      userId: user?.id,
     });
     return res.status(200).json(result);
   } catch (error) {

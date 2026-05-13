@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import axios from "axios";
 import { handleAIEmbed, handleAIGenerate, handleAIExplain, handleAILessonBlocks, handleAIStatus } from "./ai/shared";
+import { handleDeleteUserAiKey, handleTestUserAiKey, handleUserAiKeys } from "../src/server/api/userAiKeys";
 import { backfillTopicsFromLessons } from "../lib/topicSync";
 import { seedStarterLessonsFromTopics } from "../src/server/curriculum/starterLessons";
 import {
@@ -1097,6 +1098,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (segments[0] === "admin" && segments[1] === "ai-recovery") {
     return handleAiRecovery(req, res, segments);
+  }
+
+  if (segments[0] === "user" && segments[1] === "ai-keys") {
+    if (segments.length === 2) return handleUserAiKeys(req, res);
+    if (segments.length === 3 && segments[2] === "test") return handleTestUserAiKey(req, res);
+    if (segments.length === 3) return handleDeleteUserAiKey(req, res, segments[2]);
   }
 
   const routeHandler = rootRoutes[key];

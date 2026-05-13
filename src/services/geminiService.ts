@@ -3,6 +3,7 @@ import { jsonrepair } from "jsonrepair";
 import { moroccanAcademicDb } from "../data/moroccan_academic_db";
 import { toast } from "sonner";
 import { db } from "../db/db";
+import { supabase } from "../db/supabase";
 import { searchContextForGeneration } from "./ragService";
 import { transformersService } from "./transformersService";
 import { mcpClient } from "./mcpClient";
@@ -16,6 +17,9 @@ export const getAiApiKey = () =>
 
 export const getAiProvider = () =>
   localStorage.getItem("ai_provider") || "";
+
+export const getAiCredentialMode = () =>
+  localStorage.getItem("ai_credential_mode") || "platform";
 
 export const getAiModel = () =>
   localStorage.getItem("ai_model") || "";
@@ -662,12 +666,19 @@ export async function generateAIContent(
     const preferredProvider = params.provider || getAiProvider() || undefined;
     const preferredModel = params.model || getAiModel() || undefined;
     const fallbackEnabled = localStorage.getItem("ai_fallback_enabled");
+    const credentialMode = getAiCredentialMode() === "byok" ? "byok" : "platform";
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
     const response = await fetch("/api/ai/generate", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
       body: JSON.stringify({
         provider: preferredProvider,
         model: preferredModel,
+        credentialMode,
         fallbackEnabled: fallbackEnabled === null ? undefined : fallbackEnabled === "true",
         contents: params.contents,
         config: {
