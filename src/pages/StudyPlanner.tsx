@@ -94,7 +94,7 @@ export const StudyPlanner: React.FC = () => {
     if (!newSession.subject || !newSession.date || !newSession.startTime) return;
     
     const session: StudySession = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: crypto.randomUUID(),
       ...newSession,
       completed: false
     };
@@ -114,7 +114,7 @@ export const StudyPlanner: React.FC = () => {
     if (!newGoal.title || !newGoal.deadline) return;
     
     const goal: StudyGoal = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: crypto.randomUUID(),
       ...newGoal,
       progress: 0
     };

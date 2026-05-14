@@ -35,7 +35,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
 
     // Unique name per effect run — survives React StrictMode's double-invoke
     const channel = supabase
-      .channel(`app_settings_${Math.random().toString(36).slice(2)}`)
+      .channel(`app_settings_${crypto.randomUUID()}`)
       .on('postgres_changes', { event: '*', table: 'app_settings', schema: 'public' }, (payload) => {
         if (active && payload.new) {
           const s = payload.new as any;
