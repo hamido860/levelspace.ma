@@ -245,15 +245,23 @@ export const Modules: React.FC = () => {
 
   const [bacTrackName, setBacTrackName] = useState<string>('');
   const [bacIntOptionName, setBacIntOptionName] = useState<string>('');
-  const trustedSubjectNames = buildTrustedSubjectNames(country, grade, bacTrackName || selectedBacTrackId);
-  const trustedSubjectSet = buildTrustedSubjectSet(trustedSubjectNames);
-  const modules = (dbModules || [])
-    .filter((module) => moduleMatchesTrustedSubjects(module, trustedSubjectSet))
-    .map(m => ({
-      ...m,
-      icon: getIconForCategory(m.category)
-    }));
-  const selectedCount = modules.filter(m => m.selected).length;
+
+  // ⚡ Bolt Optimization: Memoize derived modules arrays
+  // Why: useLiveQuery (dbModules) can trigger frequent re-renders. We memoize
+  // the derived properties to maintain referential equality and avoid expensive filtering/mapping
+  // on every render cycle (especially since we create new icon elements).
+  // Impact: Prevents O(N) array recalculations and prevents cascading re-renders of the list.
+  const trustedSubjectNames = useMemo(() => buildTrustedSubjectNames(country, grade, bacTrackName || selectedBacTrackId), [country, grade, bacTrackName, selectedBacTrackId]);
+  const trustedSubjectSet = useMemo(() => buildTrustedSubjectSet(trustedSubjectNames), [trustedSubjectNames]);
+  const modules = useMemo(() => {
+    return (dbModules || [])
+      .filter((module) => moduleMatchesTrustedSubjects(module, trustedSubjectSet))
+      .map(m => ({
+        ...m,
+        icon: getIconForCategory(m.category)
+      }));
+  }, [dbModules, trustedSubjectSet]);
+  const selectedCount = useMemo(() => modules.filter(m => m.selected).length, [modules]);
 
   useEffect(() => {
     const fetchBacDetails = async () => {
@@ -408,10 +416,14 @@ export const Modules: React.FC = () => {
     await db.modules.bulkPut(updates);
   };
 
-  const filteredModules = modules.filter(m => 
-    m.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    m.code.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // ⚡ Bolt Optimization: Memoize search filtering
+  // Why: Prevents text-search filtering on every render cycle when other state changes.
+  const filteredModules = useMemo(() => {
+    return modules.filter(m =>
+      m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      m.code.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [modules, searchQuery]);
 
   return (
     <Layout>
