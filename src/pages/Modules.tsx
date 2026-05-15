@@ -245,14 +245,26 @@ export const Modules: React.FC = () => {
 
   const [bacTrackName, setBacTrackName] = useState<string>('');
   const [bacIntOptionName, setBacIntOptionName] = useState<string>('');
-  const trustedSubjectNames = buildTrustedSubjectNames(country, grade, bacTrackName || selectedBacTrackId);
-  const trustedSubjectSet = buildTrustedSubjectSet(trustedSubjectNames);
-  const modules = (dbModules || [])
-    .filter((module) => moduleMatchesTrustedSubjects(module, trustedSubjectSet))
-    .map(m => ({
-      ...m,
-      icon: getIconForCategory(m.category)
-    }));
+
+  // ⚡ Bolt: Memoize derived data to prevent unnecessary re-evaluations and new object references
+  // that would otherwise trigger cascading re-renders in child components.
+  const { trustedSubjectNames, trustedSubjectSet } = useMemo(() => {
+    const names = buildTrustedSubjectNames(country, grade, bacTrackName || selectedBacTrackId);
+    const set = buildTrustedSubjectSet(names);
+    return { trustedSubjectNames: names, trustedSubjectSet: set };
+  }, [country, grade, bacTrackName, selectedBacTrackId]);
+
+  // ⚡ Bolt: Memoize module processing to prevent creating new array references on every render,
+  // especially important when derived from useLiveQuery which can re-trigger often.
+  const modules = useMemo(() => {
+    return (dbModules || [])
+      .filter((module) => moduleMatchesTrustedSubjects(module, trustedSubjectSet))
+      .map(m => ({
+        ...m,
+        icon: getIconForCategory(m.category)
+      }));
+  }, [dbModules, trustedSubjectSet]);
+
   const selectedCount = modules.filter(m => m.selected).length;
 
   useEffect(() => {
