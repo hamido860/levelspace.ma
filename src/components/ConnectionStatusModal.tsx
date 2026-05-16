@@ -40,8 +40,8 @@ export const ConnectionStatusModal: React.FC<ConnectionStatusModalProps> = ({
 
   const runCheck = async () => {
     setChecking(true);
-    const url = import.meta.env.VITE_SUPABASE_URL;
-    const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    const url = import.meta.env.NEXT_PUBLIC_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL;
+    const key = import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
     
     const urlValid = !!url && url.startsWith('http');
     const keyValid = !!key && key !== 'YOUR_SUPABASE_ANON_KEY';
@@ -52,14 +52,10 @@ export const ConnectionStatusModal: React.FC<ConnectionStatusModalProps> = ({
 
     if (urlValid && keyValid) {
       try {
-        const { error } = await supabase.from('lessons').select('id').limit(1);
-        if (!error) {
-          tablesExist = true;
-        } else if (error.code === 'PGRST116' || error.message.includes('relation "public.lessons" does not exist')) {
-          errorMsg = 'Tables missing. Please run the SQL schema in Supabase.';
-        } else {
-          errorMsg = error.message;
-        }
+        const response = await fetch('/api/health/supabase');
+        const health = await response.json().catch(() => ({}));
+        tablesExist = Boolean(response.ok && health.ok);
+        if (!tablesExist) errorMsg = health.error || 'Supabase health check failed';
         
         const { data: { session } } = await supabase.auth.getSession();
         authOk = !!session;

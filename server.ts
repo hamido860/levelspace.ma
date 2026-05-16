@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
 
+dotenv.config({ path: ".env.local" });
 dotenv.config();
 
 type ApiHandlerModule = {
@@ -32,6 +33,7 @@ const apiRouteTable = [
   ["/api/ai/lesson-blocks", "./api/ai/lesson-blocks.ts"],
   ["/api/ai/embed", "./api/ai/embed.ts"],
   ["/api/ai/status", "./api/ai/status.ts"],
+  ["/api/health/supabase", "./api/health/supabase.ts"],
   ["/api/user/ai-keys", "./api/user/ai-keys.ts"],
   ["/api/user/ai-keys/test", "./api/user/ai-keys/test.ts"],
   ["/api/user/ai-keys/:provider", "./api/user/ai-keys/[provider].ts"],

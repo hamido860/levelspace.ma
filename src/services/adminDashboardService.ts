@@ -255,7 +255,8 @@ const isMissingTableError = (error: { code?: string; message?: string } | null) 
 const readCount = async (label: string, query: Promise<{ count: number | null; error: { message: string } | null }>) => {
   const { count, error } = await query;
   if (error) {
-    throw new Error(`${label}: ${error.message}`);
+    console.warn(`[Admin metrics] ${label} unavailable: ${error.message}`);
+    return 0;
   }
   return count ?? 0;
 };
@@ -266,7 +267,8 @@ const readRows = async <T = any>(
 ): Promise<T[]> => {
   const { data, error } = await query;
   if (error) {
-    throw new Error(`${label}: ${error.message}`);
+    console.warn(`[Admin metrics] ${label} unavailable: ${error.message}`);
+    return [];
   }
   return data ?? [];
 };

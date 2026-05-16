@@ -12,9 +12,7 @@ export default defineConfig(({mode}) => {
     'http://127.0.0.1:4321';
   return {
     plugins: [react(), tailwindcss()],
-    define: {
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY || process.env.GEMINI_API_KEY || ''),
-    },
+    envPrefix: ['VITE_', 'NEXT_PUBLIC_'],
     build: {
       chunkSizeWarningLimit: 600,
       rollupOptions: {

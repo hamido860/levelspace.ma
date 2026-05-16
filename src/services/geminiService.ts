@@ -666,9 +666,9 @@ export async function generateAIContent(
     const preferredProvider = params.provider || getAiProvider() || undefined;
     const preferredModel = params.model || getAiModel() || undefined;
     const fallbackEnabled = localStorage.getItem("ai_fallback_enabled");
-    const credentialMode = getAiCredentialMode() === "byok" ? "byok" : "platform";
     const { data: sessionData } = await supabase.auth.getSession();
     const accessToken = sessionData.session?.access_token;
+    const credentialMode = getAiCredentialMode() === "byok" && accessToken ? "byok" : "platform";
     const response = await fetch("/api/ai/generate", {
       method: "POST",
       headers: {
