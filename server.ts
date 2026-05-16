@@ -18,45 +18,7 @@ const app = express();
 const port = Number(process.env.API_PORT || process.env.PORT || 4321);
 
 const apiRouteTable = [
-  ["/api/ai-analyst", "./api/ai-analyst.ts"],
-  ["/api/ai-approve-task", "./api/ai-approve-task.ts"],
-  ["/api/ai-execute-task", "./api/ai-execute-task.ts"],
-  ["/api/ai-plan-task", "./api/ai-plan-task.ts"],
-  ["/api/ai-rag-check", "./api/ai-rag-check.ts"],
-  ["/api/ai-reject-task", "./api/ai-reject-task.ts"],
-  ["/api/ai-request-approval", "./api/ai-request-approval.ts"],
-  ["/api/ai-run-audit", "./api/ai-run-audit.ts"],
-  ["/api/ai-run-monitoring", "./api/ai-run-monitoring.ts"],
-  ["/api/ai-validate-task", "./api/ai-validate-task.ts"],
-  ["/api/ai/generate", "./api/ai/generate.ts"],
-  ["/api/ai/explain", "./api/ai/explain.ts"],
-  ["/api/ai/lesson-blocks", "./api/ai/lesson-blocks.ts"],
-  ["/api/ai/embed", "./api/ai/embed.ts"],
-  ["/api/ai/status", "./api/ai/status.ts"],
-  ["/api/health/supabase", "./api/health/supabase.ts"],
-  ["/api/user/ai-keys", "./api/user/ai-keys.ts"],
-  ["/api/user/ai-keys/test", "./api/user/ai-keys/test.ts"],
-  ["/api/user/ai-keys/:provider", "./api/user/ai-keys/[provider].ts"],
-  ["/api/admin/ai-recovery/failed-jobs", "./api/admin/ai-recovery/failed-jobs.ts"],
-  ["/api/admin/ai-recovery/logs", "./api/admin/ai-recovery/logs.ts"],
-  ["/api/admin/ai-recovery/recovered-lessons", "./api/admin/ai-recovery/recovered-lessons.ts"],
-  ["/api/admin/ai-recovery/jobs/:jobId/create-task", "./api/admin/ai-recovery/jobs/[jobId]/create-task.ts"],
-  ["/api/admin/ai-recovery/jobs/:jobId/diagnostics", "./api/admin/ai-recovery/jobs/[jobId]/diagnostics.ts"],
-  ["/api/admin/ai-recovery/recovered-lessons/:lessonId/approve", "./api/admin/ai-recovery/recovered-lessons/[lessonId]/approve.ts"],
-  ["/api/admin/ai-recovery/recovered-lessons/:lessonId/detail", "./api/admin/ai-recovery/recovered-lessons/[lessonId]/detail.ts"],
-  ["/api/admin/ai-recovery/recovered-lessons/:lessonId/reject", "./api/admin/ai-recovery/recovered-lessons/[lessonId]/reject.ts"],
-  ["/api/admin/ai-recovery/recovered-lessons/:lessonId/save", "./api/admin/ai-recovery/recovered-lessons/[lessonId]/save.ts"],
-  ["/api/admin/ai-recovery/recovered-lessons/:lessonId/send-back", "./api/admin/ai-recovery/recovered-lessons/[lessonId]/send-back.ts"],
-  ["/api/admin/ai-recovery/tasks/:taskId/approve-execute", "./api/admin/ai-recovery/tasks/[taskId]/approve-execute.ts"],
-  ["/api/admin/ai-recovery/tasks/:taskId/copy-sql", "./api/admin/ai-recovery/tasks/[taskId]/copy-sql.ts"],
-  ["/api/admin/ai-recovery/tasks/:taskId/detail", "./api/admin/ai-recovery/tasks/[taskId]/detail.ts"],
-  ["/api/admin/ai-recovery/tasks/:taskId/execute", "./api/admin/ai-recovery/tasks/[taskId]/execute.ts"],
-  ["/api/admin/ai-recovery/tasks/:taskId/generate-sql", "./api/admin/ai-recovery/tasks/[taskId]/generate-sql.ts"],
-  ["/api/admin/ai-recovery/tasks/:taskId/reject-sql", "./api/admin/ai-recovery/tasks/[taskId]/reject-sql.ts"],
-  ["/api/admin/ai-recovery/tasks/:taskId/reset", "./api/admin/ai-recovery/tasks/[taskId]/reset.ts"],
-  ["/api/admin/ai-recovery/tasks/:taskId/safety-check", "./api/admin/ai-recovery/tasks/[taskId]/safety-check.ts"],
-  ["/api/admin/lessons/seed-starter", "./api/admin/lessons/seed-starter.ts"],
-  ["/api/admin/topics/repair", "./api/admin/topics/repair.ts"],
+  ["/api/*", "./api/[...slug].ts"],
 ] as const;
 
 const handlerCache = new Map<string, Promise<ApiHandlerModule["default"]>>();
@@ -96,6 +58,12 @@ for (const [routePath, modulePath] of apiRouteTable) {
   app.all(routePath, async (req, res, next) => {
     try {
       Object.assign(req.query, req.params);
+      if (routePath === "/api/*") {
+        const wildcard = req.params[0];
+        req.query.slug = String(wildcard || "")
+          .split("/")
+          .filter(Boolean);
+      }
       const handler = await loadHandler(modulePath);
       await handler(req, res);
     } catch (error) {

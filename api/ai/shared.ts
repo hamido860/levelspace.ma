@@ -34,8 +34,14 @@ const hasBearerToken = (req: ApiRequest) => {
   return typeof header === "string" && /^Bearer\s+.+/i.test(header);
 };
 
+const isProductionLike = () => process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
+
 const resolveCredentialContext = async (req: ApiRequest, body: Record<string, any>) => {
   const wantsByok = body.credentialMode === "byok";
+  if (wantsByok && !isProductionLike() && typeof body.requestApiKey === "string" && body.requestApiKey.trim()) {
+    return { credentialMode: "byok" as const, userId: undefined };
+  }
+
   if (!wantsByok || !hasBearerToken(req)) {
     return { credentialMode: "platform" as const, userId: undefined };
   }
@@ -108,6 +114,7 @@ export async function handleAIGenerate(req: ApiRequest, res: ApiResponse) {
       fallbackEnabled: body.fallbackEnabled,
       credentialMode: credentials.credentialMode,
       userId: credentials.userId,
+      requestApiKey: typeof body.requestApiKey === "string" && !isProductionLike() ? body.requestApiKey : undefined,
     });
     return res.status(200).json(result);
   } catch (error) {
@@ -148,6 +155,7 @@ Return a concise student-friendly answer.`;
       maxOutputTokens: 1200,
       credentialMode: credentials.credentialMode,
       userId: credentials.userId,
+      requestApiKey: typeof body.requestApiKey === "string" && !isProductionLike() ? body.requestApiKey : undefined,
     });
     return res.status(200).json(result);
   } catch (error) {
@@ -176,6 +184,7 @@ export async function handleAILessonBlocks(req: ApiRequest, res: ApiResponse) {
       maxOutputTokens: 4096,
       credentialMode: credentials.credentialMode,
       userId: credentials.userId,
+      requestApiKey: typeof body.requestApiKey === "string" && !isProductionLike() ? body.requestApiKey : undefined,
     });
     return res.status(200).json(result);
   } catch (error) {

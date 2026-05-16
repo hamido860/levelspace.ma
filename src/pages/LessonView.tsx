@@ -64,6 +64,8 @@ import { PedagogicalTools } from '../components/PedagogicalTools';
 import { AIAssistant } from '../components/AIAssistant';
 import { EduWorkspace } from '../components/workspace/EduWorkspace';
 import { LessonBlockRenderer } from '../components/lesson/LessonBlockRenderer';
+import { LessonReader } from '../features/lesson/LessonReader';
+import { useDisplayedLessonBlocks } from '../features/lesson/useDisplayedLessonBlocks';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { useAppSettings } from '../context/AppSettingsContext';
@@ -107,7 +109,7 @@ const getExplanationTitle = (mode: SelectionIntent) => {
     sentence_explanation: 'Sentence Explanation',
     paragraph_explanation: 'Contextual Explanation',
     full_context_analysis: 'Lesson Analysis',
-    answer_question: 'AI Answer',
+    answer_question: 'Answer Help',
   };
   return titles[mode];
 };
@@ -324,10 +326,10 @@ const Timer = () => {
 };
 
 const PENDING_STAGES = [
-  'Analyzing curriculum...',
-  'Building generation plan...',
-  'Generating lesson content...',
-  'Validating and saving...',
+  'Reading the curriculum...',
+  'Preparing lesson structure...',
+  'Preparing lesson...',
+  'Checking and saving...',
 ];
 
 type SupabaseLessonRecord = {
@@ -353,7 +355,7 @@ type SupabaseLessonRecord = {
   teaching_contract?: unknown;
 };
 
-// Shown when AI Crew is generating a lesson on-demand (status === 'pending')
+// Shown when a lesson is being prepared on demand (status === 'pending')
 const PendingLessonView: React.FC<{ title: string; lessonId: string; onReady: () => void }> = ({ title, lessonId, onReady }) => {
   const navigate = useNavigate();
   const [dots, setDots] = useState('.');
@@ -387,7 +389,7 @@ const PendingLessonView: React.FC<{ title: string; lessonId: string; onReady: ()
         <div className="text-center space-y-2 max-w-md">
           <p className="text-ink font-semibold text-lg">"{title}"</p>
           <p className="text-accent font-medium text-sm">{PENDING_STAGES[stageIdx]}{dots}</p>
-          <p className="text-muted text-xs">AI Crew is building this lesson. This usually takes 30–90 seconds.</p>
+          <p className="text-muted text-xs">Preparing lesson. This usually takes 30-90 seconds.</p>
         </div>
         <div className="flex gap-1.5">
           {PENDING_STAGES.map((_, i) => (
@@ -897,60 +899,9 @@ export const LessonView: React.FC = () => {
   }, [effectiveLesson?.id, effectiveLesson?.blocks, openBlocks.length]);
 
   useEffect(() => {
-    let isCancelled = false;
-
-    const buildLearningBlocks = async () => {
-      if (!effectiveLesson?.id || !rawLessonContent) {
-        setLearningBlocks([]);
-        setIsStructuringLesson(false);
-        return;
-      }
-
-      const structureInput = {
-        rawContent: rawLessonContent,
-        lessonTitle: lessonMetaTitle,
-        subject: lessonSubject,
-        topic: lessonTopic || lessonMetaTitle,
-        gradeLevel: lessonGrade,
-        language,
-        curriculumMetadata: {
-          country: lessonCountry,
-          topic_id: effectiveLesson.topic_id,
-          validation_status: effectiveLesson.validation_status,
-          source_name: effectiveLesson.source_name,
-        },
-      };
-
-      setLearningBlocks(buildFallbackLearningBlocks(structureInput));
-      if (!hasAiAccess || !aiAvailable) {
-        setIsStructuringLesson(false);
-        setLearningBlockError(null);
-        return;
-      }
-
-      setIsStructuringLesson(true);
-      setLearningBlockError(null);
-      try {
-        const structured = await structureLessonIntoLearningBlocks(structureInput);
-        if (!isCancelled) {
-          setLearningBlocks(structured);
-        }
-      } catch (error) {
-        console.error("Failed to structure lesson blocks:", error);
-        if (!isCancelled) {
-          setLearningBlockError("Using quick structured learning blocks while AI structuring is unavailable.");
-        }
-      } finally {
-        if (!isCancelled) {
-          setIsStructuringLesson(false);
-        }
-      }
-    };
-
-    buildLearningBlocks();
-    return () => {
-      isCancelled = true;
-    };
+    setLearningBlocks([]);
+    setIsStructuringLesson(false);
+    setLearningBlockError(null);
   }, [
     effectiveLesson?.id,
     effectiveLesson?.topic_id,
@@ -1191,6 +1142,25 @@ export const LessonView: React.FC = () => {
     }
   };
 
+  const readerSourceBlocks = effectiveLesson?.blocks || [];
+  const readerIsFrenchLesson = (() => {
+    const candidates = [lessonSubject, module?.name, effectiveLesson?.subject, effectiveLesson?.title];
+    return candidates.some((candidate) => {
+      const normalized = normalizeCurriculumValue(String(candidate || ''));
+      return normalized === 'francais' || normalized === 'langue francaise' || normalized.includes('francais');
+    });
+  })();
+  const {
+    allBlocks: readerAllBlocks,
+    displayedBlocks,
+    domainStats: readerDomainStats,
+    showDomainFilters: readerShowDomainFilters,
+  } = useDisplayedLessonBlocks({
+    blocks: readerSourceBlocks,
+    activeDomain: activeFrenchDomain,
+    isFrenchLesson: readerIsFrenchLesson,
+  });
+
   if (effectiveLesson === undefined) {
     return (
       <Layout fullWidth topbarGradeOverride={lessonGrade}>
@@ -1226,7 +1196,7 @@ export const LessonView: React.FC = () => {
     );
   }
 
-  // AI Crew is generating this lesson on-demand (Pro planned, Gemma 4 is executing)
+  // Lesson is being prepared on demand.
   if (effectiveLesson.status === 'pending' && !lessonHasStoredContent) {
     return (
       <PendingLessonView
@@ -1311,6 +1281,154 @@ export const LessonView: React.FC = () => {
   const outlinePreviewCards = nextBlockCard
     ? [nextBlockCard, ...blockCards.filter((card) => card.id !== nextBlockCard.id).slice(0, 2)]
     : blockCards.slice(0, 3);
+
+  return (
+    <Layout fullWidth topbarGradeOverride={lessonGrade}>
+      <SEO
+        title={lessonMetaTitle}
+        description={lessonMetaDescription}
+        keywords={lessonMetaKeywords}
+        type="article"
+        image={`https://picsum.photos/seed/${encodeURIComponent(lessonMetaTitle.toLowerCase().replace(/\s+/g, '-'))}/1200/630`}
+      />
+
+      <div
+        dir={contentDir}
+        onMouseUp={handleMouseUp}
+        className="min-h-screen bg-background"
+      >
+        <AnimatePresence>
+          {selectedText && !explanation && !isExplaining && hasAiAccess && (
+            <motion.div
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 24 }}
+              className="fixed bottom-6 left-1/2 z-[100] w-full max-w-sm -translate-x-1/2 px-4"
+            >
+              <div className="flex items-center gap-3 rounded-2xl border border-ink/10 bg-paper p-3 shadow-xl">
+                <p className="min-w-0 flex-1 truncate text-xs text-muted">"{selectedText}"</p>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    if (aiAvailable) handleExplain();
+                  }}
+                  disabled={!aiAvailable}
+                  className="rounded-xl bg-ink px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-paper disabled:opacity-50"
+                >
+                  Extra help
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <Modal
+          isOpen={isExplaining || !!explanation}
+          onClose={() => {
+            if (!isExplaining) {
+              setExplanation(null);
+              setSelectedText(null);
+            }
+          }}
+          maxWidth="3xl"
+          title={getExplanationTitle(explanationMode)}
+        >
+          <div className="space-y-5">
+            <div className="rounded-2xl bg-surface-low p-4">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted">Selected text</p>
+              <p className="mt-2 text-sm font-medium leading-relaxed text-ink">"{selectedText}"</p>
+            </div>
+            <div className="min-h-[180px] rounded-2xl border border-ink/5 bg-paper p-5">
+              {isExplaining ? (
+                <div className="flex min-h-[140px] flex-col items-center justify-center gap-3 text-sm text-muted">
+                  <Loader2 size={24} className="animate-spin text-accent" />
+                  Preparing extra help...
+                </div>
+              ) : (
+                <div className="lesson-reader-markdown">
+                  <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>
+                    {explanation || ''}
+                  </Markdown>
+                </div>
+              )}
+            </div>
+          </div>
+        </Modal>
+
+        <LessonReader
+          title={effectiveLesson.title}
+          subtitle={effectiveLesson.subtitle || `${displayedBlocks.length} sections`}
+          grade={lessonGrade}
+          subject={lessonSubject || module?.name}
+          draftWarning={isDraftValidationStatus(effectiveLesson.validation_status, !!effectiveLesson.is_ai_generated)}
+          displayedBlocks={displayedBlocks}
+          allBlocks={readerAllBlocks}
+          domainStats={readerDomainStats}
+          activeDomain={activeFrenchDomain}
+          showDomainFilters={readerShowDomainFilters}
+          readingBlockIndex={readingBlockIndex}
+          quizAnswered={quizAnswered}
+          quizCorrect={quizCorrect}
+          quizSelectedOption={quizSelectedOption}
+          exerciseResult={exerciseResult}
+          exerciseHintShown={exerciseHintShown}
+          examResult={examResult}
+          examHintShown={examHintShown}
+          onBack={() => navigate('/dashboard')}
+          onDomainChange={setActiveFrenchDomain}
+          onAddNote={() => setShowNoteModal(true)}
+          onReadBlock={toggleReadAloud}
+          onOpenWorkspace={hasAiAccess ? () => setIsWorkspaceOpen(true) : undefined}
+          onQuizAnswer={handleQuizAnswer}
+          onExerciseSubmit={handleExerciseSubmit}
+          onShowExerciseHint={(sourceIndex) => setExerciseHintShown((previous) => ({ ...previous, [sourceIndex]: true }))}
+          onExamSubmit={handleExamSubmit}
+          onShowExamHint={(sourceIndex) => setExamHintShown((previous) => ({ ...previous, [sourceIndex]: true }))}
+          blockRefs={blockRefs}
+        />
+
+        <Modal
+          isOpen={showNoteModal}
+          onClose={() => setShowNoteModal(false)}
+          title="Add a note"
+        >
+          <div className="space-y-5">
+            <p className="text-sm leading-relaxed text-muted">
+              Capture a question, reminder, or takeaway from this lesson.
+            </p>
+            <textarea
+              value={noteContent}
+              onChange={(event) => setNoteContent(event.target.value)}
+              placeholder="Write your note..."
+              rows={5}
+              className="w-full resize-none rounded-2xl border border-ink/10 bg-surface-low p-4 text-sm text-ink outline-none transition-colors focus:border-accent/40"
+            />
+            <button
+              type="button"
+              onClick={handleAddNote}
+              disabled={!noteContent}
+              className="w-full rounded-xl bg-ink py-3 text-[10px] font-bold uppercase tracking-widest text-paper transition-colors hover:bg-accent disabled:opacity-50"
+            >
+              Save note
+            </button>
+          </div>
+        </Modal>
+
+        <EduWorkspace
+          isOpen={isWorkspaceOpen}
+          onClose={() => setIsWorkspaceOpen(false)}
+          subjectId={effectiveLesson?.moduleId || 'lesson'}
+          lessonContext={{
+            title: effectiveLesson?.title || '',
+            content: readerSourceBlocks.map((block: any) => block.content || block.question || '').join('\n'),
+            grade: lessonGrade,
+            country: lessonCountry,
+          }}
+        />
+      </div>
+    </Layout>
+  );
 
   return (
     <Layout fullWidth topbarGradeOverride={lessonGrade}>
@@ -1652,7 +1770,7 @@ export const LessonView: React.FC = () => {
                       <Loader2 size={32} className="animate-spin text-accent" />
                       <div className="text-center space-y-1">
                         <p className="text-xs font-bold text-ink">Generating Insights...</p>
-                        <p className="text-[10px] text-muted italic">Gemini is crafting custom materials for you</p>
+                        <p className="text-[10px] text-muted italic">Preparing practice material for you</p>
                       </div>
                     </div>
                   ) : (
@@ -1695,13 +1813,13 @@ export const LessonView: React.FC = () => {
           </h1>
 
           <p className="lesson-header__sub">
-            {effectiveLesson.subtitle || `${totalBlocks} blocks · ~15 min · AI Generated`}
+            {effectiveLesson.subtitle || `${totalBlocks} blocks - ~15 min - Draft lesson`}
           </p>
 
           <p className={`text-[11px] font-medium mt-2 ${lessonHasPreferredValidation ? 'text-success' : 'text-warning'}`}>
             {lessonHasPreferredValidation
               ? 'Validated for student-facing use.'
-              : 'Draft AI-assisted content pending curriculum validation.'}
+              : 'Draft lesson pending teacher validation.'}
           </p>
 
           {showLessonValidationWarning ? (
@@ -1807,14 +1925,14 @@ export const LessonView: React.FC = () => {
         {/* Config Strip */}
         <div className="config-strip mb-8">
           <div>
-            <div className="config-strip__label">Config used</div>
+            <div className="config-strip__label">Lesson details</div>
             <div className="config-strip__name">
               {effectiveLesson.title} · {totalBlocks} blocks
             </div>
           </div>
           <div className="config-strip__author">
             <div className="avatar">AI</div>
-            <span className="text-xs text-ink-secondary">LevelSpace AI</span>
+            <span className="text-xs text-ink-secondary">Draft lesson</span>
             <div className="flex items-center gap-2">
               <div className="relative">
                 <button 
@@ -2038,7 +2156,7 @@ export const LessonView: React.FC = () => {
                 <div className="flex items-center gap-3">
                   <Loader2 size={18} className="animate-spin" />
                   <div>
-                    <p className="font-bold">Structuring this lesson into guided learning blocks...</p>
+                    <p className="font-bold">Preparing guided learning blocks...</p>
                     <p className="mt-0.5 text-xs opacity-80">Definitions, examples, warnings, vocabulary, and checkpoints are being prepared.</p>
                   </div>
                 </div>

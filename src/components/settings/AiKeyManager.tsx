@@ -36,6 +36,16 @@ const PROVIDERS: { id: Provider; label: string; placeholder: string }[] = [
   { id: 'openai', label: 'OpenAI', placeholder: 'sk-...' },
 ];
 
+const localKeyStorageKey = (provider: Provider) => `AI_API_KEY_${provider.toUpperCase()}`;
+
+const getLocalProviderKey = (provider: Provider) =>
+  localStorage.getItem(localKeyStorageKey(provider)) ||
+  (provider === 'gemini' ? localStorage.getItem('CUSTOM_GEMINI_API_KEY') : '') ||
+  localStorage.getItem('AI_API_KEY') ||
+  '';
+
+const maskLast4 = (key: string) => key.length >= 4 ? key.slice(-4) : '****';
+
 const authHeaders = async () => {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
@@ -60,6 +70,7 @@ export const AiKeyManager: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [platformStatus, setPlatformStatus] = useState<PlatformStatus | null>(null);
   const [authenticated, setAuthenticated] = useState(false);
+  const [, setLocalKeyRevision] = useState(0);
 
   const loadKeys = async () => {
     setLoading(true);
@@ -115,21 +126,23 @@ export const AiKeyManager: React.FC = () => {
 
   const saveKey = async (provider: Provider) => {
     const apiKey = drafts[provider].trim();
-    if (!authenticated) {
-      if (platformStatus?.devAdmin?.enabled) {
-        toast.info('Using temporary developer AI key', {
-          description: 'Developer keys are loaded from server environment variables and are not stored in the browser.',
-        });
-      } else {
-        toast.info('Personal key storage is waiting for auth', {
-          description: 'For admin testing, use server/platform keys or enable DEV_ADMIN AI key mode in .env.',
-        });
-      }
+    if (!apiKey) {
+      toast.error('Paste an API key first.');
       return;
     }
 
-    if (!apiKey) {
-      toast.error('Paste an API key first.');
+    if (!authenticated) {
+      // TODO(auth): temporary dev/admin escape hatch. Remove when per-user auth-backed key storage exists.
+      localStorage.setItem(localKeyStorageKey(provider), apiKey);
+      localStorage.setItem('AI_API_KEY', apiKey);
+      if (provider === 'gemini') localStorage.setItem('CUSTOM_GEMINI_API_KEY', apiKey);
+      localStorage.setItem('ai_provider', provider);
+      localStorage.setItem('ai_credential_mode', 'byok');
+      setSelectedProvider(provider);
+      setMode('byok');
+      setDrafts((current) => ({ ...current, [provider]: '' }));
+      setLocalKeyRevision((revision) => revision + 1);
+      toast.success(`${PROVIDERS.find((item) => item.id === provider)?.label} key saved for local dev`);
       return;
     }
 
@@ -155,12 +168,31 @@ export const AiKeyManager: React.FC = () => {
 
   const testKey = async (provider: Provider) => {
     if (!authenticated) {
-      if (platformStatus?.devAdmin?.enabled) {
-        toast.info('Developer AI key mode is enabled', {
-          description: 'Use any AI feature to test the temporary server-side developer key.',
+      const localKey = getLocalProviderKey(provider);
+      if (!localKey) {
+        toast.error('Save a local dev key first.');
+        return;
+      }
+      setBusy(`${provider}:test`);
+      try {
+        const response = await fetch('/api/ai/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            provider,
+            credentialMode: 'byok',
+            requestApiKey: localKey,
+            contents: 'Reply with exactly: ok',
+            config: { maxOutputTokens: 8 },
+          }),
         });
-      } else {
-        toast.info('Use an AI feature to test server keys', { description: 'Personal key tests will be available after auth is implemented.' });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || 'Provider rejected the local dev key.');
+        toast.success('Local dev key test passed');
+      } catch (error: any) {
+        toast.error('Key test failed', { description: error.message });
+      } finally {
+        setBusy(null);
       }
       return;
     }
@@ -184,13 +216,11 @@ export const AiKeyManager: React.FC = () => {
 
   const deleteKey = async (provider: Provider) => {
     if (!authenticated) {
-      if (platformStatus?.devAdmin?.enabled) {
-        toast.info('Developer AI key mode is enabled', {
-          description: 'Temporary developer keys live in server environment variables, not personal storage.',
-        });
-      } else {
-        toast.info('Personal key storage is waiting for auth', { description: 'Temporary admin keys live in server environment variables.' });
-      }
+      localStorage.removeItem(localKeyStorageKey(provider));
+      if (provider === 'gemini') localStorage.removeItem('CUSTOM_GEMINI_API_KEY');
+      if (selectedProvider === provider) localStorage.removeItem('AI_API_KEY');
+      setLocalKeyRevision((revision) => revision + 1);
+      toast.success('Local dev key removed');
       return;
     }
 
@@ -337,7 +367,7 @@ export const AiKeyManager: React.FC = () => {
               <p>
                 {devAdminEnabled
                   ? 'Using temporary admin/developer key from server environment variables.'
-                  : 'Authentication is not implemented yet. Use server/platform keys from .env for AI testing.'}
+                  : 'Authentication is not implemented yet. You can paste and use a local dev API key in this browser.'}
               </p>
               <p>Temporary development mode. Replace with authenticated per-user keys before production.</p>
             </section>
@@ -349,7 +379,9 @@ export const AiKeyManager: React.FC = () => {
           {PROVIDERS.map((provider) => {
             const metadata = metadataFor(provider.id);
             const devConfigured = Boolean(platformStatus?.devAdmin?.providers?.[provider.id]);
-            const configured = Boolean(metadata?.configured);
+            const localKey = getLocalProviderKey(provider.id);
+            const localConfigured = Boolean(!authenticated && localKey);
+            const configured = Boolean(metadata?.configured || localConfigured);
             return (
               <section key={provider.id} className="bg-paper border border-ink/10 rounded-2xl p-5 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
@@ -358,7 +390,7 @@ export const AiKeyManager: React.FC = () => {
                     <div className={`mt-1 inline-flex items-center gap-2 text-xs font-semibold ${configured || devConfigured ? 'text-emerald-600' : 'text-amber-600'}`}>
                       {configured || devConfigured ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
                       {configured
-                        ? `Configured ending in ${metadata?.keyLast4 || '****'}`
+                        ? `Configured ending in ${metadata?.keyLast4 || maskLast4(localKey)}`
                         : devConfigured
                           ? 'Using temporary admin/developer key'
                           : 'Missing'}
@@ -375,8 +407,7 @@ export const AiKeyManager: React.FC = () => {
                     autoComplete="off"
                     value={drafts[provider.id]}
                     onChange={(event) => setDrafts((current) => ({ ...current, [provider.id]: event.target.value }))}
-                    disabled={!authenticated && devAdminEnabled}
-                    placeholder={!authenticated && devAdminEnabled ? 'Temporary key is loaded server-side from .env' : configured ? 'Paste a new key to replace the saved key' : provider.placeholder}
+                    placeholder={configured ? 'Paste a new key to replace the saved key' : provider.placeholder}
                     className="min-w-0 flex-1 rounded-xl border border-ink/10 bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent/20"
                   />
                   <button

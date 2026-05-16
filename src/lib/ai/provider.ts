@@ -19,6 +19,7 @@ export type GenerateAIResponseInput = {
   fallbackEnabled?: boolean;
   credentialMode?: AICredentialMode;
   userId?: string;
+  requestApiKey?: string;
 };
 
 export type GenerateAIResponseResult = {
@@ -36,12 +37,12 @@ const normalizeProvider = (value: unknown): AIProviderName | null => {
 };
 
 const isTruthy = (value: unknown) => ["1", "true", "yes", "on"].includes(String(value || "").toLowerCase());
+const isProductionLike = () => process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
 
 // TODO(auth): temporary developer/admin exception. Remove once authenticated per-user API keys are implemented end to end.
 export const isDevAdminAiKeyModeEnabled = () => {
   const explicitlyEnabled = isTruthy(process.env.NEXT_PUBLIC_ENABLE_DEV_ADMIN_AI_KEYS);
-  const productionLike = process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
-  return explicitlyEnabled && !productionLike;
+  return explicitlyEnabled && !isProductionLike();
 };
 
 const getDevAdminKey = (provider: AIProviderName) => {
@@ -90,6 +91,10 @@ const isPlatformEnabled = () => process.env.AI_PLATFORM_CREDITS_ENABLED !== "fal
 
 const resolveApiKey = async (provider: AIProviderName, input: GenerateAIResponseInput) => {
   if (input.credentialMode === "byok") {
+    // TODO(auth): dev-only compatibility for the old UI-pasted API key flow.
+    // Remove this once authenticated per-user keys are implemented.
+    if (!isProductionLike() && input.requestApiKey) return input.requestApiKey;
+
     const byokProvider = normalizeUserAiProvider(provider);
     if (byokProvider && input.userId) {
       const apiKey = await getDecryptedUserAiKey(getServerSupabase(), input.userId, byokProvider);
