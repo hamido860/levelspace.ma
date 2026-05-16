@@ -1,74 +1,32 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { motion, AnimatePresence } from 'motion/react';
-import { Layout } from '../components/Layout';
-import { SEO } from '../components/SEO';
-import {
-  AlertCircle,
-  ArrowLeft,
-  CheckCircle2,
-  Loader2,
-  ChevronRight,
-  ShieldAlert,
-  Brain,
-  Sparkles,
-  X,
-  Plus,
-  Bell,
-  StickyNote,
-  Check,
-  Edit2,
-  Save,
-  Trash2,
-  BookOpen,
-  HelpCircle,
-  XCircle,
-  PenTool,
-  Lightbulb,
-  Send,
-  Target,
-  Dumbbell,
-  Type,
-  Globe,
-  ListMusic,
-  List,
-  FileText,
-  FlaskConical,
-  GraduationCap,
-  Languages,
-} from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { supabase } from '../db/supabase';
-import { db } from '../db/db';
 import Markdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
-import { toast } from 'sonner';
 import {
-  auditLessonLanguage,
-  AuditResult,
-  explainText,
-  buildFallbackLearningBlocks,
-  getSelectionIntent,
-  SelectionIntent,
-  structureLessonIntoLearningBlocks,
-  StructuredLearningBlock,
-  generateInteractiveContent,
-  generateAnotherExample,
-  checkAIProvider
-} from '../services/geminiService';
-import { getQuizzesByLesson } from '../services/quizService';
-import { getExercisesByLesson } from '../services/exerciseService';
+  AlertCircle,
+  ArrowLeft,
+  BookOpen,
+  CheckCircle2,
+  ChevronRight,
+  Dumbbell,
+  FileText,
+  HelpCircle,
+  Lightbulb,
+  List,
+  Loader2,
+  PenTool,
+  XCircle,
+} from 'lucide-react';
+import { Layout } from '../components/Layout';
 import { Modal } from '../components/Modal';
-import { PedagogicalTools } from '../components/PedagogicalTools';
-import { AIAssistant } from '../components/AIAssistant';
-import { EduWorkspace } from '../components/workspace/EduWorkspace';
-import { LessonBlockRenderer } from '../components/lesson/LessonBlockRenderer';
-import { useLanguage } from '../context/LanguageContext';
+import { SEO } from '../components/SEO';
+import { db } from '../db/db';
+import { supabase } from '../db/supabase';
 import { useAuth } from '../context/AuthContext';
-import { useAppSettings } from '../context/AppSettingsContext';
-import { getSubjectCandidates, normalizeCurriculumValue } from '../services/curriculumMatching';
-import { isStudentVisibleLesson, normalizeLessonBlockUiType } from '../services/lessonRecovery';
+import { useLanguage } from '../context/LanguageContext';
+import { getExercisesByLesson } from '../services/exerciseService';
 import {
   getLessonSelectColumns,
   inferLegacyLessonSourceConfidence,
@@ -76,259 +34,16 @@ import {
   inferLegacyLessonValidationStatus,
   isMissingLessonValidationColumnError,
 } from '../services/lessonSupabase';
+import { getQuizzesByLesson } from '../services/quizService';
+import { isStudentVisibleLesson } from '../services/lessonRecovery';
 import {
   getCurriculumValidationBadgeClass,
   getCurriculumValidationLabel,
-  getCurriculumValidationStatus,
   isDraftValidationStatus,
   isStudentPreferredValidationStatus,
 } from '../services/curriculumValidation';
-import { FRENCH_SUBJECT_DOMAINS } from '../services/curriculumStructure';
-
-const BLOCK_TYPE_CONFIG: Record<string, { icon: React.ElementType; colorClass: string; label: string }> = {
-  text:     { icon: FileText,      colorClass: 'text-accent',   label: 'Text'         },
-  formula:  { icon: Type,          colorClass: 'text-warning',  label: 'Formula'      },
-  example:  { icon: FlaskConical,  colorClass: 'text-warning',  label: 'Example'      },
-  summary:  { icon: List,          colorClass: 'text-success',  label: 'Summary'      },
-};
-
-const getBlockTypeConfig = (type: string) =>
-  BLOCK_TYPE_CONFIG[normalizeLessonBlockUiType(type)] ?? { icon: FileText, colorClass: 'text-muted', label: 'Text' };
-
-type SelectionContext = {
-  surroundingSentence: string;
-  surroundingParagraph: string;
-};
-
-const getExplanationTitle = (mode: SelectionIntent) => {
-  const titles: Record<SelectionIntent, string> = {
-    word_definition: 'Word Help',
-    short_phrase_explanation: 'Phrase Help',
-    sentence_explanation: 'Sentence Explanation',
-    paragraph_explanation: 'Contextual Explanation',
-    full_context_analysis: 'Lesson Analysis',
-    answer_question: 'AI Answer',
-  };
-  return titles[mode];
-};
-
-const extractSelectionContext = (selection: Selection | null): SelectionContext => {
-  const selected = selection?.toString().trim() || '';
-  const anchor = selection?.anchorNode;
-  const element = anchor?.nodeType === Node.TEXT_NODE ? anchor.parentElement : (anchor as Element | null);
-  const paragraph = element?.closest('p, li, section, article, div')?.textContent?.replace(/\s+/g, ' ').trim()
-    || anchor?.textContent?.replace(/\s+/g, ' ').trim()
-    || selected;
-  const escaped = selected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const sentenceMatch = escaped
-    ? paragraph.match(new RegExp(`[^.!?؟]*${escaped}[^.!?؟]*[.!?؟]?`, 'i'))
-    : null;
-
-  return {
-    surroundingSentence: (sentenceMatch?.[0] || selected).trim(),
-    surroundingParagraph: paragraph,
-  };
-};
-
-const isRTL = (text: string) => {
-  const rtlChars = /[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
-  return rtlChars.test(text);
-};
-
-const stripMarkdown = (text: string) =>
-  text
-    .replace(/```[\s\S]*?```/g, ' ')
-    .replace(/`([^`]+)`/g, '$1')
-    .replace(/!\[.*?\]\(.*?\)/g, ' ')
-    .replace(/\[(.*?)\]\(.*?\)/g, '$1')
-    .replace(/[#>*_~\-]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-const truncateText = (text: string, max = 110) =>
-  text.length <= max ? text : `${text.slice(0, max).trim()}...`;
-
-const buildMetaDescription = (text: string, fallback: string) => {
-  const cleanDescription = stripMarkdown(text).replace(/\s+/g, ' ').trim();
-  const value = cleanDescription || fallback;
-  return value.length <= 155 ? value : `${value.slice(0, 152).trim()}...`;
-};
-
-const getBlockTitle = (block: any, index: number) => {
-  const config = getBlockTypeConfig(block?.type || '');
-  return block?.title || block?.label || `${config.label} ${index + 1}`;
-};
-
-const getBlockPreviewHint = (type: string) => {
-  switch (type) {
-    case 'intro':
-      return 'Open for the full concept overview.';
-    case 'theory':
-    case 'content':
-    case 'definition':
-      return 'Open for the full explanation and key idea.';
-    case 'formula':
-      return 'Open to see the formula highlighted clearly.';
-    case 'example':
-    case 'examples':
-      return 'Open the worked example step by step.';
-    case 'summary':
-      return 'Open for the condensed takeaways.';
-    case 'rules':
-      return 'Open for the key rules and structure.';
-    default:
-      return 'Open for the full explanation.';
-  }
-};
-
-const getBlockPreview = (block: any) => {
-  if (block?.question) return truncateText(stripMarkdown(String(block.question)));
-  const type = String(block?.type || '');
-  if (typeof block?.content === 'string' && block.content.trim()) {
-    const contentPreview = truncateText(stripMarkdown(block.content), 90);
-    if (['intro', 'theory', 'content', 'definition', 'formula', 'example'].includes(type)) {
-      return getBlockPreviewHint(type);
-    }
-    return contentPreview;
-  }
-  if (Array.isArray(block?.points) && block.points.length > 0) {
-    return truncateText(stripMarkdown(String(block.points[0])));
-  }
-  if (Array.isArray(block?.rules) && block.rules.length > 0) {
-    return truncateText(stripMarkdown(String(block.rules[0])));
-  }
-  if (Array.isArray(block?.examples) && block.examples.length > 0) {
-    return truncateText(stripMarkdown(String(block.examples[0]?.question || block.examples[0]?.answer || '')));
-  }
-  if (block?.quiz?.question) return truncateText(stripMarkdown(String(block.quiz.question)));
-  if (block?.exercise?.prompt) return truncateText(stripMarkdown(String(block.exercise.prompt)));
-  return '';
-};
 
 type LessonMainTab = 'content' | 'quizzes' | 'exercises';
-type LessonDomain = { code: string; name: string };
-
-const FRENCH_DOMAIN_KEYWORDS: Record<string, string[]> = {
-  GRAMMAIRE: ['grammaire', 'phrase', 'sujet', 'verbe', 'complement', 'adjectif', 'nom', 'determinant', 'pronom', 'accord'],
-  CONJUGAISON: ['conjugaison', 'conjuguer', 'verbe', 'temps', 'present', 'passe', 'futur', 'imparfait', 'conditionnel', 'subjonctif'],
-  ORTHOGRAPHE: ['orthographe', 'orthograph', 'dictee', 'accent', 'homophone', 'accord', 'pluriel', 'singulier', 'majuscule'],
-  LEXIQUE: ['lexique', 'vocabulaire', 'synonyme', 'antonyme', 'champ lexical', 'famille de mots', 'mot'],
-  LECTURE: ['lecture', 'texte', 'comprehension', 'auteur', 'narrateur', 'recit', 'poeme', 'roman', 'extrait'],
-  EXPRESSION_ECRITE: ['expression ecrite', 'production ecrite', 'redaction', 'paragraphe', 'introduction', 'conclusion', 'argument'],
-  COMMUNICATION_ORALE: ['communication orale', 'oral', 'expose', 'debat', 'discussion', 'prendre la parole'],
-};
-
-const normalizeLessonSearchText = (value: string) =>
-  normalizeCurriculumValue(value)
-    .replace(/\s+/g, ' ')
-    .trim();
-
-const getBlockSearchText = (block: any) =>
-  normalizeLessonSearchText([
-    block?.title,
-    block?.label,
-    block?.type,
-    block?.content,
-    block?.question,
-    ...(Array.isArray(block?.rules) ? block.rules : []),
-    ...(Array.isArray(block?.points) ? block.points : []),
-    ...(Array.isArray(block?.examples)
-      ? block.examples.flatMap((example: any) => [example?.question, example?.answer, ...(Array.isArray(example?.steps) ? example.steps : [])])
-      : []),
-  ].filter(Boolean).join(' '));
-
-const formatDomainName = (value: string) =>
-  value
-    .replace(/[_-]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
-
-const normalizeDomainCode = (value: string) =>
-  normalizeLessonSearchText(value)
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .toUpperCase();
-
-const getExplicitBlockDomain = (block: any): LessonDomain | null => {
-  const rawCode = String(block?.domain_code || block?.subject_domain_code || '').trim();
-  const rawName = String(block?.domain_name || block?.subject_domain_name || block?.domain || block?.subject_domain || '').trim();
-  const rawValue = rawCode || rawName;
-  if (!rawValue) return null;
-
-  const code = normalizeDomainCode(rawCode || rawName);
-  if (!code) return null;
-
-  const knownFrenchDomain = FRENCH_SUBJECT_DOMAINS.find((domain) => domain.code === code);
-  return {
-    code,
-    name: rawName || knownFrenchDomain?.name || formatDomainName(rawCode || code),
-  };
-};
-
-const getBlockDomain = (block: any, isFrenchLesson: boolean): LessonDomain | null => {
-  const explicitDomain = getExplicitBlockDomain(block);
-  if (explicitDomain) return explicitDomain;
-
-  if (!isFrenchLesson) return null;
-
-  const text = getBlockSearchText(block);
-  const matchedDomain = FRENCH_SUBJECT_DOMAINS.find((domain) => {
-    const domainName = normalizeLessonSearchText(domain.name);
-    const keywords = FRENCH_DOMAIN_KEYWORDS[domain.code] || [];
-    return text.includes(domainName) || keywords.some((keyword) => text.includes(normalizeLessonSearchText(keyword)));
-  }) || FRENCH_SUBJECT_DOMAINS.find((domain) => domain.code === 'LECTURE') || FRENCH_SUBJECT_DOMAINS[0];
-
-  return matchedDomain ? { code: matchedDomain.code, name: matchedDomain.name } : null;
-};
-
-const Timer = () => {
-  const [time, setTime] = useState(0);
-  const [isRunning, setIsRunning] = useState(false);
-
-  useEffect(() => {
-    let interval: ReturnType<typeof setInterval> | undefined;
-    if (isRunning) {
-      interval = setInterval(() => {
-        setTime((prevTime) => prevTime + 1);
-      }, 1000);
-    } else if (!isRunning) {
-      clearInterval(interval);
-    }
-    return () => clearInterval(interval);
-  }, [isRunning]);
-
-  const formatTime = (time: number) => {
-    const minutes = Math.floor(time / 60);
-    const seconds = time % 60;
-    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-  };
-
-  return (
-    <div className="flex items-center gap-3 bg-surface-mid px-4 py-2 rounded-xl">
-      <div className="font-mono font-bold text-lg text-ink">{formatTime(time)}</div>
-      <button 
-        onClick={() => setIsRunning(!isRunning)}
-        className={`px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-widest transition-colors ${isRunning ? 'bg-warning-soft text-warning hover:bg-warning/20' : 'bg-success-soft text-success hover:bg-success/20'}`}
-      >
-        {isRunning ? 'Pause' : 'Start'}
-      </button>
-      <button 
-        onClick={() => { setIsRunning(false); setTime(0); }}
-        className="px-3 py-1 bg-error-soft text-error rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-error/20 transition-colors"
-      >
-        Reset
-      </button>
-    </div>
-  );
-};
-
-const PENDING_STAGES = [
-  'Analyzing curriculum...',
-  'Building generation plan...',
-  'Generating lesson content...',
-  'Validating and saving...',
-];
 
 type SupabaseLessonRecord = {
   id?: string;
@@ -353,25 +68,117 @@ type SupabaseLessonRecord = {
   teaching_contract?: unknown;
 };
 
-// Shown when AI Crew is generating a lesson on-demand (status === 'pending')
+type CurriculumContext = {
+  lesson_id?: string | null;
+  lesson_title?: string | null;
+  topic_id?: string | null;
+  topic_title?: string | null;
+  grade_id?: string | null;
+  grade_name?: string | null;
+  subject_id?: string | null;
+  subject_name?: string | null;
+  subject_code?: string | null;
+  domain_id?: string | null;
+  domain_code?: string | null;
+  domain_name?: string | null;
+  domain_order?: number | null;
+  validation_status?: string | null;
+  lesson_status?: string | null;
+};
+
+type SubjectDomain = {
+  id: string;
+  code: string;
+  name: string;
+  domain_order: number;
+};
+
+type TopicOverview = {
+  topic_id: string;
+  topic_title: string;
+  grade_id?: string | null;
+  subject_id?: string | null;
+  domain_id?: string | null;
+  domain_code?: string | null;
+  domain_name?: string | null;
+  outline_count?: number | null;
+};
+
+const stripMarkdown = (text: string) =>
+  text
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/!\[.*?\]\(.*?\)/g, ' ')
+    .replace(/\[(.*?)\]\(.*?\)/g, '$1')
+    .replace(/[#>*_~\-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const truncateText = (text: string, max = 155) =>
+  text.length <= max ? text : `${text.slice(0, max).trim()}...`;
+
+const isRTL = (text: string) => /[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(text);
+
+const getBlockTitle = (block: any, index: number) =>
+  String(block?.title || block?.label || block?.question || `Section ${index + 1}`);
+
+const getBlockBody = (block: any) => {
+  if (typeof block?.content === 'string') return block.content;
+  if (Array.isArray(block?.points)) return block.points.join('\n');
+  if (Array.isArray(block?.rules)) return block.rules.join('\n');
+  if (block?.quiz?.question) return block.quiz.question;
+  if (block?.exercise?.question) return block.exercise.question;
+  if (block?.exam?.question) return block.exam.question;
+  return '';
+};
+
+const getPedagogicalLabel = (block: any) => {
+  const type = String(block?.type || '').toLowerCase();
+  if (type === 'intro') return 'What you will learn';
+  if (type === 'definition') return 'Definition';
+  if (type === 'theory' || type === 'content' || type === 'text') return 'Explanation';
+  if (type === 'formula') return 'Key formula';
+  if (type === 'example' || type === 'examples') return 'Example';
+  if (type === 'rules') return 'Key rules';
+  if (type === 'exercise') return 'Practice';
+  if (type === 'quiz') return 'Quick check';
+  if (type === 'exam') return 'Exam-style question';
+  if (type === 'summary') return 'Summary';
+  return 'Lesson part';
+};
+
+const getBlockIcon = (block: any) => {
+  const label = getPedagogicalLabel(block);
+  if (label === 'Practice') return Dumbbell;
+  if (label === 'Quick check') return HelpCircle;
+  if (label === 'Exam-style question') return PenTool;
+  if (label === 'Example') return Lightbulb;
+  if (label === 'Summary' || label === 'Key rules') return List;
+  if (label === 'Definition') return BookOpen;
+  return FileText;
+};
+
+const buildLessonDescription = (lesson: any, fallback: string) => {
+  const blockPreview = Array.isArray(lesson?.blocks)
+    ? lesson.blocks.map((block: any) => getBlockBody(block)).filter(Boolean).join(' ')
+    : '';
+  return truncateText(stripMarkdown(lesson?.subtitle || lesson?.content || blockPreview || fallback));
+};
+
 const PendingLessonView: React.FC<{ title: string; lessonId: string; onReady: () => void }> = ({ title, lessonId, onReady }) => {
   const navigate = useNavigate();
-  const [dots, setDots] = useState('.');
-  const [stageIdx, setStageIdx] = useState(0);
+  const [stage, setStage] = useState(0);
+  const stages = ['Preparing lesson', 'Organizing sections', 'Checking content', 'Saving'];
 
   useEffect(() => {
-    const dotInterval  = setInterval(() => setDots(d => d.length >= 3 ? '.' : d + '.'), 600);
-    const stageInterval = setInterval(() => setStageIdx(i => Math.min(i + 1, PENDING_STAGES.length - 1)), 8000);
-
+    const stageInterval = setInterval(() => setStage((value) => Math.min(value + 1, stages.length - 1)), 8000);
     const handleReady = () => {
-      clearInterval(dotInterval);
       clearInterval(stageInterval);
       db.lessons.update(lessonId, { status: 'done' }).then(onReady);
     };
 
     window.addEventListener('lesson-ready', handleReady);
     return () => {
-      clearInterval(dotInterval);
       clearInterval(stageInterval);
       window.removeEventListener('lesson-ready', handleReady);
     };
@@ -379,26 +186,177 @@ const PendingLessonView: React.FC<{ title: string; lessonId: string; onReady: ()
 
   return (
     <Layout fullWidth>
-      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6 px-4">
-        <div className="relative">
-          <Loader2 className="w-12 h-12 text-accent animate-spin" />
-          <Sparkles className="w-5 h-5 text-warning absolute -top-1 -right-1 animate-pulse" />
+      <div className="flex min-h-[60vh] flex-col items-center justify-center space-y-6 px-4 text-center">
+        <Loader2 className="h-10 w-10 animate-spin text-accent" />
+        <div className="max-w-md space-y-2">
+          <p className="text-lg font-semibold text-ink">{title}</p>
+          <p className="text-sm font-medium text-accent">{stages[stage]}...</p>
+          <p className="text-xs text-muted">The lesson will be available when preparation finishes.</p>
         </div>
-        <div className="text-center space-y-2 max-w-md">
-          <p className="text-ink font-semibold text-lg">"{title}"</p>
-          <p className="text-accent font-medium text-sm">{PENDING_STAGES[stageIdx]}{dots}</p>
-          <p className="text-muted text-xs">AI Crew is building this lesson. This usually takes 30–90 seconds.</p>
-        </div>
-        <div className="flex gap-1.5">
-          {PENDING_STAGES.map((_, i) => (
-            <div key={i} className={`h-1.5 rounded-full transition-all duration-500 ${i <= stageIdx ? 'w-8 bg-accent' : 'w-3 bg-ink/10'}`} />
-          ))}
-        </div>
-        <button onClick={() => navigate('/dashboard')} className="text-muted text-xs hover:text-accent transition-colors">
-          Go back — lesson will be ready when you return
+        <button onClick={() => navigate('/dashboard')} className="text-xs text-muted transition-colors hover:text-accent">
+          Back to dashboard
         </button>
       </div>
     </Layout>
+  );
+};
+
+const LessonMarkdown: React.FC<{ children: string }> = ({ children }) => (
+  <div className="lesson-copy max-w-none">
+    <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>
+      {children}
+    </Markdown>
+  </div>
+);
+
+const LessonBlock: React.FC<{
+  block: any;
+  index: number;
+  expanded: boolean;
+  onToggle: () => void;
+  onQuizAnswer: (index: number, option: string, correctAnswer: string) => void;
+  quizAnswered: Record<number, boolean>;
+  quizCorrect: Record<number, boolean>;
+  quizSelectedOption: Record<number, string>;
+}> = ({ block, index, expanded, onToggle, onQuizAnswer, quizAnswered, quizCorrect, quizSelectedOption }) => {
+  const Icon = getBlockIcon(block);
+  const label = getPedagogicalLabel(block);
+  const title = getBlockTitle(block, index);
+  const blockId = `block-${index}`;
+
+  const renderBlockContent = () => {
+    if (block?.type === 'summary' && Array.isArray(block.points)) {
+      return (
+        <ul className="space-y-3">
+          {block.points.map((point: string, pointIndex: number) => (
+            <li key={pointIndex} className="flex gap-3 text-sm leading-relaxed text-ink-secondary">
+              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" />
+              <LessonMarkdown>{point}</LessonMarkdown>
+            </li>
+          ))}
+        </ul>
+      );
+    }
+
+    if (block?.type === 'rules' && Array.isArray(block.rules)) {
+      return (
+        <ul className="space-y-3">
+          {block.rules.map((rule: string, ruleIndex: number) => (
+            <li key={ruleIndex} className="flex gap-3 text-sm leading-relaxed text-ink-secondary">
+              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
+              <LessonMarkdown>{rule}</LessonMarkdown>
+            </li>
+          ))}
+        </ul>
+      );
+    }
+
+    if ((block?.type === 'examples' || block?.type === 'example') && Array.isArray(block.examples)) {
+      return (
+        <div className="space-y-4">
+          {block.examples.map((example: any, exampleIndex: number) => (
+            <div key={exampleIndex} className="rounded-2xl bg-surface-low p-4">
+              {example?.question && <LessonMarkdown>{String(example.question)}</LessonMarkdown>}
+              {Array.isArray(example?.steps) && (
+                <div className="mt-3 space-y-2 border-l-2 border-accent/20 pl-4">
+                  {example.steps.map((step: string, stepIndex: number) => (
+                    <LessonMarkdown key={stepIndex}>{step}</LessonMarkdown>
+                  ))}
+                </div>
+              )}
+              {example?.answer && (
+                <div className="mt-3 rounded-xl bg-success-soft p-3 text-success">
+                  <LessonMarkdown>{String(example.answer)}</LessonMarkdown>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    const flatQuizQuestion = block?.type === 'quiz' && block.question && Array.isArray(block.options);
+    const nestedQuizQuestion = block?.type === 'quiz' && block.quiz?.question && Array.isArray(block.quiz.options);
+    if (flatQuizQuestion || nestedQuizQuestion) {
+      const question = flatQuizQuestion ? block.question : block.quiz.question;
+      const options = flatQuizQuestion ? block.options : block.quiz.options;
+      const correctAnswer = flatQuizQuestion ? block.correctAnswer : block.quiz.correctAnswer;
+      const explanation = flatQuizQuestion ? block.explanation : block.quiz.explanation;
+      const isAnswered = quizAnswered[index];
+
+      return (
+        <div className="space-y-4">
+          <LessonMarkdown>{String(question)}</LessonMarkdown>
+          <div className="grid gap-2">
+            {options.map((option: string, optionIndex: number) => {
+              const isSelected = quizSelectedOption[index] === option;
+              const isCorrect = option === correctAnswer;
+              const stateClass = !isAnswered
+                ? 'border-surface-mid bg-paper hover:border-accent/40 hover:bg-accent/5'
+                : isCorrect
+                  ? 'border-success bg-success-soft text-success'
+                  : isSelected
+                    ? 'border-error bg-error-soft text-error'
+                    : 'border-surface-mid bg-paper/60 text-muted';
+
+              return (
+                <button
+                  key={optionIndex}
+                  onClick={() => onQuizAnswer(index, option, correctAnswer)}
+                  disabled={isAnswered}
+                  className={`flex w-full items-center justify-between rounded-xl border-2 p-4 text-left text-sm font-medium transition-all ${stateClass}`}
+                >
+                  <span>{option}</span>
+                  {isAnswered && isCorrect && <CheckCircle2 className="h-5 w-5" />}
+                  {isAnswered && isSelected && !isCorrect && <XCircle className="h-5 w-5" />}
+                </button>
+              );
+            })}
+          </div>
+          {isAnswered && (
+            <div className={`rounded-xl p-4 text-sm ${quizCorrect[index] ? 'bg-success-soft text-success' : 'bg-warning-soft text-warning'}`}>
+              <p className="font-bold">{quizCorrect[index] ? 'Correct' : 'Review this point'}</p>
+              {explanation && <p className="mt-1 leading-relaxed">{explanation}</p>}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    const exercise = block?.exercise || (block?.type === 'exercise' ? block : null);
+    if (exercise && (exercise.question || exercise.content || exercise.prompt)) {
+      return (
+        <div className="space-y-4">
+          <LessonMarkdown>{String(exercise.question || exercise.content || exercise.prompt)}</LessonMarkdown>
+          {(exercise.hint || exercise.solution) && (
+            <div className="rounded-2xl bg-surface-low p-4 text-sm text-ink-secondary">
+              {exercise.hint && <p><strong className="text-ink">Hint:</strong> {exercise.hint}</p>}
+              {exercise.solution && <p className="mt-2"><strong className="text-ink">Solution:</strong> {exercise.solution}</p>}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    const body = getBlockBody(block);
+    return body ? <LessonMarkdown>{body}</LessonMarkdown> : <p className="text-sm text-muted">No content for this section yet.</p>;
+  };
+
+  return (
+    <article id={blockId} className="scroll-mt-28 rounded-3xl border border-surface-mid bg-paper shadow-sm">
+      <button onClick={onToggle} className="flex w-full items-start gap-4 p-5 text-left md:p-6">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-accent/8 text-accent">
+          <Icon className="h-5 w-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted">{label}</p>
+          <h2 className="mt-1 text-xl font-bold leading-tight text-ink md:text-2xl">{title}</h2>
+        </div>
+        <ChevronRight className={`mt-2 h-5 w-5 shrink-0 text-muted transition-transform ${expanded ? 'rotate-90' : ''}`} />
+      </button>
+
+      {expanded && <div className="border-t border-surface-mid px-5 pb-6 pt-5 md:px-6">{renderBlockContent()}</div>}
+    </article>
   );
 };
 
@@ -406,807 +364,241 @@ export const LessonView: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { t, language } = useLanguage();
-  const { user, isAdmin } = useAuth();
-  const { settings } = useAppSettings();
-  const askAiAccess = settings.ask_ai_access || 'admin';
-  const hasAiAccess = askAiAccess === 'all' || (askAiAccess === 'admin' && isAdmin);
-  const aiAvailable = checkAIProvider();
+  const { isAdmin } = useAuth();
+  const lesson = useLiveQuery(() => (id ? db.lessons.get(id) : undefined), [id]);
 
-  const [openBlocks, setOpenBlocks] = useState<string[]>([]);
+  const [supabaseLesson, setSupabaseLesson] = useState<SupabaseLessonRecord | null>(null);
+  const [curriculumContext, setCurriculumContext] = useState<CurriculumContext | null>(null);
+  const [domains, setDomains] = useState<SubjectDomain[]>([]);
+  const [topics, setTopics] = useState<TopicOverview[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [openBlocks, setOpenBlocks] = useState<string[]>(['block-0']);
   const [activeTab, setActiveTab] = useState<LessonMainTab>('content');
-  const [activeFrenchDomain, setActiveFrenchDomain] = useState<string>('all');
+  const [activeDomain, setActiveDomain] = useState('all');
+  const [showOutlineModal, setShowOutlineModal] = useState(false);
   const [quizzes, setQuizzes] = useState<any[]>([]);
   const [exercises, setExercises] = useState<any[]>([]);
   const [isLoadingExtra, setIsLoadingExtra] = useState(false);
-
-  // Quiz state
   const [quizAnswered, setQuizAnswered] = useState<Record<number, boolean>>({});
   const [quizCorrect, setQuizCorrect] = useState<Record<number, boolean>>({});
   const [quizSelectedOption, setQuizSelectedOption] = useState<Record<number, string>>({});
-  const [xp, setXp] = useState(35);
-
-  // Exam state
-  const [examInput, setExamInput] = useState<Record<number, string>>({});
-  const [examHintShown, setExamHintShown] = useState<Record<number, boolean>>({});
-  const [examResult, setExamResult] = useState<Record<number, 'correct' | 'wrong' | 'shown' | null>>({});
-
-  // Exercise state
-  const [exerciseHintShown, setExerciseHintShown] = useState<Record<number, boolean>>({});
-  const [exerciseResult, setExerciseResult] = useState<Record<number, 'correct' | 'wrong' | 'shown' | null>>({});
-
-  // Audit state
-  const [isAuditing, setIsAuditing] = useState(false);
-  const [auditResult, setAuditResult] = useState<AuditResult | null>(null);
-
-  // Scroll Progress state
-  const [scrollProgress, setScrollProgress] = useState(0);
-  const [showAddMenu, setShowAddMenu] = useState(false);
-  const [showReminderModal, setShowReminderModal] = useState(false);
-  const [showNoteModal, setShowNoteModal] = useState(false);
-  const [reminderText, setReminderText] = useState('');
-  const [noteContent, setNoteContent] = useState('');
-  
-  // Edit state
-  const [editingBlockIndex, setEditingBlockIndex] = useState<number | null>(null);
-  const [editContent, setEditContent] = useState<string>('');
-  const [editTitle, setEditTitle] = useState<string>('');
-
-  // Interactive Learning state
-  const [clickCount, setClickCount] = useState(0);
-  const [lastClickTime, setLastClickTime] = useState(0);
-  const [showInteractiveModal, setShowInteractiveModal] = useState(false);
-  const [interactiveContent, setInteractiveContent] = useState<string | null>(null);
-  const [isGeneratingInteractive, setIsGeneratingInteractive] = useState(false);
-  const [activeInteractiveType, setActiveInteractiveType] = useState<'hard_questions' | 'more_examples' | 'exam_questions' | null>(null);
-  const [showOutlineModal, setShowOutlineModal] = useState(false);
-  const [readingBlockIndex, setReadingBlockIndex] = useState<number | null>(null);
-  const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
-  const [forceDir, setForceDir] = useState<'ltr' | 'rtl' | null>(null);
   const blockRefs = useRef<Record<string, HTMLElement | null>>({});
 
   useEffect(() => {
-    const handleScroll = () => {
-      const totalHeight = document.documentElement.scrollHeight - window.innerHeight;
-      const progress = (window.scrollY / totalHeight) * 100;
-      setScrollProgress(progress);
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  // AI Explanation state
-  const [selectedText, setSelectedText] = useState<string | null>(null);
-  const [explanation, setExplanation] = useState<string | null>(null);
-  const [explanationMode, setExplanationMode] = useState<SelectionIntent>('paragraph_explanation');
-  const [selectionContext, setSelectionContext] = useState<SelectionContext>({ surroundingSentence: '', surroundingParagraph: '' });
-  const [isExplaining, setIsExplaining] = useState(false);
-  const [learningBlocks, setLearningBlocks] = useState<StructuredLearningBlock[]>([]);
-  const [isStructuringLesson, setIsStructuringLesson] = useState(false);
-  const [learningBlockError, setLearningBlockError] = useState<string | null>(null);
-
-
-  // --- Audio Reading Logic ---
-  useEffect(() => {
-    return () => {
-      if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-      }
-    };
-  }, []);
-
-  const toggleReadAloud = (index: number, text: string) => {
-    if (!('speechSynthesis' in window)) {
-      toast.error('Text-to-speech is not supported in this browser.');
-      return;
-    }
-
-    if (readingBlockIndex === index) {
-      // Stop reading
-      window.speechSynthesis.cancel();
-      setReadingBlockIndex(null);
-    } else {
-      // Start reading new block
-      window.speechSynthesis.cancel();
-
-      // Strip markdown syntax for better reading
-      const cleanText = text
-        .replace(/[#*_\`]/g, '')
-        .replace(/\n/g, ' ')
-        .trim();
-
-      if (!cleanText) return;
-
-      const utterance = new SpeechSynthesisUtterance(cleanText);
-      utterance.rate = 0.9; // Slightly slower for better comprehension
-
-      utterance.onend = () => {
-        setReadingBlockIndex(null);
-      };
-
-      utterance.onerror = () => {
-        setReadingBlockIndex(null);
-        toast.error('Error playing audio.');
-      };
-
-      setReadingBlockIndex(index);
-      window.speechSynthesis.speak(utterance);
-    }
-  };
-  // -------------------------
-
-
-  const handleMouseUp = (e: React.MouseEvent) => {
-    // If we're clicking inside the explain button, don't do anything
-    if ((e.target as HTMLElement).closest('.explain-btn')) return;
-
-    const selection = window.getSelection();
-    const selectionText = selection?.toString().trim() || '';
-    if (selection && selectionText.length > 0) {
-      setSelectedText(selectionText);
-      setExplanationMode(getSelectionIntent(selectionText));
-      setSelectionContext(extractSelectionContext(selection));
-      setExplanation(null);
-    } else {
-      if (!explanation && !isExplaining) {
-        setSelectedText(null);
-      }
-    }
-  };
-
-  const handleExplain = async (options: { mode?: SelectionIntent; userRequest?: string } = {}) => {
-    if (!selectedText || !lesson || !hasAiAccess || !aiAvailable) return;
-    const mode = options.mode || getSelectionIntent(selectedText);
-    setExplanationMode(mode);
-    setIsExplaining(true);
-    setExplanation(null);
-    try {
-      const context = effectiveLesson.blocks?.map(b => b.content || '').join('\n') || effectiveLesson.content || '';
-      const result = await explainText(selectedText, context, lessonGrade, lessonCountry, language, module?.strictRAG, {
-        mode,
-        surroundingSentence: selectionContext.surroundingSentence,
-        surroundingParagraph: selectionContext.surroundingParagraph,
-        lessonTitle: effectiveLesson.title,
-        lessonSubject: effectiveLesson.subject || module?.name || '',
-        lessonTopic: module?.name || effectiveLesson.title,
-        gradeLevel: lessonGrade,
-        userRequest: options.userRequest,
-      });
-      setExplanation(result);
-    } catch (error) {
-      console.error("Failed to explain text:", error);
-      setExplanation("Failed to generate explanation. Please try again.");
-    } finally {
-      setIsExplaining(false);
-    }
-  };
-
-  const openVocabularyDictionary = async (term: string, sourceBlock?: StructuredLearningBlock) => {
-    if (!effectiveLesson || !hasAiAccess || !aiAvailable) return;
-    const cleanTerm = term.trim();
-    if (!cleanTerm) return;
-
-    const surroundingParagraph = sourceBlock?.content || selectionContext.surroundingParagraph || cleanTerm;
-    setSelectedText(cleanTerm);
-    setExplanationMode('word_definition');
-    setSelectionContext({
-      surroundingSentence: surroundingParagraph,
-      surroundingParagraph,
-    });
-    setIsExplaining(true);
-    setExplanation(null);
-
-    try {
-      const context = effectiveLesson.blocks?.map(b => b.content || '').join('\n') || effectiveLesson.content || '';
-      const result = await explainText(cleanTerm, context, lessonGrade, lessonCountry, language, module?.strictRAG, {
-        mode: 'word_definition',
-        surroundingSentence: surroundingParagraph,
-        surroundingParagraph,
-        lessonTitle: effectiveLesson.title,
-        lessonSubject: effectiveLesson.subject || module?.name || '',
-        lessonTopic: module?.name || effectiveLesson.title,
-        gradeLevel: lessonGrade,
-        userRequest: 'Explain this vocabulary word from a lesson vocabulary block.',
-      });
-      setExplanation(result);
-    } catch (error) {
-      console.error("Failed to explain vocabulary term:", error);
-      setExplanation("Failed to generate explanation. Please try again.");
-    } finally {
-      setIsExplaining(false);
-    }
-  };
-
-  const lesson = useLiveQuery(() => id ? db.lessons.get(id) : undefined, [id]);
-  const [supabaseLesson, setSupabaseLesson] = useState<SupabaseLessonRecord | null>(null);
-  const moduleIdForLookup = lesson?.moduleId || supabaseLesson?.topic_id || undefined;
-  const module = useLiveQuery(() => moduleIdForLookup ? db.modules.get(moduleIdForLookup) : undefined, [moduleIdForLookup]);
-
-  useEffect(() => {
     if (!id) return;
-
     let isCancelled = false;
 
-    const hydrateSupabaseLesson = async () => {
+    const fetchLesson = async () => {
+      setIsLoading(true);
       const fetchAttempt = async (includeValidation: boolean) => {
         const selectColumns = getLessonSelectColumns({ includeTags: true, includeValidation });
-
-        const directMatch = await supabase
+        return supabase
           .from('lessons')
           .select(selectColumns)
           .or(`id.eq.${id},topic_id.eq.${id}`)
           .maybeSingle()
           .throwOnError();
-
-        if (isCancelled) return;
-        if (directMatch.data) {
-          setSupabaseLesson(directMatch.data as SupabaseLessonRecord);
-          return;
-        }
-
-        if (!lesson?.title) return;
-
-        let titleQuery = supabase
-          .from('lessons')
-          .select(selectColumns)
-          .eq('lesson_title', lesson.title);
-
-        const subjectCandidates = module ? getSubjectCandidates(module.name, module.category) : [];
-        if (subjectCandidates.length > 0) {
-          titleQuery = titleQuery.in('subject', subjectCandidates);
-        }
-
-        const { data: titleMatches } = await titleQuery.limit(5).throwOnError();
-        if (isCancelled) return;
-
-        const fallbackMatch = (titleMatches || [])[0] as SupabaseLessonRecord | undefined;
-        if (fallbackMatch) {
-          setSupabaseLesson(fallbackMatch);
-        }
       };
 
       try {
-        await fetchAttempt(true);
-      } catch (error) {
-        if (isMissingLessonValidationColumnError(error)) {
-          console.warn('[LessonView] Lesson validation columns are missing in Supabase; retrying with legacy lesson schema.');
-          await fetchAttempt(false);
-          return;
+        let response;
+        try {
+          response = await fetchAttempt(true);
+        } catch (error) {
+          if (!isMissingLessonValidationColumnError(error)) throw error;
+          response = await fetchAttempt(false);
         }
 
-        throw error;
+        if (isCancelled) return;
+        const foundLesson = response.data as SupabaseLessonRecord | null;
+        setSupabaseLesson(foundLesson);
+
+        if (foundLesson?.id) {
+          const { data: context } = await supabase
+            .from('lesson_curriculum_context')
+            .select('*')
+            .eq('lesson_id', foundLesson.id)
+            .maybeSingle();
+
+          if (!isCancelled && context) {
+            setCurriculumContext(context as CurriculumContext);
+          }
+        }
+      } catch (error) {
+        console.warn('[LessonView] Failed to load lesson from Supabase:', error);
+      } finally {
+        if (!isCancelled) setIsLoading(false);
       }
     };
 
-    hydrateSupabaseLesson().catch((error) => {
-      console.warn('[LessonView] Failed to hydrate lesson metadata from Supabase:', error);
-    });
-
+    fetchLesson();
     return () => {
       isCancelled = true;
     };
-  }, [id, lesson?.title, module?.name, module?.category]);
+  }, [id]);
 
   useEffect(() => {
-    if (!lesson || !supabaseLesson) return;
-
-    const inferredValidationStatus =
-      lesson.validation_status ||
-      supabaseLesson.validation_status ||
-      inferLegacyLessonValidationStatus(supabaseLesson);
-    const inferredSourceConfidence =
-      lesson.source_confidence ??
-      supabaseLesson.source_confidence ??
-      inferLegacyLessonSourceConfidence(supabaseLesson) ??
-      undefined;
-    const inferredSourceName =
-      lesson.source_name ||
-      supabaseLesson.source_name ||
-      inferLegacyLessonSourceName(supabaseLesson);
-
-    const nextPatch = {
-      grade: lesson.grade || supabaseLesson.grade || undefined,
-      country: lesson.country || supabaseLesson.country || undefined,
-      subject: lesson.subject || supabaseLesson.subject || module?.name || undefined,
-      topic_id: lesson.topic_id || supabaseLesson.topic_id || undefined,
-      sourceLessonId: lesson.sourceLessonId || supabaseLesson.id || undefined,
-      validation_status: inferredValidationStatus,
-      source_confidence: inferredSourceConfidence,
-      source_name: inferredSourceName,
-      source_url: lesson.source_url || supabaseLesson.source_url || undefined,
-      review_notes: lesson.review_notes || supabaseLesson.review_notes || undefined,
-      reviewed_by: lesson.reviewed_by || supabaseLesson.reviewed_by || undefined,
-      reviewed_at: lesson.reviewed_at || supabaseLesson.reviewed_at || undefined,
-      teaching_contract: lesson.teaching_contract || supabaseLesson.teaching_contract || undefined,
-      is_ai_generated: lesson.is_ai_generated ?? supabaseLesson.is_ai_generated ?? undefined,
-    };
-
-    if (
-      nextPatch.grade !== lesson.grade ||
-      nextPatch.country !== lesson.country ||
-      nextPatch.subject !== lesson.subject ||
-      nextPatch.topic_id !== lesson.topic_id ||
-      nextPatch.sourceLessonId !== lesson.sourceLessonId ||
-      nextPatch.validation_status !== lesson.validation_status ||
-      nextPatch.source_confidence !== lesson.source_confidence ||
-      nextPatch.source_name !== lesson.source_name ||
-      nextPatch.source_url !== lesson.source_url ||
-      nextPatch.review_notes !== lesson.review_notes ||
-      nextPatch.reviewed_by !== lesson.reviewed_by ||
-      nextPatch.reviewed_at !== lesson.reviewed_at ||
-      nextPatch.teaching_contract !== lesson.teaching_contract ||
-      nextPatch.is_ai_generated !== lesson.is_ai_generated
-    ) {
-      db.lessons.update(lesson.id, nextPatch);
-    }
-  }, [lesson, module?.name, supabaseLesson]);
-
-  // Merge: prefer IndexedDB lesson, enriched with Supabase metadata when available.
-  const effectiveLesson = lesson
-    ? {
-        ...lesson,
-        title: supabaseLesson?.lesson_title || lesson.title,
-        content: supabaseLesson?.content || lesson.content,
-        blocks: supabaseLesson?.blocks ?? lesson.blocks,
-        subtitle: supabaseLesson?.subtitle ?? lesson.subtitle,
-        tags: supabaseLesson?.tags || lesson.tags,
-        grade: lesson.grade || supabaseLesson?.grade || undefined,
-        country: lesson.country || supabaseLesson?.country || undefined,
-        subject: lesson.subject || supabaseLesson?.subject || module?.name || undefined,
-        topic_id: lesson.topic_id || supabaseLesson?.topic_id || undefined,
-        sourceLessonId: lesson.sourceLessonId || supabaseLesson?.id || undefined,
-        validation_status:
-          lesson.validation_status ||
-          supabaseLesson?.validation_status ||
-          (supabaseLesson ? inferLegacyLessonValidationStatus(supabaseLesson) : undefined),
-        source_confidence:
-          lesson.source_confidence ??
-          supabaseLesson?.source_confidence ??
-          (supabaseLesson ? inferLegacyLessonSourceConfidence(supabaseLesson) : undefined),
-        source_name:
-          lesson.source_name ||
-          supabaseLesson?.source_name ||
-          (supabaseLesson ? inferLegacyLessonSourceName(supabaseLesson) : undefined),
-        source_url: lesson.source_url || supabaseLesson?.source_url || undefined,
-        review_notes: lesson.review_notes || supabaseLesson?.review_notes || undefined,
-        reviewed_by: lesson.reviewed_by || supabaseLesson?.reviewed_by || undefined,
-        reviewed_at: lesson.reviewed_at || supabaseLesson?.reviewed_at || undefined,
-        teaching_contract: lesson.teaching_contract || supabaseLesson?.teaching_contract || undefined,
-        is_ai_generated: lesson.is_ai_generated ?? supabaseLesson?.is_ai_generated ?? undefined,
-      }
-    : (supabaseLesson ? {
-        id: supabaseLesson.id,
-        moduleId: supabaseLesson.topic_id,
-        title: supabaseLesson.lesson_title,
-        content: supabaseLesson.content,
-        status: 'done' as const,
-        createdAt: Date.now(),
-        blocks: supabaseLesson.blocks || [],
-        subtitle: supabaseLesson.subtitle,
-        tags: supabaseLesson.tags || [],
-        topic_id: supabaseLesson.topic_id || undefined,
-        grade: supabaseLesson.grade || undefined,
-        country: supabaseLesson.country || undefined,
-        subject: supabaseLesson.subject || undefined,
-        sourceLessonId: supabaseLesson.id || undefined,
-        validation_status: inferLegacyLessonValidationStatus(supabaseLesson),
-        source_confidence: supabaseLesson.source_confidence ?? inferLegacyLessonSourceConfidence(supabaseLesson) ?? undefined,
-        source_name: supabaseLesson.source_name || inferLegacyLessonSourceName(supabaseLesson) || undefined,
-        source_url: supabaseLesson.source_url || undefined,
-        review_notes: supabaseLesson.review_notes || undefined,
-        reviewed_by: supabaseLesson.reviewed_by || undefined,
-        reviewed_at: supabaseLesson.reviewed_at || undefined,
-        teaching_contract: supabaseLesson.teaching_contract || undefined,
-        is_ai_generated: supabaseLesson.is_ai_generated ?? undefined,
-      } : undefined);
-  const lessonHasStoredContent =
-    Boolean(effectiveLesson?.content?.trim()) ||
-    ((effectiveLesson?.blocks?.length || 0) > 0);
-  const validationStatus = getCurriculumValidationStatus(
-    effectiveLesson?.validation_status,
-    !!effectiveLesson?.is_ai_generated,
-  );
-  const validationLabel = getCurriculumValidationLabel(
-    effectiveLesson?.validation_status,
-    !!effectiveLesson?.is_ai_generated,
-  );
-  const validationBadgeClass = getCurriculumValidationBadgeClass(
-    effectiveLesson?.validation_status,
-    !!effectiveLesson?.is_ai_generated,
-  );
-  const showLessonValidationWarning =
-    !isAdmin &&
-    effectiveLesson !== undefined &&
-    effectiveLesson !== null &&
-    isDraftValidationStatus(effectiveLesson.validation_status, !!effectiveLesson.is_ai_generated);
-  const lessonHasPreferredValidation =
-    isStudentPreferredValidationStatus(effectiveLesson?.validation_status, !!effectiveLesson?.is_ai_generated);
-
-  const contentDir = useMemo(() => {
-    if (forceDir) return forceDir;
-    if (!effectiveLesson) return language === 'ar' ? 'rtl' : 'ltr';
-    
-    // Check title and first block for RTL characters
-    const sampleText = (effectiveLesson.title || '') + (effectiveLesson.blocks?.[0]?.content || '');
-    return isRTL(sampleText) ? 'rtl' : 'ltr';
-  }, [lesson, language, forceDir]);
-
-  const isMismatchedDir = useMemo(() => {
-    const uiDir = language === 'ar' ? 'rtl' : 'ltr';
-    return contentDir !== uiDir;
-  }, [contentDir, language]);
-  const notes = useLiveQuery(() => id ? db.notes.where('lessonId').equals(id).toArray() : [], [id]) || [];
-  const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
-  const settingsMap = useMemo(() => Object.fromEntries(dbSettings.map(s => [s.key, s.value])), [dbSettings]);
-
-  const selectedGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
-  const selectedCountry = settingsMap['selected_country'] || localStorage.getItem('selected_country') || '';
-  const lazyModeEnabled = String(settingsMap['lazy_mode']) === 'true' || localStorage.getItem('lazy_mode') === 'true';
-  const lessonGrade = effectiveLesson?.grade || supabaseLesson?.grade || selectedGrade;
-  const lessonCountry = effectiveLesson?.country || supabaseLesson?.country || selectedCountry;
-  const lessonSubject = effectiveLesson?.subject || supabaseLesson?.subject || module?.name || '';
-  const lessonTopic = module?.name || effectiveLesson?.title || '';
-  const explanationContextLabel = [lessonSubject || 'Lesson', lessonTopic].filter(Boolean).join(' > ');
-  const rawLessonContent = useMemo(() => {
-    if (!effectiveLesson) return '';
-    const blockText = Array.isArray(effectiveLesson.blocks)
-      ? effectiveLesson.blocks
-          .map((block: any) => [
-            block?.title,
-            block?.label,
-            block?.content,
-            block?.question,
-            ...(Array.isArray(block?.rules) ? block.rules : []),
-            ...(Array.isArray(block?.points) ? block.points : []),
-          ].filter(Boolean).join('\n'))
-          .filter(Boolean)
-          .join('\n\n')
-      : '';
-    return (blockText || effectiveLesson.content || '').trim();
-  }, [effectiveLesson]);
-  const lessonMetaTitle = effectiveLesson?.title || supabaseLesson?.lesson_title || 'Lesson';
-  const lessonMetaDescription = buildMetaDescription(
-    effectiveLesson?.subtitle ||
-      effectiveLesson?.content ||
-      effectiveLesson?.blocks?.map((block: any) => block.content || block.title || block.question || '').join(' ') ||
-      '',
-    `${lessonSubject || 'Curriculum'} lesson for ${lessonGrade || 'students'} on LevelSpace.`,
-  );
-  const lessonMetaKeywords = [
-    lessonMetaTitle,
-    lessonSubject,
-    lessonGrade,
-    lessonCountry,
-    'lesson',
-    'curriculum',
-    'LevelSpace',
-  ].filter(Boolean).join(', ');
-
-  // Initialize first block open
-  useEffect(() => {
-    if (effectiveLesson?.blocks && effectiveLesson.blocks.length > 0 && openBlocks.length === 0) {
-      setOpenBlocks(['block-0']);
-    } else if (effectiveLesson && !effectiveLesson.blocks && openBlocks.length === 0) {
-      setOpenBlocks(['content']);
-    }
-
-    if (effectiveLesson?.id) {
-      // Save last viewed lesson
-      db.settings.put({ key: 'last_viewed_lesson_id', value: effectiveLesson.id });
-    }
-  }, [effectiveLesson?.id, effectiveLesson?.blocks, openBlocks.length]);
-
-  useEffect(() => {
+    if (!curriculumContext?.subject_id) return;
     let isCancelled = false;
 
-    const buildLearningBlocks = async () => {
-      if (!effectiveLesson?.id || !rawLessonContent) {
-        setLearningBlocks([]);
-        setIsStructuringLesson(false);
-        return;
-      }
+    const fetchDomainOverview = async () => {
+      const [{ data: domainRows }, { data: topicRows }] = await Promise.all([
+        supabase
+          .from('subject_domains')
+          .select('id, code, name, domain_order')
+          .eq('subject_id', curriculumContext.subject_id)
+          .order('domain_order', { ascending: true }),
+        supabase
+          .from('topic_domain_overview')
+          .select('topic_id, topic_title, grade_id, subject_id, domain_id, domain_code, domain_name, outline_count')
+          .eq('subject_id', curriculumContext.subject_id)
+          .eq('grade_id', curriculumContext.grade_id || '')
+          .order('domain_order', { ascending: true }),
+      ]);
 
-      const structureInput = {
-        rawContent: rawLessonContent,
-        lessonTitle: lessonMetaTitle,
-        subject: lessonSubject,
-        topic: lessonTopic || lessonMetaTitle,
-        gradeLevel: lessonGrade,
-        language,
-        curriculumMetadata: {
-          country: lessonCountry,
-          topic_id: effectiveLesson.topic_id,
-          validation_status: effectiveLesson.validation_status,
-          source_name: effectiveLesson.source_name,
-        },
-      };
-
-      setLearningBlocks(buildFallbackLearningBlocks(structureInput));
-      if (!hasAiAccess || !aiAvailable) {
-        setIsStructuringLesson(false);
-        setLearningBlockError(null);
-        return;
-      }
-
-      setIsStructuringLesson(true);
-      setLearningBlockError(null);
-      try {
-        const structured = await structureLessonIntoLearningBlocks(structureInput);
-        if (!isCancelled) {
-          setLearningBlocks(structured);
-        }
-      } catch (error) {
-        console.error("Failed to structure lesson blocks:", error);
-        if (!isCancelled) {
-          setLearningBlockError("Using quick structured learning blocks while AI structuring is unavailable.");
-        }
-      } finally {
-        if (!isCancelled) {
-          setIsStructuringLesson(false);
-        }
-      }
+      if (isCancelled) return;
+      setDomains((domainRows || []) as SubjectDomain[]);
+      setTopics((topicRows || []) as TopicOverview[]);
     };
 
-    buildLearningBlocks();
+    fetchDomainOverview().catch((error) => console.warn('[LessonView] Failed to load domain overview:', error));
     return () => {
       isCancelled = true;
     };
-  }, [
-    effectiveLesson?.id,
-    effectiveLesson?.topic_id,
-    effectiveLesson?.validation_status,
-    effectiveLesson?.source_name,
-    rawLessonContent,
-    lessonMetaTitle,
-    lessonSubject,
-    lessonTopic,
-    lessonGrade,
-    lessonCountry,
-    language,
-    hasAiAccess,
-    aiAvailable,
-  ]);
+  }, [curriculumContext?.subject_id, curriculumContext?.grade_id]);
+
+  useEffect(() => {
+    if (!curriculumContext?.domain_code) return;
+    setActiveDomain(curriculumContext.domain_code);
+  }, [curriculumContext?.domain_code]);
 
   useEffect(() => {
     const fetchExtraData = async () => {
-      if (!id) return;
+      const lessonId = supabaseLesson?.id || id;
+      if (!lessonId || activeTab === 'content') return;
       setIsLoadingExtra(true);
       try {
-        const lessonQuizzes = await getQuizzesByLesson(id);
-        const lessonExercises = await getExercisesByLesson(id);
+        const [lessonQuizzes, lessonExercises] = await Promise.all([
+          getQuizzesByLesson(lessonId),
+          getExercisesByLesson(lessonId),
+        ]);
         setQuizzes(lessonQuizzes || []);
         setExercises(lessonExercises || []);
       } catch (error) {
-        console.error("Failed to fetch extra data:", error);
+        console.warn('[LessonView] Failed to fetch lesson extras:', error);
       } finally {
         setIsLoadingExtra(false);
       }
     };
-    
-    if (activeTab !== 'content') {
-      fetchExtraData();
+
+    fetchExtraData();
+  }, [activeTab, id, supabaseLesson?.id]);
+
+  const effectiveLesson = useMemo(() => {
+    if (supabaseLesson) {
+      return {
+        id: supabaseLesson.id,
+        title: supabaseLesson.lesson_title,
+        content: supabaseLesson.content || '',
+        blocks: Array.isArray(supabaseLesson.blocks) ? supabaseLesson.blocks : [],
+        subtitle: supabaseLesson.subtitle || '',
+        tags: supabaseLesson.tags || [],
+        status: supabaseLesson.status || 'published',
+        grade: curriculumContext?.grade_name || supabaseLesson.grade || '',
+        country: supabaseLesson.country || '',
+        subject: curriculumContext?.subject_name || supabaseLesson.subject || '',
+        topic_id: supabaseLesson.topic_id || undefined,
+        validation_status: supabaseLesson.validation_status || inferLegacyLessonValidationStatus(supabaseLesson),
+        source_confidence: supabaseLesson.source_confidence ?? inferLegacyLessonSourceConfidence(supabaseLesson) ?? undefined,
+        source_name: supabaseLesson.source_name || inferLegacyLessonSourceName(supabaseLesson),
+        is_ai_generated: supabaseLesson.is_ai_generated ?? undefined,
+      };
     }
-  }, [activeTab, id]);
+
+    if (lesson) {
+      return {
+        ...lesson,
+        title: lesson.title,
+        content: lesson.content || '',
+        blocks: Array.isArray(lesson.blocks) ? lesson.blocks : [],
+        subtitle: lesson.subtitle || '',
+        grade: lesson.grade || '',
+        subject: lesson.subject || '',
+      } as any;
+    }
+
+    return undefined;
+  }, [lesson, supabaseLesson, curriculumContext]);
+
+  const blocks = Array.isArray(effectiveLesson?.blocks) ? effectiveLesson.blocks : [];
+  const hasStoredContent = Boolean(effectiveLesson?.content?.trim()) || blocks.length > 0;
+  const lessonDomainCode = curriculumContext?.domain_code || '';
+  const lessonDomainName = curriculumContext?.domain_name || '';
+  const domainTopics = topics.filter((topic) => activeDomain === 'all' || topic.domain_code === activeDomain);
+  const showDomainOverview = activeDomain !== 'all' && activeDomain !== lessonDomainCode;
+  const contentDir = isRTL(`${effectiveLesson?.title || ''} ${blocks[0]?.content || effectiveLesson?.content || ''}`)
+    ? 'rtl'
+    : language === 'ar'
+      ? 'rtl'
+      : 'ltr';
+  const validationLabel = getCurriculumValidationLabel(effectiveLesson?.validation_status, !!effectiveLesson?.is_ai_generated);
+  const validationBadgeClass = getCurriculumValidationBadgeClass(effectiveLesson?.validation_status, !!effectiveLesson?.is_ai_generated);
+  const lessonHasPreferredValidation = isStudentPreferredValidationStatus(effectiveLesson?.validation_status, !!effectiveLesson?.is_ai_generated);
+  const showValidationWarning =
+    !isAdmin &&
+    effectiveLesson &&
+    isDraftValidationStatus(effectiveLesson.validation_status, !!effectiveLesson.is_ai_generated);
+  const metaDescription = buildLessonDescription(
+    effectiveLesson,
+    `${effectiveLesson?.subject || 'Curriculum'} lesson for ${effectiveLesson?.grade || 'students'} on LevelSpace.`,
+  );
 
   const toggleBlock = (blockId: string) => {
-    setOpenBlocks(prev => 
-      prev.includes(blockId) 
-        ? prev.filter(b => b !== blockId) 
-        : [...prev, blockId]
-    );
+    setOpenBlocks((current) => current.includes(blockId) ? current.filter((item) => item !== blockId) : [...current, blockId]);
   };
 
   const focusBlock = (blockId: string) => {
-    setOpenBlocks(prev => (prev.includes(blockId) ? prev : [...prev, blockId]));
-    window.setTimeout(() => {
-      blockRefs.current[blockId]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 80);
-  };
-
-  const expandAllBlocks = () => {
-    if (!effectiveLesson?.blocks?.length) return;
-    setOpenBlocks(effectiveLesson.blocks.map((_, index) => `block-${index}`));
-  };
-
-  const collapseAllBlocks = () => {
-    setOpenBlocks([]);
-  };
-
-  const openOutlineSection = (blockIndex: number) => {
-    setShowOutlineModal(false);
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      setReadingBlockIndex(null);
-    }
-    focusBlock(`block-${blockIndex}`);
-  };
-
-  const markLessonComplete = async () => {
-    if (lesson) {
-      await db.lessons.update(effectiveLesson.id, { status: 'done' });
-      
-      navigate('/dashboard');
-    }
+    setOpenBlocks((current) => current.includes(blockId) ? current : [...current, blockId]);
+    setTimeout(() => {
+      document.getElementById(blockId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 60);
   };
 
   const handleQuizAnswer = (blockIndex: number, option: string, correctAnswer: string) => {
     if (quizAnswered[blockIndex]) return;
-    
-    const isCorrect = option === correctAnswer;
-    setQuizSelectedOption(prev => ({ ...prev, [blockIndex]: option }));
-    setQuizAnswered(prev => ({ ...prev, [blockIndex]: true }));
-    setQuizCorrect(prev => ({ ...prev, [blockIndex]: isCorrect }));
-    
-    if (isCorrect) {
-      setXp(prev => Math.min(100, prev + 15));
+    setQuizSelectedOption((current) => ({ ...current, [blockIndex]: option }));
+    setQuizAnswered((current) => ({ ...current, [blockIndex]: true }));
+    setQuizCorrect((current) => ({ ...current, [blockIndex]: option === correctAnswer }));
+  };
+
+  const continueToNext = () => {
+    const nextIndex = blocks.findIndex((_, index) => !openBlocks.includes(`block-${index}`));
+    focusBlock(`block-${nextIndex >= 0 ? nextIndex : 0}`);
+  };
+
+  const markLessonComplete = async () => {
+    if (lesson?.id) {
+      await db.lessons.update(lesson.id, { status: 'done' });
     }
+    navigate('/dashboard');
   };
 
-  const handleExamSubmit = (blockIndex: number, solution: string) => {
-    // For paper-based exercises, we just show the solution
-    setExamResult(prev => ({ ...prev, [blockIndex]: 'shown' }));
-  };
-
-  const handleExerciseSubmit = (blockIndex: number, solution: string) => {
-    setExerciseResult(prev => ({ ...prev, [blockIndex]: 'shown' }));
-  };
-
-  const handleAudit = async () => {
-    if (!effectiveLesson || !module || !hasAiAccess || !aiAvailable) return;
-    setIsAuditing(true);
-    setAuditResult(null);
-    try {
-      const result = await auditLessonLanguage(
-        effectiveLesson.title,
-        effectiveLesson.blocks || [{ content: effectiveLesson.content }],
-        module.name,
-        lessonGrade,
-        lessonCountry
-      );
-      setAuditResult(result);
-    } catch (error) {
-      console.error("Audit failed", error);
-    } finally {
-      setIsAuditing(false);
-    }
-  };
-
-  const handleAddReminder = async () => {
-    if (!reminderText) return;
-    await db.tasks.add({
-      id: crypto.randomUUID(),
-      title: reminderText,
-      completed: false,
-      createdAt: Date.now(),
-      dueDate: new Date(Date.now() + 86400000).toISOString(), // Tomorrow
-      type: 'general'
-    });
-    setReminderText('');
-    setShowReminderModal(false);
-  };
-
-  const handleAddNote = async () => {
-    if (!noteContent || !lesson) return;
-    await db.notes.add({
-      id: crypto.randomUUID(),
-      lessonId: effectiveLesson.id,
-      content: noteContent,
-      createdAt: Date.now()
-    });
-    setNoteContent('');
-    setShowNoteModal(false);
-  };
-
-  const handleDeleteNote = async (noteId: string) => {
-    await db.notes.delete(noteId);
-  };
-
-  const startEditing = (index: number, block: any) => {
-    setEditingBlockIndex(index);
-    setEditTitle(block.title);
-    setEditContent(block.content || '');
-  };
-
-  const saveEdit = async () => {
-    if (!effectiveLesson || editingBlockIndex === null) return;
-    const newBlocks = [...(effectiveLesson.blocks || [])];
-    newBlocks[editingBlockIndex] = {
-      ...newBlocks[editingBlockIndex],
-      title: editTitle,
-      content: editContent
-    };
-    await db.lessons.update(effectiveLesson.id, { blocks: newBlocks });
-    setEditingBlockIndex(null);
-  };
-
-  const handleBackgroundClick = (e: React.MouseEvent) => {
-    // Only trigger if clicking directly on the container or white space
-    if (e.target !== e.currentTarget) return;
-
-    const now = Date.now();
-    if (now - lastClickTime > 500) {
-      setClickCount(1);
-    } else {
-      const newCount = clickCount + 1;
-      setClickCount(newCount);
-      if (newCount === 3) {
-        setShowInteractiveModal(true);
-        setClickCount(0);
-      }
-    }
-    setLastClickTime(now);
-  };
-
-  const handleGenerateInteractive = async (type: 'hard_questions' | 'more_examples' | 'exam_questions') => {
-    if (!effectiveLesson || !hasAiAccess || !aiAvailable) return;
-    setIsGeneratingInteractive(true);
-    setActiveInteractiveType(type);
-    setInteractiveContent(null);
-    try {
-      const content = effectiveLesson.blocks?.map((b: any) => b.content || '').join('\n') || effectiveLesson.content || '';
-      const result = await generateInteractiveContent(type, content, lessonGrade, lessonCountry, module?.strictRAG);
-      setInteractiveContent(result);
-    } catch (error) {
-      console.error("Failed to generate interactive content:", error);
-      setInteractiveContent("Failed to generate content. Please try again.");
-    } finally {
-      setIsGeneratingInteractive(false);
-    }
-  };
-
-  const [isGeneratingExample, setIsGeneratingExample] = useState<number | null>(null);
-
-  const handleGenerateAnotherExample = async (blockIndex: number) => {
-    if (!effectiveLesson || !effectiveLesson.blocks) return;
-    const block = effectiveLesson.blocks[blockIndex];
-    if (!block || block.type !== 'examples' || !block.examples) return;
-
-    setIsGeneratingExample(blockIndex);
-    try {
-      const newExample = await generateAnotherExample(
-        effectiveLesson.title,
-        block.title || 'Examples',
-        block.examples,
-        lessonGrade,
-        lessonCountry,
-        module?.strictRAG
-      );
-
-      if (newExample) {
-        const newBlocks = [...effectiveLesson.blocks];
-        newBlocks[blockIndex] = {
-          ...block,
-          examples: [...block.examples, newExample]
-        };
-        await db.lessons.update(effectiveLesson.id, { blocks: newBlocks });
-        toast.success("New example generated!");
-      } else {
-        toast.error("Failed to generate a new example.");
-      }
-    } catch (error) {
-      console.error("Error generating example:", error);
-      toast.error("An error occurred while generating the example.");
-    } finally {
-      setIsGeneratingExample(null);
-    }
-  };
-
-  if (effectiveLesson === undefined) {
+  if (isLoading && !effectiveLesson) {
     return (
-      <Layout fullWidth topbarGradeOverride={lessonGrade}>
-        <div className="flex items-center justify-center min-h-[50vh]">
-          <Loader2 className="w-8 h-8 text-accent animate-spin" />
+      <Layout fullWidth>
+        <div className="flex min-h-[50vh] items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-accent" />
         </div>
       </Layout>
     );
   }
 
-  if (effectiveLesson === null) {
+  if (!effectiveLesson) {
     return (
-      <Layout fullWidth topbarGradeOverride={lessonGrade}>
-        <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
-          <AlertCircle className="w-12 h-12 text-error" />
-          <p className="text-ink font-medium">{t('lesson_not_found')}</p>
+      <Layout fullWidth>
+        <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 px-6 text-center">
+          <AlertCircle className="h-12 w-12 text-error" />
+          <p className="font-medium text-ink">{t('lesson_not_found')}</p>
           <button onClick={() => navigate('/dashboard')} className="text-accent hover:underline">{t('return_to_dashboard')}</button>
         </div>
       </Layout>
@@ -1215,10 +607,10 @@ export const LessonView: React.FC = () => {
 
   if (!isAdmin && !isStudentVisibleLesson(effectiveLesson)) {
     return (
-      <Layout fullWidth topbarGradeOverride={lessonGrade}>
-        <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4 px-6 text-center">
-          <ShieldAlert className="w-12 h-12 text-error" />
-          <p className="text-ink font-medium">{t('lesson_unavailable')}</p>
+      <Layout fullWidth>
+        <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 px-6 text-center">
+          <AlertCircle className="h-12 w-12 text-error" />
+          <p className="font-medium text-ink">{t('lesson_unavailable')}</p>
           <p className="max-w-lg text-sm text-muted">{t('lesson_unavailable_desc')}</p>
           <button onClick={() => navigate('/dashboard')} className="text-accent hover:underline">{t('return_to_dashboard')}</button>
         </div>
@@ -1226,1789 +618,252 @@ export const LessonView: React.FC = () => {
     );
   }
 
-  // AI Crew is generating this lesson on-demand (Pro planned, Gemma 4 is executing)
-  if (effectiveLesson.status === 'pending' && !lessonHasStoredContent) {
-    return (
-      <PendingLessonView
-        title={effectiveLesson.title}
-        lessonId={id!}
-        onReady={() => window.location.reload()}
-      />
-    );
+  if (effectiveLesson.status === 'pending' && !hasStoredContent) {
+    return <PendingLessonView title={effectiveLesson.title} lessonId={id!} onReady={() => window.location.reload()} />;
   }
 
-  const blocks = effectiveLesson.blocks || [];
-  const isFrenchLesson = (() => {
-    const candidates = [lessonSubject, module?.name, effectiveLesson.subject, effectiveLesson.title];
-    return candidates.some((candidate) => {
-      const normalized = normalizeCurriculumValue(String(candidate || ''));
-      return normalized === 'francais' || normalized === 'langue francaise' || normalized.includes('francais');
-    });
-  })();
-  const indexedBlocks = blocks.map((block: any, index: number) => ({
-    block,
-    index,
-    domain: getBlockDomain(block, isFrenchLesson),
-  }));
-  const lessonDomainStats = (() => {
-    if (isFrenchLesson) {
-      return FRENCH_SUBJECT_DOMAINS.map((domain) => ({
-        ...domain,
-        count: indexedBlocks.filter((item) => item.domain?.code === domain.code).length,
-      }));
-    }
-
-    const domains = new Map<string, LessonDomain & { count: number }>();
-    for (const item of indexedBlocks) {
-      if (!item.domain) continue;
-      const existing = domains.get(item.domain.code);
-      domains.set(item.domain.code, {
-        ...item.domain,
-        count: (existing?.count || 0) + 1,
-      });
-    }
-    return Array.from(domains.values()).sort((left, right) => left.name.localeCompare(right.name));
-  })();
-  const showLessonDomainTabs = lessonDomainStats.length > 0;
-  const visibleIndexedBlocks =
-    showLessonDomainTabs && activeFrenchDomain !== 'all'
-      ? indexedBlocks.filter((item) => item.domain?.code === activeFrenchDomain)
-      : indexedBlocks;
-  const selectedLessonDomain = lessonDomainStats.find((domain) => domain.code === activeFrenchDomain);
-  const totalBlocks = blocks.length > 0 ? blocks.length : 1;
-  const openCount = openBlocks.length;
-  const progressPct = Math.round((openCount / totalBlocks) * 100);
-  const interactiveBlockCount = blocks.filter((block: any) => ['quiz', 'exercise', 'exam'].includes(block?.type || '')).length;
-  const conceptBlockCount = blocks.filter((block: any) => ['intro', 'theory', 'formula', 'definition', 'content', 'summary'].includes(block?.type || '')).length;
-  const estimatedMinutes = Math.max(8, totalBlocks * 3);
-  const blockCards = blocks.map((block: any, index: number) => {
-    const blockId = `block-${index}`;
-    const isOpen = openBlocks.includes(blockId);
-    const { label } = getBlockTypeConfig(block?.type || '');
-    let status: 'pending' | 'active' | 'done' | 'error' = 'pending';
-    if (isOpen) status = 'active';
-    if (block?.type === 'quiz' && quizAnswered[index]) {
-      status = quizCorrect[index] ? 'done' : 'error';
-    }
-    if (block?.type === 'exam' && examResult[index]) {
-      status = examResult[index] === 'correct' ? 'done' : 'error';
-    }
-
-    return {
-      id: blockId,
-      index,
-      title: getBlockTitle(block, index),
-      preview: getBlockPreview(block),
-      typeLabel: label,
-      status,
-      isOpen,
-    };
-  });
-  const visibleBlockCards = !showLessonDomainTabs || activeFrenchDomain === 'all'
-    ? blockCards
-    : blockCards.filter((card) => indexedBlocks[card.index]?.domain?.code === activeFrenchDomain);
-  const nextBlockCard = blockCards.find((card) => !card.isOpen) || blockCards[0];
-  const outlinePreviewCards = nextBlockCard
-    ? [nextBlockCard, ...blockCards.filter((card) => card.id !== nextBlockCard.id).slice(0, 2)]
-    : blockCards.slice(0, 3);
-
   return (
-    <Layout fullWidth topbarGradeOverride={lessonGrade}>
+    <Layout fullWidth topbarGradeOverride={effectiveLesson.grade}>
       <SEO
-        title={lessonMetaTitle}
-        description={lessonMetaDescription}
-        keywords={lessonMetaKeywords}
+        title={effectiveLesson.title}
+        description={metaDescription}
+        keywords={[effectiveLesson.title, effectiveLesson.subject, effectiveLesson.grade, lessonDomainName, 'LevelSpace'].filter(Boolean).join(', ')}
         type="article"
-        image={`https://picsum.photos/seed/${encodeURIComponent(lessonMetaTitle.toLowerCase().replace(/\s+/g, '-'))}/1200/630`}
       />
-      {/* Fixed Progress Bar */}
-      <div className="fixed top-0 left-0 right-0 h-1.5 z-40 bg-ink/5 pointer-events-none">
-        <motion.div 
-          className="h-full bg-accent shadow-[0_0_12px_rgba(18,70,255,0.4)]"
-          initial={{ width: 0 }}
-          animate={{ width: `${scrollProgress}%` }}
-          transition={{ type: 'spring', damping: 25, stiffness: 120 }}
-        />
-      </div>
 
-      <div 
-        className="max-w-7xl mx-auto py-6 px-4 pb-24 min-h-screen relative" 
-        dir={contentDir}
-        onMouseUp={handleMouseUp}
-        onClick={handleBackgroundClick}
-      >
-        {isMismatchedDir && (
-          <motion.div 
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="absolute top-6 right-4 z-30"
-          >
-            <button
-              onClick={() => setForceDir(contentDir === 'rtl' ? 'ltr' : 'rtl')}
-              className="flex items-center gap-2 px-3 py-1.5 bg-accent/10 text-accent rounded-full text-[10px] font-bold uppercase tracking-wider hover:bg-accent hover:text-white transition-all shadow-sm backdrop-blur-sm"
-              title="Switch Content Direction"
-            >
-              <Globe size={12} />
-              {contentDir === 'rtl' ? 'RTL View' : 'LTR View'}
-            </button>
-          </motion.div>
-        )}
-        <AnimatePresence>
-          {clickCount > 0 && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.5 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed top-20 right-8 z-50 bg-accent text-white w-8 h-8 rounded-full flex items-center justify-center font-bold shadow-lg pointer-events-none"
-            >
-              {clickCount}
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <AnimatePresence>
-          {selectedText && !explanation && !isExplaining && hasAiAccess && (
-            <motion.div
-              initial={{ opacity: 0, y: 50 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 50 }}
-              className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] px-4 w-full max-w-md"
-            >
-              <div className="bg-ink text-paper p-3 rounded-2xl shadow-2xl flex items-center justify-between gap-4 border border-white/10">
-                <div className="flex-1 truncate text-xs text-paper/70 italic">
-                  "{selectedText.length > 40 ? selectedText.substring(0, 40) + '...' : selectedText}"
-                </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (aiAvailable) handleExplain();
-                  }}
-                  disabled={!aiAvailable}
-                  title={!aiAvailable ? "AI help requires API key" : undefined}
-                  className="explain-btn shrink-0 bg-accent text-paper px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-accent"
-                >
-                  {explanationMode === 'word_definition' ? <Languages size={14} /> : <Brain size={14} />}
-                  {getExplanationTitle(explanationMode)}
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <Modal
-          isOpen={isExplaining || !!explanation}
-          onClose={() => {
-            if (!isExplaining) {
-              setExplanation(null);
-              setSelectedText(null);
-            }
-          }}
-          maxWidth="4xl"
-          title={
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center text-accent shadow-sm">
-                {explanationMode === 'word_definition' ? <Languages size={22} /> : <Brain size={22} />}
-              </div>
-              <div>
-                <h3 className="text-sm font-bold uppercase tracking-widest text-ink">{getExplanationTitle(explanationMode)}</h3>
-                <p className="text-[10px] text-muted font-medium">
-                  {explanationMode === 'word_definition'
-                    ? 'Compact vocabulary help grounded in this lesson'
-                    : 'Grounded in this lesson\'s content'}
-                </p>
-              </div>
-            </div>
-          }
-        >
-          {explanationMode === 'word_definition' ? (
-            <div className="space-y-5">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="p-4 bg-surface-low rounded-2xl border border-ink/5">
-                  <div className="flex items-center gap-2 text-accent mb-2">
-                    <Languages size={14} />
-                    <span className="text-[10px] font-bold uppercase tracking-widest">Selected Word</span>
-                  </div>
-                  <p className="text-xl font-bold text-ink break-words">{selectedText}</p>
-                </div>
-                <div className="p-4 bg-surface-low rounded-2xl border border-ink/5">
-                  <div className="flex items-center gap-2 text-accent mb-2">
-                    <BookOpen size={14} />
-                    <span className="text-[10px] font-bold uppercase tracking-widest">Context</span>
-                  </div>
-                  <p className="text-sm font-medium text-ink leading-relaxed">{explanationContextLabel}</p>
-                </div>
-              </div>
-
-              {!isExplaining && (
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => handleExplain({ userRequest: 'Explain this word in Arabic only, using the same lesson context. Keep it compact.' })}
-                    className="explain-btn px-3 py-2 bg-surface-low border border-ink/10 rounded-xl text-[10px] font-bold uppercase tracking-widest text-ink hover:border-accent/40 hover:text-accent transition-colors"
-                  >
-                    Explain in Arabic
-                  </button>
-                  <button
-                    onClick={() => handleExplain({ userRequest: 'Give one different short example sentence for this word in the lesson context.' })}
-                    className="explain-btn px-3 py-2 bg-surface-low border border-ink/10 rounded-xl text-[10px] font-bold uppercase tracking-widest text-ink hover:border-accent/40 hover:text-accent transition-colors"
-                  >
-                    Give another example
-                  </button>
-                  <button
-                    onClick={() => handleExplain({ userRequest: 'Show useful synonyms for this word and note which ones fit this lesson context.' })}
-                    className="explain-btn px-3 py-2 bg-surface-low border border-ink/10 rounded-xl text-[10px] font-bold uppercase tracking-widest text-ink hover:border-accent/40 hover:text-accent transition-colors"
-                  >
-                    Show synonyms
-                  </button>
-                  <button
-                    onClick={() => handleExplain({ mode: 'paragraph_explanation', userRequest: 'Explain this selected word in the broader lesson context with a little more detail.' })}
-                    className="explain-btn px-3 py-2 bg-accent text-paper rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-accent-hover transition-colors"
-                  >
-                    Explain in lesson context
-                  </button>
-                </div>
-              )}
-
-              <div className="bg-paper p-5 rounded-2xl border border-ink/5 shadow-sm min-h-[180px]">
-                <div className="text-sm text-ink leading-relaxed prose prose-sm max-w-none">
-                  {isExplaining ? (
-                    <div className="flex flex-col items-center justify-center py-10 space-y-4">
-                      <Loader2 size={30} className="animate-spin text-accent" />
-                      <div className="space-y-1 text-center">
-                        <p className="text-xs font-bold text-ink">Building word help...</p>
-                        <p className="text-[10px] text-muted italic">Checking subject meaning and examples</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="markdown-body">
-                      <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{explanation || ''}</Markdown>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-              <div className="lg:col-span-4 space-y-4">
-                <div className="p-4 bg-surface-low rounded-2xl border border-ink/5 space-y-3">
-                  <div className="flex items-center gap-2 text-accent">
-                    <Sparkles size={14} />
-                    <span className="text-[10px] font-bold uppercase tracking-widest">Source Context</span>
-                  </div>
-                  <p className="text-sm font-medium text-ink italic leading-relaxed border-l-2 border-accent/30 pl-4 py-1">
-                    "{selectedText}"
-                  </p>
-                </div>
-                <div className="p-4 bg-accent/5 rounded-2xl border border-accent/10">
-                  <p className="text-[10px] text-accent font-medium leading-relaxed">
-                    This answer is scoped to the selected text and the lesson context, not a full-lesson rewrite.
-                  </p>
-                </div>
-              </div>
-
-              <div className="lg:col-span-8 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-muted">
-                    <BookOpen size={14} />
-                    <span className="text-[10px] font-bold uppercase tracking-widest">{getExplanationTitle(explanationMode)}</span>
-                  </div>
-                  {!isExplaining && (
-                    <span className="text-[9px] font-mono text-muted/40 uppercase">v3.1-FLASH-LITE</span>
-                  )}
-                </div>
-                <div className="bg-paper p-6 rounded-2xl border border-ink/5 shadow-sm min-h-[200px]">
-                  <div className="text-sm text-ink leading-relaxed prose prose-sm max-w-none">
-                    {isExplaining ? (
-                      <div className="flex flex-col items-center justify-center py-12 space-y-4">
-                        <Loader2 size={32} className="animate-spin text-accent" />
-                        <div className="space-y-1 text-center">
-                          <p className="text-xs font-bold text-ink">Synthesizing Explanation...</p>
-                          <p className="text-[10px] text-muted italic">Grounding the answer in the selected text</p>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="markdown-body">
-                        <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{explanation || ''}</Markdown>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {!isExplaining && (
-            <div className="mt-8 pt-6 border-t border-ink/5 flex justify-end">
-              <button 
-                onClick={() => {
-                  setExplanation(null);
-                  setSelectedText(null);
-                }}
-                className="px-8 py-2.5 bg-ink text-paper rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-accent transition-all shadow-lg shadow-ink/10"
-              >
-                Understood
-              </button>
-            </div>
-          )}
-        </Modal>
-
-        <Modal
-          isOpen={showInteractiveModal}
-          dir={contentDir}
-          onClose={() => {
-            setShowInteractiveModal(false);
-            setInteractiveContent(null);
-            setActiveInteractiveType(null);
-          }}
-          maxWidth="3xl"
-          title={
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center text-accent shadow-sm">
-                <Sparkles size={22} />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold uppercase tracking-widest text-ink">{t('interactive_title')}</h3>
-                <p className="text-[10px] text-muted font-medium">{t('interactive_desc')}</p>
-              </div>
-            </div>
-          }
-        >
-          <div className="space-y-8">
-            {!interactiveContent && !isGeneratingInteractive ? (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {[
-                  { 
-                    id: 'hard_questions', 
-                    title: t('hard_questions'), 
-                    desc: 'Deep dive into complex concepts', 
-                    icon: <Brain className="w-6 h-6 text-purple-500" />,
-                    bg: 'bg-purple-500/5',
-                    border: 'border-purple-500/10'
-                  },
-                  { 
-                    id: 'more_examples', 
-                    title: t('more_examples'), 
-                    desc: 'See more practical applications', 
-                    icon: <Lightbulb className="w-6 h-6 text-amber-500" />,
-                    bg: 'bg-amber-500/5',
-                    border: 'border-amber-500/10'
-                  },
-                  { 
-                    id: 'exam_questions', 
-                    title: t('exam_questions'), 
-                    desc: 'Prepare for national standards', 
-                    icon: <PenTool className="w-6 h-6 text-emerald-500" />,
-                    bg: 'bg-emerald-500/5',
-                    border: 'border-emerald-500/10'
-                  }
-                ].map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => handleGenerateInteractive(item.id as any)}
-                    className={`group flex flex-col items-start gap-4 p-6 ${item.bg} border ${item.border} rounded-2xl hover:border-accent/40 hover:shadow-lg transition-all text-left relative overflow-hidden`}
-                  >
-                    <div className="p-3 bg-paper rounded-xl shadow-sm group-hover:scale-110 transition-transform">
-                      {item.icon}
-                    </div>
-                    <div className="space-y-1">
-                      <h4 className="text-sm font-bold text-ink group-hover:text-accent transition-colors">{item.title}</h4>
-                      <p className="text-[10px] text-muted leading-relaxed">{item.desc}</p>
-                    </div>
-                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-                    </div>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${
-                      activeInteractiveType === 'hard_questions' ? 'bg-purple-500' : 
-                      activeInteractiveType === 'more_examples' ? 'bg-amber-500' : 'bg-emerald-500'
-                    }`} />
-                    <span className="text-[10px] font-bold text-ink uppercase tracking-widest">
-                      {activeInteractiveType === 'hard_questions' ? t('hard_questions') : 
-                       activeInteractiveType === 'more_examples' ? t('more_examples') : t('exam_questions')}
-                    </span>
-                  </div>
-                  {interactiveContent && (
-                    <button 
-                      onClick={() => {
-                        setInteractiveContent(null);
-                        setActiveInteractiveType(null);
-                      }}
-                      className="flex items-center gap-1 text-[10px] font-bold text-accent uppercase tracking-widest hover:underline"
-                    >
-                      <X size={12} />
-                      {t('back')}
-                    </button>
-                  )}
-                </div>
-                
-                <div className="bg-surface-low p-8 rounded-3xl border border-ink/5 min-h-[300px] relative">
-                  {isGeneratingInteractive ? (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center space-y-4">
-                      <Loader2 size={32} className="animate-spin text-accent" />
-                      <div className="text-center space-y-1">
-                        <p className="text-xs font-bold text-ink">Generating Insights...</p>
-                        <p className="text-[10px] text-muted italic">Gemini is crafting custom materials for you</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="markdown-body prose prose-sm max-w-none">
-                      <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>
-                        {interactiveContent || ''}
-                      </Markdown>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        </Modal>
-
-        <div className="max-w-4xl mx-auto">
-          <button 
-            onClick={() => navigate('/dashboard')}
-            className="flex items-center gap-2 text-sm font-medium text-ink-muted hover:text-ink transition-colors mb-6"
-          >
-            <ArrowLeft className="w-4 h-4" />
+      <main className="mx-auto grid max-w-7xl gap-6 px-4 py-6 pb-24 lg:grid-cols-[minmax(0,1fr)_280px]" dir={contentDir}>
+        <section className="min-w-0 space-y-6">
+          <button onClick={() => navigate('/dashboard')} className="flex items-center gap-2 text-sm font-medium text-muted transition-colors hover:text-ink">
+            <ArrowLeft className="h-4 w-4" />
             {t('back_to_dashboard')}
           </button>
 
-          {/* Lesson Header */}
-          <header className="lesson-header">
-          <div className="lesson-header__meta">
-            <span className="pill pill--info">{lessonGrade}</span>
-            {module && <span className="pill pill--neutral">{module.name}</span>}
-            <span className={validationBadgeClass}>{validationLabel}</span>
-            {effectiveLesson.source_confidence ? (
-              <span className="pill pill--neutral">
-                {Math.round(Number(effectiveLesson.source_confidence) * 100)}% source confidence
-              </span>
-            ) : null}
-          </div>
-
-          <h1 className="lesson-header__title">
-            {effectiveLesson.title}
-          </h1>
-
-          <p className="lesson-header__sub">
-            {effectiveLesson.subtitle || `${totalBlocks} blocks · ~15 min · AI Generated`}
-          </p>
-
-          <p className={`text-[11px] font-medium mt-2 ${lessonHasPreferredValidation ? 'text-success' : 'text-warning'}`}>
-            {lessonHasPreferredValidation
-              ? 'Validated for student-facing use.'
-              : 'Draft AI-assisted content pending curriculum validation.'}
-          </p>
-
-          {showLessonValidationWarning ? (
-            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              <div className="flex items-start gap-3">
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                <div>
-                  <p className="font-semibold">This lesson should not be treated as final curriculum truth yet.</p>
-                  <p className="mt-1 text-amber-800">Use it as draft guidance until a teacher review or official validation is attached.</p>
-                </div>
-              </div>
+          <header className="rounded-3xl border border-surface-mid bg-paper p-6 shadow-sm md:p-8">
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              {effectiveLesson.grade && <span className="pill pill--info">{effectiveLesson.grade}</span>}
+              {effectiveLesson.subject && <span className="pill pill--neutral">{effectiveLesson.subject}</span>}
+              {lessonDomainName && <span className="pill pill--success">{lessonDomainName}</span>}
+              <span className={validationBadgeClass}>{validationLabel}</span>
             </div>
+
+            <h1 className="max-w-4xl text-3xl font-bold leading-tight text-ink md:text-5xl">{effectiveLesson.title}</h1>
+            <p className="mt-4 max-w-3xl text-sm leading-relaxed text-muted md:text-base">
+              {effectiveLesson.subtitle || `${blocks.length || 1} learning section${blocks.length === 1 ? '' : 's'} · guided practice`}
+            </p>
+
+            <div className={`mt-4 text-xs font-medium ${lessonHasPreferredValidation ? 'text-success' : 'text-warning'}`}>
+              {lessonHasPreferredValidation ? 'Validated for student use.' : 'Draft lesson awaiting curriculum validation.'}
+            </div>
+
+            {showValidationWarning && (
+              <div className="mt-5 rounded-2xl border border-warning/30 bg-warning-soft px-4 py-3 text-sm text-warning">
+                This lesson is visible as draft guidance. Treat it as a learning aid until teacher validation is attached.
+              </div>
+            )}
+          </header>
+
+          {domains.length > 0 && (
+            <section className="rounded-3xl border border-surface-mid bg-paper p-4 shadow-sm">
+              <div className="mb-3 flex items-end justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted">Subject outline</p>
+                  <h2 className="text-lg font-bold text-ink">Curriculum domains</h2>
+                </div>
+                <p className="hidden max-w-md text-xs leading-relaxed text-muted md:block">
+                  Domains come from Supabase topic metadata. Lesson sections inherit the topic domain; they are not guessed from text.
+                </p>
+              </div>
+
+              <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                <button
+                  onClick={() => setActiveDomain('all')}
+                  className={`shrink-0 rounded-full px-4 py-2 text-xs font-bold transition-all ${activeDomain === 'all' ? 'bg-ink text-paper' : 'bg-surface-low text-muted hover:text-ink'}`}
+                >
+                  All {topics.length || ''}
+                </button>
+                {domains.map((domain) => {
+                  const topicCount = topics.filter((topic) => topic.domain_code === domain.code).length;
+                  const isCurrentLessonDomain = domain.code === lessonDomainCode;
+                  return (
+                    <button
+                      key={domain.id}
+                      onClick={() => setActiveDomain(domain.code)}
+                      className={`shrink-0 rounded-full px-4 py-2 text-xs font-bold transition-all ${
+                        activeDomain === domain.code
+                          ? 'bg-ink text-paper'
+                          : isCurrentLessonDomain
+                            ? 'bg-accent-soft text-accent hover:bg-accent hover:text-paper'
+                            : 'bg-surface-low text-muted hover:text-ink'
+                      }`}
+                    >
+                      {domain.name} {topicCount > 0 ? topicCount : 0}
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          {activeTab === 'content' && showDomainOverview ? (
+            <section className="rounded-3xl border border-surface-mid bg-paper p-6 shadow-sm">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted">Domain overview</p>
+              <h2 className="mt-1 text-2xl font-bold text-ink">
+                {domains.find((domain) => domain.code === activeDomain)?.name || 'Domain'} topics
+              </h2>
+              <p className="mt-2 text-sm leading-relaxed text-muted">
+                This lesson belongs to <strong className="text-ink">{lessonDomainName || 'its assigned domain'}</strong>. The list below shows the selected domain from the curriculum outline.
+              </p>
+              <div className="mt-5 grid gap-3 md:grid-cols-2">
+                {domainTopics.length > 0 ? domainTopics.map((topic) => (
+                  <button
+                    key={topic.topic_id}
+                    onClick={() => navigate(`/lesson/${topic.topic_id}`)}
+                    className="rounded-2xl border border-surface-mid bg-surface-low p-4 text-left transition-all hover:border-accent/30 hover:bg-accent/5"
+                  >
+                    <p className="text-sm font-semibold text-ink">{topic.topic_title}</p>
+                    <p className="mt-1 text-xs text-muted">{topic.outline_count || 0} outline item{topic.outline_count === 1 ? '' : 's'}</p>
+                  </button>
+                )) : (
+                  <p className="text-sm text-muted">No topics are attached to this domain yet.</p>
+                )}
+              </div>
+            </section>
+          ) : activeTab === 'content' ? (
+            <section className="space-y-4">
+              {blocks.length > 0 ? blocks.map((block: any, index: number) => {
+                const blockId = `block-${index}`;
+                return (
+                  <div key={blockId} ref={(node) => { blockRefs.current[blockId] = node; }}>
+                    <LessonBlock
+                      block={block}
+                      index={index}
+                      expanded={openBlocks.includes(blockId)}
+                      onToggle={() => toggleBlock(blockId)}
+                      onQuizAnswer={handleQuizAnswer}
+                      quizAnswered={quizAnswered}
+                      quizCorrect={quizCorrect}
+                      quizSelectedOption={quizSelectedOption}
+                    />
+                  </div>
+                );
+              }) : (
+                <article className="rounded-3xl border border-surface-mid bg-paper p-6 shadow-sm">
+                  <LessonMarkdown>{effectiveLesson.content || 'This lesson does not have structured content yet.'}</LessonMarkdown>
+                </article>
+              )}
+            </section>
           ) : null}
 
-          <div className="lesson-workspace-grid">
-            <section className="lesson-tool-card lesson-tool-card--wide">
-              <div className="lesson-tool-card__header">
-                <div className="lesson-tool-card__icon">
-                  <List className="w-4 h-4" />
+          {activeTab === 'quizzes' && (
+            <section className="rounded-3xl border border-surface-mid bg-paper p-6 shadow-sm">
+              <h2 className="flex items-center gap-2 text-xl font-bold text-ink"><HelpCircle className="h-5 w-5 text-accent" /> {t('lesson_quizzes')}</h2>
+              {isLoadingExtra ? <Loader2 className="mt-6 h-6 w-6 animate-spin text-accent" /> : quizzes.length > 0 ? (
+                <div className="mt-5 grid gap-4 md:grid-cols-2">
+                  {quizzes.map((quiz) => (
+                    <div key={quiz.id} className="rounded-2xl border border-surface-mid bg-surface-low p-4">
+                      <h3 className="font-bold text-ink">{quiz.title}</h3>
+                      <p className="mt-1 text-sm text-muted">{quiz.description}</p>
+                    </div>
+                  ))}
                 </div>
-                <div>
-                  <p className="lesson-tool-card__eyebrow">Lesson Flow</p>
-                  <h3 className="lesson-tool-card__title">
-                    {nextBlockCard ? `Next: ${nextBlockCard.title}` : 'All sections explored'}
-                  </h3>
-                </div>
-              </div>
+              ) : <p className="mt-5 text-sm text-muted">{t('no_quizzes_for_lesson')}</p>}
+            </section>
+          )}
 
-              <p className="lesson-tool-card__desc">
-                Move through the lesson with less friction. Use the quick outline to jump ahead, keep your place, and open the full navigator only when you need the bigger view.
-              </p>
-
-              <div className="lesson-flow-strip">
-                <div className="lesson-flow-chip">
-                  <span className="lesson-flow-chip__label">Subject</span>
-                  <strong className="lesson-flow-chip__value">{lessonSubject || module?.name || 'Lesson'}</strong>
+          {activeTab === 'exercises' && (
+            <section className="rounded-3xl border border-surface-mid bg-paper p-6 shadow-sm">
+              <h2 className="flex items-center gap-2 text-xl font-bold text-ink"><Dumbbell className="h-5 w-5 text-accent" /> {t('practice_exercises')}</h2>
+              {isLoadingExtra ? <Loader2 className="mt-6 h-6 w-6 animate-spin text-accent" /> : exercises.length > 0 ? (
+                <div className="mt-5 grid gap-4 md:grid-cols-2">
+                  {exercises.map((exercise) => (
+                    <div key={exercise.id} className="rounded-2xl border border-surface-mid bg-surface-low p-4">
+                      <h3 className="font-bold text-ink">{exercise.title}</h3>
+                      <p className="mt-1 line-clamp-2 text-sm text-muted">{exercise.prompt}</p>
+                    </div>
+                  ))}
                 </div>
-                <div className="lesson-flow-chip">
-                  <span className="lesson-flow-chip__label">Sections</span>
-                  <strong className="lesson-flow-chip__value">{totalBlocks}</strong>
-                </div>
-                <div className="lesson-flow-chip">
-                  <span className="lesson-flow-chip__label">Open now</span>
-                  <strong className="lesson-flow-chip__value">{openCount}</strong>
-                </div>
-              </div>
+              ) : <p className="mt-5 text-sm text-muted">{t('no_exercises_for_lesson')}</p>}
+            </section>
+          )}
 
-              <div className="lesson-outline-preview">
-                {outlinePreviewCards.map((card) => (
-                  <button
-                    key={card.id}
-                    onClick={() => focusBlock(card.id)}
-                    className={`lesson-outline-preview__item ${card.id === nextBlockCard?.id ? 'lesson-outline-preview__item--active' : ''}`}
-                  >
-                    <span className="lesson-outline-preview__index">{card.index + 1}</span>
-                    <span className="lesson-outline-preview__copy">
-                      <strong>{card.title}</strong>
-                      <span>{card.preview || card.typeLabel}</span>
-                    </span>
-                  </button>
-                ))}
-              </div>
+          <footer className="flex flex-col gap-3 pt-4 sm:flex-row">
+            <button onClick={() => navigate(-1)} className="h-12 flex-1 rounded-xl border border-surface-mid bg-paper text-xs font-bold uppercase tracking-widest text-ink transition-colors hover:bg-surface-low">
+              {t('back')}
+            </button>
+            <button onClick={continueToNext} className="h-12 flex-1 rounded-xl bg-accent text-xs font-bold uppercase tracking-widest text-paper transition-colors hover:bg-accent-hover">
+              Continue
+            </button>
+            <button onClick={markLessonComplete} className="h-12 flex-1 rounded-xl bg-ink text-xs font-bold uppercase tracking-widest text-paper transition-colors hover:bg-accent">
+              {t('complete_lesson')}
+            </button>
+          </footer>
+        </section>
 
-              <div className="lesson-tool-actions">
-                <button
-                  onClick={() => setShowOutlineModal(true)}
-                  className="lesson-tool-card__button"
-                >
-                  Open outline
-                </button>
-                <button
-                  onClick={() => nextBlockCard && focusBlock(nextBlockCard.id)}
-                  disabled={!nextBlockCard}
-                  className="lesson-tool-card__button"
-                >
-                  Jump to next
-                </button>
+        <aside className="hidden lg:block">
+          <div className="sticky top-20 space-y-4">
+            <section className="rounded-3xl border border-surface-mid bg-paper p-4 shadow-sm">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted">Lesson outline</p>
+              <div className="mt-4 space-y-2">
+                {blocks.map((block: any, index: number) => {
+                  const blockId = `block-${index}`;
+                  return (
+                    <button key={blockId} onClick={() => focusBlock(blockId)} className="flex w-full items-start gap-3 rounded-2xl p-3 text-left transition-colors hover:bg-surface-low">
+                      <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${openBlocks.includes(blockId) ? 'bg-accent text-paper' : 'bg-surface-low text-muted'}`}>
+                        {index + 1}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-[10px] font-bold uppercase tracking-widest text-muted">{getPedagogicalLabel(block)}</span>
+                        <span className="mt-0.5 block text-sm font-semibold text-ink">{getBlockTitle(block, index)}</span>
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </section>
 
-            <div className="lesson-tools">
+            <section className="rounded-3xl border border-surface-mid bg-paper p-4 shadow-sm">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted">Practice</p>
+              <div className="mt-3 flex flex-col gap-2">
+                <button onClick={() => setActiveTab('content')} className={`rounded-xl px-3 py-2 text-left text-xs font-bold uppercase tracking-widest ${activeTab === 'content' ? 'bg-ink text-paper' : 'bg-surface-low text-muted'}`}>Content</button>
+                <button onClick={() => setActiveTab('quizzes')} className={`rounded-xl px-3 py-2 text-left text-xs font-bold uppercase tracking-widest ${activeTab === 'quizzes' ? 'bg-ink text-paper' : 'bg-surface-low text-muted'}`}>Quizzes</button>
+                <button onClick={() => setActiveTab('exercises')} className={`rounded-xl px-3 py-2 text-left text-xs font-bold uppercase tracking-widest ${activeTab === 'exercises' ? 'bg-ink text-paper' : 'bg-surface-low text-muted'}`}>Exercises</button>
+              </div>
+            </section>
+          </div>
+        </aside>
+
+        <button
+          onClick={() => setShowOutlineModal(true)}
+          className="fixed bottom-6 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full bg-ink px-5 py-3 text-xs font-bold uppercase tracking-widest text-paper shadow-2xl lg:hidden"
+        >
+          <List className="h-4 w-4" />
+          Outline
+        </button>
+      </main>
+
+      <Modal isOpen={showOutlineModal} onClose={() => setShowOutlineModal(false)} title="Lesson outline" maxWidth="lg">
+        <div className="space-y-3">
+          {blocks.map((block: any, index: number) => {
+            const blockId = `block-${index}`;
+            return (
               <button
-                onClick={() => setIsWorkspaceOpen(true)}
-                className="lesson-workspace-button"
+                key={blockId}
+                onClick={() => {
+                  setShowOutlineModal(false);
+                  focusBlock(blockId);
+                }}
+                className="flex w-full items-start gap-3 rounded-2xl border border-surface-mid bg-surface-low p-4 text-left"
               >
-                <Sparkles className="w-4 h-4" />
-                Open workspace
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-paper text-xs font-bold text-muted">{index + 1}</span>
+                <span>
+                  <span className="block text-[10px] font-bold uppercase tracking-widest text-muted">{getPedagogicalLabel(block)}</span>
+                  <span className="mt-1 block text-sm font-semibold text-ink">{getBlockTitle(block, index)}</span>
+                </span>
               </button>
-            </div>
-          </div>
-
-          <div className="progress">
-            <div className="progress__label">
-              <span>Explored</span>
-              <span>{openCount} / {totalBlocks} blocks · {progressPct}%</span>
-            </div>
-            <div className="progress__track">
-              <div className="progress__fill" style={{ width: `${progressPct}%` }}></div>
-            </div>
-          </div>
-        </header>
-
-        {/* Config Strip */}
-        <div className="config-strip mb-8">
-          <div>
-            <div className="config-strip__label">Config used</div>
-            <div className="config-strip__name">
-              {effectiveLesson.title} · {totalBlocks} blocks
-            </div>
-          </div>
-          <div className="config-strip__author">
-            <div className="avatar">AI</div>
-            <span className="text-xs text-ink-secondary">LevelSpace AI</span>
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <button 
-                  onClick={() => setShowAddMenu(!showAddMenu)}
-                  className="w-8 h-8 rounded-xl bg-ink text-paper flex items-center justify-center hover:bg-accent transition-colors"
-                >
-                  <Plus className={`w-4 h-4 transition-transform ${showAddMenu ? 'rotate-45' : ''}`} />
-                </button>
-                
-                <AnimatePresence>
-                  {showAddMenu && (
-                    <motion.div 
-                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                      className="absolute right-0 top-full mt-2 w-48 bg-paper border border-ink/5 rounded-2xl shadow-2xl z-50 overflow-hidden"
-                    >
-                      <button 
-                        onClick={() => {
-                          setShowReminderModal(true);
-                          setShowAddMenu(false);
-                        }}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-muted hover:text-ink hover:bg-surface-low transition-all text-left"
-                      >
-                        <Bell className="w-4 h-4 text-accent" />
-                        Add Reminder
-                      </button>
-                      <button 
-                        onClick={() => {
-                          setShowNoteModal(true);
-                          setShowAddMenu(false);
-                        }}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-muted hover:text-ink hover:bg-surface-low transition-all text-left"
-                      >
-                        <StickyNote className="w-4 h-4 text-emerald-500" />
-                        Add Note
-                      </button>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <section className="lesson-cockpit">
-          <div className="lesson-cockpit__stats">
-            <div className="lesson-cockpit__stat">
-              <span className="lesson-cockpit__stat-label">{t('concepts')}</span>
-              <strong className="lesson-cockpit__stat-value">{conceptBlockCount}</strong>
-            </div>
-            <div className="lesson-cockpit__stat">
-              <span className="lesson-cockpit__stat-label">{t('interactive')}</span>
-              <strong className="lesson-cockpit__stat-value">{interactiveBlockCount}</strong>
-            </div>
-            <div className="lesson-cockpit__stat">
-              <span className="lesson-cockpit__stat-label">Study time</span>
-              <strong className="lesson-cockpit__stat-value">~{estimatedMinutes} min</strong>
-            </div>
-          </div>
-
-          <div className="lesson-cockpit__actions">
-            <button
-              onClick={() => nextBlockCard && focusBlock(nextBlockCard.id)}
-              className="lesson-cockpit__button lesson-cockpit__button--primary"
-            >
-              Continue
-            </button>
-            <button onClick={expandAllBlocks} className="lesson-cockpit__button">
-              Expand all
-            </button>
-            <button onClick={collapseAllBlocks} className="lesson-cockpit__button">
-              Collapse all
-            </button>
-          </div>
-
-          <div className="lesson-map">
-            <div className="lesson-map__header">
-              <span className="lesson-map__eyebrow">Lesson map</span>
-              <button onClick={() => setShowOutlineModal(true)} className="lesson-map__link">
-                Open outline
-              </button>
-            </div>
-            <div className="lesson-map__rail no-scrollbar">
-              {blockCards.map((card) => (
-                <button
-                  key={card.id}
-                  onClick={() => focusBlock(card.id)}
-                  className={`lesson-map__chip ${card.isOpen ? 'lesson-map__chip--active' : ''} ${card.status === 'done' ? 'lesson-map__chip--done' : ''}`}
-                >
-                  <span className="lesson-map__chip-index">{card.index + 1}</span>
-                  <span className="lesson-map__chip-copy">
-                    <span className="lesson-map__chip-title">{card.title}</span>
-                    {card.preview && <span className="lesson-map__chip-preview">{card.preview}</span>}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Tabs */}
-        <div className="flex border-b border-ink/10 mb-8">
-          <button
-            onClick={() => setActiveTab('content')}
-            className={`px-6 py-3 text-sm font-bold uppercase tracking-widest transition-colors border-b-2 ${
-              activeTab === 'content' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-ink'
-            }`}
-          >
-            Content
-          </button>
-          <button
-            onClick={() => setActiveTab('quizzes')}
-            className={`px-6 py-3 text-sm font-bold uppercase tracking-widest transition-colors border-b-2 flex items-center gap-2 ${
-              activeTab === 'quizzes' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-ink'
-            }`}
-          >
-            {t('quizzes')}
-            {quizzes.length > 0 && <span className="bg-accent/10 text-accent px-1.5 py-0.5 rounded text-[10px]">{quizzes.length}</span>}
-          </button>
-          <button
-            onClick={() => setActiveTab('exercises')}
-            className={`px-6 py-3 text-sm font-bold uppercase tracking-widest transition-colors border-b-2 flex items-center gap-2 ${
-              activeTab === 'exercises' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-ink'
-            }`}
-          >
-            {t('exercises')}
-            {exercises.length > 0 && <span className="bg-accent/10 text-accent px-1.5 py-0.5 rounded text-[10px]">{exercises.length}</span>}
-          </button>
-        </div>
-
-        {showLessonDomainTabs && blocks.length > 0 && (
-          <section className="mb-8 border-b border-ink/10 pb-6">
-            <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">{t('study_domains')}</p>
-                <h2 className="text-lg font-bold text-ink">
-                  {selectedLessonDomain ? selectedLessonDomain.name : t('all_domains')}
-                </h2>
-              </div>
-              <p className="max-w-xl text-xs leading-relaxed text-muted">
-                Use these tabs to isolate the exact strand you are studying, then jump through the outline without losing your place in the full lesson.
-              </p>
-            </div>
-
-            <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-              <button
-                onClick={() => setActiveFrenchDomain('all')}
-                className={`shrink-0 rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest transition-all ${
-                  activeFrenchDomain === 'all'
-                    ? 'bg-ink text-paper'
-                    : 'text-muted hover:bg-surface-low hover:text-accent'
-                }`}
-              >
-                {t('all')} <span className="ml-1 opacity-70">{blocks.length}</span>
-              </button>
-              {lessonDomainStats.map((domain) => (
-                <button
-                  key={domain.code}
-                  onClick={() => setActiveFrenchDomain(domain.code)}
-                  className={`shrink-0 rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest transition-all ${
-                    activeFrenchDomain === domain.code
-                      ? 'bg-accent text-paper'
-                      : 'text-muted hover:bg-surface-low hover:text-accent'
-                  }`}
-                >
-                  {domain.name} <span className="ml-1 opacity-70">{domain.count}</span>
-                </button>
-              ))}
-            </div>
-
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
-              {visibleBlockCards.slice(0, 3).map((card) => (
-                <button
-                  key={card.id}
-                  onClick={() => focusBlock(card.id)}
-                  className="text-left transition-colors hover:text-accent"
-                >
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">
-                    {card.index + 1} · {card.typeLabel}
-                  </span>
-                  <strong className="mt-1 block text-sm text-ink">{card.title}</strong>
-                  {card.preview && <span className="mt-1 block text-[12px] leading-relaxed text-muted">{card.preview}</span>}
-                </button>
-              ))}
-              {visibleBlockCards.length === 0 && (
-                <div className="py-3 md:col-span-3">
-                  <p className="text-sm font-semibold text-ink">No sections tagged for this domain yet.</p>
-                  <p className="mt-1 text-xs text-muted">The lesson still opens normally in Tous; future generated content can attach clearer domain metadata.</p>
-                </div>
-              )}
-            </div>
-          </section>
-        )}
-
-        {/* Main Content Grid */}
-        {activeTab === 'content' && (
-          <>
-          <div className="space-y-8">
-            {/* Audit Result */}
-            {auditResult && (
-              <div className={`p-4 rounded-xl border ${auditResult.isAccurate ? 'bg-success-soft border-success text-success' : 'bg-warning-soft border-warning text-warning'}`}>
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="font-bold text-sm flex items-center gap-2">
-                    <ShieldAlert className="w-4 h-4" />
-                    Language Audit: {auditResult.isAccurate ? 'Passed' : 'Failed'}
-                  </h3>
-                  <button onClick={() => setAuditResult(null)} className="text-xs opacity-70 hover:opacity-100">Dismiss</button>
-                </div>
-                <p className="text-xs mb-2 opacity-90">
-                  <strong>Expected:</strong> {auditResult.expectedLanguage} <br/>
-                  <strong>Detected:</strong> {auditResult.detectedLanguages.join(', ')}
-                </p>
-                <p className="text-xs opacity-90 leading-relaxed">{auditResult.feedback}</p>
-              </div>
-            )}
-
-            {/* AI-guided semantic learning blocks */}
-            {isStructuringLesson && (
-              <div className="py-2 text-sm text-accent">
-                <div className="flex items-center gap-3">
-                  <Loader2 size={18} className="animate-spin" />
-                  <div>
-                    <p className="font-bold">Structuring this lesson into guided learning blocks...</p>
-                    <p className="mt-0.5 text-xs opacity-80">Definitions, examples, warnings, vocabulary, and checkpoints are being prepared.</p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {learningBlockError && !isStructuringLesson && (
-              <div className="text-xs font-medium text-warning">
-                {learningBlockError} Showing the original lesson blocks instead.
-              </div>
-            )}
-
-            {learningBlocks.length > 0 ? (
-              <LessonBlockRenderer
-                blocks={learningBlocks}
-                lazyMode={lazyModeEnabled}
-                onVocabularyTermClick={openVocabularyDictionary}
-              />
-            ) : (
-            <div className="space-y-2">
-              {visibleIndexedBlocks.length > 0 ? (
-                visibleIndexedBlocks.map(({ block, index }) => {
-                  const blockId = `block-${index}`;
-                  const isOpen = openBlocks.includes(blockId);
-                  const uiBlockType = normalizeLessonBlockUiType(block.type || '');
-                  const { icon: BlockIcon, colorClass: blockColorClass, label: blockTypeLabel } = getBlockTypeConfig(uiBlockType);
-
-              // Determine status
-              let status = 'pending';
-              if (isOpen) status = 'active';
-              if (block.type === 'quiz' && quizAnswered[index]) {
-                status = quizCorrect[index] ? 'done' : 'error';
-              }
-              if (block.type === 'exam' && examResult[index]) {
-                status = examResult[index] === 'correct' ? 'done' : 'error';
-              }
-
-              const blockHeading = getBlockTitle(block, index);
-              const blockPreview = getBlockPreview(block);
-
-              return (
-                <article
-                  key={index}
-                  className="block group scroll-mt-28"
-                  ref={(node) => {
-                    blockRefs.current[blockId] = node;
-                  }}
-                >
-                  <div
-                    className={`block__header border-b border-surface-mid transition-all duration-200 ${isOpen ? 'bg-surface-low/70 shadow-sm' : 'bg-paper'}`}
-                    onClick={() => toggleBlock(blockId)}
-                  >
-                    <div className={`block__num block__num--${status}`}>
-                      {status === 'done' ? '✓' : status === 'error' ? '!' : index + 1}
-                    </div>
-                    <BlockIcon size={14} className={`shrink-0 ${blockColorClass} opacity-70`} />
-                    <div className="block__copy">
-                      <div className="block__copy-top">
-                        <span className="block__label">{blockHeading}</span>
-                      </div>
-                      {blockPreview && !isOpen && <p className="block__preview">{blockPreview}</p>}
-                    </div>
-                    <div className="flex items-center gap-2 ml-auto mr-2">
-                      <span className="pill pill--neutral text-[10px]">{blockTypeLabel}</span>
-                      
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          startEditing(index, block);
-                        }}
-                        className="w-8 h-8 rounded-xl hover:bg-ink/5 flex items-center justify-center text-muted opacity-0 group-hover:opacity-100 transition-all"
-                      >
-                        <Edit2 size={14} />
-                      </button>
-                    </div>
-                    <ChevronRight className={`block__chevron ${isOpen ? 'block__chevron--open' : ''}`} />
-                  </div>
-
-                  <AnimatePresence>
-                    {isOpen && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                      >
-                        <div className="block__body block__body--open">
-                      {editingBlockIndex === index ? (
-                        <div className="space-y-4 p-4 bg-surface-low rounded-2xl border border-accent/20 mb-4">
-                          <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-muted uppercase tracking-widest">Block Title</label>
-                            <input 
-                              type="text"
-                              value={editTitle}
-                              onChange={(e) => setEditTitle(e.target.value)}
-                              className="w-full p-3 bg-paper border border-ink/5 rounded-xl text-sm focus:outline-none focus:border-accent/30"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-muted uppercase tracking-widest">Content (Markdown)</label>
-                            <textarea 
-                              value={editContent}
-                              onChange={(e) => setEditContent(e.target.value)}
-                              rows={6}
-                              className="w-full p-3 bg-paper border border-ink/5 rounded-xl text-sm focus:outline-none focus:border-accent/30 resize-none font-mono"
-                            />
-                          </div>
-                          <div className="flex justify-end gap-3 pt-2">
-                            <button 
-                              onClick={() => setEditingBlockIndex(null)}
-                              className="px-4 py-2 text-xs font-bold text-muted hover:text-ink transition-colors"
-                            >
-                              Cancel
-                            </button>
-                            <button 
-                              onClick={saveEdit}
-                              className="flex items-center gap-2 px-6 py-2 bg-accent text-paper rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-ink transition-all shadow-lg shadow-accent/20"
-                            >
-                              <Save size={14} />
-                              Save Changes
-                            </button>
-                          </div>
-                        </div>
-                      ) : null}
-                      
-                                            {/* Intro */}
-                      {block.type === 'intro' && block.content && (
-                        <div className="lesson-intro lesson-copy">
-                          <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>
-                            {block.content}
-                          </Markdown>
-                        </div>
-                      )}
-
-                      {/* Theory */}
-                      {block.type === 'theory' && block.content && (
-                        <div className="def-box lesson-copy">
-                          <div className="flex items-center gap-1.5 mb-2.5 pb-2 border-b border-accent/15">
-                            <FileText size={11} className="text-accent" />
-                            <span className="text-[9px] font-bold text-accent uppercase tracking-widest">
-                              {block.title || 'Theory'}
-                            </span>
-                          </div>
-                          <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>
-                            {block.content}
-                          </Markdown>
-                        </div>
-                      )}
-
-                      {/* Formula */}
-                      {block.type === 'formula' && block.content && (
-                        <div className="lesson-formula">
-                          <div className="flex items-center gap-1.5 mb-2 pb-2 border-b border-warning/15">
-                            <Type size={11} className="text-warning" />
-                            <span className="text-[9px] font-bold text-warning uppercase tracking-widest">
-                              {block.label || 'Formula'}
-                            </span>
-                          </div>
-                          <div className="lesson-copy lesson-copy--formula font-mono text-sm">
-                            <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>
-                              {block.content}
-                            </Markdown>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Example */}
-                      {block.type === 'example' && block.content && (
-                        <div className="example-card">
-                          <div className="flex items-center gap-1.5 mb-2 pb-2 border-b border-warning/15">
-                            <FlaskConical size={11} className="text-warning" />
-                            <span className="text-[9px] font-bold text-warning uppercase tracking-widest">
-                              {block.title || 'Example'}
-                            </span>
-                          </div>
-                          <div className="example-card__question lesson-copy">
-                            <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>
-                              {block.content}
-                            </Markdown>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Summary */}
-                      {block.type === 'summary' && block.points && Array.isArray(block.points) && (
-                        <div className="p-4 rounded-2xl bg-success/5 border border-success/20">
-                          <div className="flex items-center gap-1.5 mb-3 pb-2 border-b border-success/15">
-                            <List size={11} className="text-success" />
-                            <span className="text-[9px] font-bold text-success uppercase tracking-widest">Key Takeaways</span>
-                          </div>
-                          <ul className="rules-list">
-                            {block.points.map((point: string, i: number) => (
-                              <li key={i} className="rules-list__item">
-                                <div className="rules-list__dot"></div>
-                                <span className="lesson-copy">
-                                  <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>
-                                    {point}
-                                  </Markdown>
-                                </span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {/* Definition / Content */}
-                          {(block.type === 'definition' || block.type === 'content') && block.content && (
-                            <div className="def-box lesson-copy">
-                              <div className="flex items-center gap-1.5 mb-2.5 pb-2 border-b border-accent/15">
-                                <BookOpen size={11} className="text-accent" />
-                                <span className="text-[9px] font-bold text-accent uppercase tracking-widest">
-                                  {block.type === 'definition' ? 'Definition' : 'Content'}
-                                </span>
-                              </div>
-                              <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{block.content}</Markdown>
-                              {block.source && <span className="def-box__source">Source: {block.source}</span>}
-                            </div>
-                          )}
-
-                          {/* Rules */}
-                          {block.type === 'rules' && block.rules && Array.isArray(block.rules) && (
-                            <>
-                              <div className="flex items-center gap-1.5 mt-3.5 mb-1">
-                                <List size={12} className="text-success" />
-                                <span className="text-[9px] font-bold text-success uppercase tracking-widest">Key Rules</span>
-                              </div>
-                              <ul className="rules-list">
-                                {block.rules.map((rule, i) => (
-                                  <li key={i} className="rules-list__item">
-                                    <div className="rules-list__dot"></div>
-                                    <span className="lesson-copy"><Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{rule}</Markdown></span>
-                                  </li>
-                                ))}
-                              </ul>
-                            </>
-                          )}
-
-                          {/* Examples */}
-                          {block.type === 'examples' && block.examples && Array.isArray(block.examples) && (
-                            <>
-                              <div className="flex items-center gap-1.5 mt-3.5 mb-1">
-                                <FlaskConical size={12} className="text-warning" />
-                                <span className="text-[9px] font-bold text-warning uppercase tracking-widest">Worked Examples</span>
-                              </div>
-                              {block.examples.map((ex, i) => (
-                                <div key={i} className="example-card">
-                                  <div className="example-card__question lesson-copy"><Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{ex.question}</Markdown></div>
-                                  {Array.isArray(ex.steps) && ex.steps.map((step, j) => (
-                                    <div key={j} className="example-card__step lesson-copy"><Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{step}</Markdown></div>
-                                  ))}
-                                  <div className="example-card__answer lesson-copy"><Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{ex.answer}</Markdown></div>
-                                </div>
-                              ))}
-                              <div className="action-row">
-                                <button 
-                                  className="btn-action"
-                                  onClick={() => handleGenerateAnotherExample(index)}
-                                  disabled={isGeneratingExample === index}
-                                >
-                                  {isGeneratingExample === index ? (
-                                    <span className="flex items-center gap-2">
-                                      <Loader2 size={14} className="animate-spin" />
-                                      Generating...
-                                    </span>
-                                  ) : (
-                                    "Generate another example ↗"
-                                  )}
-                                </button>
-                              </div>
-                            </>
-                          )}
-
-                          {/* Quiz — new canonical flat format */}
-                          {block.type === 'quiz' && !block.quiz && block.question && Array.isArray(block.options) && (
-                            <div className="bg-surface-low rounded-2xl p-4 mt-4 border border-ink/5">
-                              <p className="font-bold text-sm mb-4 text-ink leading-relaxed"><Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{block.question}</Markdown></p>
-                              <div className="grid gap-2">
-                                {block.options.map((opt, i) => {
-                                  const isSelected = quizAnswered[index] === opt;
-                                  const isCorrect = opt === block.correctAnswer;
-                                  const showResult = quizAnswered[index];
-
-                                  let bgClass = "bg-paper border-surface-mid hover:border-accent hover:bg-accent/5";
-                                  if (showResult) {
-                                    if (isCorrect) bgClass = "bg-success/10 border-success text-success-dark";
-                                    else if (isSelected) bgClass = "bg-error/10 border-error text-error-dark";
-                                    else bgClass = "bg-paper border-surface-mid opacity-50";
-                                  }
-
-                                  return (
-                                    <button
-                                      key={i}
-                                      onClick={() => handleQuizAnswer(index, opt, block.correctAnswer!)}
-                                      disabled={!!showResult}
-                                      className={`w-full text-left p-4 rounded-xl border-2 transition-all ${bgClass} flex items-center justify-between group`}
-                                    >
-                                      <span className="text-sm font-medium"><Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{opt}</Markdown></span>
-                                      {showResult && isCorrect && <CheckCircle2 size={18} className="text-success" />}
-                                      {showResult && isSelected && !isCorrect && <X size={18} className="text-error" />}
-                                      {!showResult && <ChevronRight size={16} className="text-ink-muted opacity-0 group-hover:opacity-100 transition-opacity" />}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-
-                              <AnimatePresence>
-                                {quizAnswered[index] && (
-                                  <motion.div
-                                    initial={{ opacity: 0, height: 0, marginTop: 0 }}
-                                    animate={{ opacity: 1, height: 'auto', marginTop: 16 }}
-                                    className={`p-4 rounded-xl border ${quizCorrect[index] ? 'bg-success/10 border-success/20 text-success-dark' : 'bg-surface-mid border-ink/10 text-ink'}`}
-                                  >
-                                    <div className="flex gap-3">
-                                      <div className="mt-0.5">
-                                        {quizCorrect[index] ? <CheckCircle2 size={18} className="text-success" /> : <Lightbulb size={18} className="text-warning" />}
-                                      </div>
-                                      <div>
-                                        <p className="font-bold text-sm mb-1">
-                                          {quizCorrect[index] ? 'Correct! +15 XP' : 'Not quite right'}
-                                        </p>
-                                        <p className="text-xs opacity-90 leading-relaxed">
-                                          {quizCorrect[index] ? 'Great job! You nailed it.' : block.explanation}
-                                        </p>
-                                      </div>
-                                    </div>
-                                  </motion.div>
-                                )}
-                              </AnimatePresence>
-                            </div>
-                          )}
-
-                          {/* Quiz */}
-                          {block.type === 'quiz' && block.quiz && Array.isArray(block.quiz.options) && (
-                            <div className="bg-surface-low rounded-2xl p-5 mt-4 border border-ink/5">
-                              <div className="flex items-center gap-2 mb-4">
-                                <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center text-accent">
-                                  <HelpCircle size={16} />
-                                </div>
-                                <h4 className="font-bold text-ink">Knowledge Check</h4>
-                              </div>
-                              
-                              <div className="text-sm font-medium text-ink mb-5 leading-relaxed">
-                                <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{block.quiz.question}</Markdown>
-                              </div>
-                              
-                              <div className="flex flex-col gap-2">
-                                {block.quiz.options.map((opt, i) => {
-                                  const isAnswered = quizAnswered[index];
-                                  const isSelected = quizSelectedOption[index] === opt;
-                                  const isCorrectOption = opt === block.quiz?.correctAnswer;
-                                  
-                                  let btnClass = "relative w-full text-left p-4 rounded-xl border-2 transition-all duration-200 text-sm font-medium ";
-                                  
-                                  if (!isAnswered) {
-                                    btnClass += "border-surface-mid bg-paper text-ink-secondary hover:border-accent/50 hover:bg-accent/5";
-                                  } else {
-                                    if (isCorrectOption) {
-                                      btnClass += "border-success bg-success-soft text-success";
-                                    } else if (isSelected && !isCorrectOption) {
-                                      btnClass += "border-error bg-error-soft text-error";
-                                    } else {
-                                      btnClass += "border-surface-mid bg-paper/50 text-ink-muted opacity-50";
-                                    }
-                                  }
-                                  
-                                  return (
-                                    <button 
-                                      key={i} 
-                                      className={btnClass}
-                                      disabled={isAnswered}
-                                      onClick={() => handleQuizAnswer(index, opt, block.quiz!.correctAnswer)}
-                                    >
-                                      <div className="flex items-center justify-between">
-                                        <span>{opt}</span>
-                                        {isAnswered && isCorrectOption && <CheckCircle2 className="w-5 h-5 text-success" />}
-                                        {isAnswered && isSelected && !isCorrectOption && <XCircle className="w-5 h-5 text-error" />}
-                                      </div>
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                              
-                              <AnimatePresence>
-                                {quizAnswered[index] && (
-                                  <motion.div 
-                                    initial={{ opacity: 0, height: 0, marginTop: 0 }}
-                                    animate={{ opacity: 1, height: 'auto', marginTop: 16 }}
-                                    className={`p-4 rounded-xl ${quizCorrect[index] ? 'bg-success-soft text-success' : 'bg-error-soft text-error'}`}
-                                  >
-                                    <div className="flex items-start gap-3">
-                                      {quizCorrect[index] ? <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5" /> : <XCircle className="w-5 h-5 shrink-0 mt-0.5" />}
-                                      <div>
-                                        <p className="font-bold text-sm mb-1">
-                                          {quizCorrect[index] ? 'Correct! +15 XP' : 'Not quite right'}
-                                        </p>
-                                        <p className="text-xs opacity-90 leading-relaxed">
-                                          {quizCorrect[index] ? 'Great job! You nailed it.' : block.quiz.explanation}
-                                        </p>
-                                      </div>
-                                    </div>
-                                  </motion.div>
-                                )}
-                              </AnimatePresence>
-                            </div>
-                          )}
-
-                          {/* Exercise — new canonical format */}
-                          {block.type === 'exercise' && !block.exercise && block.content && (
-                            <div className="bg-surface-low rounded-2xl p-5 mt-4 border border-ink/5">
-                              <div className="text-sm font-medium text-ink mb-4 leading-relaxed">
-                                <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{block.content}</Markdown>
-                              </div>
-                              {!exerciseResult[index] ? (
-                                <div className="flex gap-3">
-                                  {block.hint && (
-                                    <button
-                                      className="flex-1 py-3 bg-paper border-2 border-surface-mid text-ink-secondary rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-surface-mid transition-colors flex items-center justify-center gap-2"
-                                      onClick={() => setExerciseHintShown(prev => ({ ...prev, [index]: true }))}
-                                      disabled={exerciseHintShown[index]}
-                                    >
-                                      <Lightbulb size={16} />
-                                      {exerciseHintShown[index] ? block.hint : 'Show Hint'}
-                                    </button>
-                                  )}
-                                  <button
-                                    className="flex-[2] py-3 bg-accent text-paper rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-accent/90 transition-all shadow-lg shadow-accent/20 flex items-center justify-center gap-2"
-                                    onClick={() => handleExerciseSubmit(index, block.solution || '')}
-                                  >
-                                    <CheckCircle2 size={16} />
-                                    I'm Done, Show Solution
-                                  </button>
-                                </div>
-                              ) : (
-                                <div className="p-4 rounded-xl bg-surface-low border border-surface-mid">
-                                  <p className="font-bold text-sm mb-1 text-ink">Solution</p>
-                                  <div className="text-xs leading-relaxed mt-2 pt-2 border-t border-current/10 text-ink">
-                                    <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{block.solution || ''}</Markdown>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          )}
-
-                          {/* Exercise */}
-                          {block.type === 'exercise' && block.exercise && (
-                            <div className="bg-surface-low rounded-2xl p-5 mt-4 border border-ink/5">
-                              <div className="flex items-center justify-between mb-4">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center text-accent">
-                                    <Dumbbell size={16} />
-                                  </div>
-                                  <h4 className="font-bold text-ink">Practice Exercise</h4>
-                                </div>
-                                <Timer />
-                              </div>
-                              
-                              <div className="text-sm font-medium text-ink mb-5 leading-relaxed">
-                                <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{block.exercise.question}</Markdown>
-                              </div>
-                              
-                              <div className="mb-4 p-4 bg-paper border-2 border-surface-mid rounded-xl text-sm text-ink-secondary flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-surface-low flex items-center justify-center shrink-0">
-                                  <PenTool size={20} className="text-ink-muted" />
-                                </div>
-                                <div>
-                                  <p className="font-bold text-ink">Grab a pen and paper!</p>
-                                  <p className="text-xs">Solve this exercise on paper. When you are finished, check the solution below.</p>
-                                </div>
-                              </div>
-                              
-                              <AnimatePresence>
-                                {exerciseHintShown[index] && (
-                                  <motion.div 
-                                    initial={{ opacity: 0, height: 0 }}
-                                    animate={{ opacity: 1, height: 'auto' }}
-                                    className="mb-4 p-4 bg-warning-soft rounded-xl border border-warning/20 text-warning text-sm"
-                                  >
-                                    <div className="flex gap-2">
-                                      <Lightbulb className="w-5 h-5 shrink-0" />
-                                      <p><span className="font-bold">Hint:</span> {block.exercise.hint}</p>
-                                    </div>
-                                  </motion.div>
-                                )}
-                              </AnimatePresence>
-
-                              {!exerciseResult[index] ? (
-                                <div className="flex gap-3">
-                                  <button 
-                                    className="flex-1 py-3 bg-paper border-2 border-surface-mid text-ink-secondary rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-surface-mid transition-colors flex items-center justify-center gap-2" 
-                                    onClick={() => setExerciseHintShown(prev => ({ ...prev, [index]: true }))}
-                                    disabled={exerciseHintShown[index]}
-                                  >
-                                    <Lightbulb size={16} />
-                                    {exerciseHintShown[index] ? 'Hint Shown' : 'Show Hint'}
-                                  </button>
-                                  <button 
-                                    className="flex-[2] py-3 bg-accent text-paper rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-accent/90 transition-all shadow-lg shadow-accent/20 flex items-center justify-center gap-2" 
-                                    onClick={() => handleExerciseSubmit(index, block.exercise!.solution)}
-                                  >
-                                    <CheckCircle2 size={16} />
-                                    I'm Done, Show Solution
-                                  </button>
-                                </div>
-                              ) : (
-                                <motion.div 
-                                  initial={{ opacity: 0, y: 10 }}
-                                  animate={{ opacity: 1, y: 0 }}
-                                  className="p-4 rounded-xl bg-surface-low border border-surface-mid"
-                                >
-                                  <div className="flex items-start gap-3">
-                                    <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5 text-success" />
-                                    <div className="w-full">
-                                      <p className="font-bold text-sm mb-1 text-ink">
-                                        Solution
-                                      </p>
-                                      <div className="text-xs opacity-90 leading-relaxed mt-2 pt-2 border-t border-current/10 text-ink">
-                                        <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{block.exercise.solution}</Markdown>
-                                      </div>
-                                      
-                                      <div className="mt-4 pt-4 border-t border-surface-mid flex items-center justify-between">
-                                        <p className="text-xs font-bold text-ink-secondary">Did you get it right?</p>
-                                        <div className="flex gap-2">
-                                          <button 
-                                            onClick={() => setXp(prev => Math.min(100, prev + 15))}
-                                            className="px-3 py-1.5 bg-success-soft text-success rounded-lg text-xs font-bold hover:bg-success/20 transition-colors"
-                                          >
-                                            Yes (+15 XP)
-                                          </button>
-                                          <button 
-                                            className="px-3 py-1.5 bg-error-soft text-error rounded-lg text-xs font-bold hover:bg-error/20 transition-colors"
-                                          >
-                                            No, I need to review
-                                          </button>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </motion.div>
-                              )}
-                            </div>
-                          )}
-
-                          {/* Exam */}
-                          {block.type === 'exam' && block.exam && (
-                            <div className="bg-surface-low rounded-2xl p-5 mt-4 border border-ink/5">
-                              <div className="flex items-center justify-between mb-4">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-8 h-8 rounded-full bg-warning/10 flex items-center justify-center text-warning">
-                                    <PenTool size={16} />
-                                  </div>
-                                  <h4 className="font-bold text-ink">National Exam Training</h4>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                  <Timer />
-                                  {block.exam.source && (
-                                    <span className="text-[10px] font-bold text-warning uppercase tracking-widest px-2 py-1 bg-warning/10 rounded-md">
-                                      {block.exam.source}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                              
-                              <div className="text-sm font-medium text-ink mb-5 leading-relaxed">
-                                <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{block.exam.question}</Markdown>
-                              </div>
-                              
-                              <div className="mb-4 p-4 bg-paper border-2 border-surface-mid rounded-xl text-sm text-ink-secondary flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-surface-low flex items-center justify-center shrink-0">
-                                  <PenTool size={20} className="text-ink-muted" />
-                                </div>
-                                <div>
-                                  <p className="font-bold text-ink">Grab a pen and paper!</p>
-                                  <p className="text-xs">Solve this exercise on paper. When you are finished, check the solution below.</p>
-                                </div>
-                              </div>
-                              
-                              <AnimatePresence>
-                                {examHintShown[index] && (
-                                  <motion.div 
-                                    initial={{ opacity: 0, height: 0 }}
-                                    animate={{ opacity: 1, height: 'auto' }}
-                                    className="mb-4 p-4 bg-warning-soft rounded-xl border border-warning/20 text-warning text-sm"
-                                  >
-                                    <div className="flex gap-2">
-                                      <Lightbulb className="w-5 h-5 shrink-0" />
-                                      <p><span className="font-bold">Hint:</span> {block.exam.hint}</p>
-                                    </div>
-                                  </motion.div>
-                                )}
-                              </AnimatePresence>
-
-                              {!examResult[index] ? (
-                                <div className="flex gap-3">
-                                  <button 
-                                    className="flex-1 py-3 bg-paper border-2 border-surface-mid text-ink-secondary rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-surface-mid transition-colors flex items-center justify-center gap-2" 
-                                    onClick={() => setExamHintShown(prev => ({ ...prev, [index]: true }))}
-                                    disabled={examHintShown[index]}
-                                  >
-                                    <Lightbulb size={16} />
-                                    {examHintShown[index] ? 'Hint Shown' : 'Show Hint'}
-                                  </button>
-                                  <button 
-                                    className="flex-[2] py-3 bg-accent text-paper rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-accent/90 transition-all shadow-lg shadow-accent/20 flex items-center justify-center gap-2" 
-                                    onClick={() => handleExamSubmit(index, block.exam!.solution)}
-                                  >
-                                    <CheckCircle2 size={16} />
-                                    I'm Done, Show Solution
-                                  </button>
-                                </div>
-                              ) : (
-                                <motion.div 
-                                  initial={{ opacity: 0, y: 10 }}
-                                  animate={{ opacity: 1, y: 0 }}
-                                  className="p-4 rounded-xl bg-surface-low border border-surface-mid"
-                                >
-                                  <div className="flex items-start gap-3">
-                                    <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5 text-success" />
-                                    <div className="w-full">
-                                      <p className="font-bold text-sm mb-1 text-ink">
-                                        Solution
-                                      </p>
-                                      <div className="text-xs opacity-90 leading-relaxed mt-2 pt-2 border-t border-current/10 text-ink">
-                                        <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{block.exam.solution}</Markdown>
-                                      </div>
-                                      
-                                      <div className="mt-4 pt-4 border-t border-surface-mid flex items-center justify-between">
-                                        <p className="text-xs font-bold text-ink-secondary">Did you get it right?</p>
-                                        <div className="flex gap-2">
-                                          <button 
-                                            onClick={() => setXp(prev => Math.min(100, prev + 20))}
-                                            className="px-3 py-1.5 bg-success-soft text-success rounded-lg text-xs font-bold hover:bg-success/20 transition-colors"
-                                          >
-                                            Yes (+20 XP)
-                                          </button>
-                                          <button 
-                                            className="px-3 py-1.5 bg-error-soft text-error rounded-lg text-xs font-bold hover:bg-error/20 transition-colors"
-                                          >
-                                            No, I need to review
-                                          </button>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </motion.div>
-                              )}
-                            </div>
-                          )}
-
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </article>
-                );
-              })
-            ) : (
-              <div className="p-12 text-center space-y-4 bg-surface-low rounded-3xl border border-dashed border-ink/10">
-                <div className="w-16 h-16 rounded-full bg-paper mx-auto flex items-center justify-center text-muted/30">
-                  <BookOpen size={32} />
-                </div>
-                <div>
-                  <h3 className="font-bold text-ink">
-                    {blocks.length > 0 ? 'No sections in this domain' : 'No blocks found'}
-                  </h3>
-                  <p className="text-sm text-muted">
-                    {blocks.length > 0
-                      ? 'Switch to Tous or another French study tab to keep moving.'
-                      : "This lesson doesn't have any content blocks yet."}
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-            )}
-        </div>
-
-
-        {/* Footer Navigation */}
-        <footer className="flex gap-4 pt-8">
-          <button 
-            onClick={() => navigate(-1)}
-            className="flex-1 h-12 bg-paper border border-surface-mid rounded-xl flex items-center justify-center gap-2 text-xs font-bold text-ink-secondary hover:bg-surface-low transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            {t('back')}
-          </button>
-          <button 
-            onClick={markLessonComplete}
-            className="flex-1 h-12 bg-ink text-paper rounded-xl flex items-center justify-center gap-2 text-xs font-bold hover:bg-accent transition-colors"
-          >
-            {t('complete_lesson')}
-            <CheckCircle2 className="w-4 h-4" />
-          </button>
-        </footer>
-        </>
-        )}
-
-        {activeTab === 'quizzes' && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-ink flex items-center gap-2">
-                <Target size={20} className="text-accent" />
-                {t('lesson_quizzes')}
-              </h3>
-            </div>
-            {isLoadingExtra ? (
-              <div className="flex justify-center p-8"><Loader2 className="animate-spin text-accent" /></div>
-            ) : quizzes.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {quizzes.map((quiz) => (
-                  <div key={quiz.id} className="bg-paper border border-ink/5 p-5 rounded-2xl hover:border-accent/30 transition-all cursor-pointer">
-                    <h4 className="font-bold text-ink">{quiz.title}</h4>
-                    <p className="text-sm text-muted mt-1">{quiz.description}</p>
-                    <div className="flex items-center gap-3 mt-4">
-                      <span className="text-[10px] font-bold uppercase tracking-widest bg-surface-low px-2 py-1 rounded text-muted">{quiz.difficulty}</span>
-                      <span className="text-[10px] font-bold uppercase tracking-widest bg-surface-low px-2 py-1 rounded text-muted">{quiz.questions?.length || 0} Questions</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="bg-surface-low/50 border border-dashed border-ink/10 rounded-3xl p-16 text-center">
-                <p className="text-muted">{t('no_quizzes_for_lesson')}</p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {activeTab === 'exercises' && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-ink flex items-center gap-2">
-                <Dumbbell size={20} className="text-accent" />
-                {t('practice_exercises')}
-              </h3>
-            </div>
-            {isLoadingExtra ? (
-              <div className="flex justify-center p-8"><Loader2 className="animate-spin text-accent" /></div>
-            ) : exercises.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {exercises.map((exercise) => (
-                  <div key={exercise.id} className="bg-paper border border-ink/5 p-5 rounded-2xl hover:border-accent/30 transition-all cursor-pointer">
-                    <h4 className="font-bold text-ink">{exercise.title}</h4>
-                    <p className="text-sm text-muted mt-1 line-clamp-2">{exercise.prompt}</p>
-                    <div className="flex items-center gap-3 mt-4">
-                      <span className="text-[10px] font-bold uppercase tracking-widest bg-surface-low px-2 py-1 rounded text-muted">{exercise.difficulty}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="bg-surface-low/50 border border-dashed border-ink/10 rounded-3xl p-16 text-center">
-                <p className="text-muted">{t('no_exercises_for_lesson')}</p>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-
-
-
-      {/* Lesson Outline Modal */}
-      <Modal
-        isOpen={showOutlineModal}
-        onClose={() => {
-          setShowOutlineModal(false);
-          // Stop audio when modal closes
-          if ('speechSynthesis' in window) {
-            window.speechSynthesis.cancel();
-            setReadingBlockIndex(null);
-          }
-        }}
-        title={t('lesson_outline')}
-      >
-        <div className="space-y-4">
-          <div className="outline-summary">
-            <div className="outline-summary__stat">
-              <span className="outline-summary__label">{t('visible')}</span>
-              <strong className="outline-summary__value">{visibleIndexedBlocks.length}</strong>
-            </div>
-            <div className="outline-summary__stat">
-              <span className="outline-summary__label">{t('concepts')}</span>
-              <strong className="outline-summary__value">{conceptBlockCount}</strong>
-            </div>
-            <div className="outline-summary__stat">
-              <span className="outline-summary__label">{t('interactive')}</span>
-              <strong className="outline-summary__value">{interactiveBlockCount}</strong>
-            </div>
-          </div>
-
-          {showLessonDomainTabs && (
-            <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-              <button
-                onClick={() => setActiveFrenchDomain('all')}
-                className={`shrink-0 rounded-xl px-3 py-2 text-[10px] font-bold uppercase tracking-widest ${
-                  activeFrenchDomain === 'all' ? 'bg-ink text-paper' : 'bg-surface-low text-muted'
-                }`}
-              >
-                {t('all')}
-              </button>
-              {lessonDomainStats.map((domain) => (
-                <button
-                  key={domain.code}
-                  onClick={() => setActiveFrenchDomain(domain.code)}
-                  className={`shrink-0 rounded-xl px-3 py-2 text-[10px] font-bold uppercase tracking-widest ${
-                    activeFrenchDomain === domain.code ? 'bg-accent text-paper' : 'bg-surface-low text-muted'
-                  }`}
-                >
-                  {domain.name} ({domain.count})
-                </button>
-              ))}
-            </div>
-          )}
-
-          <div className="p-4 bg-accent/5 rounded-xl border border-accent/10 space-y-2">
-            <h3 className="font-bold text-accent">Jump or listen</h3>
-            <p className="text-sm text-muted">
-              Tap a section card to move there instantly. Use the play button when you want read-aloud for that section.
-            </p>
-          </div>
-
-          <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
-            {visibleIndexedBlocks.map(({ block, index }) => {
-              const isReading = readingBlockIndex === index;
-              const preview = getBlockPreview(block);
-              const label = getBlockTypeConfig(block.type || '').label;
-              return (
-                <div
-                  key={block.id || index}
-                  className={`outline-item ${isReading ? 'outline-item--reading' : ''}`}
-                >
-                  <button
-                    onClick={() => openOutlineSection(index)}
-                    className="outline-item__main"
-                  >
-                    <div className="outline-item__index">{index + 1}</div>
-                    <div className="outline-item__copy">
-                      <div className="outline-item__top">
-                        <span className="outline-item__section">Section {index + 1}</span>
-                        <span className="pill pill--neutral text-[10px]">{label}</span>
-                      </div>
-                      <h4 className="outline-item__title">{getBlockTitle(block, index)}</h4>
-                      {preview && <p className="outline-item__preview">{preview}</p>}
-                    </div>
-                  </button>
-
-                  <button
-                    onClick={() => toggleReadAloud(index, block.content || preview || '')}
-                    className={`outline-item__audio ${isReading ? 'outline-item__audio--active' : ''}`}
-                    title={isReading ? 'Stop reading' : 'Read this section aloud'}
-                  >
-                    {isReading ? (
-                      <div className="w-4 h-4 flex items-center justify-center gap-1">
-                        <span className="w-1 h-3 bg-paper rounded-full animate-pulse" style={{ animationDelay: '0ms' }} />
-                        <span className="w-1 h-4 bg-paper rounded-full animate-pulse" style={{ animationDelay: '150ms' }} />
-                        <span className="w-1 h-3 bg-paper rounded-full animate-pulse" style={{ animationDelay: '300ms' }} />
-                      </div>
-                    ) : (
-                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-                    )}
-                  </button>
-                </div>
-              );
-            })}
-
-            {visibleIndexedBlocks.length === 0 && (
-              <div className="text-center p-8 text-muted">
-                No sections found for this outline view.
-              </div>
-            )}
-          </div>
+            );
+          })}
         </div>
       </Modal>
-
-      {/* Reminder Modal */}
-      <Modal
-        isOpen={showReminderModal}
-        onClose={() => setShowReminderModal(false)}
-        title="Set a Reminder"
-      >
-        <div className="space-y-6">
-          <div className="p-6 bg-accent/5 rounded-2xl border border-accent/10 space-y-4">
-            <div className="flex items-center gap-3 text-accent">
-              <Bell className="w-6 h-6" />
-              <h3 className="font-bold text-lg">Study Reminder</h3>
-            </div>
-            <p className="text-sm text-muted leading-relaxed">
-              Set a reminder to revisit this lesson or complete a specific task related to it.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold text-muted uppercase tracking-widest">Reminder Text</label>
-            <input 
-              type="text"
-              value={reminderText}
-              onChange={(e) => setReminderText(e.target.value)}
-              placeholder="e.g. Review the Gestalt principles tomorrow"
-              className="w-full p-4 bg-surface-low border border-ink/5 rounded-xl text-sm focus:outline-none focus:border-accent/30 transition-all"
-            />
-          </div>
-
-          <button 
-            onClick={handleAddReminder}
-            disabled={!reminderText}
-            className="w-full py-4 bg-ink text-paper rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-accent transition-all disabled:opacity-50 shadow-xl shadow-ink/20"
-          >
-            Save Reminder
-          </button>
-        </div>
-      </Modal>
-
-      {/* Note Modal */}
-      <Modal
-        isOpen={showNoteModal}
-        onClose={() => setShowNoteModal(false)}
-        title="Add a Note"
-      >
-        <div className="space-y-6">
-          <div className="p-6 bg-emerald-50 rounded-2xl border border-emerald-100 space-y-4">
-            <div className="flex items-center gap-3 text-emerald-600">
-              <StickyNote className="w-6 h-6" />
-              <h3 className="font-bold text-lg">Personal Note</h3>
-            </div>
-            <p className="text-sm text-emerald-800/70 leading-relaxed">
-              Capture your thoughts, questions, or key takeaways from this lesson.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold text-muted uppercase tracking-widest">Note Content</label>
-            <textarea 
-              value={noteContent}
-              onChange={(e) => setNoteContent(e.target.value)}
-              placeholder="What's on your mind?"
-              rows={4}
-              className="w-full p-4 bg-surface-low border border-ink/5 rounded-xl text-sm focus:outline-none focus:border-accent/30 transition-all resize-none"
-            />
-          </div>
-
-          <button 
-            onClick={handleAddNote}
-            disabled={!noteContent}
-            className="w-full py-4 bg-emerald-600 text-paper rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-emerald-700 transition-all disabled:opacity-50 shadow-xl shadow-emerald-600/20"
-          >
-            Save Note
-          </button>
-        </div>
-      </Modal>
-
-      <EduWorkspace 
-        isOpen={isWorkspaceOpen}
-        onClose={() => setIsWorkspaceOpen(false)}
-        subjectId={effectiveLesson?.moduleId || 'math'}
-        lessonContext={{
-          title: lesson?.title || '',
-          content: effectiveLesson?.blocks?.map(b => b.content || '').join('\n') || effectiveLesson?.content || '',
-          grade: lessonGrade,
-          country: lessonCountry
-        }}
-      />
-
-      <AIAssistant
-        lessonContent={effectiveLesson?.blocks?.map((b: any) => b.content || '').join('\n') || effectiveLesson?.content || ''}
-        strictRAG={module?.strictRAG}
-        subject={lessonSubject || module?.name}
-        grade={lessonGrade}
-        aiAvailable={aiAvailable}
-      />
     </Layout>
   );
 };
