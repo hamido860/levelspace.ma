@@ -245,14 +245,28 @@ export const Modules: React.FC = () => {
 
   const [bacTrackName, setBacTrackName] = useState<string>('');
   const [bacIntOptionName, setBacIntOptionName] = useState<string>('');
-  const trustedSubjectNames = buildTrustedSubjectNames(country, grade, bacTrackName || selectedBacTrackId);
-  const trustedSubjectSet = buildTrustedSubjectSet(trustedSubjectNames);
-  const modules = (dbModules || [])
-    .filter((module) => moduleMatchesTrustedSubjects(module, trustedSubjectSet))
-    .map(m => ({
-      ...m,
-      icon: getIconForCategory(m.category)
-    }));
+
+  const trustedSubjectNames = useMemo(() =>
+    buildTrustedSubjectNames(country, grade, bacTrackName || selectedBacTrackId),
+  [country, grade, bacTrackName, selectedBacTrackId]);
+
+  // ⚡ Bolt Optimization: Memoize the trustedSubjectSet creation
+  // Impact: Prevents recreation of the Set on every render
+  const trustedSubjectSet = useMemo(() =>
+    buildTrustedSubjectSet(trustedSubjectNames),
+  [trustedSubjectNames]);
+
+  // ⚡ Bolt Optimization: Memoize derived `modules` array from Dexie useLiveQuery
+  // Impact: Prevents creating new array and object references on every render due to Dexie updates.
+  // Measurement: Verify component doesn't re-render cascadingly on related state updates.
+  const modules = useMemo(() =>
+    (dbModules || [])
+      .filter((module) => moduleMatchesTrustedSubjects(module, trustedSubjectSet))
+      .map(m => ({
+        ...m,
+        icon: getIconForCategory(m.category)
+      })),
+  [dbModules, trustedSubjectSet]);
   const selectedCount = modules.filter(m => m.selected).length;
 
   useEffect(() => {
