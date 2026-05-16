@@ -1,7 +1,17 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import axios from "axios";
-import { handleAIEmbed, handleAIGenerate, handleAIExplain, handleAILessonBlocks, handleAIStatus } from "./ai/shared";
-import { handleDeleteUserAiKey, handleTestUserAiKey, handleUserAiKeys } from "../src/server/api/userAiKeys";
+import {
+  handleAIEmbed,
+  handleAIGenerate,
+  handleAIExplain,
+  handleAILessonBlocks,
+  handleAIStatus,
+} from "./ai/shared";
+import {
+  handleDeleteUserAiKey,
+  handleTestUserAiKey,
+  handleUserAiKeys,
+} from "../src/server/api/userAiKeys";
 import { backfillTopicsFromLessons } from "../lib/topicSync";
 import { seedStarterLessonsFromTopics } from "../src/server/curriculum/starterLessons";
 import {
@@ -27,6 +37,7 @@ import {
   loadAiRecoveryTaskDetail,
   MAX_AUTOMATIC_RETRIES,
   requireAdminUser,
+  requireAuthenticatedUser,
   requireAiAdmin,
   resetAiRecoveryTask,
   runAiRecoverySafetyCheck,
@@ -53,7 +64,11 @@ import {
 } from "../src/server/api/curriculumValidation";
 
 type JsonBody = Record<string, any>;
-type RouteHandler = (req: VercelRequest, res: VercelResponse, segments: string[]) => Promise<VercelResponse | void>;
+type RouteHandler = (
+  req: VercelRequest,
+  res: VercelResponse,
+  segments: string[],
+) => Promise<VercelResponse | void>;
 const MAX_STARTER_TOPIC_IDS_PER_REQUEST = 25;
 
 function getSegments(req: VercelRequest) {
@@ -79,7 +94,11 @@ function routeKey(segments: string[]) {
   return segments.join("/");
 }
 
-function sendError(res: VercelResponse, error: unknown, fallbackMessage: string) {
+function sendError(
+  res: VercelResponse,
+  error: unknown,
+  fallbackMessage: string,
+) {
   if (error instanceof AiCommandCenterHttpError) {
     return res.status(error.status).json({ error: error.message });
   }
@@ -90,13 +109,18 @@ function sendError(res: VercelResponse, error: unknown, fallbackMessage: string)
 }
 
 function readContentType(value: string | undefined): CurriculumContentType {
-  if (value && (CURRICULUM_CONTENT_TYPES as readonly string[]).includes(value)) {
+  if (
+    value &&
+    (CURRICULUM_CONTENT_TYPES as readonly string[]).includes(value)
+  ) {
     return value as CurriculumContentType;
   }
   throw new AiCommandCenterHttpError(400, "content_type is required.");
 }
 
-function readReviewContentType(value: string | undefined): CurriculumContentType | "all" | null {
+function readReviewContentType(
+  value: string | undefined,
+): CurriculumContentType | "all" | null {
   if (!value || value === "all") return "all";
   if ((CURRICULUM_CONTENT_TYPES as readonly string[]).includes(value)) {
     return value as CurriculumContentType;
@@ -104,15 +128,22 @@ function readReviewContentType(value: string | undefined): CurriculumContentType
   throw new AiCommandCenterHttpError(400, "Unsupported content_type filter.");
 }
 
-function readValidationStatus(value: string | undefined): CurriculumValidationStatus | "all" | null {
+function readValidationStatus(
+  value: string | undefined,
+): CurriculumValidationStatus | "all" | null {
   if (!value || value === "all") return "all";
   if ((CURRICULUM_VALIDATION_STATUSES as readonly string[]).includes(value)) {
     return value as CurriculumValidationStatus;
   }
-  throw new AiCommandCenterHttpError(400, "Unsupported validation_status filter.");
+  throw new AiCommandCenterHttpError(
+    400,
+    "Unsupported validation_status filter.",
+  );
 }
 
-function readRecoveryStatus(value: string | undefined): AiRecoveryRecoveredLessonStatus {
+function readRecoveryStatus(
+  value: string | undefined,
+): AiRecoveryRecoveredLessonStatus {
   if (value === "approved" || value === "rejected") {
     return value;
   }
@@ -123,7 +154,10 @@ async function handleNvidiaProxy(req: VercelRequest, res: VercelResponse) {
   if (req.method === "OPTIONS") {
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    res.setHeader(
+      "Access-Control-Allow-Headers",
+      "Content-Type, Authorization",
+    );
     return res.status(200).end();
   }
 
@@ -137,6 +171,12 @@ async function handleNvidiaProxy(req: VercelRequest, res: VercelResponse) {
 
   if (!apiKey || apiKey === "MY_NVIDIA_API_KEY") {
     return res.status(503).json({ error: "NVIDIA API key not configured." });
+  }
+
+  try {
+    await requireAuthenticatedUser(req);
+  } catch (error) {
+    return res.status(401).json({ error: "Authentication required." });
   }
 
   try {
@@ -154,7 +194,10 @@ async function handleNvidiaProxy(req: VercelRequest, res: VercelResponse) {
 
     return res.status(response.status).json(response.data);
   } catch (error: any) {
-    const message = error?.response?.data?.detail || error?.response?.data?.message || error.message;
+    const message =
+      error?.response?.data?.detail ||
+      error?.response?.data?.message ||
+      error.message;
     console.error("[NVIDIA Proxy] Error:", message);
     return res
       .status(error?.response?.status || 502)
@@ -207,7 +250,10 @@ async function handleAiExecuteTask(req: VercelRequest, res: VercelResponse) {
     }
 
     const supabase = getServerSupabase();
-    const { task, issue, latestApproval } = await fetchTaskBundle(supabase, task_id);
+    const { task, issue, latestApproval } = await fetchTaskBundle(
+      supabase,
+      task_id,
+    );
     const plan = buildExecutionPlan(task, issue);
 
     if (plan.destructiveBlocked) {
@@ -237,7 +283,12 @@ async function handleAiExecuteTask(req: VercelRequest, res: VercelResponse) {
         "Worker is waiting for an approved write action before executing.",
         { approval_status: latestApproval?.status || "missing" },
       );
-      return res.status(409).json({ error: "Approval is required before execution.", waiting_approval: true });
+      return res
+        .status(409)
+        .json({
+          error: "Approval is required before execution.",
+          waiting_approval: true,
+        });
     }
 
     await updateTaskStatus(supabase, task_id, "running", 70);
@@ -280,7 +331,13 @@ async function handleAiExecuteTask(req: VercelRequest, res: VercelResponse) {
         "Dry run only. No write operations were executed.",
         { sql_preview: plan.sqlPreview },
       );
-      return res.status(200).json({ success: true, dry_run: true, execution_result: executionResult });
+      return res
+        .status(200)
+        .json({
+          success: true,
+          dry_run: true,
+          execution_result: executionResult,
+        });
     }
 
     if (lowerTitle.includes("missing topic")) {
@@ -294,7 +351,8 @@ async function handleAiExecuteTask(req: VercelRequest, res: VercelResponse) {
         {},
       );
       return res.status(409).json({
-        error: "No topic_id, no lesson. The task remains blocked until an exact mapping exists.",
+        error:
+          "No topic_id, no lesson. The task remains blocked until an exact mapping exists.",
         blocked: true,
       });
     }
@@ -307,7 +365,10 @@ async function handleAiExecuteTask(req: VercelRequest, res: VercelResponse) {
         COMMAND_CENTER_AGENTS.worker,
         "warning",
         "Duplicate lesson remediation requires an explicit action choice. Default action remains skip.",
-        { allowed_actions: ["skip", "update_existing", "create_new_version"], default_action: "skip" },
+        {
+          allowed_actions: ["skip", "update_existing", "create_new_version"],
+          default_action: "skip",
+        },
       );
       return res.status(409).json({
         error: "Duplicate lesson action choice required.",
@@ -324,22 +385,42 @@ async function handleAiExecuteTask(req: VercelRequest, res: VercelResponse) {
 
       if (queueError) throw queueError;
 
-      const retryableRows = (queueRows || []).filter((row: { id: string; attempts: number | null }) => Number(row.attempts || 0) < MAX_AUTOMATIC_RETRIES);
-      const permanentRows = (queueRows || []).filter((row: { id: string; attempts: number | null }) => Number(row.attempts || 0) >= MAX_AUTOMATIC_RETRIES);
+      const retryableRows = (queueRows || []).filter(
+        (row: { id: string; attempts: number | null }) =>
+          Number(row.attempts || 0) < MAX_AUTOMATIC_RETRIES,
+      );
+      const permanentRows = (queueRows || []).filter(
+        (row: { id: string; attempts: number | null }) =>
+          Number(row.attempts || 0) >= MAX_AUTOMATIC_RETRIES,
+      );
 
       if (retryableRows.length > 0) {
         const { error: retryError } = await supabase
           .from("lesson_gen_queue")
-          .update({ status: "pending", claimed_at: null, last_error: null, updated_at: new Date().toISOString() })
-          .in("id", retryableRows.map((row) => row.id));
+          .update({
+            status: "pending",
+            claimed_at: null,
+            last_error: null,
+            updated_at: new Date().toISOString(),
+          })
+          .in(
+            "id",
+            retryableRows.map((row) => row.id),
+          );
         if (retryError) throw retryError;
       }
 
       if (permanentRows.length > 0) {
         const { error: permanentError } = await supabase
           .from("lesson_gen_queue")
-          .update({ status: "permanent_failed", updated_at: new Date().toISOString() })
-          .in("id", permanentRows.map((row) => row.id));
+          .update({
+            status: "permanent_failed",
+            updated_at: new Date().toISOString(),
+          })
+          .in(
+            "id",
+            permanentRows.map((row) => row.id),
+          );
         if (permanentError) throw permanentError;
       }
 
@@ -369,7 +450,9 @@ async function handleAiExecuteTask(req: VercelRequest, res: VercelResponse) {
     }
 
     await updateTaskStatus(supabase, task_id, "validating", 85);
-    return res.status(200).json({ success: true, execution_result: executionResult });
+    return res
+      .status(200)
+      .json({ success: true, execution_result: executionResult });
   } catch (error) {
     return sendError(res, error, "Unable to execute task.");
   }
@@ -392,7 +475,9 @@ async function handleAiApproveTask(req: VercelRequest, res: VercelResponse) {
     const approval = await fetchLatestPendingApproval(supabase, task_id);
 
     if (!approval) {
-      return res.status(404).json({ error: "No pending approval request found for this task." });
+      return res
+        .status(404)
+        .json({ error: "No pending approval request found for this task." });
     }
 
     const { data, error } = await supabase
@@ -433,7 +518,10 @@ async function handleAiRejectTask(req: VercelRequest, res: VercelResponse) {
 
   try {
     const { user } = await requireAdminUser(req);
-    const { task_id, reason } = getBody(req) as { task_id?: string; reason?: string };
+    const { task_id, reason } = getBody(req) as {
+      task_id?: string;
+      reason?: string;
+    };
     if (!task_id) {
       return res.status(400).json({ error: "task_id is required" });
     }
@@ -477,14 +565,24 @@ async function handleAiRejectTask(req: VercelRequest, res: VercelResponse) {
   }
 }
 
-async function handleAiRequestApproval(req: VercelRequest, res: VercelResponse) {
+async function handleAiRequestApproval(
+  req: VercelRequest,
+  res: VercelResponse,
+) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
   try {
     await requireAdminUser(req);
-    const { task_id, proposed_action, risk_level, sql_preview, affected_records, rollback_plan } = getBody(req) as {
+    const {
+      task_id,
+      proposed_action,
+      risk_level,
+      sql_preview,
+      affected_records,
+      rollback_plan,
+    } = getBody(req) as {
       task_id?: string;
       proposed_action?: string;
       risk_level?: string;
@@ -506,7 +604,9 @@ async function handleAiRequestApproval(req: VercelRequest, res: VercelResponse) 
       risk_level: risk_level || "medium",
       sql_preview: sql_preview || null,
       affected_records: affected_records ?? null,
-      rollback_plan: rollback_plan || "Restore from the latest execution snapshot before retrying.",
+      rollback_plan:
+        rollback_plan ||
+        "Restore from the latest execution snapshot before retrying.",
       status: "pending",
     };
 
@@ -555,7 +655,14 @@ async function handleAiRunAudit(req: VercelRequest, res: VercelResponse) {
     const audit = await runAuditForTask(supabase, task, issue);
 
     for (const log of audit.logs) {
-      await createTaskLog(supabase, task_id, log.agent_name, log.log_type, log.message, log.metadata);
+      await createTaskLog(
+        supabase,
+        task_id,
+        log.agent_name,
+        log.log_type,
+        log.message,
+        log.metadata,
+      );
     }
 
     const nextStatus = audit.report.recommended_status;
@@ -563,7 +670,11 @@ async function handleAiRunAudit(req: VercelRequest, res: VercelResponse) {
       supabase,
       task_id,
       nextStatus,
-      nextStatus === "waiting_approval" ? 55 : nextStatus === "waiting_for_chunks" ? 45 : 50,
+      nextStatus === "waiting_approval"
+        ? 55
+        : nextStatus === "waiting_for_chunks"
+          ? 45
+          : 50,
     );
 
     return res.status(200).json(audit);
@@ -605,7 +716,14 @@ async function handleAiValidateTask(req: VercelRequest, res: VercelResponse) {
     const validation = await validateTaskExecution(supabase, task, issue);
 
     for (const log of validation.logs) {
-      await createTaskLog(supabase, task_id, log.agent_name, log.log_type, log.message, log.metadata);
+      await createTaskLog(
+        supabase,
+        task_id,
+        log.agent_name,
+        log.log_type,
+        log.message,
+        log.metadata,
+      );
     }
 
     await updateTaskStatus(
@@ -616,7 +734,10 @@ async function handleAiValidateTask(req: VercelRequest, res: VercelResponse) {
     );
     await supabase
       .from("ai_issues")
-      .update({ status: validation.validation_report.issue_status, updated_at: new Date().toISOString() })
+      .update({
+        status: validation.validation_report.issue_status,
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", issue.id);
 
     return res.status(200).json(validation);
@@ -719,14 +840,22 @@ Be specific and reference actual numbers from the metrics. Be concise but comple
       const supabase = getServerSupabase();
       const { error } = await supabase
         .from("lesson_gen_queue")
-        .update({ status: "pending", attempts: 0, last_error: null, claimed_at: null })
+        .update({
+          status: "pending",
+          attempts: 0,
+          last_error: null,
+          claimed_at: null,
+        })
         .eq("status", "failed");
 
       if (error) {
         return res.status(500).json({ error: error.message });
       }
 
-      return res.json({ success: true, message: `Reset ${metrics.failedJobs} failed jobs back to pending.` });
+      return res.json({
+        success: true,
+        message: `Reset ${metrics.failedJobs} failed jobs back to pending.`,
+      });
     }
 
     if (!action || !(action in actionPrompts)) {
@@ -763,19 +892,29 @@ Be specific and reference actual numbers from the metrics. Be concise but comple
       parsed = { raw };
     }
 
-    return res.json({ ok: true, result: parsed, model: "qwen/qwen3-coder-480b-a35b-instruct" });
+    return res.json({
+      ok: true,
+      result: parsed,
+      model: "qwen/qwen3-coder-480b-a35b-instruct",
+    });
   } catch (error: any) {
     if (error instanceof AiCommandCenterHttpError) {
       return res.status(error.status).json({ error: error.message });
     }
 
-    const message = error?.response?.data?.detail || error?.response?.data?.message || error.message;
+    const message =
+      error?.response?.data?.detail ||
+      error?.response?.data?.message ||
+      error.message;
     console.error("[AI Analyst] NVIDIA API error:", message);
     return res.status(502).json({ error: `NVIDIA API error: ${message}` });
   }
 }
 
-async function handleCurriculumReviewList(req: VercelRequest, res: VercelResponse) {
+async function handleCurriculumReviewList(
+  req: VercelRequest,
+  res: VercelResponse,
+) {
   if (req.method !== "GET") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -787,7 +926,9 @@ async function handleCurriculumReviewList(req: VercelRequest, res: VercelRespons
       grade: readQuery(req, "grade") || null,
       subject: readQuery(req, "subject") || null,
       topic: readQuery(req, "topic") || null,
-      validation_status: readValidationStatus(readQuery(req, "validation_status")),
+      validation_status: readValidationStatus(
+        readQuery(req, "validation_status"),
+      ),
       source_confidence: readQuery(req, "source_confidence") || null,
     };
 
@@ -798,7 +939,10 @@ async function handleCurriculumReviewList(req: VercelRequest, res: VercelRespons
   }
 }
 
-async function handleCurriculumReviewDetail(req: VercelRequest, res: VercelResponse) {
+async function handleCurriculumReviewDetail(
+  req: VercelRequest,
+  res: VercelResponse,
+) {
   if (req.method !== "GET") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -812,14 +956,21 @@ async function handleCurriculumReviewDetail(req: VercelRequest, res: VercelRespo
       return res.status(400).json({ error: "content_id is required." });
     }
 
-    const detail = await loadCurriculumReviewDetail(getServerSupabase(), contentType, contentId);
+    const detail = await loadCurriculumReviewDetail(
+      getServerSupabase(),
+      contentType,
+      contentId,
+    );
     return res.status(200).json({ detail });
   } catch (error) {
     return sendError(res, error, "Unable to load curriculum review detail.");
   }
 }
 
-async function handleCurriculumReviewAction(req: VercelRequest, res: VercelResponse) {
+async function handleCurriculumReviewAction(
+  req: VercelRequest,
+  res: VercelResponse,
+) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -827,8 +978,11 @@ async function handleCurriculumReviewAction(req: VercelRequest, res: VercelRespo
   try {
     const { user } = await requireAdminUser(req);
     const body = getBody(req);
-    const contentType = readContentType(typeof body.content_type === "string" ? body.content_type : "");
-    const contentId = typeof body.content_id === "string" ? body.content_id : "";
+    const contentType = readContentType(
+      typeof body.content_type === "string" ? body.content_type : "",
+    );
+    const contentId =
+      typeof body.content_id === "string" ? body.content_id : "";
     const action = typeof body.action === "string" ? body.action : "";
 
     if (!contentId) {
@@ -844,12 +998,15 @@ async function handleCurriculumReviewAction(req: VercelRequest, res: VercelRespo
       contentId,
       action: action as any,
       actorUserId: user.id,
-      reviewNotes: typeof body.review_notes === "string" ? body.review_notes : null,
+      reviewNotes:
+        typeof body.review_notes === "string" ? body.review_notes : null,
       title: typeof body.title === "string" ? body.title : null,
       content: typeof body.content === "string" ? body.content : null,
       answer: typeof body.answer === "string" ? body.answer : null,
-      sourceRefId: typeof body.source_ref_id === "string" ? body.source_ref_id : null,
-      sourceName: typeof body.source_name === "string" ? body.source_name : null,
+      sourceRefId:
+        typeof body.source_ref_id === "string" ? body.source_ref_id : null,
+      sourceName:
+        typeof body.source_name === "string" ? body.source_name : null,
       sourceUrl: typeof body.source_url === "string" ? body.source_url : null,
     });
 
@@ -873,7 +1030,10 @@ async function handleTopicsRepair(req: VercelRequest, res: VercelResponse) {
   }
 }
 
-async function handleSeedStarterLessons(req: VercelRequest, res: VercelResponse) {
+async function handleSeedStarterLessons(
+  req: VercelRequest,
+  res: VercelResponse,
+) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -882,7 +1042,10 @@ async function handleSeedStarterLessons(req: VercelRequest, res: VercelResponse)
     await requireAdminUser(req);
     const body = getBody(req);
     const topicIds = Array.isArray(body.topic_ids)
-      ? body.topic_ids.filter((id: unknown): id is string => typeof id === "string" && id.trim().length > 0)
+      ? body.topic_ids.filter(
+          (id: unknown): id is string =>
+            typeof id === "string" && id.trim().length > 0,
+        )
       : [];
 
     if (topicIds.length === 0) {
@@ -906,20 +1069,26 @@ async function handleSeedStarterLessons(req: VercelRequest, res: VercelResponse)
   }
 }
 
-async function handleAiRecovery(req: VercelRequest, res: VercelResponse, segments: string[]) {
+async function handleAiRecovery(
+  req: VercelRequest,
+  res: VercelResponse,
+  segments: string[],
+) {
   const supabase = getServerSupabase();
 
   try {
     await requireAdminUser(req);
 
     if (segments.length === 3 && segments[2] === "failed-jobs") {
-      if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
+      if (req.method !== "GET")
+        return res.status(405).json({ error: "Method not allowed" });
       const jobs = await loadAiRecoveryFailedJobs(supabase);
       return res.status(200).json({ jobs });
     }
 
     if (segments.length === 3 && segments[2] === "logs") {
-      if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
+      if (req.method !== "GET")
+        return res.status(405).json({ error: "Method not allowed" });
       const logs = await loadAiRecoveryLogs(supabase, {
         event_type: readQuery(req, "event_type") || null,
         job_id: readQuery(req, "job_id") || null,
@@ -931,8 +1100,12 @@ async function handleAiRecovery(req: VercelRequest, res: VercelResponse, segment
     }
 
     if (segments.length === 3 && segments[2] === "recovered-lessons") {
-      if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
-      const lessons = await loadAiRecoveryRecoveredLessons(supabase, readRecoveryStatus(readQuery(req, "status")));
+      if (req.method !== "GET")
+        return res.status(405).json({ error: "Method not allowed" });
+      const lessons = await loadAiRecoveryRecoveredLessons(
+        supabase,
+        readRecoveryStatus(readQuery(req, "status")),
+      );
       return res.status(200).json({ lessons });
     }
 
@@ -945,8 +1118,12 @@ async function handleAiRecovery(req: VercelRequest, res: VercelResponse, segment
       }
 
       if (action === "detail") {
-        if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
-        const detail = await loadAiRecoveryRecoveredLessonDetail(supabase, lessonId);
+        if (req.method !== "GET")
+          return res.status(405).json({ error: "Method not allowed" });
+        const detail = await loadAiRecoveryRecoveredLessonDetail(
+          supabase,
+          lessonId,
+        );
         return res.status(200).json({ detail });
       }
 
@@ -956,25 +1133,44 @@ async function handleAiRecovery(req: VercelRequest, res: VercelResponse, segment
 
       if (action === "save") {
         const body = getBody(req);
-        const detail = await saveRecoveredLessonReviewEdits(supabase, lessonId, {
-          lesson_title: typeof body.lesson_title === "string" ? body.lesson_title : "",
-          subtitle: typeof body.subtitle === "string" ? body.subtitle : "",
-          blocks: Array.isArray(body.blocks) ? body.blocks : [],
-        });
+        const detail = await saveRecoveredLessonReviewEdits(
+          supabase,
+          lessonId,
+          {
+            lesson_title:
+              typeof body.lesson_title === "string" ? body.lesson_title : "",
+            subtitle: typeof body.subtitle === "string" ? body.subtitle : "",
+            blocks: Array.isArray(body.blocks) ? body.blocks : [],
+          },
+        );
         return res.status(200).json({ detail });
       }
 
       const { user } = await requireAdminUser(req);
       if (action === "approve") {
-        const lesson = await updateRecoveredLessonReviewStatus(supabase, lessonId, "approved", user.id);
+        const lesson = await updateRecoveredLessonReviewStatus(
+          supabase,
+          lessonId,
+          "approved",
+          user.id,
+        );
         return res.status(200).json({ lesson });
       }
       if (action === "reject") {
-        const lesson = await updateRecoveredLessonReviewStatus(supabase, lessonId, "rejected", user.id);
+        const lesson = await updateRecoveredLessonReviewStatus(
+          supabase,
+          lessonId,
+          "rejected",
+          user.id,
+        );
         return res.status(200).json({ lesson });
       }
       if (action === "send-back") {
-        const result = await sendRecoveredLessonToAi(supabase, lessonId, user.id);
+        const result = await sendRecoveredLessonToAi(
+          supabase,
+          lessonId,
+          user.id,
+        );
         return res.status(200).json(result);
       }
     }
@@ -988,15 +1184,21 @@ async function handleAiRecovery(req: VercelRequest, res: VercelResponse, segment
       }
 
       if (action === "diagnostics") {
-        if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
+        if (req.method !== "GET")
+          return res.status(405).json({ error: "Method not allowed" });
         const diagnostics = await loadAiRecoveryJobDiagnostics(supabase, jobId);
         return res.status(200).json({ diagnostics });
       }
 
       if (action === "create-task") {
-        if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+        if (req.method !== "POST")
+          return res.status(405).json({ error: "Method not allowed" });
         const { user } = await requireAdminUser(req);
-        const result = await createAiRecoveryTaskForJob(supabase, jobId, user.id);
+        const result = await createAiRecoveryTaskForJob(
+          supabase,
+          jobId,
+          user.id,
+        );
         return res.status(200).json(result);
       }
     }
@@ -1010,7 +1212,8 @@ async function handleAiRecovery(req: VercelRequest, res: VercelResponse, segment
       }
 
       if (action === "detail") {
-        if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
+        if (req.method !== "GET")
+          return res.status(405).json({ error: "Method not allowed" });
         const detail = await loadAiRecoveryTaskDetail(supabase, taskId);
         return res.status(200).json({ detail });
       }
@@ -1021,28 +1224,52 @@ async function handleAiRecovery(req: VercelRequest, res: VercelResponse, segment
 
       if (action === "generate-sql") {
         const { user } = await requireAdminUser(req);
-        const result = await generateAiRecoveryRepairSql(supabase, taskId, user.id);
+        const result = await generateAiRecoveryRepairSql(
+          supabase,
+          taskId,
+          user.id,
+        );
         return res.status(200).json(result);
       }
       if (action === "safety-check") {
         const { user } = await requireAdminUser(req);
-        const result = await runAiRecoverySafetyCheck(supabase, taskId, user.id);
+        const result = await runAiRecoverySafetyCheck(
+          supabase,
+          taskId,
+          user.id,
+        );
         return res.status(200).json(result);
       }
       if (action === "approve-execute") {
         const { user } = await requireAdminUser(req);
-        const result = await approveAiRecoveryTaskExecution(supabase, taskId, user.id);
+        const result = await approveAiRecoveryTaskExecution(
+          supabase,
+          taskId,
+          user.id,
+        );
         return res.status(200).json(result);
       }
       if (action === "execute") {
         const { user } = await requireAdminUser(req);
-        const result = await executeAiRecoveryTaskSql(supabase, taskId, user.id);
+        const result = await executeAiRecoveryTaskSql(
+          supabase,
+          taskId,
+          user.id,
+        );
         return res.status(200).json(result);
       }
       if (action === "reject-sql") {
         const { user } = await requireAdminUser(req);
-        const reason = typeof getBody(req).reason === "string" ? getBody(req).reason : undefined;
-        const result = await rejectAiRecoveryTaskSql(supabase, taskId, user.id, reason);
+        const reason =
+          typeof getBody(req).reason === "string"
+            ? getBody(req).reason
+            : undefined;
+        const result = await rejectAiRecoveryTaskSql(
+          supabase,
+          taskId,
+          user.id,
+          reason,
+        );
         return res.status(200).json(result);
       }
       if (action === "copy-sql") {
@@ -1087,7 +1314,10 @@ const rootRoutes: Record<string, RouteHandler> = {
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.setHeader(
+    "Cache-Control",
+    "no-store, no-cache, must-revalidate, proxy-revalidate",
+  );
   res.setHeader("CDN-Cache-Control", "no-store");
   res.setHeader("Vercel-CDN-Cache-Control", "no-store");
   res.setHeader("Pragma", "no-cache");
@@ -1102,8 +1332,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (segments[0] === "user" && segments[1] === "ai-keys") {
     if (segments.length === 2) return handleUserAiKeys(req, res);
-    if (segments.length === 3 && segments[2] === "test") return handleTestUserAiKey(req, res);
-    if (segments.length === 3) return handleDeleteUserAiKey(req, res, segments[2]);
+    if (segments.length === 3 && segments[2] === "test")
+      return handleTestUserAiKey(req, res);
+    if (segments.length === 3)
+      return handleDeleteUserAiKey(req, res, segments[2]);
   }
 
   const routeHandler = rootRoutes[key];
