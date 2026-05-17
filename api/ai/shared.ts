@@ -1,5 +1,11 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { generateAIResponse, generateContextualExplanation, generateEmbedding, generateLessonBlocks } from "../../src/lib/ai/provider";
+import {
+  generateAIResponse,
+  generateContextualExplanation,
+  generateEmbedding,
+  generateLessonBlocks,
+  getDevAdminAiStatus,
+} from "../../src/lib/ai/provider";
 import { requireAuthenticatedUser } from "../../src/server/api/aiCommandCenter";
 
 type ApiRequest = VercelRequest;
@@ -20,26 +26,56 @@ const readConfig = (body: Record<string, any>) => body.config && typeof body.con
 const hasSecret = (value: string | undefined, placeholder: string) =>
   !!value && value.trim().length > 0 && value !== placeholder;
 
+const isConfigurationError = (message: string) =>
+  /no ai provider configured|not configured/i.test(message);
+
+const hasBearerToken = (req: ApiRequest) => {
+  const header = req.headers.authorization || req.headers.Authorization;
+  return typeof header === "string" && /^Bearer\s+.+/i.test(header);
+};
+
+const isProductionLike = () => process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
+
+const resolveCredentialContext = async (req: ApiRequest, body: Record<string, any>) => {
+  const wantsByok = body.credentialMode === "byok";
+  if (wantsByok && !isProductionLike() && typeof body.requestApiKey === "string" && body.requestApiKey.trim()) {
+    return { credentialMode: "byok" as const, userId: undefined };
+  }
+
+  if (!wantsByok || !hasBearerToken(req)) {
+    return { credentialMode: "platform" as const, userId: undefined };
+  }
+
+  const user = await requireAuthenticatedUser(req);
+  return { credentialMode: "byok" as const, userId: user.id };
+};
+
 export async function handleAIStatus(req: ApiRequest, res: ApiResponse) {
   if (req.method !== "GET") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const geminiConfigured = hasSecret(process.env.GEMINI_API_KEY || process.env.GEMINI_KEY_0, "MY_GEMINI_API_KEY");
+  const geminiConfigured = hasSecret(
+    process.env.GEMINI_API_KEY || process.env.GEMINI_KEY_0 || process.env.AI_API_KEY || process.env.VITE_AI_API_KEY,
+    "MY_GEMINI_API_KEY",
+  );
   const nvidiaConfigured = hasSecret(process.env.NVIDIA_API_KEY, "MY_NVIDIA_API_KEY");
   const openRouterConfigured = hasSecret(process.env.OPENROUTER_API_KEY, "MY_OPENROUTER_API_KEY");
   const openAiConfigured = hasSecret(process.env.OPENAI_API_KEY, "MY_OPENAI_API_KEY");
-  const configuredProvider = String(process.env.AI_PROVIDER || "gemini").toLowerCase();
+  const devAdmin = getDevAdminAiStatus();
+  const configuredProvider = String(devAdmin.defaultProvider || process.env.AI_PROVIDER || "gemini").toLowerCase();
   const fallbackProvider = String(process.env.AI_FALLBACK_PROVIDER || "").toLowerCase();
 
   return res.status(200).json({
-    configured: geminiConfigured || nvidiaConfigured || openRouterConfigured || openAiConfigured,
+    configured: geminiConfigured || nvidiaConfigured || openRouterConfigured || openAiConfigured || Object.values(devAdmin.providers).some(Boolean),
     providers: {
       gemini: geminiConfigured,
       nvidia: nvidiaConfigured,
       openrouter: openRouterConfigured,
       openai: openAiConfigured,
     },
+    // TODO(auth): temporary developer/admin key status only. Never expose raw DEV_ADMIN_* keys to the browser.
+    devAdmin,
     defaultProvider: ["gemini", "nvidia", "openrouter", "openai"].includes(configuredProvider) ? configuredProvider : "gemini",
     fallbackProvider: ["gemini", "nvidia", "openrouter", "openai"].includes(fallbackProvider) ? fallbackProvider : null,
     fallbackEnabled: process.env.AI_FALLBACK_ENABLED !== "false",
@@ -66,8 +102,7 @@ export async function handleAIGenerate(req: ApiRequest, res: ApiResponse) {
   }
 
   try {
-    const credentialMode = body.credentialMode === "byok" ? "byok" : "platform";
-    const user = credentialMode === "byok" ? await requireAuthenticatedUser(req) : null;
+    const credentials = await resolveCredentialContext(req, body);
     const result = await generateAIResponse({
       prompt,
       provider: body.provider,
@@ -77,13 +112,14 @@ export async function handleAIGenerate(req: ApiRequest, res: ApiResponse) {
       maxOutputTokens: typeof config.maxOutputTokens === "number" ? config.maxOutputTokens : undefined,
       temperature: typeof config.temperature === "number" ? config.temperature : undefined,
       fallbackEnabled: body.fallbackEnabled,
-      credentialMode,
-      userId: user?.id,
+      credentialMode: credentials.credentialMode,
+      userId: credentials.userId,
+      requestApiKey: typeof body.requestApiKey === "string" && !isProductionLike() ? body.requestApiKey : undefined,
     });
     return res.status(200).json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : "AI request failed.";
-    return res.status(message.includes("not configured") ? 503 : 502).json({ error: message });
+    return res.status(isConfigurationError(message) ? 503 : 502).json({ error: message });
   }
 }
 
@@ -111,20 +147,20 @@ Surrounding paragraph: ${body.surroundingParagraph || ""}
 Return a concise student-friendly answer.`;
 
   try {
-    const credentialMode = body.credentialMode === "byok" ? "byok" : "platform";
-    const user = credentialMode === "byok" ? await requireAuthenticatedUser(req) : null;
+    const credentials = await resolveCredentialContext(req, body);
     const result = await generateContextualExplanation({
       prompt,
       provider: body.provider,
       model: body.model,
       maxOutputTokens: 1200,
-      credentialMode,
-      userId: user?.id,
+      credentialMode: credentials.credentialMode,
+      userId: credentials.userId,
+      requestApiKey: typeof body.requestApiKey === "string" && !isProductionLike() ? body.requestApiKey : undefined,
     });
     return res.status(200).json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : "AI explanation failed.";
-    return res.status(message.includes("not configured") ? 503 : 502).json({ error: message });
+    return res.status(isConfigurationError(message) ? 503 : 502).json({ error: message });
   }
 }
 
@@ -140,20 +176,20 @@ export async function handleAILessonBlocks(req: ApiRequest, res: ApiResponse) {
   }
 
   try {
-    const credentialMode = body.credentialMode === "byok" ? "byok" : "platform";
-    const user = credentialMode === "byok" ? await requireAuthenticatedUser(req) : null;
+    const credentials = await resolveCredentialContext(req, body);
     const result = await generateLessonBlocks({
       prompt,
       provider: body.provider,
       model: body.model,
       maxOutputTokens: 4096,
-      credentialMode,
-      userId: user?.id,
+      credentialMode: credentials.credentialMode,
+      userId: credentials.userId,
+      requestApiKey: typeof body.requestApiKey === "string" && !isProductionLike() ? body.requestApiKey : undefined,
     });
     return res.status(200).json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : "AI lesson block generation failed.";
-    return res.status(message.includes("not configured") ? 503 : 502).json({ error: message });
+    return res.status(isConfigurationError(message) ? 503 : 502).json({ error: message });
   }
 }
 
@@ -173,6 +209,6 @@ export async function handleAIEmbed(req: ApiRequest, res: ApiResponse) {
     return res.status(200).json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : "AI embedding failed.";
-    return res.status(message.includes("not configured") ? 503 : 502).json({ error: message });
+    return res.status(isConfigurationError(message) ? 503 : 502).json({ error: message });
   }
 }

@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { getGradeCandidates, getSubjectCandidates, normalizeCurriculumValue, pickBestCurriculumMatch } from '../services/curriculumMatching';
+import { FRENCH_SUBJECT_DOMAINS } from '../services/curriculumStructure';
 import {
   getLessonSelectColumns,
   inferLegacyLessonSourceConfidence,
@@ -72,6 +73,49 @@ type SupabaseTopicOutlineRow = {
   title: string;
   description: string;
   outline_order: number;
+};
+
+type ClassroomDomain = {
+  key: string;
+  code: string;
+  name: string;
+  order: number;
+};
+
+const FRENCH_DOMAIN_TITLE_PREFIXES: Record<string, string[]> = {
+  GRAMMAIRE: ['grammaire', 'langue'],
+  CONJUGAISON: ['conjugaison'],
+  ORTHOGRAPHE: ['orthographe'],
+  LEXIQUE: ['lexique', 'vocabulaire'],
+  LECTURE: ['lecture'],
+  EXPRESSION_ECRITE: ['expression ecrite', 'production ecrite', 'redaction', 'la production ecrite'],
+  COMMUNICATION_ORALE: ['communication orale', 'oral'],
+};
+
+const inferFrenchDomainCodeFromTitle = (title: string | null | undefined) => {
+  const normalizedTitle = normalizeCurriculumValue(String(title || ''));
+  if (!normalizedTitle) return null;
+
+  for (const domain of FRENCH_SUBJECT_DOMAINS) {
+    const normalizedName = normalizeCurriculumValue(domain.name);
+    const prefixes = FRENCH_DOMAIN_TITLE_PREFIXES[domain.code] || [];
+    const matchesDomainName =
+      normalizedTitle === normalizedName ||
+      normalizedTitle.startsWith(`${normalizedName}:`) ||
+      normalizedTitle.startsWith(`${normalizedName} -`);
+    const matchesPrefix = prefixes.some((prefix) => {
+      const normalizedPrefix = normalizeCurriculumValue(prefix);
+      return (
+        normalizedTitle === normalizedPrefix ||
+        normalizedTitle.startsWith(`${normalizedPrefix}:`) ||
+        normalizedTitle.startsWith(`${normalizedPrefix} -`)
+      );
+    });
+
+    if (matchesDomainName || matchesPrefix) return domain.code;
+  }
+
+  return null;
 };
 
 const CLASSROOM_TAB_CONFIG = {
@@ -147,6 +191,7 @@ export const ClassroomView: React.FC = () => {
   const [isGeneratingStarterLessons, setIsGeneratingStarterLessons] = useState(false);
   const [isHydratingSupabase, setIsHydratingSupabase] = useState(false);
   const [topicFallbackRows, setTopicFallbackRows] = useState<SupabaseTopicRow[]>([]);
+  const [curriculumTopicRows, setCurriculumTopicRows] = useState<SupabaseTopicRow[]>([]);
   const [suggestions, setSuggestions] = useState<LessonSuggestion[]>([]);
   const [selectedSuggestions, setSelectedSuggestions] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'lessons' | 'quizzes' | 'exercises'>('lessons');
@@ -213,9 +258,27 @@ export const ClassroomView: React.FC = () => {
   );
   const hasLessons = lessons.length > 0;
   const hasTopicFallback = !hasLessons && topicFallbackRows.length > 0;
+  const topicDomainRows = curriculumTopicRows.length > 0 ? curriculumTopicRows : topicFallbackRows;
+  const topicDomainById = useMemo(() => {
+    const domains = new Map<string, ClassroomDomain>();
+    for (const topic of topicDomainRows) {
+      if (!topic.id || !topic.domain_name) continue;
+
+      const key = topic.domain_id || topic.domain_code || topic.domain_name;
+      if (!key) continue;
+
+      domains.set(topic.id, {
+        key,
+        code: topic.domain_code || "DOMAIN",
+        name: topic.domain_name,
+        order: topic.domain_order ?? 999,
+      });
+    }
+    return domains;
+  }, [topicDomainRows]);
   const topicFallbackDomains = useMemo(() => {
-    const domains = new Map<string, { key: string; code: string; name: string; order: number }>();
-    for (const topic of topicFallbackRows) {
+    const domains = new Map<string, ClassroomDomain>();
+    for (const topic of topicDomainRows) {
       const key = topic.domain_id || topic.domain_code || topic.domain_name;
       if (!key || !topic.domain_name) continue;
       domains.set(key, {
@@ -226,8 +289,55 @@ export const ClassroomView: React.FC = () => {
       });
     }
     return Array.from(domains.values()).sort((left, right) => left.order - right.order || left.name.localeCompare(right.name));
-  }, [topicFallbackRows]);
-  const showDomainTabs = topicFallbackDomains.length > 0;
+  }, [topicDomainRows]);
+  const frenchDomainByCode = useMemo(
+    () => new Map(FRENCH_SUBJECT_DOMAINS.map((domain) => [domain.code, domain])),
+    [],
+  );
+  const lessonDomainStats = useMemo(() => {
+    if (!hasLessons) return topicFallbackDomains.map((domain) => ({ ...domain, count: 0 }));
+
+    const counts = new Map<string, ClassroomDomain & { count: number }>();
+    for (const lesson of lessons) {
+      const domain =
+        (lesson.topic_id ? topicDomainById.get(lesson.topic_id) : undefined) ||
+        (() => {
+          const code = inferFrenchDomainCodeFromTitle(lesson.title);
+          const frenchDomain = code ? frenchDomainByCode.get(code) : undefined;
+          return frenchDomain
+            ? { key: frenchDomain.code, code: frenchDomain.code, name: frenchDomain.name, order: frenchDomain.order }
+            : undefined;
+        })();
+
+      if (!domain) continue;
+
+      const existing = counts.get(domain.key);
+      counts.set(domain.key, {
+        ...domain,
+        count: (existing?.count || 0) + 1,
+      });
+    }
+
+    return Array.from(counts.values()).sort((left, right) => left.order - right.order || left.name.localeCompare(right.name));
+  }, [frenchDomainByCode, hasLessons, lessons, topicDomainById, topicFallbackDomains]);
+  const showDomainTabs = lessonDomainStats.length > 0 || topicFallbackDomains.length > 0;
+  const visibleLessons = useMemo(() => {
+    if (!showDomainTabs || activeDomainKey === 'all') return lessons;
+
+    return lessons.filter((lesson) => {
+      const domain =
+        (lesson.topic_id ? topicDomainById.get(lesson.topic_id) : undefined) ||
+        (() => {
+          const code = inferFrenchDomainCodeFromTitle(lesson.title);
+          const frenchDomain = code ? frenchDomainByCode.get(code) : undefined;
+          return frenchDomain
+            ? { key: frenchDomain.code, code: frenchDomain.code, name: frenchDomain.name, order: frenchDomain.order }
+            : undefined;
+        })();
+
+      return domain?.key === activeDomainKey;
+    });
+  }, [activeDomainKey, frenchDomainByCode, lessons, showDomainTabs, topicDomainById]);
   const visibleTopicFallbackRows = useMemo(() => {
     if (!showDomainTabs || activeDomainKey === 'all') return topicFallbackRows;
 
@@ -514,6 +624,7 @@ export const ClassroomView: React.FC = () => {
           fetchSupabaseLessons(),
           fetchSupabaseTopics(),
         ]);
+        setCurriculumTopicRows(topics);
         if (cloudLessons.length === 0) {
           setTopicFallbackRows(topics);
           return;
@@ -535,10 +646,10 @@ export const ClassroomView: React.FC = () => {
       return;
     }
 
-    if (activeDomainKey !== 'all' && !topicFallbackDomains.some((domain) => domain.key === activeDomainKey)) {
+    if (activeDomainKey !== 'all' && !lessonDomainStats.some((domain) => domain.key === activeDomainKey)) {
       setActiveDomainKey('all');
     }
-  }, [activeDomainKey, showDomainTabs, topicFallbackDomains]);
+  }, [activeDomainKey, lessonDomainStats, showDomainTabs]);
 
   useEffect(() => {
     const fetchExtraData = async () => {
@@ -837,6 +948,7 @@ export const ClassroomView: React.FC = () => {
 
       if (!dbLessons || dbLessons.length === 0) {
         const topics = await fetchSupabaseTopics();
+        setCurriculumTopicRows(topics);
 
         if (topics.length > 0) {
           setTopicFallbackRows(topics.filter((topic) => !existingTitles.has(normalizeLessonTitle(topic.title))));
@@ -851,6 +963,7 @@ export const ClassroomView: React.FC = () => {
       }
 
       await hydrateLessonCache(dbLessons);
+      setCurriculumTopicRows(await fetchSupabaseTopics());
       setTopicFallbackRows([]);
       cloudHydrationKeyRef.current = classroomScopeKey;
 
@@ -901,6 +1014,7 @@ export const ClassroomView: React.FC = () => {
       toast.success(`Generated ${inserted} starter lessons. Skipped ${skipped} existing topics.`);
 
       const cloudLessons = await fetchSupabaseLessons();
+      setCurriculumTopicRows(await fetchSupabaseTopics());
       await hydrateLessonCache(cloudLessons);
       setTopicFallbackRows([]);
       cloudHydrationKeyRef.current = classroomScopeKey;
@@ -1223,7 +1337,7 @@ export const ClassroomView: React.FC = () => {
                       >
                         {t('all')}
                       </button>
-                      {topicFallbackDomains.map((domain) => (
+                      {lessonDomainStats.map((domain) => (
                         <button
                           key={domain.key}
                           onClick={() => setActiveDomainKey(domain.key)}
@@ -1234,6 +1348,7 @@ export const ClassroomView: React.FC = () => {
                           }`}
                         >
                           {domain.name}
+                          {hasLessons && <span className="ml-1 opacity-70">{domain.count}</span>}
                         </button>
                       ))}
                     </div>
@@ -1242,7 +1357,7 @@ export const ClassroomView: React.FC = () => {
                 
                 <div className="grid grid-cols-1 gap-3">
                   {Array.isArray(lessons) && lessons.length > 0 ? (
-                    lessons.map((lesson, i) => (
+                    visibleLessons.length > 0 ? visibleLessons.map((lesson, i) => (
                       <motion.div 
                         key={lesson.id}
                         initial={{ opacity: 0, y: 10 }}
@@ -1294,7 +1409,12 @@ export const ClassroomView: React.FC = () => {
                         </div>
                         <ChevronRight size={20} className="text-muted/30 group-hover:text-accent group-hover:translate-x-1 transition-all" />
                       </motion.div>
-                    ))
+                    )) : (
+                      <div className="rounded-2xl border border-dashed border-ink/10 bg-paper p-5">
+                        <p className="text-sm font-semibold text-ink">No lessons in this domain yet.</p>
+                        <p className="mt-1 text-xs text-muted">Switch back to {t('all')} to see every available lesson for this classroom.</p>
+                      </div>
+                    )
                   ) : hasTopicFallback ? (
                     visibleTopicFallbackRows.map((topic, i) => (
                       <motion.div

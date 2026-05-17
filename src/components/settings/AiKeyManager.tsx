@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AlertCircle, CheckCircle2, Key, Loader2, Save, ShieldCheck, Trash2, Zap } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Key, Loader2, Save, Server, ShieldCheck, Trash2, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../../db/supabase';
 
@@ -14,18 +14,47 @@ type KeyMetadata = {
   updatedAt: string | null;
 };
 
+type PlatformStatus = {
+  configured: boolean;
+  platformCreditsEnabled: boolean;
+  defaultProvider: string;
+  fallbackProvider: string | null;
+  providers: Record<string, boolean>;
+  devAdmin?: {
+    enabled: boolean;
+    providers: Partial<Record<Provider, boolean>>;
+    defaultProvider: string | null;
+  };
+};
+
+const isLocalDeveloperHost = () =>
+  ["localhost", "127.0.0.1", "0.0.0.0"].includes(window.location.hostname);
+
 const PROVIDERS: { id: Provider; label: string; placeholder: string }[] = [
   { id: 'gemini', label: 'Gemini', placeholder: 'AIza...' },
   { id: 'openrouter', label: 'OpenRouter', placeholder: 'sk-or-...' },
   { id: 'openai', label: 'OpenAI', placeholder: 'sk-...' },
 ];
 
+const localKeyStorageKey = (provider: Provider) => `AI_API_KEY_${provider.toUpperCase()}`;
+
+const getLocalProviderKey = (provider: Provider) =>
+  localStorage.getItem(localKeyStorageKey(provider)) ||
+  (provider === 'gemini' ? localStorage.getItem('CUSTOM_GEMINI_API_KEY') : '') ||
+  localStorage.getItem('AI_API_KEY') ||
+  '';
+
+const maskLast4 = (key: string) => key.length >= 4 ? key.slice(-4) : '****';
+
 const authHeaders = async () => {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
   return {
-    'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    authenticated: Boolean(token),
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
   };
 };
 
@@ -39,14 +68,32 @@ export const AiKeyManager: React.FC = () => {
   });
   const [busy, setBusy] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [platformStatus, setPlatformStatus] = useState<PlatformStatus | null>(null);
+  const [authenticated, setAuthenticated] = useState(false);
+  const [, setLocalKeyRevision] = useState(0);
 
   const loadKeys = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/user/ai-keys', { headers: await authHeaders() });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || 'Unable to load AI keys.');
-      setKeys(data.keys || []);
+      const { authenticated: hasSession, headers } = await authHeaders();
+      setAuthenticated(hasSession);
+
+      const statusResponse = await fetch('/api/ai/status');
+
+      if (statusResponse.ok) {
+        const statusData = await statusResponse.json().catch(() => null);
+        setPlatformStatus(statusData);
+      }
+
+      if (!hasSession) {
+        setKeys([]);
+        return;
+      }
+
+      const keysResponse = await fetch('/api/user/ai-keys', { headers });
+      const keysData = await keysResponse.json().catch(() => ({}));
+      if (!keysResponse.ok) throw new Error(keysData.error || 'Unable to load AI keys.');
+      setKeys(keysData.keys || []);
     } catch (error: any) {
       toast.error('Unable to load AI keys', { description: error.message });
     } finally {
@@ -57,6 +104,14 @@ export const AiKeyManager: React.FC = () => {
   useEffect(() => {
     loadKeys();
   }, []);
+
+  useEffect(() => {
+    const devDefault = platformStatus?.devAdmin?.defaultProvider;
+    if (!localStorage.getItem('ai_provider') && (devDefault === 'gemini' || devDefault === 'openrouter' || devDefault === 'openai')) {
+      setSelectedProvider(devDefault);
+      localStorage.setItem('ai_provider', devDefault);
+    }
+  }, [platformStatus]);
 
   const saveMode = (nextMode: CredentialMode) => {
     setMode(nextMode);
@@ -76,11 +131,26 @@ export const AiKeyManager: React.FC = () => {
       return;
     }
 
+    if (!authenticated) {
+      // TODO(auth): temporary dev/admin escape hatch. Remove when per-user auth-backed key storage exists.
+      localStorage.setItem(localKeyStorageKey(provider), apiKey);
+      localStorage.setItem('AI_API_KEY', apiKey);
+      if (provider === 'gemini') localStorage.setItem('CUSTOM_GEMINI_API_KEY', apiKey);
+      localStorage.setItem('ai_provider', provider);
+      localStorage.setItem('ai_credential_mode', 'byok');
+      setSelectedProvider(provider);
+      setMode('byok');
+      setDrafts((current) => ({ ...current, [provider]: '' }));
+      setLocalKeyRevision((revision) => revision + 1);
+      toast.success(`${PROVIDERS.find((item) => item.id === provider)?.label} key saved for local dev`);
+      return;
+    }
+
     setBusy(`${provider}:save`);
     try {
       const response = await fetch('/api/user/ai-keys', {
         method: 'POST',
-        headers: await authHeaders(),
+        headers: (await authHeaders()).headers,
         body: JSON.stringify({ provider, apiKey }),
       });
       const data = await response.json().catch(() => ({}));
@@ -97,11 +167,41 @@ export const AiKeyManager: React.FC = () => {
   };
 
   const testKey = async (provider: Provider) => {
+    if (!authenticated) {
+      const localKey = getLocalProviderKey(provider);
+      if (!localKey) {
+        toast.error('Save a local dev key first.');
+        return;
+      }
+      setBusy(`${provider}:test`);
+      try {
+        const response = await fetch('/api/ai/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            provider,
+            credentialMode: 'byok',
+            requestApiKey: localKey,
+            contents: 'Reply with exactly: ok',
+            config: { maxOutputTokens: 8 },
+          }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || 'Provider rejected the local dev key.');
+        toast.success('Local dev key test passed');
+      } catch (error: any) {
+        toast.error('Key test failed', { description: error.message });
+      } finally {
+        setBusy(null);
+      }
+      return;
+    }
+
     setBusy(`${provider}:test`);
     try {
       const response = await fetch('/api/user/ai-keys/test', {
         method: 'POST',
-        headers: await authHeaders(),
+        headers: (await authHeaders()).headers,
         body: JSON.stringify({ provider }),
       });
       const data = await response.json().catch(() => ({}));
@@ -115,11 +215,20 @@ export const AiKeyManager: React.FC = () => {
   };
 
   const deleteKey = async (provider: Provider) => {
+    if (!authenticated) {
+      localStorage.removeItem(localKeyStorageKey(provider));
+      if (provider === 'gemini') localStorage.removeItem('CUSTOM_GEMINI_API_KEY');
+      if (selectedProvider === provider) localStorage.removeItem('AI_API_KEY');
+      setLocalKeyRevision((revision) => revision + 1);
+      toast.success('Local dev key removed');
+      return;
+    }
+
     setBusy(`${provider}:delete`);
     try {
       const response = await fetch(`/api/user/ai-keys/${provider}`, {
         method: 'DELETE',
-        headers: await authHeaders(),
+        headers: (await authHeaders()).headers,
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || 'Unable to delete API key.');
@@ -133,39 +242,91 @@ export const AiKeyManager: React.FC = () => {
   };
 
   const metadataFor = (provider: Provider) => keys.find((item) => item.provider === provider);
+  const configuredByokCount = keys.filter((item) => item.configured).length;
+  const platformProviderLabels = Object.entries(platformStatus?.providers || {})
+    .filter(([, configured]) => configured)
+    .map(([provider]) => provider);
+  const devAdminEnabled = Boolean(platformStatus?.devAdmin?.enabled);
+  const devAdminProviderLabels = Object.entries(platformStatus?.devAdmin?.providers || {})
+    .filter(([, configured]) => configured)
+    .map(([provider]) => provider);
+  const adminDeveloperMode = devAdminEnabled || (!authenticated && isLocalDeveloperHost());
 
   return (
     <div className="space-y-5">
       <section className="bg-paper border border-ink/10 rounded-2xl p-5 space-y-4">
-        <div className="flex items-start gap-3">
-          <div className="w-9 h-9 rounded-lg bg-accent/10 text-accent flex items-center justify-center">
-            <ShieldCheck className="w-5 h-5" />
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-lg bg-accent/10 text-accent flex items-center justify-center">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-serif text-ink">AI API keys</h1>
+              <p className="text-sm text-muted max-w-2xl">
+                Your API key is encrypted and stored securely. It is only decrypted on the server when making AI requests.
+                The full key is never shown again after saving.
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-serif text-ink">AI API keys</h1>
-            <p className="text-sm text-muted max-w-2xl">
-              Your API key is encrypted and stored securely. It is only decrypted on the server when making AI requests.
-              The full key is never shown again after saving.
-            </p>
+
+          <div className="rounded-xl border border-ink/10 bg-background p-3 text-xs text-muted lg:min-w-72">
+            <div className="flex items-center gap-2 font-semibold text-ink">
+              <Server className="w-4 h-4" />
+              Platform AI
+            </div>
+            <div className="mt-2 space-y-1">
+              <p>{platformStatus?.platformCreditsEnabled === false ? 'Platform credits disabled' : 'Platform credits available when server keys exist'}</p>
+              <p>
+                Server providers:{' '}
+                <span className="font-semibold text-ink">
+                  {platformProviderLabels.length > 0 ? platformProviderLabels.join(', ') : 'none detected'}
+                </span>
+              </p>
+              {devAdminEnabled && (
+                <p>
+                  Developer keys:{' '}
+                  <span className="font-semibold text-ink">
+                    {devAdminProviderLabels.length > 0 ? devAdminProviderLabels.join(', ') : 'enabled, no provider key detected'}
+                  </span>
+                </p>
+              )}
+              <p>
+                Default:{' '}
+                <span className="font-semibold text-ink">{platformStatus?.defaultProvider || 'gemini'}</span>
+                {platformStatus?.fallbackProvider ? `, fallback ${platformStatus.fallbackProvider}` : ''}
+              </p>
+            </div>
           </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <button
             type="button"
+            aria-pressed={mode === 'byok'}
             onClick={() => saveMode('byok')}
             className={`flex items-center gap-3 rounded-xl border p-3 text-left transition-colors ${mode === 'byok' ? 'bg-ink text-paper border-ink' : 'bg-background border-ink/10 text-ink hover:border-accent/40'}`}
           >
             <Key className="w-4 h-4" />
-            <span className="text-sm font-semibold">Use my own API key</span>
+            <span>
+              <span className="block text-sm font-semibold">Use my own API key</span>
+              <span className={`block text-[10px] ${mode === 'byok' ? 'text-paper/60' : 'text-muted'}`}>
+                {configuredByokCount} saved provider{configuredByokCount === 1 ? '' : 's'}
+              </span>
+            </span>
           </button>
           <button
             type="button"
+            aria-pressed={mode === 'platform'}
             onClick={() => saveMode('platform')}
             className={`flex items-center gap-3 rounded-xl border p-3 text-left transition-colors ${mode === 'platform' ? 'bg-ink text-paper border-ink' : 'bg-background border-ink/10 text-ink hover:border-accent/40'}`}
           >
             <Zap className="w-4 h-4" />
-            <span className="text-sm font-semibold">Use platform AI credits if available</span>
+            <span>
+              <span className="block text-sm font-semibold">Use platform AI credits if available</span>
+              <span className={`block text-[10px] ${mode === 'platform' ? 'text-paper/60' : 'text-muted'}`}>
+                {platformStatus?.configured ? 'Server key detected' : 'No server key detected'}
+              </span>
+            </span>
           </button>
         </div>
 
@@ -179,7 +340,12 @@ export const AiKeyManager: React.FC = () => {
                 onClick={() => saveSelectedProvider(provider.id)}
                 className={`rounded-xl border p-3 text-left text-sm font-semibold transition-colors ${selectedProvider === provider.id ? 'bg-accent text-paper border-accent' : 'bg-background border-ink/10 text-ink hover:border-accent/40'}`}
               >
-                {provider.label}
+                <span className="block">{provider.label}</span>
+                {devAdminEnabled && (
+                  <span className={`block text-[10px] ${selectedProvider === provider.id ? 'text-paper/70' : platformStatus?.devAdmin?.providers?.[provider.id] ? 'text-emerald-600' : 'text-muted'}`}>
+                    {platformStatus?.devAdmin?.providers?.[provider.id] ? 'Developer key available' : 'No developer key'}
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -193,17 +359,41 @@ export const AiKeyManager: React.FC = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4">
+          {adminDeveloperMode ? (
+            <section className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 text-sm text-amber-800 space-y-1">
+              <p className="font-semibold text-amber-900">
+                {devAdminEnabled ? 'Developer AI key mode is enabled' : 'Admin/developer testing mode'}
+              </p>
+              <p>
+                {devAdminEnabled
+                  ? 'Using temporary admin/developer key from server environment variables.'
+                  : 'Authentication is not implemented yet. You can paste and use a local dev API key in this browser.'}
+              </p>
+              <p>Temporary development mode. Replace with authenticated per-user keys before production.</p>
+            </section>
+          ) : !authenticated && (
+            <section className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 text-sm text-amber-800">
+              Sign in to save a personal API key. Platform AI can still use server keys when configured.
+            </section>
+          )}
           {PROVIDERS.map((provider) => {
             const metadata = metadataFor(provider.id);
-            const configured = Boolean(metadata?.configured);
+            const devConfigured = Boolean(platformStatus?.devAdmin?.providers?.[provider.id]);
+            const localKey = getLocalProviderKey(provider.id);
+            const localConfigured = Boolean(!authenticated && localKey);
+            const configured = Boolean(metadata?.configured || localConfigured);
             return (
               <section key={provider.id} className="bg-paper border border-ink/10 rounded-2xl p-5 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <div>
                     <h2 className="text-lg font-semibold text-ink">{provider.label}</h2>
-                    <div className={`mt-1 inline-flex items-center gap-2 text-xs font-semibold ${configured ? 'text-emerald-600' : 'text-amber-600'}`}>
-                      {configured ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
-                      {configured ? `Configured ending in ${metadata?.keyLast4 || '****'}` : 'Missing'}
+                    <div className={`mt-1 inline-flex items-center gap-2 text-xs font-semibold ${configured || devConfigured ? 'text-emerald-600' : 'text-amber-600'}`}>
+                      {configured || devConfigured ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+                      {configured
+                        ? `Configured ending in ${metadata?.keyLast4 || maskLast4(localKey)}`
+                        : devConfigured
+                          ? 'Using temporary admin/developer key'
+                          : 'Missing'}
                     </div>
                   </div>
                   {metadata?.updatedAt && (

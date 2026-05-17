@@ -1,7 +1,9 @@
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { SupabaseClient } from "@supabase/supabase-js";
 import type { AuthUser as User } from "@supabase/supabase-js";
 import type { VercelRequest } from "@vercel/node";
 import postgres from "postgres";
+import { createSupabaseAdminClient } from "../../lib/supabase/admin";
+import { createServerSupabaseClient } from "../../lib/supabase/server";
 
 type JsonRecord = Record<string, any>;
 
@@ -348,16 +350,7 @@ type IssueRow = {
 };
 
 export function getServerSupabase(): SupabaseClient {
-  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!url || !serviceRoleKey) {
-    throw new Error("Supabase service-role credentials are not configured.");
-  }
-
-  return createClient(url, serviceRoleKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+  return createSupabaseAdminClient() as SupabaseClient;
 }
 
 function getRecoveryExecutionDatabaseUrl() {
@@ -401,18 +394,7 @@ async function executeRecoverySqlServerSide(sqlPreview: string): Promise<AiRecov
 }
 
 function getPublicSupabaseForAuth(): SupabaseClient {
-  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-  const authKey =
-    process.env.SUPABASE_ANON_KEY ||
-    process.env.VITE_SUPABASE_ANON_KEY;
-
-  if (!url || !authKey) {
-    throw new Error("Supabase auth credentials are not configured.");
-  }
-
-  return createClient(url, authKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+  return createServerSupabaseClient() as SupabaseClient;
 }
 
 function getBearerToken(req: VercelRequest) {

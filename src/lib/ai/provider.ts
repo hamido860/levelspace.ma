@@ -19,6 +19,7 @@ export type GenerateAIResponseInput = {
   fallbackEnabled?: boolean;
   credentialMode?: AICredentialMode;
   userId?: string;
+  requestApiKey?: string;
 };
 
 export type GenerateAIResponseResult = {
@@ -27,8 +28,7 @@ export type GenerateAIResponseResult = {
   model: string;
 };
 
-const MISSING_PROVIDER_MESSAGE =
-  "AI provider is not configured. Save your own API key or enable platform AI credits.";
+const MISSING_PROVIDER_MESSAGE = "No AI provider configured";
 
 const normalizeProvider = (value: unknown): AIProviderName | null => {
   const provider = String(value || "").toLowerCase();
@@ -36,17 +36,51 @@ const normalizeProvider = (value: unknown): AIProviderName | null => {
   return null;
 };
 
+const isTruthy = (value: unknown) => ["1", "true", "yes", "on"].includes(String(value || "").toLowerCase());
+const isProductionLike = () => process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
+
+// TODO(auth): temporary developer/admin exception. Remove once authenticated per-user API keys are implemented end to end.
+export const isDevAdminAiKeyModeEnabled = () => {
+  const explicitlyEnabled = isTruthy(process.env.NEXT_PUBLIC_ENABLE_DEV_ADMIN_AI_KEYS);
+  return explicitlyEnabled && !isProductionLike();
+};
+
+const getDevAdminKey = (provider: AIProviderName) => {
+  if (!isDevAdminAiKeyModeEnabled()) return "";
+  if (provider === "gemini") return process.env.DEV_ADMIN_GEMINI_API_KEY || "";
+  if (provider === "openrouter") return process.env.DEV_ADMIN_OPENROUTER_API_KEY || "";
+  return "";
+};
+
+export const getDevAdminAiStatus = () => {
+  const enabled = isDevAdminAiKeyModeEnabled();
+  const providers = {
+    gemini: Boolean(enabled && process.env.DEV_ADMIN_GEMINI_API_KEY),
+    openrouter: Boolean(enabled && process.env.DEV_ADMIN_OPENROUTER_API_KEY),
+  };
+
+  return {
+    enabled,
+    providers,
+    defaultProvider: normalizeProvider(process.env.DEV_ADMIN_AI_PROVIDER) || null,
+  };
+};
+
 const getConfiguredProvider = () =>
-  normalizeProvider(process.env.AI_PROVIDER) || "gemini";
+  (isDevAdminAiKeyModeEnabled() ? normalizeProvider(process.env.DEV_ADMIN_AI_PROVIDER) : null) ||
+  normalizeProvider(process.env.AI_PROVIDER) ||
+  "gemini";
 
 const getFallbackProvider = (primary: AIProviderName) =>
   normalizeProvider(process.env.AI_FALLBACK_PROVIDER) || (primary === "gemini" ? "nvidia" : "gemini");
 
 const isMissingProviderError = (error: unknown) =>
-  error instanceof Error && /not configured|API_KEY|environment variables/i.test(error.message);
+  error instanceof Error && /no ai provider configured|not configured|API_KEY|environment variables/i.test(error.message);
 
 const getPlatformKey = (provider: AIProviderName) => {
-  if (provider === "gemini") return process.env.GEMINI_API_KEY || process.env.GEMINI_KEY_0 || "";
+  if (provider === "gemini") {
+    return process.env.GEMINI_API_KEY || process.env.GEMINI_KEY_0 || process.env.AI_API_KEY || process.env.VITE_AI_API_KEY || "";
+  }
   if (provider === "openrouter") return process.env.OPENROUTER_API_KEY || "";
   if (provider === "openai") return process.env.OPENAI_API_KEY || "";
   if (provider === "nvidia") return process.env.NVIDIA_API_KEY || "";
@@ -57,6 +91,10 @@ const isPlatformEnabled = () => process.env.AI_PLATFORM_CREDITS_ENABLED !== "fal
 
 const resolveApiKey = async (provider: AIProviderName, input: GenerateAIResponseInput) => {
   if (input.credentialMode === "byok") {
+    // TODO(auth): dev-only compatibility for the old UI-pasted API key flow.
+    // Remove this once authenticated per-user keys are implemented.
+    if (!isProductionLike() && input.requestApiKey) return input.requestApiKey;
+
     const byokProvider = normalizeUserAiProvider(provider);
     if (byokProvider && input.userId) {
       const apiKey = await getDecryptedUserAiKey(getServerSupabase(), input.userId, byokProvider);
@@ -64,8 +102,12 @@ const resolveApiKey = async (provider: AIProviderName, input: GenerateAIResponse
     }
   }
 
+  // TODO(auth): temporary developer/admin exception. This must not persist after auth-backed BYOK is complete.
+  const devAdminKey = getDevAdminKey(provider);
+  if (devAdminKey) return devAdminKey;
+
   if (!isPlatformEnabled()) {
-    throw new Error(`No saved ${provider} API key was found and platform AI credits are not enabled.`);
+    throw new Error(`No AI provider configured for ${provider}.`);
   }
 
   return getPlatformKey(provider);

@@ -9,11 +9,16 @@ import { transformersService } from "./transformersService";
 import { mcpClient } from "./mcpClient";
 
 export const getCustomApiKey = () =>
-  "";
+  localStorage.getItem("CUSTOM_GEMINI_API_KEY") || localStorage.getItem("AI_API_KEY") || "";
 
 // Flexible provider keys — users configure these instead of provider-specific ones
-export const getAiApiKey = () =>
-  "";
+export const getAiApiKey = (provider = getAiProvider()) =>
+  provider === "nvidia"
+    ? ""
+    : localStorage.getItem(`AI_API_KEY_${provider.toUpperCase()}`) ||
+      localStorage.getItem("AI_API_KEY") ||
+      localStorage.getItem("CUSTOM_GEMINI_API_KEY") ||
+      "";
 
 export const getAiProvider = () =>
   localStorage.getItem("ai_provider") || "";
@@ -25,14 +30,14 @@ export const getAiModel = () =>
   localStorage.getItem("ai_model") || "";
 
 export const getAiBaseUrl = () =>
-  "";
+  localStorage.getItem("ai_base_url") || "";
 
 export const getEffectiveApiKey = () =>
-  "";
+  getAiApiKey();
 
 // NVIDIA keys are server-side only.
 export const getNvidiaApiKey = () =>
-  "";
+  "server-side";
 
 // Once a key fails with 403/PERMISSION_DENIED (e.g. leaked/revoked), record its
 // fingerprint so subsequent checks treat the app as having no AI provider.
@@ -114,8 +119,13 @@ export async function callNvidiaAPI(params: {
 }
 
 export const setCustomApiKey = (key: string) => {
-  localStorage.removeItem("CUSTOM_GEMINI_API_KEY");
-  localStorage.removeItem("AI_API_KEY");
+  if (key.trim()) {
+    localStorage.setItem("CUSTOM_GEMINI_API_KEY", key.trim());
+    localStorage.setItem("AI_API_KEY", key.trim());
+  } else {
+    localStorage.removeItem("CUSTOM_GEMINI_API_KEY");
+    localStorage.removeItem("AI_API_KEY");
+  }
 };
 
 export class QuotaExceededError extends Error {
@@ -666,9 +676,10 @@ export async function generateAIContent(
     const preferredProvider = params.provider || getAiProvider() || undefined;
     const preferredModel = params.model || getAiModel() || undefined;
     const fallbackEnabled = localStorage.getItem("ai_fallback_enabled");
-    const credentialMode = getAiCredentialMode() === "byok" ? "byok" : "platform";
     const { data: sessionData } = await supabase.auth.getSession();
     const accessToken = sessionData.session?.access_token;
+    const requestApiKey = preferredProvider ? getAiApiKey(preferredProvider) : getAiApiKey();
+    const credentialMode = preferredProvider !== "nvidia" && getAiCredentialMode() === "byok" && (accessToken || requestApiKey) ? "byok" : "platform";
     const response = await fetch("/api/ai/generate", {
       method: "POST",
       headers: {
@@ -679,6 +690,7 @@ export async function generateAIContent(
         provider: preferredProvider,
         model: preferredModel,
         credentialMode,
+        requestApiKey: credentialMode === "byok" ? requestApiKey : undefined,
         fallbackEnabled: fallbackEnabled === null ? undefined : fallbackEnabled === "true",
         contents: params.contents,
         config: {
