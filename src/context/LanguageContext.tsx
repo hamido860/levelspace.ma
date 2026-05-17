@@ -11,6 +11,8 @@ interface LanguageContextType {
 const translations: Record<Language, Record<string, string>> = {
   en: {
     dashboard: 'Dashboard',
+    expand_sidebar: 'Expand Sidebar',
+    collapse_sidebar: 'Collapse Sidebar',
     classrooms: 'Classrooms',
     blueprints: 'Blueprints',
     schedule: 'Schedule',
@@ -139,6 +141,8 @@ const translations: Record<Language, Record<string, string>> = {
   },
   fr: {
     dashboard: 'Tableau de bord',
+    expand_sidebar: 'Développer la barre latérale',
+    collapse_sidebar: 'Réduire la barre latérale',
     classrooms: 'Salles de classe',
     blueprints: 'Schémas',
     schedule: 'Emploi du temps',
@@ -267,6 +271,8 @@ const translations: Record<Language, Record<string, string>> = {
   },
   ar: {
     dashboard: 'لوحة القيادة',
+    expand_sidebar: 'توسيع الشريط الجانبي',
+    collapse_sidebar: 'تصغير الشريط الجانبي',
     classrooms: 'الفصول الدراسية',
     blueprints: 'المخططات',
     schedule: 'الجدول الزمني',
@@ -395,6 +401,8 @@ const translations: Record<Language, Record<string, string>> = {
   },
   es: {
     dashboard: 'Tablero',
+    expand_sidebar: 'Expandir la barra lateral',
+    collapse_sidebar: 'Contraer la barra lateral',
     classrooms: 'Aulas',
     blueprints: 'Planos',
     schedule: 'Horario',
@@ -523,6 +531,8 @@ const translations: Record<Language, Record<string, string>> = {
   },
   de: {
     dashboard: 'Dashboard',
+    expand_sidebar: 'Seitenleiste erweitern',
+    collapse_sidebar: 'Seitenleiste reduzieren',
     classrooms: 'Klassenzimmer',
     blueprints: 'Entwürfe',
     schedule: 'Zeitplan',
