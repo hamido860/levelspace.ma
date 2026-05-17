@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import axios from "axios";
+import handleSupabaseHealth from "./health/supabase";
 import { handleAIEmbed, handleAIGenerate, handleAIExplain, handleAILessonBlocks, handleAIStatus } from "./ai/shared";
 import { handleDeleteUserAiKey, handleTestUserAiKey, handleUserAiKeys } from "../src/server/api/userAiKeys";
 import { backfillTopicsFromLessons } from "../lib/topicSync";
@@ -1079,6 +1080,7 @@ const rootRoutes: Record<string, RouteHandler> = {
   "ai/lesson-blocks": handleAILessonBlocks,
   "ai/embed": handleAIEmbed,
   "ai/status": handleAIStatus,
+  "health/supabase": handleSupabaseHealth,
   "admin/curriculum-review": handleCurriculumReviewList,
   "admin/curriculum-review-detail": handleCurriculumReviewDetail,
   "admin/curriculum-review-action": handleCurriculumReviewAction,
