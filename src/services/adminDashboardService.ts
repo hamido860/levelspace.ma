@@ -165,6 +165,8 @@ const getAdminApiHeaders = async () => {
 
   if (accessToken) {
     headers.Authorization = `Bearer ${accessToken}`;
+  } else if (typeof localStorage !== "undefined" && localStorage.getItem("demo_admin_logged_in") === "true") {
+    headers["x-levelspace-demo-admin"] = "true";
   }
 
   return headers;

@@ -226,7 +226,7 @@ const KPI: React.FC<{ label: string; value: number | string; sub?: string; varia
 // ─── Component ────────────────────────────────────────────────────────────────
 export const Admin: React.FC = () => {
   const navigate = useNavigate();
-  const { loading: authLoading } = useAuth();
+  const { loading: authLoading, isDemoAdmin } = useAuth();
   const [tab, setTab] = useState<Tab>("overview");
   const [loading, setLoading] = useState(true);
   const [dashboardError, setDashboardError] = useState("");
@@ -576,6 +576,7 @@ export const Admin: React.FC = () => {
         headers: {
           "Content-Type": "application/json",
           ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+          ...(isDemoAdmin ? { "x-levelspace-demo-admin": "true" } : {}),
         },
         body: JSON.stringify({ metrics: metricsSnapshot, action }),
       });
@@ -593,7 +594,7 @@ export const Admin: React.FC = () => {
       setAiError(e.message);
     }
     setAiLoading(false);
-  }, [aiReviewStatuses, gradeData, kpis, tableHealth]);
+  }, [aiReviewStatuses, gradeData, isDemoAdmin, kpis, tableHealth]);
 
   const refreshAll = useCallback(async () => {
     setLoading(true);
