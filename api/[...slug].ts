@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import axios from "axios";
 import handleSupabaseHealth from "./health/supabase";
 import { handleAIEmbed, handleAIGenerate, handleAIExplain, handleAILessonBlocks, handleAIStatus } from "./ai/shared";
+import { generateAIResponse, type AIProviderName, type AICredentialMode } from "../src/lib/ai/provider";
 import { handleDeleteUserAiKey, handleTestUserAiKey, handleUserAiKeys } from "../src/server/api/userAiKeys";
 import { backfillTopicsFromLessons } from "../lib/topicSync";
 import { seedStarterLessonsFromTopics } from "../src/server/curriculum/starterLessons";
@@ -702,14 +703,13 @@ Be specific and reference actual numbers from the metrics. Be concise but comple
   try {
     await requireAdminUser(req);
 
-    const nvidiaKey = process.env.NVIDIA_API_KEY;
-    if (!nvidiaKey || nvidiaKey === "MY_NVIDIA_API_KEY") {
-      return res.status(503).json({ error: "NVIDIA API key not configured." });
-    }
-
-    const { metrics, action } = getBody(req) as {
+    const { metrics, action, provider, model, credentialMode, requestApiKey } = getBody(req) as {
       metrics: any;
       action: "insights" | "tasks" | "strategy" | "retry_failed";
+      provider?: AIProviderName;
+      model?: string;
+      credentialMode?: AICredentialMode;
+      requestApiKey?: string;
     };
 
     if (!metrics) {
@@ -735,28 +735,19 @@ Be specific and reference actual numbers from the metrics. Be concise but comple
     }
 
     const userPrompt = `Here are the live metrics from the database:\n\n${JSON.stringify(metrics, null, 2)}\n\n${actionPrompts[action]}`;
-    const response = await axios.post(
-      "https://integrate.api.nvidia.com/v1/chat/completions",
-      {
-        model: "qwen/qwen3-coder-480b-a35b-instruct",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        temperature: 0.3,
-        max_tokens: 2048,
-        response_format: { type: "json_object" },
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${nvidiaKey}`,
-          "Content-Type": "application/json",
-        },
-        timeout: 60000,
-      },
-    );
+    const aiResponse = await generateAIResponse({
+      prompt: userPrompt,
+      provider,
+      model,
+      credentialMode,
+      requestApiKey,
+      systemInstruction: systemPrompt,
+      responseMimeType: "application/json",
+      temperature: 0.3,
+      maxOutputTokens: 2048,
+    });
 
-    const raw = response.data?.choices?.[0]?.message?.content ?? "{}";
+    const raw = aiResponse.text || "{}";
     let parsed: any;
     try {
       parsed = JSON.parse(raw);
@@ -764,15 +755,15 @@ Be specific and reference actual numbers from the metrics. Be concise but comple
       parsed = { raw };
     }
 
-    return res.json({ ok: true, result: parsed, model: "qwen/qwen3-coder-480b-a35b-instruct" });
+    return res.json({ ok: true, result: parsed, provider: aiResponse.provider, model: aiResponse.model });
   } catch (error: any) {
     if (error instanceof AiCommandCenterHttpError) {
       return res.status(error.status).json({ error: error.message });
     }
 
     const message = error?.response?.data?.detail || error?.response?.data?.message || error.message;
-    console.error("[AI Analyst] NVIDIA API error:", message);
-    return res.status(502).json({ error: `NVIDIA API error: ${message}` });
+    console.error("[AI Analyst] provider error:", message);
+    return res.status(502).json({ error: `AI provider error: ${message}` });
   }
 }
 

@@ -48,6 +48,7 @@ export const isDevAdminAiKeyModeEnabled = () => {
 const getDevAdminKey = (provider: AIProviderName) => {
   if (!isDevAdminAiKeyModeEnabled()) return "";
   if (provider === "gemini") return process.env.DEV_ADMIN_GEMINI_API_KEY || "";
+  if (provider === "nvidia") return process.env.DEV_ADMIN_NVIDIA_API_KEY || process.env.NVIDIA_API_KEY || "";
   if (provider === "openrouter") return process.env.DEV_ADMIN_OPENROUTER_API_KEY || "";
   return "";
 };
@@ -56,6 +57,7 @@ export const getDevAdminAiStatus = () => {
   const enabled = isDevAdminAiKeyModeEnabled();
   const providers = {
     gemini: Boolean(enabled && process.env.DEV_ADMIN_GEMINI_API_KEY),
+    nvidia: Boolean(enabled && (process.env.DEV_ADMIN_NVIDIA_API_KEY || process.env.NVIDIA_API_KEY)),
     openrouter: Boolean(enabled && process.env.DEV_ADMIN_OPENROUTER_API_KEY),
   };
 

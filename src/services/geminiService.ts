@@ -12,13 +12,19 @@ export const getCustomApiKey = () =>
   localStorage.getItem("CUSTOM_GEMINI_API_KEY") || localStorage.getItem("AI_API_KEY") || "";
 
 // Flexible provider keys — users configure these instead of provider-specific ones
-export const getAiApiKey = (provider = getAiProvider()) =>
-  provider === "nvidia"
-    ? ""
-    : localStorage.getItem(`AI_API_KEY_${provider.toUpperCase()}`) ||
-      localStorage.getItem("AI_API_KEY") ||
-      localStorage.getItem("CUSTOM_GEMINI_API_KEY") ||
-      "";
+export const getAiApiKey = (provider = getAiProvider()) => {
+  const normalizedProvider = String(provider || "").toLowerCase();
+  const providerKey = normalizedProvider ? localStorage.getItem(`AI_API_KEY_${normalizedProvider.toUpperCase()}`) : "";
+  if (providerKey) return providerKey;
+  if (normalizedProvider === "gemini") {
+    const geminiKey = localStorage.getItem("CUSTOM_GEMINI_API_KEY");
+    if (geminiKey) return geminiKey;
+  }
+
+  return !normalizedProvider || localStorage.getItem("ai_provider") === normalizedProvider
+    ? localStorage.getItem("AI_API_KEY") || ""
+    : "";
+};
 
 export const getAiProvider = () =>
   localStorage.getItem("ai_provider") || "";
@@ -35,9 +41,8 @@ export const getAiBaseUrl = () =>
 export const getEffectiveApiKey = () =>
   getAiApiKey();
 
-// NVIDIA keys are server-side only.
 export const getNvidiaApiKey = () =>
-  "server-side";
+  getAiApiKey("nvidia");
 
 // Once a key fails with 403/PERMISSION_DENIED (e.g. leaked/revoked), record its
 // fingerprint so subsequent checks treat the app as having no AI provider.
@@ -79,7 +84,13 @@ export const checkAIProvider = (): boolean => {
 };
 
 export const setNvidiaApiKey = (key: string) => {
-  localStorage.removeItem("CUSTOM_NVIDIA_API_KEY");
+  if (key.trim()) {
+    localStorage.setItem("AI_API_KEY_NVIDIA", key.trim());
+    localStorage.setItem("AI_API_KEY", key.trim());
+  } else {
+    localStorage.removeItem("AI_API_KEY_NVIDIA");
+    localStorage.removeItem("CUSTOM_NVIDIA_API_KEY");
+  }
 };
 
 export const NVIDIA_MODEL = "google/gemma-3-27b-it";
@@ -93,13 +104,22 @@ export async function callNvidiaAPI(params: {
   model?: string;
 }): Promise<string | null> {
   const { prompt, isJson = false, temperature = 0.7, maxTokens = 4096, model = NVIDIA_MODEL } = params;
+  const { data: sessionData } = await supabase.auth.getSession();
+  const accessToken = sessionData.session?.access_token;
+  const requestApiKey = getAiApiKey("nvidia");
+  const credentialMode = getAiCredentialMode() === "byok" && (accessToken || requestApiKey) ? "byok" : "platform";
 
   const response = await fetch("/api/ai/generate", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
     body: JSON.stringify({
       provider: "nvidia",
       model,
+      credentialMode,
+      requestApiKey: credentialMode === "byok" ? requestApiKey : undefined,
       contents: isJson ? `${prompt}\n\nRespond with valid JSON only.` : prompt,
       config: {
         responseMimeType: isJson ? "application/json" : undefined,
@@ -679,7 +699,7 @@ export async function generateAIContent(
     const { data: sessionData } = await supabase.auth.getSession();
     const accessToken = sessionData.session?.access_token;
     const requestApiKey = preferredProvider ? getAiApiKey(preferredProvider) : getAiApiKey();
-    const credentialMode = preferredProvider !== "nvidia" && getAiCredentialMode() === "byok" && (accessToken || requestApiKey) ? "byok" : "platform";
+    const credentialMode = getAiCredentialMode() === "byok" && (accessToken || requestApiKey) ? "byok" : "platform";
     const response = await fetch("/api/ai/generate", {
       method: "POST",
       headers: {

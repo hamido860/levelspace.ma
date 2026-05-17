@@ -42,11 +42,15 @@ async function testProviderKey(provider: UserAiKeyProvider, apiKey: string) {
   const endpoint =
     provider === "openrouter"
       ? "https://openrouter.ai/api/v1/chat/completions"
-      : "https://api.openai.com/v1/chat/completions";
+      : provider === "nvidia"
+        ? "https://integrate.api.nvidia.com/v1/chat/completions"
+        : "https://api.openai.com/v1/chat/completions";
   const model =
     provider === "openrouter"
       ? process.env.OPENROUTER_MODEL || "openai/gpt-4o-mini"
-      : process.env.OPENAI_MODEL || "gpt-4o-mini";
+      : provider === "nvidia"
+        ? process.env.NVIDIA_MODEL || "google/gemma-3-27b-it"
+        : process.env.OPENAI_MODEL || "gpt-4o-mini";
 
   const response = await fetch(endpoint, {
     method: "POST",

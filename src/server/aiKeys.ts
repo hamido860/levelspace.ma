@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export const USER_AI_KEY_PROVIDERS = ["gemini", "openrouter", "openai"] as const;
+export const USER_AI_KEY_PROVIDERS = ["gemini", "nvidia", "openrouter", "openai"] as const;
 export type UserAiKeyProvider = (typeof USER_AI_KEY_PROVIDERS)[number];
 
 export type UserAiKeyMetadata = {

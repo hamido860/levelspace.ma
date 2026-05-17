@@ -5,6 +5,7 @@ import { SEO } from "../components/SEO";
 import { isSupabaseConfigured, supabase } from "../db/supabase";
 import { useAuth } from "../context/AuthContext";
 import { validateMetrics, formatValidationErrors } from "../services/metricsValidator";
+import { getAiApiKey, getAiCredentialMode, getAiModel, getAiProvider } from "../services/geminiService";
 import {
   AdminGradeRow,
   AdminOverviewKpis,
@@ -571,6 +572,10 @@ export const Admin: React.FC = () => {
     try {
       const { data } = await supabase.auth.getSession();
       const accessToken = data?.session?.access_token;
+      const provider = getAiProvider() || undefined;
+      const model = getAiModel() || undefined;
+      const requestApiKey = provider ? getAiApiKey(provider) : getAiApiKey();
+      const credentialMode = getAiCredentialMode() === "byok" && (accessToken || requestApiKey) ? "byok" : "platform";
       const res = await fetch("/api/ai-analyst", {
         method: "POST",
         headers: {
@@ -578,7 +583,14 @@ export const Admin: React.FC = () => {
           ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
           ...(isDemoAdmin ? { "x-levelspace-demo-admin": "true" } : {}),
         },
-        body: JSON.stringify({ metrics: metricsSnapshot, action }),
+        body: JSON.stringify({
+          metrics: metricsSnapshot,
+          action,
+          provider,
+          model,
+          credentialMode,
+          requestApiKey: credentialMode === "byok" ? requestApiKey : undefined,
+        }),
       });
       const text = await res.text();
       if (!text) throw new Error(`Empty response from server (HTTP ${res.status}). Is the dev server running with \`npm run dev\`?`);

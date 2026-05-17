@@ -1,5 +1,6 @@
 export type NvidiaGenerateOptions = {
   prompt: string;
+  apiKey?: string;
   model?: string;
   systemInstruction?: string;
   responseMimeType?: string;
@@ -13,7 +14,7 @@ const DEFAULT_NVIDIA_MODEL = "google/gemma-3-27b-it";
 const getNvidiaApiKey = () => process.env.NVIDIA_API_KEY || "";
 
 export async function generateWithNvidia(options: NvidiaGenerateOptions) {
-  const apiKey = getNvidiaApiKey();
+  const apiKey = options.apiKey || getNvidiaApiKey();
   if (!apiKey || apiKey === "MY_NVIDIA_API_KEY") {
     throw new Error("NVIDIA provider is not configured. Set NVIDIA_API_KEY in environment variables.");
   }

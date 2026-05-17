@@ -3,7 +3,7 @@ import { AlertCircle, CheckCircle2, Key, Loader2, Save, Server, ShieldCheck, Tra
 import { toast } from 'sonner';
 import { supabase } from '../../db/supabase';
 
-type Provider = 'gemini' | 'openrouter' | 'openai';
+type Provider = 'gemini' | 'nvidia' | 'openrouter' | 'openai';
 type CredentialMode = 'byok' | 'platform';
 
 type KeyMetadata = {
@@ -32,17 +32,22 @@ const isLocalDeveloperHost = () =>
 
 const PROVIDERS: { id: Provider; label: string; placeholder: string }[] = [
   { id: 'gemini', label: 'Gemini', placeholder: 'AIza...' },
+  { id: 'nvidia', label: 'NVIDIA', placeholder: 'nvapi-...' },
   { id: 'openrouter', label: 'OpenRouter', placeholder: 'sk-or-...' },
   { id: 'openai', label: 'OpenAI', placeholder: 'sk-...' },
 ];
 
 const localKeyStorageKey = (provider: Provider) => `AI_API_KEY_${provider.toUpperCase()}`;
 
-const getLocalProviderKey = (provider: Provider) =>
-  localStorage.getItem(localKeyStorageKey(provider)) ||
-  (provider === 'gemini' ? localStorage.getItem('CUSTOM_GEMINI_API_KEY') : '') ||
-  localStorage.getItem('AI_API_KEY') ||
-  '';
+const getLocalProviderKey = (provider: Provider) => {
+  const providerKey = localStorage.getItem(localKeyStorageKey(provider));
+  if (providerKey) return providerKey;
+  if (provider === 'gemini') {
+    const geminiKey = localStorage.getItem('CUSTOM_GEMINI_API_KEY');
+    if (geminiKey) return geminiKey;
+  }
+  return localStorage.getItem('ai_provider') === provider ? localStorage.getItem('AI_API_KEY') || '' : '';
+};
 
 const maskLast4 = (key: string) => key.length >= 4 ? key.slice(-4) : '****';
 
@@ -60,11 +65,11 @@ const authHeaders = async () => {
 
 export const AiKeyManager: React.FC = () => {
   const [keys, setKeys] = useState<KeyMetadata[]>([]);
-  const [drafts, setDrafts] = useState<Record<Provider, string>>({ gemini: '', openrouter: '', openai: '' });
+  const [drafts, setDrafts] = useState<Record<Provider, string>>({ gemini: '', nvidia: '', openrouter: '', openai: '' });
   const [mode, setMode] = useState<CredentialMode>(() => (localStorage.getItem('ai_credential_mode') === 'byok' ? 'byok' : 'platform'));
   const [selectedProvider, setSelectedProvider] = useState<Provider>(() => {
     const stored = localStorage.getItem('ai_provider');
-    return stored === 'openrouter' || stored === 'openai' || stored === 'gemini' ? stored : 'gemini';
+    return stored === 'openrouter' || stored === 'openai' || stored === 'gemini' || stored === 'nvidia' ? stored : 'gemini';
   });
   const [busy, setBusy] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -107,7 +112,7 @@ export const AiKeyManager: React.FC = () => {
 
   useEffect(() => {
     const devDefault = platformStatus?.devAdmin?.defaultProvider;
-    if (!localStorage.getItem('ai_provider') && (devDefault === 'gemini' || devDefault === 'openrouter' || devDefault === 'openai')) {
+    if (!localStorage.getItem('ai_provider') && (devDefault === 'gemini' || devDefault === 'nvidia' || devDefault === 'openrouter' || devDefault === 'openai')) {
       setSelectedProvider(devDefault);
       localStorage.setItem('ai_provider', devDefault);
     }
@@ -332,7 +337,7 @@ export const AiKeyManager: React.FC = () => {
 
         <div className="space-y-2">
           <label className="text-[10px] font-bold uppercase tracking-widest text-muted">Preferred AI provider</label>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
             {PROVIDERS.map((provider) => (
               <button
                 key={provider.id}
