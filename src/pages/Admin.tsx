@@ -8,8 +8,11 @@ import { validateMetrics, formatValidationErrors } from "../services/metricsVali
 import { getAiApiKey, getAiCredentialMode, getAiModel, getAiProvider } from "../services/geminiService";
 import {
   AdminGradeRow,
+  AiExecutionSnapshotDebugRow,
+  AiObservabilityDebugData,
   AdminOverviewKpis,
   AdminTableHealth,
+  AiTaskLogDebugRow,
   AiReviewStatusCount,
   FailedQueueJob,
   QueueStatusBreakdown,
@@ -20,8 +23,11 @@ import {
   loadAdminQueueMetrics,
   loadAdminRagMetrics,
   loadAdminTableHealth,
+  loadAiObservabilityDebugData,
   loadAiRecoveryReviewStatusCounts,
+  repairRagTopicLinks,
   repairTopicsFromLessons,
+  RagTopicRepairResult,
 } from "../services/adminDashboardService";
 import {
   RefreshCw, Database, BarChart2, BookOpen, Cpu, Table2,
@@ -199,6 +205,26 @@ const formatRowsAsTSV = (cols: string[], rows: any[]) => {
   return `${header}\n${body}`;
 };
 
+const formatDebugTime = (value?: string | null) => {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+};
+
+const getDebugMetadataValue = (metadata: Record<string, unknown> | null | undefined, key: string) => {
+  const value = metadata?.[key];
+  return value === null || value === undefined || value === "" ? "—" : String(value);
+};
+
+const formatDebugJson = (value: unknown) => {
+  if (!value) return "—";
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+};
+
 const Spinner: React.FC = () => (
   <div className="flex items-center justify-center py-10 text-gray-400 gap-3 text-sm">
     <RefreshCw className="w-4 h-4 animate-spin" />
@@ -280,6 +306,7 @@ export const Admin: React.FC = () => {
   const [aiTaskList, setAiTaskList]   = useState<AITaskList | null>(null);
   const [aiStrategy, setAiStrategy]   = useState<AIStrategy | null>(null);
   const [activeAITab, setActiveAITab] = useState<AIAction>("insights");
+  const [aiObservability, setAiObservability] = useState<AiObservabilityDebugData>({ logs: [], snapshots: [] });
   const [topicRepairLoading, setTopicRepairLoading] = useState(false);
   const [topicRepairMsg, setTopicRepairMsg] = useState("");
 
@@ -299,6 +326,9 @@ export const Admin: React.FC = () => {
   const [ragChunks, setRagChunks] = useState<any[]>([]);
   const [ragChunkLoading, setRagChunkLoading] = useState(false);
   const [ragChunkError, setRagChunkError] = useState("");
+  const [ragRepairLoading, setRagRepairLoading] = useState(false);
+  const [ragRepairResult, setRagRepairResult] = useState<RagTopicRepairResult | null>(null);
+  const [ragRepairError, setRagRepairError] = useState("");
 
   // Dormant modal state kept isolated until protected workflow routes are added.
   const [execModal, setExecModal] = useState<{ task: any; open: boolean } | null>(null);
@@ -515,6 +545,22 @@ export const Admin: React.FC = () => {
     setRagByGrade(ragRows);
   }, []);
 
+  const handleRepairRagTopicLinks = useCallback(async () => {
+    setRagRepairLoading(true);
+    setRagRepairError("");
+    try {
+      const result = await repairRagTopicLinks();
+      setRagRepairResult(result);
+      const rag = await loadAdminRagMetrics();
+      setRagStats(rag.ragStats);
+      setRagByGrade(rag.ragByGrade);
+    } catch (error) {
+      setRagRepairError(error instanceof Error ? error.message : "Unable to repair RAG topic links.");
+    } finally {
+      setRagRepairLoading(false);
+    }
+  }, []);
+
   // ── AI Agent caller ──────────────────────────────────────────────────────
   const callAgent = useCallback(async (action: AIAction) => {
     setAiLoading(true);
@@ -611,13 +657,14 @@ export const Admin: React.FC = () => {
   const refreshAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [overview, health, grades, queue, rag, reviewStatuses] = await Promise.all([
+      const [overview, health, grades, queue, rag, reviewStatuses, observabilityDebug] = await Promise.all([
         loadAdminOverviewKpis(),
         loadAdminTableHealth(),
         loadAdminGradeMetrics(),
         loadAdminQueueMetrics(),
         loadAdminRagMetrics(),
         loadAiRecoveryReviewStatusCounts(),
+        loadAiObservabilityDebugData(),
       ]);
       setKpis(overview);
       setTableHealth(health);
@@ -627,6 +674,7 @@ export const Admin: React.FC = () => {
       setRagStats(rag.ragStats);
       setRagByGrade(rag.ragByGrade);
       setAiReviewStatuses(reviewStatuses);
+      setAiObservability(observabilityDebug);
       setDashboardError("");
       setLastRefresh(new Date().toLocaleTimeString());
     } catch (e: any) {
@@ -1120,11 +1168,77 @@ export const Admin: React.FC = () => {
         <div>
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
             <KPI label="Total Chunks" value={(ragStats.total ?? 0).toLocaleString()} sub="in rag_chunks" />
-            <KPI label="Embedded" value={(ragStats.embedded ?? 0).toLocaleString()} sub="in rag_embeddings" variant="success" />
+            <KPI label="Embedding Done" value={(ragStats.embedded ?? 0).toLocaleString()} sub="rag_chunks.embedding_status = done" variant="success" />
             <KPI label="Linked to Topic" value={(ragStats.linkedToTopic ?? 0).toLocaleString()} sub="topic_id is not null" />
-            <KPI label="Usable" value={(ragStats.usable ?? 0).toLocaleString()} sub="embedded + linked + done" variant="success" />
+            <KPI label="Usable" value={(ragStats.usable ?? 0).toLocaleString()} sub="content + topic + grade + embedding" variant="success" />
             <KPI label="Pending" value={(ragStats.pending ?? 0).toLocaleString()} sub="embedding_status = pending" variant="warn" />
-            <KPI label="Other Statuses" value={(ragStats.other ?? 0).toLocaleString()} sub="non-pending / non-done chunks" variant="warn" />
+            <KPI label="Unlinked" value={(ragStats.unlinkedToTopic ?? 0).toLocaleString()} sub="topic_id is null" variant="warn" />
+          </div>
+
+          <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-950">Fix RAG Topic Links</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Safely links chunks by lesson_id, valid metadata topic_id, exact title matches, or one unambiguous grade/subject topic. Ambiguous chunks stay unmatched.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
+                  <span className="ls-badge">with grade {(ragStats.withGrade ?? 0).toLocaleString()}</span>
+                  <span className="ls-badge">with embedding {(ragStats.withEmbedding ?? 0).toLocaleString()}</span>
+                  <span className="ls-badge">missing embedding {(ragStats.missingEmbedding ?? 0).toLocaleString()}</span>
+                  <span className="ls-badge">short content {(ragStats.shortContent ?? 0).toLocaleString()}</span>
+                  <span className="ls-badge">unmatched {(ragStats.unmatched ?? 0).toLocaleString()}</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleRepairRagTopicLinks}
+                disabled={ragRepairLoading}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:opacity-50"
+              >
+                {ragRepairLoading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Wrench className="h-4 w-4" />}
+                Fix RAG Topic Links
+              </button>
+            </div>
+            {ragRepairError && (
+              <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{ragRepairError}</p>
+            )}
+            {ragRepairResult && (
+              <div className="mt-4 grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
+                <div className="rounded-2xl bg-slate-50 p-4 text-sm">
+                  <p className="font-semibold text-slate-950">Before / after</p>
+                  <div className="mt-3 grid grid-cols-2 gap-3 text-xs text-slate-600">
+                    <div>Usable: {ragRepairResult.before.usable_chunks.toLocaleString()} {"->"} {ragRepairResult.after.usable_chunks.toLocaleString()}</div>
+                    <div>Linked: {ragRepairResult.before.with_topic_id.toLocaleString()} {"->"} {ragRepairResult.after.with_topic_id.toLocaleString()}</div>
+                    <div>Unlinked: {ragRepairResult.before.without_topic_id.toLocaleString()} {"->"} {ragRepairResult.after.without_topic_id.toLocaleString()}</div>
+                    <div>Unmatched: {ragRepairResult.after.unmatched.toLocaleString()}</div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <span className="ls-badge">lesson_id {ragRepairResult.methods.lesson_id}</span>
+                    <span className="ls-badge">metadata_topic_id {ragRepairResult.methods.metadata_topic_id}</span>
+                    <span className="ls-badge">title_match {ragRepairResult.methods.title_match}</span>
+                    <span className="ls-badge">unmatched {ragRepairResult.methods.unmatched}</span>
+                  </div>
+                </div>
+                <div className="rounded-2xl bg-slate-50 p-4">
+                  <p className="text-sm font-semibold text-slate-950">Sample unmatched chunks</p>
+                  <div className="mt-3 max-h-52 space-y-2 overflow-y-auto">
+                    {ragRepairResult.unmatchedSamples.length === 0 ? (
+                      <p className="text-sm text-slate-500">No unmatched chunks returned.</p>
+                    ) : ragRepairResult.unmatchedSamples.map((chunk) => (
+                      <div key={chunk.id} className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-600">
+                        <div className="mb-1 flex flex-wrap gap-2">
+                          <span className="font-mono text-slate-500">{chunk.id.slice(0, 8)}</span>
+                          <span>{chunk.embedding_status}</span>
+                          <span>{chunk.reason}</span>
+                        </div>
+                        <p className="line-clamp-2">{chunk.metadata_title || chunk.content_preview}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
@@ -1324,7 +1438,7 @@ export const Admin: React.FC = () => {
             {/* ── Edit row modal ── */}
             {editRow && (
               <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-                <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col">
+                <div className="bg-white rounded-2xl shadow-sm w-full max-w-lg max-h-[80vh] flex flex-col">
                   <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
                     <h3 className="font-bold text-sm">Edit Row — {selectedTable}</h3>
                     <button onClick={() => setEditRow(null)} className="text-gray-400 hover:text-gray-700">✕</button>
@@ -1357,6 +1471,86 @@ export const Admin: React.FC = () => {
       {/* ── AI ANALYST ── */}
       {tab === "ai" && (
         <div>
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-5">
+            <div className="px-5 py-3 border-b border-gray-50 flex items-center gap-2">
+              <Database className="w-4 h-4 text-gray-400" />
+              <h2 className="font-bold text-sm">AI Observability</h2>
+              <span className="ml-auto text-xs text-gray-400">
+                latest {aiObservability.logs.length}/50 logs · {aiObservability.snapshots.length}/20 snapshots
+              </span>
+            </div>
+            {loading ? <Spinner /> : (
+              <div className="grid gap-0 xl:grid-cols-2 xl:divide-x xl:divide-gray-100">
+                <div className="min-w-0">
+                  <div className="px-5 py-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Task Logs</div>
+                  {aiObservability.logs.length === 0 ? (
+                    <div className="px-5 pb-5 text-sm text-gray-500">No rows in `ai_task_logs` yet.</div>
+                  ) : (
+                    <div className="max-h-96 overflow-auto">
+                      <table className="w-full text-xs">
+                        <thead className="sticky top-0 bg-gray-50 text-gray-500 uppercase tracking-wide">
+                          <tr>
+                            <th className="px-4 py-2 text-left">Time</th>
+                            <th className="px-4 py-2 text-left">Event</th>
+                            <th className="px-4 py-2 text-left">Job</th>
+                            <th className="px-4 py-2 text-left">Message</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {aiObservability.logs.map((log: AiTaskLogDebugRow) => (
+                            <tr key={log.id} className="border-t border-gray-50 align-top">
+                              <td className="px-4 py-2 whitespace-nowrap text-gray-500">{formatDebugTime(log.created_at)}</td>
+                              <td className="px-4 py-2 font-semibold text-gray-800">{log.log_type}</td>
+                              <td className="px-4 py-2 font-mono text-[11px] text-gray-500">{getDebugMetadataValue(log.metadata, "job_id")}</td>
+                              <td className="px-4 py-2 text-gray-600">
+                                <div>{log.message}</div>
+                                <div className="mt-1 font-mono text-[11px] text-gray-400">
+                                  topic {getDebugMetadataValue(log.metadata, "topic_id")} · {getDebugMetadataValue(log.metadata, "duration_ms")} ms
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <div className="px-5 py-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Execution Snapshots</div>
+                  {aiObservability.snapshots.length === 0 ? (
+                    <div className="px-5 pb-5 text-sm text-gray-500">No rows in `ai_execution_snapshots` yet.</div>
+                  ) : (
+                    <div className="max-h-96 overflow-auto">
+                      <table className="w-full text-xs">
+                        <thead className="sticky top-0 bg-gray-50 text-gray-500 uppercase tracking-wide">
+                          <tr>
+                            <th className="px-4 py-2 text-left">Time</th>
+                            <th className="px-4 py-2 text-left">Type</th>
+                            <th className="px-4 py-2 text-left">Table</th>
+                            <th className="px-4 py-2 text-left">Snapshot</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {aiObservability.snapshots.map((snapshot: AiExecutionSnapshotDebugRow) => (
+                            <tr key={snapshot.id} className="border-t border-gray-50 align-top">
+                              <td className="px-4 py-2 whitespace-nowrap text-gray-500">{formatDebugTime(snapshot.created_at)}</td>
+                              <td className="px-4 py-2 font-semibold text-gray-800">{snapshot.snapshot_type}</td>
+                              <td className="px-4 py-2 text-gray-500">{snapshot.target_table ?? "—"}</td>
+                              <td className="px-4 py-2">
+                                <div className="max-w-md truncate font-mono text-[11px] text-gray-500" title={formatDebugJson(snapshot.snapshot_data)}>
+                                  {formatDebugJson(snapshot.snapshot_data)}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
           {/* Header card */}
           <div className="bg-gradient-to-r from-gray-900 to-gray-800 rounded-xl p-5 mb-5 text-white flex items-start gap-4">
             <div className="w-10 h-10 rounded-lg bg-red-500 flex items-center justify-center flex-shrink-0">
@@ -1615,7 +1809,7 @@ export const Admin: React.FC = () => {
 
           {/* Empty state */}
           {!aiLoading && !aiError && !aiInsights && !aiTaskList && !aiStrategy && (
-            <div className="bg-white rounded-xl border border-dashed border-gray-200 p-10 flex flex-col items-center gap-3 text-center">
+            <div className="bg-white rounded-xl border border-solid border-gray-200 p-10 flex flex-col items-center gap-3 text-center">
               <Sparkles className="w-8 h-8 text-gray-300" />
               <p className="text-gray-500 text-sm">Click an action above to run the AI Analyst against your live metrics.</p>
               <p className="text-gray-400 text-xs">The agent reads all grade coverage, queue status, and RAG data before responding.</p>
@@ -1627,7 +1821,7 @@ export const Admin: React.FC = () => {
       {/* ── Execute Task Modal ── */}
       {execModal?.open && execModal.task && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-sm max-w-md w-full max-h-[90vh] overflow-y-auto">
             <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
               <Zap className="w-5 h-5 text-amber-600" />
               <h3 className="font-bold text-lg">Queue in Command Center</h3>

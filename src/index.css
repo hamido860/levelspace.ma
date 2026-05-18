@@ -53,6 +53,8 @@
   --gold-soft: #FDF5DC;
   --surface-low: #F2F3F5;
   --surface-mid: #E8EAED;
+  --ls-shadow: 0 1px 3px 0 rgba(0,0,0,0.07), 0 1px 2px -1px rgba(0,0,0,0.05);
+  --ls-shadow-hover: 0 2px 6px 0 rgba(0,0,0,0.09), 0 1px 3px -1px rgba(0,0,0,0.06);
 }
 
 .dark {
@@ -74,6 +76,8 @@
   --gold-soft: rgba(187, 128, 9, 0.1);
   --surface-low: #21262D;
   --surface-mid: #30363D;
+  --ls-shadow: 0 1px 3px 0 rgba(0,0,0,0.30), 0 1px 2px -1px rgba(0,0,0,0.20);
+  --ls-shadow-hover: 0 2px 6px 0 rgba(0,0,0,0.35), 0 1px 3px -1px rgba(0,0,0,0.25);
 }
 
 @utility perspective-1000 {
@@ -114,12 +118,123 @@
 }
 
 .glass-card {
-  @apply bg-white/10 backdrop-blur-md border border-white/20;
+  @apply border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-paper;
 }
 
 @layer components {
   .editorial-title {
     letter-spacing: -0.02em;
+  }
+
+  .ls-page-header {
+    @apply flex flex-col gap-3 md:flex-row md:items-center md:justify-between;
+  }
+
+  .ls-page-title {
+    @apply text-3xl font-bold tracking-tight text-slate-950 dark:text-ink;
+  }
+
+  .ls-section-title {
+    @apply text-xl font-semibold text-slate-950 dark:text-ink;
+  }
+
+  .ls-card-title {
+    @apply text-lg font-semibold text-slate-950 dark:text-ink;
+  }
+
+  .ls-body-text {
+    @apply text-sm text-slate-500 dark:text-ink-muted;
+  }
+
+  .ls-micro-label {
+    @apply text-xs font-medium text-slate-500 dark:text-ink-muted;
+  }
+
+  .ls-card {
+    @apply rounded-2xl border border-slate-200 bg-white dark:border-white/8 dark:bg-paper;
+    box-shadow: var(--ls-shadow);
+  }
+
+  .ls-card-pad {
+    @apply rounded-2xl border border-slate-200 bg-white p-5 dark:border-white/8 dark:bg-paper;
+    box-shadow: var(--ls-shadow);
+  }
+
+  .ls-interactive-card {
+    @apply rounded-2xl border border-slate-200 bg-white transition hover:border-slate-300 dark:border-white/8 dark:bg-paper dark:hover:border-white/15;
+    box-shadow: var(--ls-shadow);
+  }
+
+  .ls-interactive-card:hover {
+    box-shadow: var(--ls-shadow-hover);
+  }
+
+  .ls-interactive-card-pad {
+    @apply rounded-2xl border border-slate-200 bg-white p-5 transition hover:border-slate-300 dark:border-white/8 dark:bg-paper dark:hover:border-white/15;
+    box-shadow: var(--ls-shadow);
+  }
+
+  .ls-interactive-card-pad:hover {
+    box-shadow: var(--ls-shadow-hover);
+  }
+
+  .ls-metric-card {
+    @apply rounded-2xl border border-slate-200 bg-white p-5 dark:border-white/8 dark:bg-paper;
+    box-shadow: var(--ls-shadow);
+  }
+
+  .ls-badge {
+    @apply inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600 dark:bg-surface-mid dark:text-ink-secondary;
+  }
+
+  .ls-status-badge {
+    @apply inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400;
+  }
+
+  .ls-status-badge--neutral {
+    @apply bg-slate-100 text-slate-600 dark:bg-surface-mid dark:text-ink-secondary;
+  }
+
+  .ls-status-badge--warning {
+    @apply bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400;
+  }
+
+  .ls-status-badge--danger {
+    @apply bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400;
+  }
+
+  .ls-icon-tile {
+    @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700 dark:bg-surface-mid dark:text-ink-secondary;
+  }
+
+  .ls-icon-tile--accent {
+    @apply bg-blue-50 text-blue-700 dark:bg-accent-soft dark:text-accent;
+  }
+
+  .ls-button-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100;
+  }
+
+  .ls-button-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:border-white/20 dark:hover:bg-surface-low;
+  }
+
+  .ls-button-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-50 dark:text-ink-muted dark:hover:bg-surface-low dark:hover:text-ink;
+  }
+
+  .ls-toolbar {
+    @apply flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3 sm:flex-row sm:items-center dark:border-white/8 dark:bg-paper;
+    box-shadow: var(--ls-shadow);
+  }
+
+  .ls-empty-state {
+    @apply rounded-2xl border border-slate-200 bg-white p-10 text-center dark:border-white/8 dark:bg-paper;
+    box-shadow: var(--ls-shadow);
+  }
+
+  .ls-field {
+    @apply rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-slate-300 dark:border-white/8 dark:bg-paper dark:text-ink dark:placeholder:text-ink-muted dark:focus:border-white/15;
   }
 }
 
@@ -148,15 +263,15 @@
 }
 
 .lesson-reader-outline-button {
-  @apply inline-flex items-center gap-2 rounded-xl border border-ink/10 bg-paper px-3 py-2 text-xs font-bold uppercase tracking-widest text-ink transition-colors hover:border-accent/30 hover:text-accent lg:hidden;
+  @apply inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 lg:hidden dark:border-white/8 dark:bg-paper dark:text-ink-secondary dark:hover:border-white/15 dark:hover:bg-surface-low;
 }
 
 .lesson-reader-hero {
-  @apply mb-6 rounded-3xl bg-paper px-5 py-7 shadow-sm md:px-8 md:py-9;
+  @apply mb-6 rounded-2xl border border-slate-200 bg-white px-5 py-7 shadow-sm md:px-8 md:py-9 dark:border-white/8 dark:bg-paper;
 }
 
 .lesson-reader-hero__meta {
-  @apply mb-3 flex flex-wrap gap-x-3 gap-y-1 text-[11px] font-bold uppercase tracking-widest text-ink-muted;
+  @apply mb-3 flex flex-wrap gap-x-3 gap-y-1 text-xs font-medium text-slate-500 dark:text-ink-muted;
 }
 
 .lesson-reader-hero h1 {
@@ -172,7 +287,7 @@
 }
 
 .lesson-reader-progress {
-  @apply sticky top-0 z-30 mb-5 flex flex-col gap-3 border-y border-ink/5 bg-background/95 py-3 backdrop-blur md:flex-row md:items-center md:justify-between;
+  @apply sticky top-0 z-30 mb-5 flex flex-col gap-3 border-y border-slate-200 bg-background/95 py-3 md:flex-row md:items-center md:justify-between dark:border-white/8;
 }
 
 .lesson-reader-progress div {
@@ -180,11 +295,11 @@
 }
 
 .lesson-reader-progress span {
-  @apply rounded-full bg-paper px-3 py-1.5;
+  @apply inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600 dark:bg-surface-mid dark:text-ink-secondary;
 }
 
 .lesson-reader-continue {
-  @apply inline-flex items-center justify-center gap-2 rounded-xl bg-ink px-4 py-2.5 text-xs font-bold uppercase tracking-widest text-paper transition-colors hover:bg-accent;
+  @apply inline-flex items-center justify-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100;
 }
 
 .lesson-reader-domains {
@@ -216,7 +331,8 @@
 }
 
 .lesson-reader-block {
-  @apply rounded-3xl bg-paper p-5 shadow-sm md:p-7;
+  @apply rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:p-7 dark:border-white/8 dark:bg-paper;
+  box-shadow: var(--ls-shadow);
 }
 
 .lesson-reader-block__header {
@@ -224,11 +340,11 @@
 }
 
 .lesson-reader-block__icon {
-  @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-accent-soft text-accent;
+  @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700 dark:bg-surface-mid dark:text-ink-secondary;
 }
 
 .lesson-reader-eyebrow {
-  @apply text-[10px] font-bold uppercase tracking-widest text-ink-muted;
+  @apply text-xs font-medium text-slate-500 dark:text-ink-muted;
 }
 
 .lesson-reader-block__title {
@@ -236,7 +352,7 @@
 }
 
 .lesson-reader-block__status {
-  @apply hidden rounded-full bg-surface-low px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-ink-muted md:inline-flex;
+  @apply hidden items-center rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600 md:inline-flex dark:bg-surface-mid dark:text-ink-secondary;
 }
 
 .lesson-reader-block__status--viewed {
@@ -287,7 +403,7 @@
 }
 
 .lesson-reader-option {
-  @apply flex w-full items-center justify-between gap-3 rounded-2xl border border-ink/10 bg-paper px-4 py-3 text-left text-sm font-medium text-ink transition-colors hover:border-accent/40 disabled:cursor-default;
+  @apply flex w-full items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-medium text-slate-950 transition-colors hover:border-slate-300 disabled:cursor-default dark:border-white/8 dark:bg-paper dark:text-ink dark:hover:border-white/15;
 }
 
 .lesson-reader-option--correct {
@@ -316,7 +432,7 @@
 
 .lesson-reader-primary,
 .lesson-reader-secondary {
-  @apply inline-flex items-center justify-center rounded-xl px-4 py-3 text-xs font-bold uppercase tracking-widest transition-colors;
+  @apply inline-flex items-center justify-center rounded-xl px-4 py-3 text-sm font-medium transition-colors;
 }
 
 .lesson-reader-primary {
@@ -328,7 +444,8 @@
 }
 
 .lesson-reader-outline {
-  @apply sticky top-20 hidden max-h-[calc(100vh-7rem)] overflow-y-auto rounded-3xl bg-paper p-4 shadow-sm lg:block;
+  @apply sticky top-20 hidden max-h-[calc(100vh-7rem)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 lg:block dark:border-white/8 dark:bg-paper;
+  box-shadow: var(--ls-shadow);
 }
 
 .lesson-reader-outline__list {
@@ -352,7 +469,7 @@
 }
 
 .lesson-reader-outline__label {
-  @apply text-[9px] font-bold uppercase tracking-widest text-ink-muted;
+  @apply text-xs font-medium text-slate-500 dark:text-ink-muted;
 }
 
 .lesson-reader-outline__copy strong {
@@ -364,11 +481,11 @@
 }
 
 .lesson-reader-drawer__backdrop {
-  @apply absolute inset-0 bg-ink/30 backdrop-blur-sm;
+  @apply absolute inset-0 bg-slate-950/40;
 }
 
 .lesson-reader-drawer__panel {
-  @apply absolute bottom-0 left-0 right-0 max-h-[82vh] overflow-y-auto rounded-t-3xl bg-paper p-5 shadow-2xl;
+  @apply absolute bottom-0 left-0 right-0 max-h-[82vh] overflow-y-auto rounded-t-3xl border border-slate-200 bg-white p-5 shadow-md;
 }
 
 .lesson-reader-drawer__header {
@@ -384,11 +501,11 @@
 }
 
 .lesson-tools-menu__trigger {
-  @apply inline-flex items-center gap-2 rounded-xl border border-ink/10 bg-paper px-3 py-2 text-xs font-bold uppercase tracking-widest text-ink transition-colors hover:border-accent/30 hover:text-accent;
+  @apply inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50;
 }
 
 .lesson-tools-menu__panel {
-  @apply absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-2xl border border-ink/10 bg-paper p-2 shadow-xl;
+  @apply absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-md;
 }
 
 .lesson-tools-menu__item {
@@ -396,11 +513,11 @@
 }
 
 .lesson-tools-menu__hint {
-  @apply mt-2 flex gap-2 border-t border-ink/5 px-3 py-3 text-xs leading-relaxed text-muted;
+  @apply mt-2 flex gap-2 border-t border-slate-200 px-3 py-3 text-xs leading-relaxed text-slate-500;
 }
 
 .lesson-reader-empty {
-  @apply rounded-3xl bg-paper p-10 text-center text-muted shadow-sm;
+  @apply rounded-2xl border border-slate-200 bg-slate-50 p-10 text-center text-sm text-slate-500;
 }
 
 .lesson-reader-empty h2 {
@@ -411,16 +528,16 @@
    LESSON TEMPLATE STYLES
 ═══════════════════════════════════════════════ */
 .pill {
-  @apply inline-flex items-center gap-1 text-[11px] font-medium px-2.5 py-0.5 rounded-full whitespace-nowrap;
+  @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap;
 }
 .pill--info { @apply bg-accent-soft text-accent; }
 .pill--success { @apply bg-success-soft text-success; }
 .pill--warn { @apply bg-warning-soft text-warning; }
 .pill--danger { @apply bg-error-soft text-error; }
-.pill--neutral { @apply bg-surface-low text-ink-muted border border-surface-mid; }
+.pill--neutral { @apply bg-slate-100 text-slate-600; }
 
 .lesson-header {
-  @apply bg-paper border border-surface-mid rounded-2xl p-4 md:p-5 mb-2.5 shadow-sm;
+  @apply mb-2.5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5;
 }
 .lesson-header__meta {
   @apply flex flex-wrap gap-1.5 mb-2.5;
@@ -449,16 +566,16 @@
 .btn-fork { @apply text-[11px] font-medium px-2.5 py-0.5 rounded-full border border-surface-mid bg-transparent text-accent cursor-pointer transition-colors hover:bg-accent-soft; }
 
 .lesson-cockpit {
-  @apply mb-8 space-y-4 rounded-3xl border border-surface-mid bg-paper p-4 shadow-sm;
+  @apply mb-8 space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm;
 }
 .lesson-cockpit__stats {
   @apply grid grid-cols-1 gap-3 md:grid-cols-3;
 }
 .lesson-cockpit__stat {
-  @apply rounded-2xl bg-surface-low p-4;
+  @apply rounded-2xl bg-slate-50 p-4;
 }
 .lesson-cockpit__stat-label {
-  @apply mb-1 block text-[10px] font-bold uppercase tracking-widest text-ink-muted;
+  @apply mb-1 block text-xs font-medium text-slate-500;
 }
 .lesson-cockpit__stat-value {
   @apply block text-sm font-semibold text-ink;
@@ -467,10 +584,10 @@
   @apply flex flex-wrap gap-2;
 }
 .lesson-cockpit__button {
-  @apply rounded-xl border border-surface-mid bg-paper px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-ink transition-all hover:border-accent/30 hover:text-accent;
+  @apply inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50;
 }
 .lesson-cockpit__button--primary {
-  @apply border-accent bg-accent text-paper hover:bg-accent-hover hover:text-paper;
+  @apply border-slate-950 bg-slate-950 text-white hover:bg-slate-800;
 }
 .lesson-map {
   @apply space-y-3;
@@ -479,19 +596,19 @@
   @apply flex items-center justify-between gap-3;
 }
 .lesson-map__eyebrow {
-  @apply text-[10px] font-bold uppercase tracking-widest text-ink-muted;
+  @apply text-xs font-medium text-slate-500;
 }
 .lesson-map__link {
-  @apply text-[10px] font-bold uppercase tracking-widest text-accent transition-colors hover:text-accent-hover;
+  @apply text-xs font-medium text-slate-600 transition-colors hover:text-slate-950;
 }
 .lesson-map__rail {
   @apply flex gap-3 overflow-x-auto pb-1;
 }
 .lesson-map__chip {
-  @apply flex min-w-[220px] items-start gap-3 rounded-2xl border border-surface-mid bg-surface-low px-3 py-3 text-left transition-all hover:border-accent/30 hover:bg-accent/5;
+  @apply flex min-w-[220px] items-start gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-3 text-left shadow-sm transition hover:border-slate-300 hover:shadow-md;
 }
 .lesson-map__chip--active {
-  @apply border-accent/30 bg-accent/5;
+  @apply border-slate-300 bg-slate-50;
 }
 .lesson-map__chip--done .lesson-map__chip-index {
   @apply bg-success-soft text-success;
@@ -516,7 +633,7 @@
   @apply flex w-full flex-col gap-3;
 }
 .lesson-tool-card {
-  @apply rounded-2xl border border-surface-mid bg-paper p-4 shadow-sm;
+  @apply rounded-2xl border border-slate-200 bg-white p-4 shadow-sm;
 }
 .lesson-tool-card--wide {
   @apply min-w-0;
@@ -525,13 +642,13 @@
   @apply flex items-start gap-3;
 }
 .lesson-tool-card__icon {
-  @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-surface-low text-ink;
+  @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700;
 }
 .lesson-tool-card__icon--accent {
   @apply bg-accent/8 text-accent;
 }
 .lesson-tool-card__eyebrow {
-  @apply mb-1 text-[10px] font-bold uppercase tracking-widest text-ink-muted;
+  @apply mb-1 text-xs font-medium text-slate-500;
 }
 .lesson-tool-card__title {
   @apply text-sm font-semibold text-ink;
@@ -540,7 +657,7 @@
   @apply mt-3 text-[12px] leading-relaxed text-ink-secondary;
 }
 .lesson-tool-card__button {
-  @apply mt-3 inline-flex items-center justify-center rounded-xl border border-surface-mid bg-surface-low px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-ink transition-all hover:border-accent/30 hover:text-accent disabled:cursor-not-allowed disabled:opacity-50;
+  @apply mt-3 inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50;
 }
 .lesson-tool-actions {
   @apply mt-4 flex flex-wrap items-center gap-2;
@@ -549,10 +666,10 @@
   @apply mt-4 grid gap-3 md:grid-cols-3;
 }
 .lesson-flow-chip {
-  @apply rounded-2xl border border-surface-mid bg-surface-low/70 p-4;
+  @apply rounded-2xl border border-slate-200 bg-slate-50 p-4;
 }
 .lesson-flow-chip__label {
-  @apply mb-1 block text-[10px] font-bold uppercase tracking-widest text-ink-muted;
+  @apply mb-1 block text-xs font-medium text-slate-500;
 }
 .lesson-flow-chip__value {
   @apply block text-sm font-semibold text-ink;
@@ -561,16 +678,16 @@
   @apply mt-4 grid gap-4 md:grid-cols-2;
 }
 .lesson-tag-panel__group {
-  @apply rounded-2xl border border-surface-mid bg-surface-low/70 p-4;
+  @apply rounded-2xl border border-slate-200 bg-slate-50 p-4;
 }
 .lesson-tag-panel__top {
   @apply mb-3 flex items-center justify-between gap-3;
 }
 .lesson-tag-panel__label {
-  @apply text-[10px] font-bold uppercase tracking-widest text-ink-muted;
+  @apply text-xs font-medium text-slate-500;
 }
 .lesson-tag-panel__value {
-  @apply rounded-full bg-paper px-2.5 py-1 text-[10px] font-semibold text-ink;
+  @apply inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600;
 }
 .lesson-tag-panel__empty {
   @apply text-[12px] leading-relaxed text-ink-secondary;
@@ -579,16 +696,16 @@
   @apply flex flex-wrap gap-2;
 }
 .lesson-suggested-tag {
-  @apply inline-flex items-center rounded-full border border-accent/20 bg-accent/8 px-3 py-1 text-[10px] font-semibold text-accent;
+  @apply inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600;
 }
 .lesson-outline-preview {
   @apply mt-4 flex flex-col gap-2;
 }
 .lesson-outline-preview__item {
-  @apply flex items-start gap-3 rounded-2xl border border-surface-mid bg-surface-low/70 p-3 text-left transition-all hover:border-accent/30 hover:bg-accent/5;
+  @apply flex items-start gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-slate-300 hover:shadow-md;
 }
 .lesson-outline-preview__item--active {
-  @apply border-accent/25 bg-accent/6 shadow-sm;
+  @apply border-slate-300 bg-slate-50;
 }
 .lesson-outline-preview__index {
   @apply flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-paper text-[11px] font-bold text-ink-muted;
@@ -603,7 +720,7 @@
   @apply mt-1 text-[11px] leading-relaxed text-ink-secondary;
 }
 .lesson-workspace-button {
-  @apply inline-flex items-center justify-center gap-2 rounded-2xl bg-accent px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-paper shadow-lg shadow-accent/20 transition-all hover:bg-ink;
+  @apply inline-flex items-center justify-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800;
 }
 .outline-summary {
   @apply grid grid-cols-3 gap-3;
@@ -612,16 +729,16 @@
   @apply rounded-2xl bg-surface-low p-4 text-center;
 }
 .outline-summary__label {
-  @apply mb-1 block text-[10px] font-bold uppercase tracking-widest text-ink-muted;
+  @apply mb-1 block text-xs font-medium text-slate-500;
 }
 .outline-summary__value {
   @apply block text-sm font-semibold text-ink;
 }
 .outline-item {
-  @apply flex items-stretch gap-3 rounded-2xl border border-surface-mid bg-surface-low p-3 transition-all;
+  @apply flex items-stretch gap-3 rounded-2xl border border-slate-200 bg-white p-3 transition;
 }
 .outline-item--reading {
-  @apply border-accent/30 bg-accent/5 shadow-sm;
+  @apply border-slate-300 bg-slate-50;
 }
 .outline-item__main {
   @apply flex flex-1 items-start gap-3 text-left;
@@ -636,7 +753,7 @@
   @apply mb-1 flex flex-wrap items-center gap-2;
 }
 .outline-item__section {
-  @apply text-[10px] font-bold uppercase tracking-widest text-ink-muted;
+  @apply text-[10px] font-bold uppercase tracking-normal text-ink-muted;
 }
 .outline-item__title {
   @apply text-sm font-semibold text-ink;
@@ -844,7 +961,7 @@
   @apply bg-accent/5 border border-accent/15 rounded-2xl p-5 mb-2;
 }
 .lesson-intro__eyebrow {
-  @apply text-[11px] font-bold text-accent uppercase tracking-widest mb-2;
+  @apply text-[11px] font-bold text-accent uppercase tracking-normal mb-2;
 }
 .lesson-intro__list {
   @apply space-y-1.5 mt-3;
@@ -861,7 +978,7 @@
   @apply bg-success-soft border border-success/20 rounded-2xl p-5 mt-2;
 }
 .lesson-takeaways__eyebrow {
-  @apply text-[11px] font-bold text-success uppercase tracking-widest mb-3;
+  @apply text-[11px] font-bold text-success uppercase tracking-normal mb-3;
 }
 .lesson-takeaways__list {
   @apply space-y-2;

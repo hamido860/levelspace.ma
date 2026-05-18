@@ -85,7 +85,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
         </div>
         
         <nav className="flex flex-col gap-1">
-          {!isCollapsed && <p className="text-[10px] font-bold text-muted uppercase tracking-widest px-3 mb-2 opacity-50">{t('content')}</p>}
+          {!isCollapsed && <p className="text-[10px] font-bold text-muted uppercase tracking-normal px-3 mb-2 opacity-50">{t('content')}</p>}
           {mainNavItems.map((item) => {
             const isActive = location.pathname === item.path;
             return (
@@ -95,7 +95,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
                 title={isCollapsed ? item.label : undefined}
                 className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3 px-3'} py-2.5 rounded-lg font-medium text-sm transition-all duration-200 ease-in-out ${
                   isActive 
-                    ? 'bg-accent text-white shadow-lg shadow-accent/20' 
+                    ? 'bg-accent text-white shadow-sm shadow-accent/20' 
                     : 'text-muted hover:bg-ink/5'
                 }`}
               >
@@ -109,7 +109,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
         </nav>
 
         <div className="mt-auto flex flex-col gap-1 pt-4 border-t border-ink/5">
-          {!isCollapsed && <p className="text-[10px] font-bold text-muted uppercase tracking-widest px-3 mb-2 opacity-50">{t('tools')}</p>}
+          {!isCollapsed && <p className="text-[10px] font-bold text-muted uppercase tracking-normal px-3 mb-2 opacity-50">{t('tools')}</p>}
           {toolNavItems.map((item) => {
             const isActive = item.matchPrefix
               ? location.pathname === item.path || location.pathname.startsWith(`${item.path}/`)
@@ -121,7 +121,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
                 title={isCollapsed ? item.label : undefined}
                 className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3 px-3'} py-2.5 rounded-lg font-medium text-sm transition-all duration-200 ease-in-out ${
                   isActive 
-                    ? 'bg-accent text-white shadow-lg shadow-accent/20' 
+                    ? 'bg-accent text-white shadow-sm shadow-accent/20' 
                     : 'text-muted hover:bg-ink/5'
                 }`}
               >

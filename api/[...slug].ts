@@ -27,9 +27,11 @@ import {
   loadAiRecoveryRecoveredLessonDetail,
   loadAiRecoveryRecoveredLessons,
   loadAiRecoveryTaskDetail,
+  loadRagChunkHealth,
   MAX_AUTOMATIC_RETRIES,
   requireAdminUser,
   requireAiAdmin,
+  repairRagTopicLinks,
   resetAiRecoveryTask,
   runAiRecoverySafetyCheck,
   runAuditForTask,
@@ -60,8 +62,20 @@ const MAX_STARTER_TOPIC_IDS_PER_REQUEST = 25;
 
 function getSegments(req: VercelRequest) {
   const slug = req.query?.slug;
-  if (Array.isArray(slug)) return slug.map(String);
-  if (typeof slug === "string" && slug) return [slug];
+  const toSegments = (value: string) =>
+    value
+      .split("/")
+      .map((segment) => {
+        try {
+          return decodeURIComponent(segment);
+        } catch {
+          return segment;
+        }
+      })
+      .filter(Boolean);
+
+  if (Array.isArray(slug)) return slug.flatMap((value) => toSegments(String(value)));
+  if (typeof slug === "string" && slug) return toSegments(slug);
   return [];
 }
 
@@ -162,6 +176,23 @@ async function handleNvidiaProxy(req: VercelRequest, res: VercelResponse) {
       .status(error?.response?.status || 502)
       .json(error?.response?.data || { error: `NVIDIA API error: ${message}` });
   }
+}
+
+async function handleAiRoot(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== "GET") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  return res.status(200).json({
+    ok: true,
+    routes: [
+      "/api/ai/status",
+      "/api/ai/generate",
+      "/api/ai/explain",
+      "/api/ai/lesson-blocks",
+      "/api/ai/embed",
+    ],
+  });
 }
 
 async function handleAiPlanTask(req: VercelRequest, res: VercelResponse) {
@@ -865,6 +896,34 @@ async function handleTopicsRepair(req: VercelRequest, res: VercelResponse) {
   }
 }
 
+async function handleRagHealth(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== "GET") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  try {
+    await requireAdminUser(req);
+    const health = await loadRagChunkHealth(getServerSupabase());
+    return res.status(200).json({ health });
+  } catch (error) {
+    return sendError(res, error, "Unable to load RAG chunk health.");
+  }
+}
+
+async function handleRagTopicRepair(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  try {
+    await requireAiAdmin(req);
+    const result = await repairRagTopicLinks(getServerSupabase());
+    return res.status(200).json(result);
+  } catch (error) {
+    return sendError(res, error, "Unable to repair RAG topic links.");
+  }
+}
+
 async function handleSeedStarterLessons(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -1056,6 +1115,7 @@ async function handleAiRecovery(req: VercelRequest, res: VercelResponse, segment
 
 const rootRoutes: Record<string, RouteHandler> = {
   "nvidia-proxy": handleNvidiaProxy,
+  "ai": handleAiRoot,
   "ai-plan-task": handleAiPlanTask,
   "ai-execute-task": handleAiExecuteTask,
   "ai-approve-task": handleAiApproveTask,
@@ -1076,6 +1136,8 @@ const rootRoutes: Record<string, RouteHandler> = {
   "admin/curriculum-review-detail": handleCurriculumReviewDetail,
   "admin/curriculum-review-action": handleCurriculumReviewAction,
   "admin/topics/repair": handleTopicsRepair,
+  "admin/rag/health": handleRagHealth,
+  "admin/rag/repair-topic-links": handleRagTopicRepair,
   "admin/lessons/seed-starter": handleSeedStarterLessons,
 };
 
@@ -1094,6 +1156,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (segments[0] === "user" && segments[1] === "ai-keys") {
+    if (segments.length === 2) return handleUserAiKeys(req, res);
+    if (segments.length === 3 && segments[2] === "test") return handleTestUserAiKey(req, res);
+    if (segments.length === 3) return handleDeleteUserAiKey(req, res, segments[2]);
+  }
+
+  if (segments[0] === "settings" && segments[1] === "ai-keys") {
     if (segments.length === 2) return handleUserAiKeys(req, res);
     if (segments.length === 3 && segments[2] === "test") return handleTestUserAiKey(req, res);
     if (segments.length === 3) return handleDeleteUserAiKey(req, res, segments[2]);

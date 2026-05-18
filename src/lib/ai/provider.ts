@@ -19,6 +19,7 @@ export type GenerateAIResponseInput = {
   fallbackEnabled?: boolean;
   credentialMode?: AICredentialMode;
   userId?: string;
+  ownerRef?: string;
   requestApiKey?: string;
 };
 
@@ -39,7 +40,7 @@ const normalizeProvider = (value: unknown): AIProviderName | null => {
 const isTruthy = (value: unknown) => ["1", "true", "yes", "on"].includes(String(value || "").toLowerCase());
 const isProductionLike = () => process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
 
-// TODO(auth): temporary developer/admin exception. Remove once authenticated per-user API keys are implemented end to end.
+// DEV ONLY - remove after auth is implemented
 export const isDevAdminAiKeyModeEnabled = () => {
   const explicitlyEnabled = isTruthy(process.env.NEXT_PUBLIC_ENABLE_DEV_ADMIN_AI_KEYS);
   return explicitlyEnabled && !isProductionLike();
@@ -59,6 +60,7 @@ export const getDevAdminAiStatus = () => {
     gemini: Boolean(enabled && process.env.DEV_ADMIN_GEMINI_API_KEY),
     nvidia: Boolean(enabled && (process.env.DEV_ADMIN_NVIDIA_API_KEY || process.env.NVIDIA_API_KEY)),
     openrouter: Boolean(enabled && process.env.DEV_ADMIN_OPENROUTER_API_KEY),
+    openai: false,
   };
 
   return {
@@ -68,43 +70,85 @@ export const getDevAdminAiStatus = () => {
   };
 };
 
-const getConfiguredProvider = () =>
-  (isDevAdminAiKeyModeEnabled() ? normalizeProvider(process.env.DEV_ADMIN_AI_PROVIDER) : null) ||
-  normalizeProvider(process.env.AI_PROVIDER) ||
-  "gemini";
-
-const getFallbackProvider = (primary: AIProviderName) =>
-  normalizeProvider(process.env.AI_FALLBACK_PROVIDER) || (primary === "gemini" ? "nvidia" : "gemini");
-
 const isMissingProviderError = (error: unknown) =>
   error instanceof Error && /no ai provider configured|not configured|API_KEY|environment variables/i.test(error.message);
 
+const cleanKey = (value: string | undefined) => String(value || "").trim().replace(/^["']|["']$/g, "");
+
+const isPlausibleProviderKey = (provider: AIProviderName, key: string) => {
+  if (!key) return false;
+  if (provider === "gemini") return key.startsWith("AIza");
+  if (provider === "openrouter") return key.startsWith("sk-or-");
+  if (provider === "openai") return key.startsWith("sk-") && !key.startsWith("sk-or-");
+  if (provider === "nvidia") return key.startsWith("nvapi-");
+  return false;
+};
+
 const getPlatformKey = (provider: AIProviderName) => {
+  const firstPlausible = (...values: Array<string | undefined>) =>
+    values.map(cleanKey).find((key) => isPlausibleProviderKey(provider, key)) || "";
+
   if (provider === "gemini") {
-    return process.env.GEMINI_API_KEY || process.env.GEMINI_KEY_0 || process.env.AI_API_KEY || process.env.VITE_AI_API_KEY || "";
+    return firstPlausible(process.env.GEMINI_API_KEY, process.env.GEMINI_KEY_0, process.env.AI_API_KEY, process.env.VITE_AI_API_KEY);
   }
-  if (provider === "openrouter") return process.env.OPENROUTER_API_KEY || "";
-  if (provider === "openai") return process.env.OPENAI_API_KEY || "";
-  if (provider === "nvidia") return process.env.NVIDIA_API_KEY || "";
+  if (provider === "openrouter") return firstPlausible(process.env.OPENROUTER_API_KEY);
+  if (provider === "openai") return firstPlausible(process.env.OPENAI_API_KEY);
+  if (provider === "nvidia") return firstPlausible(process.env.NVIDIA_API_KEY);
   return "";
 };
 
 const isPlatformEnabled = () => process.env.AI_PLATFORM_CREDITS_ENABLED !== "false";
 
+export const getPlatformAiProviderStatus = () => ({
+  gemini: Boolean(getPlatformKey("gemini")),
+  nvidia: Boolean(getPlatformKey("nvidia")),
+  openrouter: Boolean(getPlatformKey("openrouter")),
+  openai: Boolean(getPlatformKey("openai")),
+});
+
+const providerOrder: AIProviderName[] = ["gemini", "nvidia", "openrouter", "openai"];
+
+export const getConfiguredAIProvider = (): AIProviderName => {
+  const devAdmin = getDevAdminAiStatus();
+  const devAdminProvider = devAdmin.enabled ? normalizeProvider(process.env.DEV_ADMIN_AI_PROVIDER) : null;
+  if (devAdminProvider && devAdmin.providers[devAdminProvider]) return devAdminProvider;
+
+  const envProvider = normalizeProvider(process.env.AI_PROVIDER);
+  const platformStatus = getPlatformAiProviderStatus();
+  if (envProvider && platformStatus[envProvider]) return envProvider;
+
+  return providerOrder.find((provider) => platformStatus[provider] || devAdmin.providers[provider]) || envProvider || "gemini";
+};
+
+const getFallbackProvider = (primary: AIProviderName) => {
+  const configuredFallback = normalizeProvider(process.env.AI_FALLBACK_PROVIDER);
+  const platformStatus = getPlatformAiProviderStatus();
+  const devAdmin = getDevAdminAiStatus();
+  if (configuredFallback && configuredFallback !== primary && (platformStatus[configuredFallback] || devAdmin.providers[configuredFallback])) {
+    return configuredFallback;
+  }
+
+  return providerOrder.find((provider) => provider !== primary && (platformStatus[provider] || devAdmin.providers[provider])) || primary;
+};
+
 const resolveApiKey = async (provider: AIProviderName, input: GenerateAIResponseInput) => {
+  const savedProvider = normalizeUserAiProvider(provider);
+  const ownerRef = input.ownerRef || (input.userId ? `user:${input.userId}` : null);
+  if (savedProvider && ownerRef) {
+    const apiKey = await getDecryptedUserAiKey(getServerSupabase(), ownerRef, savedProvider);
+    if (apiKey) return apiKey;
+  }
+
   if (input.credentialMode === "byok") {
-    // TODO(auth): dev-only compatibility for the old UI-pasted API key flow.
-    // Remove this once authenticated per-user keys are implemented.
+    // DEV ONLY - remove after auth is implemented
     if (!isProductionLike() && input.requestApiKey) return input.requestApiKey;
 
-    const byokProvider = normalizeUserAiProvider(provider);
-    if (byokProvider && input.userId) {
-      const apiKey = await getDecryptedUserAiKey(getServerSupabase(), input.userId, byokProvider);
-      if (apiKey) return apiKey;
+    if (savedProvider) {
+      throw new Error(`No API key saved for this provider. Add it once in AI Keys settings.`);
     }
   }
 
-  // TODO(auth): temporary developer/admin exception. This must not persist after auth-backed BYOK is complete.
+  // DEV ONLY - remove after auth is implemented
   const devAdminKey = getDevAdminKey(provider);
   if (devAdminKey) return devAdminKey;
 
@@ -134,7 +178,7 @@ const callProvider = async (provider: AIProviderName, input: GenerateAIResponseI
 };
 
 export async function generateAIResponse(input: GenerateAIResponseInput): Promise<GenerateAIResponseResult> {
-  const primary = input.provider || getConfiguredProvider();
+  const primary = input.provider || getConfiguredAIProvider();
   const fallback = getFallbackProvider(primary);
   const fallbackEnabled = input.fallbackEnabled ?? process.env.AI_FALLBACK_ENABLED !== "false";
   const errors: string[] = [];

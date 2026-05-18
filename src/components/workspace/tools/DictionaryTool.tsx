@@ -49,7 +49,7 @@ export const DictionaryTool: React.FC<DictionaryToolProps> = ({ state, onChange 
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-accent">
           <Book className="w-4 h-4" />
-          <h3 className="text-sm font-bold uppercase tracking-widest">Academic Dictionary</h3>
+          <h3 className="text-sm font-bold uppercase tracking-normal">Academic Dictionary</h3>
         </div>
       </div>
 
@@ -65,7 +65,7 @@ export const DictionaryTool: React.FC<DictionaryToolProps> = ({ state, onChange 
         <button
           type="submit"
           disabled={isLoading || !word.trim()}
-          className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-accent text-white rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-ink transition-all disabled:opacity-50"
+          className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-accent text-white rounded-lg text-[10px] font-bold uppercase tracking-normal hover:bg-ink transition-all disabled:opacity-50"
         >
           {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Define'}
         </button>
@@ -75,7 +75,7 @@ export const DictionaryTool: React.FC<DictionaryToolProps> = ({ state, onChange 
         {isLoading ? (
           <div className="flex flex-col items-center justify-center h-full space-y-4 text-muted">
             <Loader2 className="w-8 h-8 animate-spin" />
-            <p className="text-xs font-bold uppercase tracking-widest">Searching dictionary...</p>
+            <p className="text-xs font-bold uppercase tracking-normal">Searching dictionary...</p>
           </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center h-full text-center space-y-4 text-error/60">
@@ -96,7 +96,7 @@ export const DictionaryTool: React.FC<DictionaryToolProps> = ({ state, onChange 
               {definition.phonetics?.find((p: any) => p.audio) && (
                 <button
                   onClick={() => playAudio(definition.phonetics.find((p: any) => p.audio).audio)}
-                  className="w-12 h-12 bg-accent/10 text-accent rounded-full flex items-center justify-center hover:bg-accent hover:text-white transition-all shadow-lg shadow-accent/20"
+                  className="w-12 h-12 bg-accent/10 text-accent rounded-full flex items-center justify-center hover:bg-accent hover:text-white transition-all shadow-sm shadow-accent/20"
                   aria-label="Play pronunciation audio"
                 >
                   <Volume2 size={20} />
@@ -108,7 +108,7 @@ export const DictionaryTool: React.FC<DictionaryToolProps> = ({ state, onChange 
               {definition.meanings.map((meaning: any, i: number) => (
                 <div key={i} className="space-y-3">
                   <div className="flex items-center gap-3">
-                    <span className="px-2 py-1 bg-surface-mid text-muted text-[10px] font-bold uppercase tracking-widest rounded">
+                    <span className="px-2 py-1 bg-surface-mid text-muted text-[10px] font-bold uppercase tracking-normal rounded">
                       {meaning.partOfSpeech}
                     </span>
                     <div className="h-px flex-grow bg-ink/5" />
@@ -137,7 +137,7 @@ export const DictionaryTool: React.FC<DictionaryToolProps> = ({ state, onChange 
             <Book className="w-12 h-12 text-muted" />
             <div className="space-y-1">
               <p className="text-sm font-bold text-ink">Ready to define</p>
-              <p className="text-[10px] text-muted uppercase tracking-widest">Enter a word above to begin</p>
+              <p className="text-[10px] text-muted uppercase tracking-normal">Enter a word above to begin</p>
             </div>
           </div>
         )}

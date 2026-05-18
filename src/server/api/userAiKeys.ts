@@ -4,10 +4,13 @@ import {
   getDecryptedUserAiKey,
   listUserAiKeyMetadata,
   normalizeUserAiProvider,
+  resolveAiKeyOwner,
+  updateUserAiKeyTestStatus,
   upsertUserAiKey,
   type UserAiKeyProvider,
 } from "../aiKeys";
-import { AiCommandCenterHttpError, getServerSupabase, requireAuthenticatedUser } from "./aiCommandCenter";
+import { AiCommandCenterHttpError, getServerSupabase } from "./aiCommandCenter";
+import { getServerSupabaseEnv } from "../../lib/supabase/server";
 
 const getBody = (req: VercelRequest) =>
   req.body && typeof req.body === "object" ? (req.body as Record<string, unknown>) : {};
@@ -18,9 +21,20 @@ const sendError = (res: VercelResponse, error: unknown) => {
   }
 
   const message = error instanceof Error ? error.message : "AI key request failed.";
-  const status = message === "AI key encryption is not configured." ? 500 : 400;
+  const status =
+    /Supabase admin env missing|Supabase env missing|encryption is not configured/i.test(message)
+      ? 500
+      : /Authentication required/i.test(message)
+        ? 401
+        : 400;
   return res.status(status).json({ error: message });
 };
+
+const adminEnvMissingResponse = (res: VercelResponse) =>
+  res.status(503).json({
+    error:
+      "Supabase admin env missing. Set SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SECRET_KEY on the server to save encrypted AI keys.",
+  });
 
 async function testProviderKey(provider: UserAiKeyProvider, apiKey: string) {
   if (provider === "gemini") {
@@ -42,15 +56,11 @@ async function testProviderKey(provider: UserAiKeyProvider, apiKey: string) {
   const endpoint =
     provider === "openrouter"
       ? "https://openrouter.ai/api/v1/chat/completions"
-      : provider === "nvidia"
-        ? "https://integrate.api.nvidia.com/v1/chat/completions"
-        : "https://api.openai.com/v1/chat/completions";
+      : "https://api.openai.com/v1/chat/completions";
   const model =
     provider === "openrouter"
       ? process.env.OPENROUTER_MODEL || "openai/gpt-4o-mini"
-      : provider === "nvidia"
-        ? process.env.NVIDIA_MODEL || "google/gemma-3-27b-it"
-        : process.env.OPENAI_MODEL || "gpt-4o-mini";
+      : process.env.OPENAI_MODEL || "gpt-4o-mini";
 
   const response = await fetch(endpoint, {
     method: "POST",
@@ -73,11 +83,26 @@ async function testProviderKey(provider: UserAiKeyProvider, apiKey: string) {
 
 export async function handleUserAiKeys(req: VercelRequest, res: VercelResponse) {
   try {
-    const user = await requireAuthenticatedUser(req);
+    const owner = await resolveAiKeyOwner(req, { requireAuthInProduction: true });
+    const env = getServerSupabaseEnv();
+
+    if (!env.serviceRoleConfigured) {
+      if (req.method === "GET") {
+        return res.status(200).json({
+          keys: [],
+          adminConfigured: false,
+          warning:
+            "Supabase admin env missing. Saved AI keys are unavailable until SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SECRET_KEY is configured.",
+        });
+      }
+
+      return adminEnvMissingResponse(res);
+    }
+
     const supabase = getServerSupabase();
 
     if (req.method === "GET") {
-      const keys = await listUserAiKeyMetadata(supabase, user.id);
+      const keys = await listUserAiKeyMetadata(supabase, owner.ownerRef);
       return res.status(200).json({ keys });
     }
 
@@ -89,13 +114,7 @@ export async function handleUserAiKeys(req: VercelRequest, res: VercelResponse) 
       if (!provider) return res.status(400).json({ error: "Unsupported AI provider." });
       if (!rawKey) return res.status(400).json({ error: "API key is required." });
 
-      const key = await upsertUserAiKey(
-        supabase,
-        user.id,
-        provider,
-        rawKey,
-        typeof body.label === "string" ? body.label : null,
-      );
+      const key = await upsertUserAiKey(supabase, owner, provider, rawKey);
       return res.status(200).json({ key });
     }
 
@@ -114,8 +133,12 @@ export async function handleDeleteUserAiKey(req: VercelRequest, res: VercelRespo
     const provider = normalizeUserAiProvider(providerValue);
     if (!provider) return res.status(400).json({ error: "Unsupported AI provider." });
 
-    const user = await requireAuthenticatedUser(req);
-    await deleteUserAiKey(getServerSupabase(), user.id, provider);
+    if (!getServerSupabaseEnv().serviceRoleConfigured) {
+      return adminEnvMissingResponse(res);
+    }
+
+    const owner = await resolveAiKeyOwner(req, { requireAuthInProduction: true });
+    await deleteUserAiKey(getServerSupabase(), owner.ownerRef, provider);
     return res.status(200).json({ success: true, provider });
   } catch (error) {
     return sendError(res, error);
@@ -128,19 +151,42 @@ export async function handleTestUserAiKey(req: VercelRequest, res: VercelRespons
       return res.status(405).json({ error: "Method not allowed" });
     }
 
-    const provider = normalizeUserAiProvider(getBody(req).provider);
+    const body = getBody(req);
+    const provider = normalizeUserAiProvider(body.provider);
     if (!provider) return res.status(400).json({ error: "Unsupported AI provider." });
 
-    const user = await requireAuthenticatedUser(req);
-    const apiKey = await getDecryptedUserAiKey(getServerSupabase(), user.id, provider);
+    const owner = await resolveAiKeyOwner(req, { requireAuthInProduction: true });
+    const submittedKey = typeof body.apiKey === "string" ? body.apiKey.trim() : "";
+
+    if (submittedKey) {
+      const success = await testProviderKey(provider, submittedKey);
+      return res.status(200).json({
+        success,
+        error: success ? null : "Invalid API key.",
+      });
+    }
+
+    if (!getServerSupabaseEnv().serviceRoleConfigured) {
+      return adminEnvMissingResponse(res);
+    }
+
+    const supabase = getServerSupabase();
+    const apiKey = submittedKey || await getDecryptedUserAiKey(supabase, owner.ownerRef, provider);
     if (!apiKey) {
-      return res.status(404).json({ success: false, error: "No saved key for this provider." });
+      return res.status(404).json({
+        success: false,
+        error: "No API key saved for this provider. Add it once in AI Keys settings.",
+      });
     }
 
     const success = await testProviderKey(provider, apiKey);
+    if (!submittedKey) {
+      await updateUserAiKeyTestStatus(supabase, owner.ownerRef, provider, success ? "passed" : "failed");
+    }
+
     return res.status(200).json({
       success,
-      error: success ? null : "Provider rejected the saved key.",
+      error: success ? null : "Invalid API key.",
     });
   } catch (error) {
     return sendError(res, error);

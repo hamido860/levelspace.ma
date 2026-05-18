@@ -172,11 +172,11 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
       <div className="fixed bottom-6 right-6 z-50 group">
         <button
           disabled
-          className="w-14 h-14 bg-surface-mid text-muted rounded-full shadow-xl flex items-center justify-center cursor-not-allowed opacity-60"
+          className="w-14 h-14 bg-surface-mid text-muted rounded-full shadow-md flex items-center justify-center cursor-not-allowed opacity-60"
         >
           <MessageCircle size={24} />
         </button>
-        <div className="absolute bottom-16 right-0 bg-ink text-paper text-xs px-3 py-2 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-lg">
+        <div className="absolute bottom-16 right-0 bg-ink text-paper text-xs px-3 py-2 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-sm">
           AI help requires API key
         </div>
       </div>,
@@ -193,7 +193,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0, opacity: 0 }}
             onClick={() => setIsOpen(true)}
-            className="fixed bottom-6 right-6 w-14 h-14 bg-accent text-white rounded-full shadow-2xl flex items-center justify-center hover:bg-accent-hover hover:scale-105 transition-all z-50 group"
+            className="fixed bottom-6 right-6 w-14 h-14 bg-accent text-white rounded-full shadow-md flex items-center justify-center hover:bg-accent-hover hover:scale-105 transition-all z-50 group"
           >
             <MessageCircle size={24} className="group-hover:animate-pulse" />
             <div className="absolute -top-2 -right-2 w-4 h-4 bg-error rounded-full border-2 border-background" />
@@ -207,7 +207,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            className="fixed bottom-6 right-6 w-[380px] h-[600px] max-h-[80vh] bg-paper rounded-3xl shadow-2xl flex flex-col z-50 border border-ink/10 overflow-hidden"
+            className="fixed bottom-6 right-6 w-[380px] h-[600px] max-h-[80vh] bg-paper rounded-3xl shadow-md flex flex-col z-50 border border-ink/10 overflow-hidden"
           >
             {/* Header */}
             <div className="p-4 bg-ink text-paper flex items-center justify-between shrink-0">
@@ -217,7 +217,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
                 </div>
                 <div>
                   <h3 className="font-bold text-sm">AI Tutor</h3>
-                  <p className="text-[10px] text-paper/60 uppercase tracking-widest">Grounded in this lesson</p>
+                  <p className="text-[10px] text-paper/60 uppercase tracking-normal">Grounded in this lesson</p>
                 </div>
               </div>
               <button 
@@ -345,7 +345,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
                     {isMathMode && (
                       <div className="relative group flex items-center">
                         <Info size={14} className="text-muted hover:text-ink transition-colors cursor-help" />
-                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2.5 bg-ink text-paper text-[10px] leading-relaxed rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 shadow-xl">
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2.5 bg-ink text-paper text-[10px] leading-relaxed rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 shadow-md">
                           Type standard math notation (e.g., 1/2 for fractions, ^ for exponents) or use the virtual keyboard that appears when you click the input.
                           <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-ink"></div>
                         </div>

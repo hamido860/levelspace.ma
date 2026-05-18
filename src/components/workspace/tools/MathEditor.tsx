@@ -66,7 +66,7 @@ export const MathEditor: React.FC<MathEditorProps> = ({ state, onChange }) => {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-accent">
           <Calculator className="w-4 h-4" />
-          <h3 className="text-sm font-bold uppercase tracking-widest">Math Editor</h3>
+          <h3 className="text-sm font-bold uppercase tracking-normal">Math Editor</h3>
         </div>
         <div className="flex items-center gap-2">
           {canAskAi && (
@@ -115,7 +115,7 @@ export const MathEditor: React.FC<MathEditorProps> = ({ state, onChange }) => {
         </div>
 
         <div className="bg-surface-medium/50 rounded-xl p-4 space-y-2">
-          <p className="text-[10px] font-bold text-muted uppercase tracking-widest">LaTeX Output</p>
+          <p className="text-[10px] font-bold text-muted uppercase tracking-normal">LaTeX Output</p>
           <code className="block text-xs font-mono text-ink break-all bg-paper p-3 rounded-lg border border-ink/5">
             {state.latex || 'Type something above...'}
           </code>

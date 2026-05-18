@@ -455,7 +455,7 @@ export const LessonView: React.FC = () => {
               type="button"
               onClick={handleAddNote}
               disabled={!noteContent.trim()}
-              className="w-full rounded-xl bg-ink py-3 text-[10px] font-bold uppercase tracking-widest text-paper transition-colors hover:bg-accent disabled:opacity-50"
+              className="w-full rounded-xl bg-ink py-3 text-[10px] font-bold uppercase tracking-normal text-paper transition-colors hover:bg-accent disabled:opacity-50"
             >
               Save note
             </button>

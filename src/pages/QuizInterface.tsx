@@ -69,7 +69,7 @@ export const QuizInterface: React.FC = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
-            className="w-full max-w-xl p-16 bg-paper border border-ink/5 rounded-4xl text-center space-y-12 shadow-2xl shadow-ink/5 relative overflow-hidden"
+            className="w-full max-w-xl p-16 bg-paper border border-ink/5 rounded-4xl text-center space-y-12 shadow-md shadow-ink/5 relative overflow-hidden"
           >
             <div className="absolute top-0 left-0 w-full h-2 bg-accent" />
             
@@ -78,7 +78,7 @@ export const QuizInterface: React.FC = () => {
             </div>
             
             <div className="space-y-6">
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-accent/5 rounded-full text-accent text-[10px] font-mono font-bold uppercase tracking-widest">
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-accent/5 rounded-full text-accent text-[10px] font-mono font-bold uppercase tracking-normal">
                 <Sparkles className="w-3 h-3" />
                 Assessment Complete
               </div>
@@ -131,14 +131,14 @@ export const QuizInterface: React.FC = () => {
         <div className="space-y-8">
           <div className="flex justify-between items-end">
             <div className="space-y-2">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-[0.3em] text-muted">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-normal text-muted">
                 Question {currentQuestionIndex + 1} / {totalQuestions}
               </span>
               <h3 className="text-2xl font-serif font-medium">Current Trajectory</h3>
             </div>
             <div className="flex items-baseline gap-1">
               <span className="text-4xl font-serif font-medium">{Math.round(progress)}</span>
-              <span className="text-sm font-mono text-muted uppercase tracking-widest">%</span>
+              <span className="text-sm font-mono text-muted uppercase tracking-normal">%</span>
             </div>
           </div>
           <div className="h-[2px] w-full bg-ink/5 rounded-full overflow-hidden">
@@ -156,7 +156,7 @@ export const QuizInterface: React.FC = () => {
           <div className="space-y-8">
             <div className="flex items-center gap-4">
               <div className="h-px w-12 bg-accent"></div>
-              <span className="text-[10px] font-mono font-bold uppercase tracking-[0.4em] text-accent">Inquiry</span>
+              <span className="text-[10px] font-mono font-bold uppercase tracking-normal text-accent">Inquiry</span>
             </div>
             <h2 className="text-4xl md:text-6xl font-serif font-medium leading-[1.1] text-ink">
               {currentQuestion.text}
@@ -175,7 +175,7 @@ export const QuizInterface: React.FC = () => {
                   onClick={() => handleOptionSelect(option)}
                   className={`w-full p-10 text-left rounded-4xl border transition-all duration-300 flex items-center justify-between group relative ${
                     isSelected
-                      ? 'bg-paper border-accent shadow-2xl shadow-accent/5'
+                      ? 'bg-paper border-accent shadow-md shadow-accent/5'
                       : 'bg-background border-ink/5 hover:border-ink/20'
                   }`}
                 >
@@ -197,7 +197,7 @@ export const QuizInterface: React.FC = () => {
                         initial={{ scale: 0, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
                         exit={{ scale: 0, opacity: 0 }}
-                        className="w-8 h-8 rounded-full bg-accent flex items-center justify-center shadow-lg shadow-accent/20"
+                        className="w-8 h-8 rounded-full bg-accent flex items-center justify-center shadow-sm shadow-accent/20"
                       >
                         <CheckCircle2 className="w-4 h-4 text-paper" />
                       </motion.div>
@@ -220,11 +220,11 @@ export const QuizInterface: React.FC = () => {
             </div>
             <div className="flex items-center gap-3 text-muted">
               <Lightbulb className="w-4 h-4 text-accent" />
-              <span className="text-[10px] font-mono font-bold uppercase tracking-[0.3em]">Curator's Insight</span>
+              <span className="text-[10px] font-mono font-bold uppercase tracking-normal">Curator's Insight</span>
             </div>
             <p className="text-ink/80 italic font-serif text-2xl leading-relaxed relative z-10">
               "The whole is other than the sum of the parts." <br />
-              <span className="text-sm font-mono uppercase tracking-widest not-italic opacity-40 mt-4 block">— Kurt Koffka</span>
+              <span className="text-sm font-mono uppercase tracking-normal not-italic opacity-40 mt-4 block">— Kurt Koffka</span>
             </p>
           </motion.section>
 
@@ -235,7 +235,7 @@ export const QuizInterface: React.FC = () => {
               whileTap={{ scale: 0.98 }}
               onClick={handleSubmit}
               disabled={!selectedOption}
-              className="group w-full py-8 bg-ink text-paper rounded-full font-medium text-sm uppercase tracking-[0.4em] flex items-center justify-center gap-4 shadow-2xl shadow-ink/20 disabled:opacity-20 disabled:grayscale disabled:cursor-not-allowed hover:bg-accent transition-all duration-300"
+              className="group w-full py-8 bg-ink text-paper rounded-full font-medium text-sm uppercase tracking-normal flex items-center justify-center gap-4 shadow-md shadow-ink/20 disabled:opacity-20 disabled:grayscale disabled:cursor-not-allowed hover:bg-accent transition-all duration-300"
             >
               Submit Response
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />

@@ -131,6 +131,13 @@ const getRequestQueueJobId = (body: Record<string, unknown>) =>
             : ""
   ) || null;
 
+const getRequestTopicId = (body: Record<string, unknown>) =>
+  normalizeValue(
+    typeof body.topicId === "string" ? body.topicId
+      : typeof body.topic_id === "string" ? body.topic_id
+        : ""
+  ) || null;
+
 const formatDbError = (error: any) =>
   [
     error?.message,
@@ -158,6 +165,23 @@ type TopicData = {
 type LessonGenerationResult = {
   lesson: any | null;
   error: string | null;
+  provider?: string | null;
+  model?: string | null;
+};
+
+type LessonGenerationObservability = {
+  runId: string;
+  issueId: string | null;
+  taskId: string | null;
+  jobId: string | null;
+  topicId: string | null;
+  model: string | null;
+  startedAt: number;
+};
+
+type ModelCallEvent = {
+  provider: string;
+  model: string;
 };
 
 const APPROVED_OUTLINE_STATUSES = new Set(["approved", "published", "done", "valid", "passed"]);
@@ -566,6 +590,287 @@ async function writeGenerationLog(
   if (error) console.error("lesson_gen_log insert error:", error);
 }
 
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  if (error && typeof error === "object" && "message" in error) return String((error as any).message || "");
+  return String(error || "Unknown error");
+}
+
+function getErrorMetadata(error: unknown) {
+  const record = error && typeof error === "object" ? error as Record<string, unknown> : {};
+  return {
+    error_message: getErrorMessage(error),
+    error_stack: typeof record.stack === "string" ? record.stack.slice(0, 6000) : null,
+    error_code: typeof record.code === "string" || typeof record.code === "number" ? String(record.code) : null,
+  };
+}
+
+async function createLessonGenerationObservability(
+  supabaseAdmin: any,
+  input: {
+    jobId: string | null;
+    topicId: string | null;
+    topic: string;
+    country: string;
+    grade: string;
+    subject: string;
+    moduleName?: string | null;
+    model: string | null;
+    startedAt: number;
+  }
+): Promise<LessonGenerationObservability> {
+  const runId = crypto.randomUUID();
+  const base: LessonGenerationObservability = {
+    runId,
+    issueId: null,
+    taskId: null,
+    jobId: input.jobId,
+    topicId: input.topicId,
+    model: input.model,
+    startedAt: input.startedAt,
+  };
+
+  try {
+    const { data: issue, error: issueError } = await supabaseAdmin
+      .from("ai_issues")
+      .insert({
+        title: `Lesson generation run${input.jobId ? ` ${input.jobId}` : ""}`,
+        severity: "low",
+        issue_type: "lesson_generation_observability",
+        affected_area: "lesson_gen_queue",
+        evidence: {
+          run_id: runId,
+          job_id: input.jobId,
+          topic_id: input.topicId,
+          topic: input.topic,
+          country: input.country,
+          grade: input.grade,
+          subject: input.subject,
+          module_name: input.moduleName ?? null,
+          model: input.model,
+        },
+        impact: "Records one real lesson generation execution.",
+        suggested_action: "Review ai_task_logs for stage-by-stage generation details.",
+        status: "observing",
+      })
+      .select("id")
+      .single();
+
+    if (issueError) throw issueError;
+    const issueId = issue?.id ?? null;
+    if (!issueId) return base;
+
+    const { data: task, error: taskError } = await supabaseAdmin
+      .from("ai_tasks")
+      .insert({
+        issue_id: issueId,
+        task_name: `Generate lesson: ${input.topic}`,
+        task_type: "lesson_generation",
+        priority: "medium",
+        assigned_agent: "generate-lessons",
+        execution_mode: "edge_function",
+        safety_level: "low",
+        target_area: "lesson_generation",
+        instructions: "Observe a real generate-lessons execution run.",
+        status: "running",
+        progress: 1,
+        requires_approval: false,
+        started_at: new Date(input.startedAt).toISOString(),
+      })
+      .select("id")
+      .single();
+
+    if (taskError) throw taskError;
+    const taskId = task?.id ?? null;
+    if (!taskId) return { ...base, issueId };
+
+    const snapshot = {
+      task_id: taskId,
+      snapshot_type: "lesson_generation_run",
+      target_table: input.jobId ? "lesson_gen_queue" : "lessons",
+      record_count: input.jobId ? 1 : 0,
+      snapshot_data: {
+        run_id: runId,
+        job_id: input.jobId,
+        topic_id: input.topicId,
+        topic: input.topic,
+        country: input.country,
+        grade: input.grade,
+        subject: input.subject,
+        module_name: input.moduleName ?? null,
+        model: input.model,
+        started_at: new Date(input.startedAt).toISOString(),
+      },
+    };
+
+    const { error: snapshotError } = await supabaseAdmin.from("ai_execution_snapshots").insert(snapshot);
+    if (snapshotError) console.error("ai_execution_snapshots insert error:", snapshotError);
+
+    return { ...base, issueId, taskId };
+  } catch (error) {
+    console.error("lesson generation observability init error:", error);
+    return base;
+  }
+}
+
+async function writeAiTaskLog(
+  supabaseAdmin: any,
+  observability: LessonGenerationObservability | null,
+  logType: string,
+  message: string,
+  metadata: Record<string, unknown> = {}
+) {
+  if (!observability?.taskId) return;
+
+  const payload = {
+    task_id: observability.taskId,
+    agent_name: "generate-lessons",
+    log_type: logType,
+    message,
+    metadata: {
+      run_id: observability.runId,
+      job_id: observability.jobId,
+      topic_id: metadata.topic_id ?? observability.topicId,
+      model: metadata.model ?? observability.model,
+      duration_ms: Date.now() - observability.startedAt,
+      ...metadata,
+    },
+  };
+
+  const { error } = await supabaseAdmin.from("ai_task_logs").insert(payload);
+  if (error) console.error("ai_task_logs insert error:", error);
+}
+
+async function finishLessonGenerationObservability(
+  supabaseAdmin: any,
+  observability: LessonGenerationObservability | null,
+  input: {
+    success: boolean;
+    topicId?: string | null;
+    lessonId?: string | null;
+    blocksCount?: number | null;
+    model?: string | null;
+    error?: unknown;
+    phase?: string;
+  }
+) {
+  if (!observability?.taskId) return;
+
+  const errorMetadata = input.error ? getErrorMetadata(input.error) : {};
+  const completedAt = new Date().toISOString();
+  const summary = {
+    run_id: observability.runId,
+    job_id: observability.jobId,
+    topic_id: input.topicId ?? observability.topicId,
+    lesson_id: input.lessonId ?? null,
+    blocks_count: input.blocksCount ?? null,
+    model: input.model ?? observability.model,
+    duration_ms: Date.now() - observability.startedAt,
+    phase: input.phase ?? null,
+    ...errorMetadata,
+  };
+
+  const { error } = await supabaseAdmin
+    .from("ai_tasks")
+    .update({
+      status: input.success ? "completed" : "failed",
+      progress: input.success ? 100 : 100,
+      completed_at: completedAt,
+      updated_at: completedAt,
+    })
+    .eq("id", observability.taskId);
+
+  if (error) console.error("ai_tasks observability status update error:", error);
+
+  if (observability.issueId) {
+    const { error: issueError } = await supabaseAdmin
+      .from("ai_issues")
+      .update({
+        status: input.success ? "resolved" : "open",
+        evidence: summary,
+        updated_at: completedAt,
+      })
+      .eq("id", observability.issueId);
+
+    if (issueError) console.error("ai_issues observability status update error:", issueError);
+  }
+}
+
+async function recordGenerationFailure(
+  supabaseAdmin: any,
+  observability: LessonGenerationObservability | null,
+  input: {
+    error: unknown;
+    phase: string;
+    topicId?: string | null;
+    lessonId?: string | null;
+    blocksCount?: number | null;
+    model?: string | null;
+  }
+) {
+  const metadata = {
+    phase: input.phase,
+    topic_id: input.topicId ?? observability?.topicId ?? null,
+    lesson_id: input.lessonId ?? null,
+    blocks_count: input.blocksCount ?? null,
+    model: input.model ?? observability?.model ?? null,
+    ...getErrorMetadata(input.error),
+  };
+
+  await writeAiTaskLog(
+    supabaseAdmin,
+    observability,
+    "job_failed",
+    `Lesson generation failed during ${input.phase}: ${getErrorMessage(input.error)}`,
+    metadata,
+  );
+  await finishLessonGenerationObservability(supabaseAdmin, observability, {
+    success: false,
+    error: input.error,
+    phase: input.phase,
+    topicId: input.topicId,
+    lessonId: input.lessonId,
+    blocksCount: input.blocksCount,
+    model: input.model,
+  });
+}
+
+async function claimQueueJob(supabaseAdmin: any, queueJobId: string | null) {
+  if (!queueJobId) return null;
+
+  const { data: existing, error: lookupError } = await supabaseAdmin
+    .from("lesson_gen_queue")
+    .select("id, topic_id, track_id, status, attempts")
+    .eq("id", queueJobId)
+    .maybeSingle();
+
+  if (lookupError) {
+    console.error("lesson_gen_queue claim lookup error:", lookupError);
+    return null;
+  }
+  if (!existing?.id) return null;
+
+  const { data: claimed, error: claimError } = await supabaseAdmin
+    .from("lesson_gen_queue")
+    .update({
+      status: "processing",
+      claimed_at: new Date().toISOString(),
+      attempts: Number(existing.attempts ?? 0) + 1,
+      last_error: null,
+    })
+    .eq("id", queueJobId)
+    .select("id, topic_id, track_id, status, attempts, claimed_at")
+    .single();
+
+  if (claimError) {
+    console.error("lesson_gen_queue claim update error:", claimError);
+    return existing;
+  }
+
+  return claimed ?? existing;
+}
+
 async function saveQueueError(supabaseAdmin: any, queueJobId: string | null, detailedError: string) {
   if (!queueJobId) return;
 
@@ -788,12 +1093,15 @@ Deno.serve(async (req) => {
   let supabaseAdmin: any = null;
   let activeTopicId: string | null = null;
   let activeMcpRunId: string | null = null;
+  let observability: LessonGenerationObservability | null = null;
+  let activeModel: string | null = null;
 
   try {
     startedAt = Date.now();
     const body = await req.json();
     const { topic, country, grade, subject, moduleName, userId, referenceUrls, existingContext } = body;
     queueJobId = getRequestQueueJobId(body);
+    activeTopicId = getRequestTopicId(body);
 
     if (!topic || !country || !grade || !subject) {
       return new Response(
@@ -811,10 +1119,56 @@ Deno.serve(async (req) => {
 
     const geminiKey = Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GEMINI_KEY_0");
     const nvidiaKey = Deno.env.get("NVIDIA_API_KEY");
+    activeModel = geminiKey ? "gemini-2.5-flash" : nvidiaKey ? "google/gemma-3-27b-it" : null;
+
+    observability = await createLessonGenerationObservability(supabaseAdmin, {
+      jobId: queueJobId,
+      topicId: activeTopicId,
+      topic,
+      country,
+      grade,
+      subject,
+      moduleName,
+      model: activeModel,
+      startedAt,
+    });
+
+    const claimedJob = await claimQueueJob(supabaseAdmin, queueJobId);
+    if (claimedJob?.topic_id && !activeTopicId) activeTopicId = claimedJob.topic_id;
+    if (claimedJob?.id) {
+      await writeAiTaskLog(supabaseAdmin, observability, "job_claimed", "Lesson generation queue job claimed.", {
+        topic_id: activeTopicId,
+        queue_status: claimedJob.status,
+        attempts: claimedJob.attempts,
+        track_id: claimedJob.track_id ?? null,
+      });
+    }
+
+    await writeAiTaskLog(supabaseAdmin, observability, "generation_started", "Lesson generation started.", {
+      topic_id: activeTopicId,
+      topic,
+      country,
+      grade,
+      subject,
+      module_name: moduleName ?? null,
+      provider_order: [
+        geminiKey ? "gemini" : null,
+        nvidiaKey ? "nvidia" : null,
+      ].filter(Boolean),
+    });
 
     if (!geminiKey && !nvidiaKey) {
+      const detailedError = "No AI API key configured (GEMINI_API_KEY or NVIDIA_API_KEY)";
+      await saveQueueError(supabaseAdmin, queueJobId, detailedError);
+      await recordGenerationFailure(supabaseAdmin, observability, {
+        error: detailedError,
+        phase: "provider_configuration",
+        topicId: activeTopicId,
+        model: activeModel,
+      });
+
       return new Response(
-        JSON.stringify({ success: false, error: "No AI API key configured (GEMINI_API_KEY or NVIDIA_API_KEY)" }),
+        JSON.stringify({ success: false, error: detailedError }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -825,8 +1179,15 @@ Deno.serve(async (req) => {
       subject,
       topic,
     });
-    activeTopicId = topicContext?.topicId ?? null;
+    activeTopicId = topicContext?.topicId ?? activeTopicId;
     const topicData = await fetchTopicData(supabaseAdmin, activeTopicId);
+    await writeAiTaskLog(supabaseAdmin, observability, "rag_context_selected", "RAG and outline context selected for lesson generation.", {
+      topic_id: activeTopicId,
+      rag_chunk_count: topicData.ragChunks.length,
+      outline_count: topicData.outlines.length,
+      fallback_reason: topicData.fallbackReason,
+    });
+
     if (topicData.ragChunks.length === 0 && topicData.outlines.length === 0) {
       const detailedError = [
         "Source grounding failed",
@@ -843,6 +1204,13 @@ Deno.serve(async (req) => {
         durationMs: Date.now() - startedAt,
       });
       await saveQueueError(supabaseAdmin, queueJobId, detailedError);
+      await recordGenerationFailure(supabaseAdmin, observability, {
+        error: detailedError,
+        phase: "source_grounding",
+        topicId: activeTopicId,
+        blocksCount: 0,
+        model: activeModel,
+      });
 
       return new Response(
         JSON.stringify({ success: false, error: detailedError, topicId: activeTopicId }),
@@ -870,7 +1238,26 @@ Deno.serve(async (req) => {
       mcpProfile ? `MCP profile: ${mcpProfile.code || "admin_heavy_curriculum_builder"}\n${mcpProfile.instructions || mcpProfile.description || ""}` : "",
     ].filter(Boolean).join("\n\n");
 
-    const generation = await generateLesson({ topic, country, grade, subject, moduleName, referenceUrls, existingContext: sourceContext, geminiKey, nvidiaKey });
+    const generation = await generateLesson({
+      topic,
+      country,
+      grade,
+      subject,
+      moduleName,
+      referenceUrls,
+      existingContext: sourceContext,
+      geminiKey,
+      nvidiaKey,
+      onModelCalled: async (event) => {
+        activeModel = event.model;
+        await writeAiTaskLog(supabaseAdmin, observability, "model_called", `${event.provider} model called.`, {
+          topic_id: activeTopicId,
+          provider: event.provider,
+          model: event.model,
+        });
+      },
+    });
+    activeModel = generation.model ?? activeModel;
     let lesson = generation.lesson;
     let fallbackUsed = false;
 
@@ -908,6 +1295,13 @@ Deno.serve(async (req) => {
         durationMs: Date.now() - startedAt,
       });
       await saveQueueError(supabaseAdmin, queueJobId, detailedError);
+      await recordGenerationFailure(supabaseAdmin, observability, {
+        error: detailedError,
+        phase: "block_generation",
+        topicId: activeTopicId,
+        blocksCount: 0,
+        model: activeModel,
+      });
       await updateMcpGenerationRun(supabaseAdmin, activeMcpRunId, {
         status: "failed",
         output_summary: { error: detailedError, phase: "block_generation" },
@@ -987,6 +1381,13 @@ Deno.serve(async (req) => {
         durationMs: Date.now() - startedAt,
       });
       await saveQueueError(supabaseAdmin, queueJobId, detailedError);
+      await recordGenerationFailure(supabaseAdmin, observability, {
+        error: lessonErr,
+        phase: "lesson_upsert",
+        topicId: activeTopicId,
+        blocksCount: lessonBlocks.length,
+        model: activeModel,
+      });
       await updateMcpGenerationRun(supabaseAdmin, activeMcpRunId, {
         status: "failed",
         output_summary: { error: detailedError, phase: "lesson_upsert" },
@@ -999,6 +1400,15 @@ Deno.serve(async (req) => {
     }
 
     const lessonId = inserted.id;
+    await writeAiTaskLog(supabaseAdmin, observability, "lesson_inserted", "Lesson row inserted or updated.", {
+      topic_id: activeTopicId,
+      lesson_id: lessonId,
+      lesson_title: lesson.lesson_title,
+      blocks_count: lessonBlocks.length,
+      fallback_used: fallbackUsed,
+      source_name: sourceName,
+      model: activeModel,
+    });
 
     try {
       await persistLessonBlocks(supabaseAdmin, lessonId, lessonBlocks);
@@ -1014,6 +1424,14 @@ Deno.serve(async (req) => {
         durationMs: Date.now() - startedAt,
       });
       await saveQueueError(supabaseAdmin, queueJobId, detailedError);
+      await recordGenerationFailure(supabaseAdmin, observability, {
+        error: blockErr,
+        phase: "lesson_blocks",
+        topicId: activeTopicId,
+        lessonId,
+        blocksCount: lessonBlocks.length,
+        model: activeModel,
+      });
       await updateMcpGenerationRun(supabaseAdmin, activeMcpRunId, {
         status: "failed",
         lesson_id: lessonId,
@@ -1025,6 +1443,12 @@ Deno.serve(async (req) => {
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+    await writeAiTaskLog(supabaseAdmin, observability, "lesson_blocks_inserted", "Lesson blocks inserted.", {
+      topic_id: activeTopicId,
+      lesson_id: lessonId,
+      blocks_count: lessonBlocks.length,
+      model: activeModel,
+    });
 
     await insertSourceEvidence(supabaseAdmin, {
       lessonId,
@@ -1053,6 +1477,23 @@ Deno.serve(async (req) => {
       durationMs: Date.now() - startedAt,
     });
     await saveQueueSuccess(supabaseAdmin, queueJobId);
+    await writeAiTaskLog(supabaseAdmin, observability, "job_completed", "Lesson generation job completed.", {
+      topic_id: activeTopicId,
+      lesson_id: lessonId,
+      blocks_count: lessonBlocks.length,
+      fallback_used: fallbackUsed,
+      source_name: sourceName,
+      source_confidence: sourceConfidence,
+      quality_score: qualityScore,
+      model: activeModel,
+    });
+    await finishLessonGenerationObservability(supabaseAdmin, observability, {
+      success: true,
+      topicId: activeTopicId,
+      lessonId,
+      blocksCount: lessonBlocks.length,
+      model: activeModel,
+    });
     await updateMcpGenerationRun(supabaseAdmin, activeMcpRunId, {
       status: "needs_review",
       lesson_id: lessonId,
@@ -1091,6 +1532,12 @@ Deno.serve(async (req) => {
         durationMs: Date.now() - startedAt,
       });
       await saveQueueError(supabaseAdmin, queueJobId, detailedError);
+      await recordGenerationFailure(supabaseAdmin, observability, {
+        error: err,
+        phase: "unhandled",
+        topicId: activeTopicId,
+        model: activeModel,
+      });
       await updateMcpGenerationRun(supabaseAdmin, activeMcpRunId, {
         status: "failed",
         output_summary: { error: detailedError, phase: "unhandled" },
@@ -1110,15 +1557,21 @@ async function generateLesson(params: {
   topic: string; country: string; grade: string; subject: string;
   moduleName?: string; referenceUrls?: string[]; existingContext?: string;
   geminiKey?: string; nvidiaKey?: string;
+  onModelCalled?: (event: ModelCallEvent) => Promise<void> | void;
 }): Promise<LessonGenerationResult> {
-  const { topic, country, grade, subject, moduleName, referenceUrls, existingContext, geminiKey, nvidiaKey } = params;
+  const { topic, country, grade, subject, moduleName, referenceUrls, existingContext, geminiKey, nvidiaKey, onModelCalled } = params;
 
   const prompt = buildMcpLessonPrompt(topic, country, grade, subject, moduleName, referenceUrls, existingContext);
   const errors: string[] = [];
+  let lastProvider: string | null = null;
+  let lastModel: string | null = null;
 
   // Primary: Gemini
   if (geminiKey) {
     try {
+      lastProvider = "gemini";
+      lastModel = "gemini-2.5-flash";
+      await onModelCalled?.({ provider: lastProvider, model: lastModel });
       const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
         {
@@ -1135,7 +1588,7 @@ async function generateLesson(params: {
         const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
         if (text) {
           const parsed = safeJsonParse(text);
-          if (parsed) return { lesson: parsed, error: null };
+          if (parsed) return { lesson: parsed, error: null, provider: lastProvider, model: lastModel };
           const reason = `Gemini JSON parse failure: response was not valid lesson JSON; excerpt=${text.slice(0, 240)}`;
           errors.push(reason);
           console.warn(reason);
@@ -1159,6 +1612,9 @@ async function generateLesson(params: {
   // Fallback: NVIDIA NIM
   if (nvidiaKey) {
     try {
+      lastProvider = "nvidia";
+      lastModel = "google/gemma-3-27b-it";
+      await onModelCalled?.({ provider: lastProvider, model: lastModel });
       const res = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${nvidiaKey}` },
@@ -1176,7 +1632,7 @@ async function generateLesson(params: {
         const text = data?.choices?.[0]?.message?.content;
         if (text) {
           const parsed = safeJsonParse(text);
-          if (parsed) return { lesson: parsed, error: null };
+          if (parsed) return { lesson: parsed, error: null, provider: lastProvider, model: lastModel };
           const reason = `NVIDIA JSON parse failure: response was not valid lesson JSON; excerpt=${text.slice(0, 240)}`;
           errors.push(reason);
           console.warn(reason);
@@ -1197,7 +1653,12 @@ async function generateLesson(params: {
     }
   }
 
-  return { lesson: null, error: errors.join(" | ") || "No model provider returned valid lesson JSON" };
+  return {
+    lesson: null,
+    error: errors.join(" | ") || "No model provider returned valid lesson JSON",
+    provider: lastProvider,
+    model: lastModel,
+  };
 }
 
 function formatThrownError(error: unknown) {

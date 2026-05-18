@@ -14,10 +14,16 @@ const getSupabaseAnonKey = () =>
   process.env.VITE_SUPABASE_ANON_KEY ||
   "";
 
+const getSupabaseAdminKey = () =>
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.SUPABASE_SECRET_KEY ||
+  process.env.SUPABASE_SECRET_ACCESS_KEY ||
+  "";
+
 export const getServerSupabaseEnv = () => {
   const url = getSupabaseUrl();
   const anonKey = getSupabaseAnonKey();
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+  const serviceRoleKey = getSupabaseAdminKey();
   return {
     url,
     anonKey,

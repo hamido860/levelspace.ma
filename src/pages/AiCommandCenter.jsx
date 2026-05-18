@@ -267,7 +267,7 @@ export const AiCommandCenter = () => {
       />
 
       <div className="space-y-8 p-4 md:p-6">
-        <section className="overflow-hidden rounded-[36px] bg-[radial-gradient(circle_at_top_left,_rgba(18,70,255,0.16),_transparent_45%),linear-gradient(135deg,#091226_0%,#101827_35%,#172033_100%)] p-6 text-white shadow-2xl shadow-slate-900/10">
+        <section className="overflow-hidden rounded-[36px] bg-[radial-gradient(circle_at_top_left,_rgba(18,70,255,0.16),_transparent_45%),linear-gradient(135deg,#091226_0%,#101827_35%,#172033_100%)] p-6 text-white shadow-md shadow-slate-900/10">
           <div className="grid gap-8 xl:grid-cols-[1.25fr_0.75fr]">
             <div className="space-y-5">
               <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.2em] text-white/80">
@@ -312,7 +312,7 @@ export const AiCommandCenter = () => {
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="rounded-[28px] border border-white/10 bg-white/8 p-5 backdrop-blur-sm">
+              <div className="rounded-[28px] border border-white/10 bg-white/8 p-5 ">
                 <div className="flex items-center gap-3">
                   <AlertTriangle className="h-5 w-5 text-red-300" />
                   <p className="text-sm font-semibold text-white/90">Open issues</p>
@@ -321,7 +321,7 @@ export const AiCommandCenter = () => {
                 <p className="mt-2 text-xs uppercase tracking-[0.18em] text-white/45">{criticalIssueCount} critical</p>
               </div>
 
-              <div className="rounded-[28px] border border-white/10 bg-white/8 p-5 backdrop-blur-sm">
+              <div className="rounded-[28px] border border-white/10 bg-white/8 p-5 ">
                 <div className="flex items-center gap-3">
                   <ShieldCheck className="h-5 w-5 text-emerald-300" />
                   <p className="text-sm font-semibold text-white/90">Waiting approval</p>
@@ -330,7 +330,7 @@ export const AiCommandCenter = () => {
                 <p className="mt-2 text-xs uppercase tracking-[0.18em] text-white/45">No destructive action passes without review</p>
               </div>
 
-              <div className="rounded-[28px] border border-white/10 bg-white/8 p-5 backdrop-blur-sm">
+              <div className="rounded-[28px] border border-white/10 bg-white/8 p-5 ">
                 <div className="flex items-center gap-3">
                   <Bot className="h-5 w-5 text-sky-300" />
                   <p className="text-sm font-semibold text-white/90">AI crew tasks</p>
@@ -339,7 +339,7 @@ export const AiCommandCenter = () => {
                 <p className="mt-2 text-xs uppercase tracking-[0.18em] text-white/45">Planner → Auditor → Worker → Validator</p>
               </div>
 
-              <div className="rounded-[28px] border border-white/10 bg-white/8 p-5 backdrop-blur-sm">
+              <div className="rounded-[28px] border border-white/10 bg-white/8 p-5 ">
                 <div className="flex items-center gap-3">
                   <CheckCircle2 className="h-5 w-5 text-emerald-300" />
                   <p className="text-sm font-semibold text-white/90">Completed tasks</p>
@@ -363,11 +363,11 @@ export const AiCommandCenter = () => {
           </div>
 
           {loading && issues.length === 0 ? (
-            <div className="rounded-3xl border border-dashed border-surface-mid p-8 text-sm text-ink-muted">
+            <div className="rounded-3xl border border-solid border-surface-mid p-8 text-sm text-ink-muted">
               Loading issue cards and execution tasks…
             </div>
           ) : issues.length === 0 ? (
-            <div className="rounded-3xl border border-dashed border-surface-mid p-8 text-sm text-ink-muted">
+            <div className="rounded-3xl border border-solid border-surface-mid p-8 text-sm text-ink-muted">
               No AI issues have been recorded yet. Once the analyzer flags lesson generation, RAG, or profile-state problems, they will appear here as executable issue cards.
             </div>
           ) : (

@@ -3314,6 +3314,103 @@ function countInvalidChunkLinks(chunks: JsonRecord[], field: string, expectedVal
   return chunks.filter((chunk) => !chunk[field] || chunk[field] !== expectedValue).length;
 }
 
+export type RagChunkHealth = {
+  total_chunks: number;
+  usable_chunks: number;
+  with_topic_id: number;
+  with_grade_id: number;
+  without_topic_id: number;
+  with_embedding: number;
+  embedding_done: number;
+  embedding_pending: number;
+  embedding_failed: number;
+  short_content: number;
+  linked_by_lesson: number;
+  linked_by_metadata: number;
+  unmatched: number;
+};
+
+const emptyRagChunkHealth = (): RagChunkHealth => ({
+  total_chunks: 0,
+  usable_chunks: 0,
+  with_topic_id: 0,
+  with_grade_id: 0,
+  without_topic_id: 0,
+  with_embedding: 0,
+  embedding_done: 0,
+  embedding_pending: 0,
+  embedding_failed: 0,
+  short_content: 0,
+  linked_by_lesson: 0,
+  linked_by_metadata: 0,
+  unmatched: 0,
+});
+
+const coerceRagChunkHealth = (row: JsonRecord | null | undefined): RagChunkHealth => {
+  const fallback = emptyRagChunkHealth();
+  if (!row) return fallback;
+  return Object.fromEntries(
+    Object.keys(fallback).map((key) => [key, Number(row[key] || 0)]),
+  ) as RagChunkHealth;
+};
+
+export async function loadRagChunkHealth(supabase: SupabaseClient) {
+  const { data, error } = await supabase
+    .from("rag_chunk_health")
+    .select("*")
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return coerceRagChunkHealth(data as JsonRecord | null);
+}
+
+export async function repairRagTopicLinks(supabase: SupabaseClient) {
+  const before = await loadRagChunkHealth(supabase);
+  const { data, error } = await supabase.rpc("repair_rag_chunk_topic_links");
+  if (error) {
+    throw error;
+  }
+  const after = await loadRagChunkHealth(supabase);
+  const methodCounts = ((data || []) as JsonRecord[]).reduce<Record<string, number>>((acc, row) => {
+    const method = String(row.method || "unknown");
+    acc[method] = Number(row.linked_count || 0);
+    return acc;
+  }, {});
+  const { data: unmatchedSamples, error: sampleError } = await supabase
+    .from("rag_chunks")
+    .select("id, content, metadata, grade_id, embedding_status")
+    .is("topic_id", null)
+    .order("updated_at", { ascending: false })
+    .limit(8);
+
+  if (sampleError) {
+    throw sampleError;
+  }
+
+  return {
+    before,
+    after,
+    methods: {
+      lesson_id: methodCounts.lesson_id || 0,
+      metadata_topic_id: methodCounts.metadata_topic_id || 0,
+      title_match: methodCounts.title_match || 0,
+      single_topic_for_grade_subject: methodCounts.single_topic_for_grade_subject || 0,
+      unmatched: methodCounts.unmatched || 0,
+    },
+    unmatchedSamples: (unmatchedSamples || []).map((chunk: JsonRecord) => ({
+      id: chunk.id,
+      grade_id: chunk.grade_id || null,
+      embedding_status: chunk.embedding_status || null,
+      reason: chunk.metadata?.topic_link_reason || "no safe topic match",
+      content_preview: String(chunk.content || "").slice(0, 220),
+      metadata_title: chunk.metadata?.title || chunk.metadata?.filename || null,
+    })),
+  };
+}
+
 export async function runRagDiagnostic(
   supabase: SupabaseClient,
   input: {
@@ -3323,11 +3420,20 @@ export async function runRagDiagnostic(
     lesson_id?: string | null;
   },
 ) {
+  const health = await loadRagChunkHealth(supabase).catch(() => emptyRagChunkHealth());
   const { data: gradeScopedChunks, error } = await safeSelect(
     supabase,
     "rag_chunks",
     "*",
-    (query) => (input.grade_id ? query.eq("grade_id", input.grade_id).limit(500) : query.limit(500)),
+    (query) => {
+      let next = query
+        .not("content", "is", null)
+        .order("created_at", { ascending: false })
+        .limit(500);
+      if (input.topic_id) next = next.eq("topic_id", input.topic_id);
+      else if (input.grade_id) next = next.eq("grade_id", input.grade_id);
+      return next;
+    },
   );
 
   if (error) {
@@ -3336,12 +3442,18 @@ export async function runRagDiagnostic(
 
   const filteredChunks = gradeScopedChunks.filter((chunk: JsonRecord) => {
     const subjectOk = input.subject_id ? !("subject_id" in chunk) || chunk.subject_id === input.subject_id : true;
-    const topicOk = input.topic_id ? !("topic_id" in chunk) || chunk.topic_id === input.topic_id : true;
+    const topicOk = input.topic_id ? chunk.topic_id === input.topic_id : true;
     const lessonOk = input.lesson_id ? !("lesson_id" in chunk) || chunk.lesson_id === input.lesson_id : true;
     return subjectOk && topicOk && lessonOk;
   });
 
-  const nonEmptyChunks = filteredChunks.filter((chunk) => String(chunk.content || "").trim().length > 0);
+  const nonEmptyChunks = filteredChunks.filter((chunk) => String(chunk.content || "").trim().length > 100);
+  const usableChunks = nonEmptyChunks.filter((chunk) =>
+    chunk.topic_id &&
+    chunk.grade_id &&
+    chunk.embedding_status === "done" &&
+    chunk.embedding,
+  );
   const averageLength =
     nonEmptyChunks.length > 0
       ? nonEmptyChunks.reduce((sum, chunk) => sum + String(chunk.content || "").trim().length, 0) / nonEmptyChunks.length
@@ -3378,8 +3490,8 @@ export async function runRagDiagnostic(
   };
 
   let blockingReason = "";
-  if (nonEmptyChunks.length === 0) {
-    blockingReason = "No valid RAG chunks found for this lesson/topic.";
+  if (usableChunks.length === 0) {
+    blockingReason = "No usable RAG chunks found: chunks require content > 100 chars, topic_id, grade_id, embedding_status='done', and embedding.";
   } else if (relevanceScore < MINIMUM_RELEVANCE_SCORE) {
     blockingReason = `Chunk relevance ${relevanceScore} is below the ${MINIMUM_RELEVANCE_SCORE} threshold.`;
   } else if (averageLength < 120) {
@@ -3387,10 +3499,24 @@ export async function runRagDiagnostic(
   }
 
   return {
-    chunks_found: nonEmptyChunks.length,
+    chunks_found: usableChunks.length,
     relevance_score: relevanceScore,
     average_chunk_length: Math.round(averageLength),
     invalid_links: invalidLinks,
+    diagnostics: {
+      ragChunksTotal: health.total_chunks,
+      ragChunksWithTopic: health.with_topic_id,
+      ragChunksWithGrade: health.with_grade_id,
+      ragChunksEmbedded: health.embedding_done,
+      ragChunksMissingEmbedding: Math.max(0, health.total_chunks - health.with_embedding),
+      ragChunksPendingEmbedding: health.embedding_pending,
+      ragChunksFailedEmbedding: health.embedding_failed,
+      ragChunksUsable: health.usable_chunks,
+      ragChunksUnlinkedToTopic: health.without_topic_id,
+      ragChunksShortContent: health.short_content,
+      ragChunksWithLessonLink: health.linked_by_lesson,
+      ragChunksWithMetadataTopic: health.linked_by_metadata,
+    },
     blocking_reason: blockingReason || null,
   };
 }

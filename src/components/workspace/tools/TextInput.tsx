@@ -29,7 +29,7 @@ export const TextInput: React.FC<TextInputProps> = ({ state, onChange }) => {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-accent">
           <FileText className="w-4 h-4" />
-          <h3 className="text-sm font-bold uppercase tracking-widest">Notes & Answers</h3>
+          <h3 className="text-sm font-bold uppercase tracking-normal">Notes & Answers</h3>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center bg-paper border border-ink/5 rounded-lg p-1">
@@ -55,7 +55,7 @@ export const TextInput: React.FC<TextInputProps> = ({ state, onChange }) => {
             placeholder="Type your notes or answer here..."
             className="w-full h-full p-6 bg-paper border border-ink/10 rounded-2xl shadow-inner text-sm leading-relaxed outline-none focus:ring-2 focus:ring-accent/20 transition-all resize-none font-sans"
           />
-          <div className="absolute bottom-4 right-4 flex items-center gap-2 px-3 py-1.5 bg-paper/80 backdrop-blur-sm border border-ink/5 rounded-full text-[9px] font-bold text-muted uppercase tracking-widest shadow-sm">
+          <div className="absolute bottom-4 right-4 flex items-center gap-2 px-3 py-1.5 bg-paper/80  border border-ink/5 rounded-full text-[9px] font-bold text-muted uppercase tracking-normal shadow-sm">
             <Save className="w-3 h-3 text-emerald-500" />
             Auto-saved
           </div>

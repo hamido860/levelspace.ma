@@ -1,46 +1,26 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  Timer, 
-  BookOpen, 
-  Calendar as CalendarIcon, 
-  RefreshCw, 
-  Settings, 
-  MoreHorizontal, 
-  ChevronRight, 
-  Check, 
+  Timer,
+  BookOpen,
+  Calendar as CalendarIcon,
+  RefreshCw,
+  Settings,
+  ChevronRight,
+  Check,
   Plus,
   Search,
-  Bell,
   Clock,
-  LayoutDashboard,
-  Archive,
-  User,
   ArrowRight,
   Brain,
   Sparkles,
   Zap,
   Loader2,
-  ChevronLeft,
   AlertCircle,
-  Calendar,
-  Database,
   Cloud
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  format, 
-  startOfMonth, 
-  endOfMonth, 
-  startOfWeek, 
-  endOfWeek, 
-  eachDayOfInterval, 
-  isSameMonth, 
-  isSameDay, 
-  isToday,
-  addMonths, 
-  subMonths 
-} from 'date-fns';
+import { format } from 'date-fns';
 import { Layout } from '../components/Layout';
 import { Modal } from '../components/Modal';
 import { TagsManager } from '../components/TagsManager';
@@ -55,6 +35,8 @@ import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { ConnectionStatusModal } from '../components/ConnectionStatusModal';
 import { OnboardingModal } from '../components/OnboardingModal';
+import { CalendarWidget } from '../components/CalendarWidget';
+import { PlanSessionModal } from '../components/PlanSessionModal';
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -76,7 +58,7 @@ export const Dashboard: React.FC = () => {
   const [timerSeconds, setTimerSeconds] = useState(1500); // 25 minutes
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [showAuditModal, setShowAuditModal] = useState(false);
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [isPlanSessionOpen, setIsPlanSessionOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
 
@@ -252,22 +234,22 @@ export const Dashboard: React.FC = () => {
         {/* Top Bar - Minimal Actions */}
         <div className="flex items-center justify-between px-4">
           <div className="flex items-center gap-4">
-            <div className="w-10 h-10 bg-accent rounded-xl flex items-center justify-center shadow-lg shadow-accent/20">
+            <div className="w-10 h-10 bg-accent rounded-xl flex items-center justify-center ">
               <Brain className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-ink leading-tight">{t('dashboard')}</h1>
-              <p className="text-[10px] font-bold text-muted uppercase tracking-widest">{t('academic_repository')}</p>
+              <h1 className="text-lg font-bold text-slate-950 leading-tight dark:text-ink">{t('dashboard')}</h1>
+              <p className="ls-micro-label">{t('academic_repository')}</p>
             </div>
           </div>
           
           <div className="flex items-center gap-3">
             <button 
               onClick={() => navigate('/pricing')}
-              className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full border text-[9px] font-bold uppercase tracking-widest transition-all ${
+              className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-semibold transition-all ${
                 isPro 
                   ? 'bg-accent/10 border-accent/20 text-accent shadow-sm' 
-                  : 'bg-paper border-ink/10 text-muted hover:border-accent/30'
+                  : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 dark:bg-paper dark:border-white/10 dark:text-ink-muted dark:hover:border-white/20'
               }`}
             >
               {isPro ? <Sparkles className="w-3 h-3" /> : <Zap className="w-3 h-3" />}
@@ -292,14 +274,14 @@ export const Dashboard: React.FC = () => {
                     }
                   }}
                   disabled={isSyncing || !dbConnected}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full border ${dbConnected ? 'bg-accent/10 border-accent/20 text-accent' : 'bg-error/10 border-error/20 text-error'} text-[9px] font-bold uppercase tracking-widest hover:scale-105 transition-all disabled:opacity-50`}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${dbConnected ? 'bg-accent/10 border-accent/20 text-accent' : 'bg-error/10 border-error/20 text-error'} text-[11px] font-semibold  transition-all disabled:opacity-50`}
                 >
                   {isSyncing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Cloud className="w-3 h-3" />}
                   {isSyncing ? 'Syncing...' : 'Sync to Cloud'}
                 </button>
                 <button 
                   onClick={() => setIsStatusModalOpen(true)}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full border ${dbConnected ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600' : 'bg-error/10 border-error/20 text-error'} text-[9px] font-bold uppercase tracking-widest hover:scale-105 transition-all`}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${dbConnected ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600' : 'bg-error/10 border-error/20 text-error'} text-[11px] font-semibold  transition-all`}
                 >
                   <div className={`w-1.5 h-1.5 rounded-full ${dbConnected ? 'bg-emerald-500' : 'bg-error'} animate-pulse`} />
                   {dbConnected ? 'Cloud Connected' : 'Local Only'}
@@ -308,7 +290,7 @@ export const Dashboard: React.FC = () => {
                   onClick={async () => {
                     await refreshDbConnection();
                   }}
-                  className="p-1.5 hover:bg-ink/5 rounded-full text-muted transition-all"
+                  className="p-1.5 hover:bg-slate-950/5 rounded-full text-slate-500 transition-all dark:text-ink-muted dark:hover:bg-surface-low"
                   title="Refresh Connection"
                 >
                   <RefreshCw className={`w-3 h-3 ${dbConnected === null ? 'animate-spin' : ''}`} />
@@ -317,7 +299,7 @@ export const Dashboard: React.FC = () => {
             )}
             <button 
               onClick={() => setShowAuditModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-paper border border-ink/5 rounded-xl text-[10px] font-bold text-muted uppercase tracking-widest hover:border-accent/30 hover:text-accent transition-all"
+              className="flex items-center gap-2 px-4 py-2 ls-card ls-micro-label hover:border-accent/30 hover:text-accent transition-all"
             >
               <Search className="w-3.5 h-3.5" />
               {t('run_audit')}
@@ -333,7 +315,7 @@ export const Dashboard: React.FC = () => {
                   window.location.reload();
                 }
               }}
-              className="flex items-center gap-2 px-4 py-2 bg-paper border border-ink/5 rounded-xl text-[10px] font-bold text-error/60 uppercase tracking-widest hover:bg-error/5 hover:text-error transition-all"
+              className="flex items-center gap-2 px-4 py-2 ls-card text-xs font-medium text-error/60  hover:bg-error/5 hover:text-error transition-all"
             >
               <RefreshCw className="w-3.5 h-3.5" />
               {t('reset')}
@@ -342,15 +324,15 @@ export const Dashboard: React.FC = () => {
         </div>
 
         {/* Hero Section - Minimal & Clean */}
-        <section className="relative overflow-hidden rounded-3xl bg-accent-soft text-ink p-8 mx-4">
+        <section className="relative overflow-hidden ls-card-pad mx-4 p-8">
           <div className="relative z-10 max-w-lg space-y-6">
             <div className="space-y-2">
               <div className="flex items-center gap-3">
-                <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-accent">
+                <p className="ls-status-badge">
                   {t('personalized_for', { grade: selectedGrade })}
                 </p>
-                <div className="w-1 h-1 rounded-full bg-ink/20" />
-                <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-ink/40">
+                <div className="w-1 h-1 rounded-full bg-slate-950/20" />
+                <p className="text-xs font-medium text-slate-500 dark:text-ink-muted">
                   {currentSession}
                 </p>
               </div>
@@ -362,13 +344,13 @@ export const Dashboard: React.FC = () => {
             <div className="flex flex-wrap gap-3">
               <button 
                 onClick={() => navigate('/modules')}
-                className="px-6 py-3 bg-accent text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-ink hover:text-paper transition-all"
+                className="ls-button-primary"
               >
                 {t('dashboard_explore')}
               </button>
               <button 
                 onClick={() => navigate('/blueprints')}
-                className="px-6 py-3 bg-ink/5 border border-ink/10 text-ink rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-ink/10 transition-all"
+                className="ls-button-secondary"
               >
                 {t('view_blueprints')}
               </button>
@@ -385,19 +367,19 @@ export const Dashboard: React.FC = () => {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 onClick={() => navigate(`/lesson/${visibleLastLesson.id}`)}
-                className="bg-accent/5 border border-accent/20 rounded-2xl p-4 flex items-center justify-between group cursor-pointer hover:bg-accent/10 transition-all"
+                className="ls-interactive-card-pad flex items-center justify-between group cursor-pointer"
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-accent text-white rounded-xl flex items-center justify-center">
+                  <div className="ls-icon-tile">
                     <BookOpen size={20} />
                   </div>
                   <div>
-                    <p className="text-[10px] font-bold text-accent uppercase tracking-widest">Continue Learning</p>
-                    <h3 className="text-sm font-bold text-ink">{visibleLastLesson.title}</h3>
+                    <p className="ls-micro-label">Continue Learning</p>
+                    <h3 className="text-sm font-bold text-slate-950 dark:text-ink">{visibleLastLesson.title}</h3>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 text-accent">
-                  <span className="text-[10px] font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">Resume</span>
+                <div className="flex items-center gap-2 text-slate-600 dark:text-ink-secondary">
+                  <span className="text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">Resume</span>
                   <ChevronRight size={18} />
                 </div>
               </motion.div>
@@ -405,12 +387,12 @@ export const Dashboard: React.FC = () => {
 
             <div className="flex items-center justify-between">
               <div className="space-y-1">
-                <h2 className="text-2xl font-bold text-ink">{t('active_classrooms')}</h2>
-                <p className="text-sm text-muted">{t('active_paths_desc')}</p>
+                <h2 className="ls-section-title">{t('active_classrooms')}</h2>
+                <p className="ls-body-text">{t('active_paths_desc')}</p>
               </div>
               <button 
                 onClick={() => navigate('/modules')}
-                className="text-xs font-bold text-accent uppercase tracking-widest hover:underline flex items-center gap-2"
+                className="ls-button-secondary"
               >
                 {t('manage')} <ArrowRight className="w-3 h-3" />
               </button>
@@ -425,33 +407,32 @@ export const Dashboard: React.FC = () => {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: i * 0.05 }}
                     onClick={() => handleModuleClick(module.id, module.name)}
-                    className="group relative bg-surface-low border border-ink/5 rounded-2xl hover:border-accent/20 transition-all cursor-pointer p-6 space-y-6"
+                    className="group relative ls-interactive-card cursor-pointer p-6 space-y-6"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="px-2 py-1 bg-background text-muted text-[10px] font-bold uppercase tracking-widest rounded">
+                      <span className="ls-badge">
                         {module.code}
                       </span>
                       <div className="flex items-center gap-1.5">
-                        <div className={`w-1.5 h-1.5 rounded-full ${module.selected ? 'bg-emerald-500' : 'bg-ink/20'}`} />
-                        <span className="text-[10px] font-bold text-muted uppercase tracking-widest">{module.selected ? t('active') : t('inactive')}</span>
+                        <span className={module.selected ? 'ls-status-badge' : 'ls-badge'}>{module.selected ? t('active') : t('inactive')}</span>
                       </div>
                     </div>
                     
                     <div className="space-y-2">
-                      <h3 className="text-xl font-bold text-ink leading-tight group-hover:text-accent transition-colors">
+                      <h3 className="text-xl font-bold text-slate-950 leading-tight group-hover:text-accent transition-colors dark:text-ink">
                         {module.name}
                       </h3>
-                      <p className="text-sm text-muted line-clamp-2 leading-relaxed">
+                      <p className="ls-body-text line-clamp-2 leading-relaxed">
                         {module.description}
                       </p>
                     </div>
 
                     <div className="space-y-3">
-                      <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-muted">
+                      <div className="flex items-center justify-between ls-micro-label">
                         <span>{t('progress')}</span>
                         <span>{module.progress}%</span>
                       </div>
-                      <div className="h-[4.5px] bg-background rounded-full overflow-hidden">
+                      <div className="h-[4.5px] bg-surface-low rounded-full overflow-hidden dark:bg-surface-mid">
                         <motion.div 
                           initial={{ width: 0 }}
                           animate={{ width: `${module.progress}%` }}
@@ -462,20 +443,14 @@ export const Dashboard: React.FC = () => {
                   </motion.div>
                 ))
               ) : (
-                <div className="col-span-full py-20 bg-surface-low/30 border border-dashed border-ink/10 rounded-[2rem] flex flex-col items-center justify-center text-center space-y-4">
-                  <div className="w-16 h-16 bg-paper rounded-full flex items-center justify-center shadow-sm">
-                    <Plus className="w-6 h-6 text-muted" />
+                <div className="col-span-full py-20 bg-slate-50/30 border border-slate-200 rounded-2xl flex flex-col items-center justify-center text-center space-y-4 dark:bg-surface-low/20 dark:border-white/8">
+                  <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center dark:bg-surface-mid" style={{ boxShadow: 'var(--ls-shadow)' }}>
+                    <BookOpen className="w-6 h-6 text-slate-500 dark:text-ink-muted" />
                   </div>
                   <div className="space-y-1">
-                    <p className="font-bold text-ink">{t('onboarding_first_classroom')}</p>
-                    <p className="text-xs text-muted">{t('motivation_start_or_stuck')}</p>
+                    <p className="font-bold text-slate-950 dark:text-ink">{t('dashboard_explore')}</p>
+                    <p className="ls-micro-label">{t('dashboard_continue')}</p>
                   </div>
-                  <button 
-                    onClick={() => navigate('/modules')}
-                    className="px-6 py-3 bg-ink text-paper rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-accent transition-all"
-                  >
-                    {t('onboarding_start_building')}
-                  </button>
                 </div>
               )}
             </div>
@@ -486,10 +461,10 @@ export const Dashboard: React.FC = () => {
             {/* Focus Timer Card */}
             <section className="bg-[#0D1117] text-white rounded-2xl p-6 space-y-6">
               <div className="flex items-center justify-between">
-                <h3 className="text-[10px] font-bold uppercase tracking-widest text-white/40">{t('deep_focus')}</h3>
+                <h3 className="text-xs font-medium text-white/60">{t('deep_focus')}</h3>
                 <div className="flex items-center gap-1.5">
                   <div className={`w-1.5 h-1.5 rounded-full ${isTimerRunning ? 'bg-accent animate-pulse' : 'bg-white/20'}`} />
-                  <span className="text-[10px] font-bold text-white/60 uppercase tracking-widest">
+                  <span className="text-xs font-medium text-white/60 ">
                     {isTimerRunning ? t('active') : t('idle')}
                   </span>
                 </div>
@@ -499,26 +474,30 @@ export const Dashboard: React.FC = () => {
                 <div className="text-5xl font-bold tracking-tighter mb-1">
                   {formatTime(timerSeconds)}
                 </div>
-                <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">{t('pomodoro_session')}</p>
+                <p className="text-xs font-medium text-white/40 ">{t('pomodoro_session')}</p>
               </div>
 
               <div className="flex gap-2">
-                <button 
+                <button
                   onClick={() => setIsTimerRunning(!isTimerRunning)}
-                  className={`flex-grow py-3 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all ${
-                    isTimerRunning 
-                      ? 'bg-white/10 text-white hover:bg-white/20' 
+                  className={`flex-1 py-3 rounded-xl font-bold text-[10px] transition-all ${
+                    isTimerRunning
+                      ? 'bg-white/10 text-white hover:bg-white/20'
                       : 'bg-accent text-white hover:bg-white hover:text-[#0D1117]'
                   }`}
                 >
                   {isTimerRunning ? t('pause') : t('dashboard_start')}
                 </button>
-                <button 
-                  onClick={() => {
-                    setIsTimerRunning(false);
-                    setTimerSeconds(defaultDuration * 60);
-                  }}
-                  className="w-12 h-12 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center hover:bg-white/10 transition-all"
+                <button
+                  onClick={() => setIsPlanSessionOpen(true)}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-white/10 border border-white/10 rounded-xl text-[10px] font-bold text-white hover:bg-white/20 transition-all"
+                >
+                  <Brain className="w-3 h-3" />
+                  Plan
+                </button>
+                <button
+                  onClick={() => { setIsTimerRunning(false); setTimerSeconds(defaultDuration * 60); }}
+                  className="w-10 h-10 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center hover:bg-white/10 transition-all shrink-0"
                 >
                   <RefreshCw className="w-3.5 h-3.5 text-white/60" />
                 </button>
@@ -526,45 +505,18 @@ export const Dashboard: React.FC = () => {
             </section>
 
             {/* Calendar Widget */}
-            <section className="bg-surface-mid border border-ink/5 rounded-[10px] p-5 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-[10px] font-bold text-muted uppercase tracking-widest">{t('calendar')}</h3>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-1 hover:bg-background rounded-lg"><ChevronLeft size={14} /></button>
-                  <span className="text-[10px] font-bold text-ink">{format(currentMonth, 'MMM yyyy')}</span>
-                  <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-1 hover:bg-background rounded-lg"><ChevronRight size={14} /></button>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-7 gap-1">
-                {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => (
-                  <div key={index} className="text-[9px] font-bold text-muted/40 text-center py-1">{day}</div>
-                ))}
-                {eachDayOfInterval({
-                  start: startOfWeek(startOfMonth(currentMonth)),
-                  end: endOfWeek(endOfMonth(currentMonth))
-                }).map((day, i) => {
-                  const isCurrentMonth = isSameMonth(day, currentMonth);
-                  const isToday = isSameDay(day, new Date());
-                  return (
-                    <div key={i} className={`aspect-square flex items-center justify-center text-[10px] font-medium rounded-lg ${!isCurrentMonth ? 'text-muted/20' : 'text-ink'} ${isToday ? 'bg-accent text-white font-bold' : 'hover:bg-background'}`}>
-                      {day.getDate()}
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
+            <CalendarWidget />
 
             {/* Learning Stats */}
-            <section className="bg-background rounded-2xl p-6 border border-ink/5">
+            <section className="bg-white rounded-2xl p-6 border border-slate-200 dark:bg-paper dark:border-white/8">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <p className="text-[9px] font-bold text-muted uppercase tracking-widest">{t('modules')}</p>
-                  <span className="text-2xl font-bold text-ink">{activeModules.length}</span>
+                  <p className="text-[9px] font-bold text-slate-500 dark:text-ink-muted">{t('modules')}</p>
+                  <span className="ls-section-title">{activeModules.length}</span>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-[9px] font-bold text-muted uppercase tracking-widest">{t('avg_completion')}</p>
-                  <span className="text-2xl font-bold text-ink">
+                  <p className="text-[9px] font-bold text-slate-500 dark:text-ink-muted">{t('avg_completion')}</p>
+                  <span className="ls-section-title">
                     {Math.round(activeModules.reduce((acc, m) => acc + m.progress, 0) / (activeModules.length || 1))}%
                   </span>
                 </div>
@@ -576,15 +528,16 @@ export const Dashboard: React.FC = () => {
               {/* Upcoming Exams & Controles */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-[10px] font-bold text-accent uppercase tracking-widest flex items-center gap-2">
+                  <h3 className="text-xs font-medium text-blue-700 flex items-center gap-2 dark:text-accent">
                     <AlertCircle className="w-3 h-3" />
                     {t('upcoming_exams')}
                   </h3>
                   <button 
                     onClick={() => setIsReminderModalOpen(true)}
-                    className="p-1.5 bg-accent/10 text-accent rounded-lg hover:bg-accent/20 transition-all"
+                    className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
                   >
-                    <Plus className="w-3 h-3" />
+                    <Plus className="w-4 h-4" />
+                    Add
                   </button>
                 </div>
                 <div className="space-y-2">
@@ -598,21 +551,21 @@ export const Dashboard: React.FC = () => {
                           <Brain className="w-4 h-4 text-accent" />
                         </div>
                         <div className="flex-grow min-w-0">
-                          <h4 className="text-xs font-bold text-ink truncate">{reminder.title}</h4>
-                          <p className="text-[9px] font-bold text-accent uppercase tracking-widest">
+                          <h4 className="text-xs font-bold text-slate-950 truncate dark:text-ink">{reminder.title}</h4>
+                          <p className="text-[9px] font-bold text-accent ">
                             {reminder.type === 'exam' ? t('exam') : t('controle')} • {reminder.dueDate ? format(new Date(reminder.dueDate), 'MMM dd') : 'No date'}
                           </p>
                         </div>
                         <button 
                           onClick={() => toggleReminder(reminder.id)}
-                          className="w-6 h-6 rounded-full border border-accent/20 flex items-center justify-center hover:bg-accent hover:text-white transition-all"
+                          className="w-6 h-6 rounded-full border-accent/20 flex items-center justify-center hover:bg-accent hover:text-white transition-all"
                         >
                           <Check size={12} />
                         </button>
                       </div>
                     ))}
                   {reminders.filter(r => (r.type === 'exam' || r.type === 'controle') && !r.completed).length === 0 && (
-                    <p className="text-[10px] text-muted italic px-2">{t('no_pending_reminders')}</p>
+                    <p className="text-[10px] text-slate-500 italic px-2 dark:text-ink-muted">{t('no_pending_reminders')}</p>
                   )}
                 </div>
               </div>
@@ -620,22 +573,22 @@ export const Dashboard: React.FC = () => {
               {/* General Reminders */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-[10px] font-bold text-muted uppercase tracking-widest">{t('reminders')}</h3>
-                  <button className="text-[9px] font-bold text-accent uppercase tracking-widest">{t('view_all')}</button>
+                  <h3 className="ls-micro-label">{t('reminders')}</h3>
+                  <button className="text-[9px] font-bold text-accent ">{t('view_all')}</button>
                 </div>
                 <div className="space-y-2">
                   {reminders
                     .filter(r => r.type !== 'exam' && r.type !== 'controle' && !r.completed)
                     .slice(0, 3)
                     .map((reminder) => (
-                      <div key={reminder.id} onClick={() => toggleReminder(reminder.id)} className="flex items-center gap-3 p-3 bg-paper border border-ink/5 rounded-xl cursor-pointer hover:border-accent/20 transition-all">
-                        <div className={`w-4 h-4 rounded border flex items-center justify-center ${reminder.completed ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-ink/10'}`}>
+                      <div key={reminder.id} onClick={() => toggleReminder(reminder.id)} className="flex items-center gap-3 p-3 ls-card cursor-pointer hover:border-accent/20 transition-all">
+                        <div className={`w-4 h-4 rounded border flex items-center justify-center ${reminder.completed ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-200 dark:border-white/15'}`}>
                           {reminder.completed && <Check size={10} />}
                         </div>
                         <div className="flex-grow min-w-0">
-                          <span className={`text-xs font-medium block truncate ${reminder.completed ? 'text-muted line-through' : 'text-ink'}`}>{reminder.title}</span>
+                          <span className={`text-xs font-medium block truncate ${reminder.completed ? 'text-slate-500 line-through dark:text-ink-muted' : 'text-slate-950 dark:text-ink'}`}>{reminder.title}</span>
                           {reminder.dueDate && (
-                            <span className="text-[8px] font-bold text-muted uppercase tracking-widest">
+                            <span className="text-[8px] font-bold text-slate-500 dark:text-ink-muted">
                               {format(new Date(reminder.dueDate), 'MMM dd')}
                             </span>
                           )}
@@ -649,37 +602,46 @@ export const Dashboard: React.FC = () => {
             {/* Schedule */}
             <section className="space-y-6">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold text-ink uppercase tracking-widest">{t('agenda')}</h3>
-                <CalendarIcon className="w-4 h-4 text-muted" />
+                <h3 className="text-sm font-bold text-slate-950 dark:text-ink">{t('agenda')}</h3>
+                <CalendarIcon className="w-4 h-4 text-slate-500 dark:text-ink-muted" />
               </div>
               <div className="space-y-4">
-                {schedule.length > 0 ? (
-                  schedule.slice(0, 3).map((event) => (
-                    <div key={event.id} className="flex gap-4">
-                      <div className="flex flex-col items-center justify-center w-12 h-12 bg-surface-low rounded-xl shrink-0">
-                        <span className="text-[10px] font-bold text-muted uppercase">{event.month.slice(0, 3)}</span>
-                        <span className="text-lg font-bold text-ink leading-none">{event.date}</span>
-                      </div>
-                      <div className="space-y-1">
-                        <h4 className="text-sm font-bold text-ink leading-tight">{event.title}</h4>
-                        <div className="flex items-center gap-2 text-[10px] text-muted font-medium uppercase tracking-wider">
-                          <Clock className="w-3 h-3" />
-                          {event.time}
+                {schedule.filter(e => e.date?.includes('-')).length > 0 ? (
+                  schedule
+                    .filter(e => e.date?.includes('-'))
+                    .sort((a, b) => a.date.localeCompare(b.date))
+                    .slice(0, 3)
+                    .map((event) => {
+                      const d = new Date(event.date);
+                      return (
+                        <div key={event.id} className="flex gap-4">
+                          <div className="flex flex-col items-center justify-center w-12 h-12 bg-slate-50 rounded-xl shrink-0 dark:bg-surface-low">
+                            <span className="text-[9px] font-medium text-slate-500 uppercase dark:text-ink-muted">{format(d, 'MMM')}</span>
+                            <span className="text-lg font-bold text-slate-950 leading-none dark:text-ink">{format(d, 'd')}</span>
+                          </div>
+                          <div className="space-y-1">
+                            <h4 className="text-sm font-bold text-slate-950 leading-tight dark:text-ink">{event.title}</h4>
+                            {event.time && (
+                              <div className="flex items-center gap-2 text-[10px] text-slate-500 font-medium uppercase tracking-wider dark:text-ink-muted">
+                                <Clock className="w-3 h-3" />
+                                {event.time}
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  ))
+                      );
+                    })
                 ) : (
-                  <p className="text-xs text-muted italic">{t('no_upcoming_events')}</p>
+                  <p className="ls-micro-label italic">{t('no_upcoming_events')}</p>
                 )}
               </div>
             </section>
 
             {/* Preferences - Subtle */}
-            <div className="pt-10 border-t border-ink/5">
-              <button 
+            <div className="pt-10 border-t border-slate-200 dark:border-white/8">
+              <button
                 onClick={() => navigate('/settings')}
-                className="flex items-center gap-2 text-[10px] font-bold text-muted uppercase tracking-widest hover:text-ink transition-colors"
+                className="flex items-center gap-2 ls-micro-label hover:text-slate-950 transition-colors dark:hover:text-ink"
               >
                 <Settings className="w-3.5 h-3.5" />
                 {t('preferences')}
@@ -693,10 +655,10 @@ export const Dashboard: React.FC = () => {
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={() => navigate('/modules')}
-          className="fixed bottom-8 right-8 w-16 h-16 bg-accent text-white rounded-full shadow-2xl shadow-accent/40 flex items-center justify-center z-50 group overflow-hidden"
+          className="fixed bottom-8 right-8 inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-slate-800 z-50 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100" style={{ boxShadow: 'var(--ls-shadow-hover)' }}
         >
-          <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
-          <Plus className="w-8 h-8 relative z-10" />
+          <Plus className="w-4 h-4" />
+          New classroom
         </motion.button>
       </div>
 
@@ -712,21 +674,21 @@ export const Dashboard: React.FC = () => {
               <Brain className="w-6 h-6" />
               <h3 className="font-bold text-lg">{t('ai_auditor')}</h3>
             </div>
-            <p className="text-sm text-muted leading-relaxed">
+            <p className="ls-body-text leading-relaxed">
               {t('audit_description', { grade: selectedGrade, country: selectedCountry })}
             </p>
           </div>
 
           <div className="space-y-4">
-            <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted">{t('audit_parameters')}</h4>
+            <h4 className="ls-micro-label">{t('audit_parameters')}</h4>
             <div className="grid grid-cols-2 gap-4">
-              <div className="p-4 bg-surface-low rounded-xl border border-ink/5">
-                <p className="text-[10px] font-bold text-muted uppercase tracking-widest mb-1">{t('grade')}</p>
-                <p className="text-sm font-bold text-ink">{selectedGrade}</p>
+              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 dark:bg-surface-low dark:border-white/8">
+                <p className="ls-micro-label mb-1">{t('grade')}</p>
+                <p className="text-sm font-bold text-slate-950 dark:text-ink">{selectedGrade}</p>
               </div>
-              <div className="p-4 bg-surface-low rounded-xl border border-ink/5">
-                <p className="text-[10px] font-bold text-muted uppercase tracking-widest mb-1">{t('region')}</p>
-                <p className="text-sm font-bold text-ink">{selectedCountry}</p>
+              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 dark:bg-surface-low dark:border-white/8">
+                <p className="ls-micro-label mb-1">{t('region')}</p>
+                <p className="text-sm font-bold text-slate-950 dark:text-ink">{selectedCountry}</p>
               </div>
             </div>
           </div>
@@ -737,7 +699,7 @@ export const Dashboard: React.FC = () => {
               // In a real app, this would trigger a background audit process
               alert(t('audit_started'));
             }}
-            className="w-full py-4 bg-ink text-paper rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-accent transition-all shadow-xl shadow-ink/20"
+            className="w-full py-4 bg-slate-950 text-white rounded-xl text-xs font-bold hover:bg-accent transition-all dark:bg-white dark:text-slate-950 dark:hover:bg-accent dark:hover:text-white"
           >
             {t('run_deep_audit')}
           </button>
@@ -753,14 +715,14 @@ export const Dashboard: React.FC = () => {
         <div className="space-y-6">
           <div className="space-y-4">
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-muted uppercase tracking-widest">{t('title')}</label>
+              <label className="ls-micro-label">{t('title')}</label>
               <input 
                 type="text"
                 list="session-titles"
                 value={newReminder.title}
                 onChange={(e) => setNewReminder({ ...newReminder, title: e.target.value })}
                 placeholder={t('e_g_math_exam')}
-                className="w-full px-4 py-3 bg-surface-low border border-ink/5 rounded-xl text-sm focus:outline-none focus:border-accent/30 transition-all"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-950 focus:outline-none focus:border-accent/30 transition-all dark:bg-surface-low dark:border-white/8 dark:text-ink dark:placeholder:text-ink-muted"
               />
               <datalist id="session-titles">
                 {activeModules.map(m => (
@@ -774,20 +736,20 @@ export const Dashboard: React.FC = () => {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-muted uppercase tracking-widest">{t('due_date')}</label>
+                <label className="ls-micro-label">{t('due_date')}</label>
                 <input 
                   type="date"
                   value={newReminder.dueDate}
                   onChange={(e) => setNewReminder({ ...newReminder, dueDate: e.target.value })}
-                  className="w-full px-4 py-3 bg-surface-low border border-ink/5 rounded-xl text-sm focus:outline-none focus:border-accent/30 transition-all"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-950 focus:outline-none focus:border-accent/30 transition-all dark:bg-surface-low dark:border-white/8 dark:text-ink"
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-muted uppercase tracking-widest">{t('type')}</label>
-                <select 
+                <label className="ls-micro-label">{t('type')}</label>
+                <select
                   value={newReminder.type}
                   onChange={(e) => setNewReminder({ ...newReminder, type: e.target.value as any })}
-                  className="w-full px-4 py-3 bg-surface-low border border-ink/5 rounded-xl text-sm focus:outline-none focus:border-accent/30 transition-all appearance-none"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-950 focus:outline-none focus:border-accent/30 transition-all appearance-none dark:bg-surface-low dark:border-white/8 dark:text-ink"
                 >
                   <option value="general">{t('general')}</option>
                   <option value="exam">{t('exam')}</option>
@@ -802,7 +764,7 @@ export const Dashboard: React.FC = () => {
 
           <button 
             onClick={handleSaveReminder}
-            className="w-full py-4 bg-accent text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-ink hover:text-paper transition-all shadow-xl shadow-accent/20"
+            className="w-full py-4 bg-accent text-white rounded-xl text-xs font-bold  hover:bg-slate-950 hover:text-white transition-all "
           >
             {t('save_profile')}
           </button>
@@ -819,9 +781,9 @@ export const Dashboard: React.FC = () => {
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-accent">
               <Sparkles className="w-4 h-4" />
-              <span className="text-[10px] font-bold uppercase tracking-widest">{t('suggested_units')}</span>
+              <span className="text-xs font-medium">{t('suggested_units')}</span>
             </div>
-            <p className="text-sm text-muted leading-relaxed">
+            <p className="ls-body-text leading-relaxed">
               {t('suggested_units_description', { grade: selectedGrade, country: selectedCountry })}
             </p>
           </div>
@@ -830,7 +792,7 @@ export const Dashboard: React.FC = () => {
             {isFetchingGallery ? (
               <div className="py-20 flex flex-col items-center justify-center space-y-4">
                 <Loader2 className="w-8 h-8 text-accent animate-spin" />
-                <p className="text-xs text-muted font-medium animate-pulse">{t('consulting_resources')}</p>
+                <p className="ls-micro-label font-medium animate-pulse">{t('consulting_resources')}</p>
               </div>
             ) : (
               suggestions.map((suggestion, i) => (
@@ -840,31 +802,31 @@ export const Dashboard: React.FC = () => {
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: i * 0.05 }}
                   onClick={() => handleCurateFromGallery(suggestion.title)}
-                  className="p-4 bg-surface-low border border-ink/5 rounded-xl hover:border-accent/30 hover:bg-paper hover:shadow-lg transition-all cursor-pointer group flex items-center justify-between"
+                  className="p-4 bg-slate-50 border border-slate-200 rounded-xl hover:border-accent/30 hover:bg-white hover:shadow-sm transition-all cursor-pointer group flex items-center justify-between dark:bg-surface-low dark:border-white/8 dark:hover:bg-surface-mid dark:hover:border-accent/30"
                 >
                   <div className="space-y-1">
-                    <h4 className="text-sm font-bold text-ink group-hover:text-accent transition-colors">{suggestion.title}</h4>
-                    <p className="text-[11px] text-muted line-clamp-1">{suggestion.description}</p>
+                    <h4 className="text-sm font-bold text-slate-950 group-hover:text-accent transition-colors dark:text-ink">{suggestion.title}</h4>
+                    <p className="text-[11px] text-slate-500 line-clamp-1 dark:text-ink-muted">{suggestion.description}</p>
                   </div>
-                  <Plus size={16} className="text-muted group-hover:text-accent transition-colors" />
+                  <Plus size={16} className="text-slate-500 group-hover:text-accent transition-colors dark:text-ink-muted" />
                 </motion.div>
               ))
             )}
           </div>
           <div 
             onClick={() => navigate('/modules')}
-            className="group relative bg-surface-low border border-dashed border-ink/20 rounded-2xl hover:border-accent/50 transition-all cursor-pointer p-6 flex flex-col items-center justify-center space-y-4"
+            className="group relative bg-slate-50 border border-solid border-ink/20 rounded-2xl hover:border-accent/50 transition-all cursor-pointer p-6 flex flex-col items-center justify-center space-y-4 dark:bg-surface-low dark:border-white/8"
           >
             <div className="w-12 h-12 rounded-full bg-accent/5 flex items-center justify-center text-accent group-hover:bg-accent group-hover:text-white transition-all">
               <Plus size={24} />
             </div>
-            <span className="text-sm font-bold text-ink uppercase tracking-widest">{t('actions_create_classroom')}</span>
+            <span className="text-sm font-bold text-slate-950 dark:text-ink">{t('actions_create_classroom')}</span>
           </div>
 
           {!isFetchingGallery && (
             <button 
               onClick={() => navigate(`/classroom/${selectedModule?.id}`)}
-              className="w-full py-4 bg-ink text-paper rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-accent transition-all flex items-center justify-center gap-2"
+              className="w-full py-4 bg-slate-950 text-white rounded-xl text-xs font-bold hover:bg-accent transition-all flex items-center justify-center gap-2 dark:bg-white dark:text-slate-950 dark:hover:bg-accent dark:hover:text-white"
             >
               {t('go_to_classroom')}
               <ArrowRight size={14} />
@@ -880,7 +842,7 @@ export const Dashboard: React.FC = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-[#0D1117]/90 backdrop-blur-md flex flex-col items-center justify-center p-8 text-center"
+            className="fixed inset-0 z-[100] bg-[#0D1117]/90  flex flex-col items-center justify-center p-8 text-center"
           >
             <div className="relative mb-8">
               <div className="absolute inset-0 bg-accent/20 blur-3xl rounded-full animate-pulse" />
@@ -893,15 +855,24 @@ export const Dashboard: React.FC = () => {
               </p>
               <div className="flex items-center justify-center gap-2 text-accent">
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span className="text-[10px] font-bold uppercase tracking-widest">{t('synthesizing_blocks')}</span>
+                <span className="text-xs font-medium">{t('synthesizing_blocks')}</span>
               </div>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
-      <ConnectionStatusModal 
-        isOpen={isStatusModalOpen} 
-        onClose={() => setIsStatusModalOpen(false)} 
+      <PlanSessionModal
+        isOpen={isPlanSessionOpen}
+        onClose={() => setIsPlanSessionOpen(false)}
+        onStartTimer={(totalMinutes) => {
+          setTimerSeconds(totalMinutes * 60);
+          setIsTimerRunning(true);
+          setIsPlanSessionOpen(false);
+        }}
+      />
+      <ConnectionStatusModal
+        isOpen={isStatusModalOpen}
+        onClose={() => setIsStatusModalOpen(false)}
         onRefresh={refreshDbConnection}
       />
       
@@ -909,7 +880,6 @@ export const Dashboard: React.FC = () => {
         isOpen={isOnboardingOpen}
         onComplete={() => {
           setIsOnboardingOpen(false);
-          // Optional: reload to apply new settings immediately
           window.location.reload();
         }}
       />

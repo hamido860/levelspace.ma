@@ -40,9 +40,9 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson }) => {
         </div>
         <h1 className="text-3xl font-display font-bold text-ink tracking-tight">{lesson.lesson_title}</h1>
         <div className="flex flex-wrap gap-2">
-          <span className="px-3 py-1 rounded-full bg-surface-mid text-[10px] font-bold text-ink-muted uppercase tracking-widest">{lesson.country}</span>
+          <span className="px-3 py-1 rounded-full bg-surface-mid text-[10px] font-bold text-ink-muted uppercase tracking-normal">{lesson.country}</span>
           {lesson.is_ai_generated && (
-            <span className="px-3 py-1 rounded-full bg-accent/10 text-[10px] font-bold text-accent uppercase tracking-widest flex items-center gap-1">
+            <span className="px-3 py-1 rounded-full bg-accent/10 text-[10px] font-bold text-accent uppercase tracking-normal flex items-center gap-1">
               <Sparkles size={10} />
               AI Generated
             </span>
@@ -60,9 +60,9 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson }) => {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
-            className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${
+            className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-normal transition-all ${
               activeTab === tab.id 
-                ? 'bg-ink text-paper shadow-lg' 
+                ? 'bg-ink text-paper shadow-sm' 
                 : 'text-ink-muted hover:text-ink hover:bg-surface-mid'
             }`}
           >
@@ -111,7 +111,7 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson }) => {
                         ))}
                       </div>
                       <div className="p-4 bg-surface-low rounded-xl border border-surface-mid">
-                        <p className="text-[10px] font-bold text-ink-muted uppercase tracking-widest mb-1">Explanation</p>
+                        <p className="text-[10px] font-bold text-ink-muted uppercase tracking-normal mb-1">Explanation</p>
                         <p className="text-[11px] text-ink-secondary leading-relaxed">{quiz.explanation}</p>
                       </div>
                     </div>
@@ -119,8 +119,8 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson }) => {
                 </div>
               ))
             ) : (
-              <div className="p-12 text-center bg-paper rounded-3xl border border-dashed border-surface-mid opacity-50">
-                <p className="text-xs font-bold text-ink-muted uppercase tracking-widest">No quizzes defined for this lesson</p>
+              <div className="p-12 text-center bg-paper rounded-3xl border border-solid border-surface-mid opacity-50">
+                <p className="text-xs font-bold text-ink-muted uppercase tracking-normal">No quizzes defined for this lesson</p>
               </div>
             )}
           </div>
@@ -154,7 +154,7 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson }) => {
                       
                       <div className="space-y-4">
                         <div className="p-4 bg-success/5 rounded-xl border border-success/20">
-                          <p className="text-[10px] font-bold text-success uppercase tracking-widest mb-2 flex items-center gap-2">
+                          <p className="text-[10px] font-bold text-success uppercase tracking-normal mb-2 flex items-center gap-2">
                             <Target size={12} />
                             Solution
                           </p>
@@ -167,7 +167,7 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson }) => {
                         
                         {ex.hint && (
                           <div className="p-4 bg-accent/5 rounded-xl border border-accent/20">
-                            <p className="text-[10px] font-bold text-accent uppercase tracking-widest mb-1 flex items-center gap-2">
+                            <p className="text-[10px] font-bold text-accent uppercase tracking-normal mb-1 flex items-center gap-2">
                               <Brain size={12} />
                               Pedagogical Hint
                             </p>
@@ -180,8 +180,8 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson }) => {
                 </div>
               ))
             ) : (
-              <div className="p-12 text-center bg-paper rounded-3xl border border-dashed border-surface-mid opacity-50">
-                <p className="text-xs font-bold text-ink-muted uppercase tracking-widest">No exercises defined for this lesson</p>
+              <div className="p-12 text-center bg-paper rounded-3xl border border-solid border-surface-mid opacity-50">
+                <p className="text-xs font-bold text-ink-muted uppercase tracking-normal">No exercises defined for this lesson</p>
               </div>
             )}
           </div>

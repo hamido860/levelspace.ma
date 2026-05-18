@@ -8,17 +8,17 @@ const STATUS_META = {
 
 export const RagHealthReportPanel = ({ reports }) => {
   return (
-    <section className="rounded-[28px] border border-surface-mid bg-paper p-5">
+    <section className="ls-card-pad">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-ink-muted">RAG Health</p>
-          <h3 className="mt-2 text-lg font-bold text-ink">Latest chunk reports</h3>
+          <p className="ls-micro-label">RAG Health</p>
+          <h3 className="mt-2 ls-card-title">Latest chunk reports</h3>
         </div>
-        <DatabaseZap className="h-5 w-5 text-ink-muted" />
+        <DatabaseZap className="h-5 w-5 text-slate-500" />
       </div>
 
       {reports.length === 0 ? (
-        <div className="rounded-3xl border border-dashed border-surface-mid p-5 text-sm text-ink-muted">
+        <div className="ls-empty-state p-5">
           No RAG health reports recorded yet.
         </div>
       ) : (
@@ -27,24 +27,24 @@ export const RagHealthReportPanel = ({ reports }) => {
             const meta = STATUS_META[report.status] || { icon: DatabaseZap, className: "text-slate-600 bg-slate-100" };
             const Icon = meta.icon;
             return (
-              <article key={report.id} className="rounded-[24px] border border-surface-mid bg-surface-low/70 p-4">
+              <article key={report.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex items-start gap-3">
                   <div className={`rounded-2xl p-2 ${meta.className}`}>
                     <Icon className="h-4 w-4" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-3">
-                      <p className="truncate text-sm font-semibold text-ink">
+                      <p className="truncate text-sm font-semibold text-slate-950">
                         {report.ai_issues?.title || "Unlinked RAG report"}
                       </p>
-                      <span className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
+                      <span className="ls-badge">
                         {report.status}
                       </span>
                     </div>
-                    <p className="mt-1 text-xs text-ink-muted">
+                    <p className="mt-1 text-xs text-slate-500">
                       {report.chunk_count} chunk(s) • relevance {report.relevance_score}
                     </p>
-                    <p className="mt-2 text-xs text-ink-secondary">
+                    <p className="mt-2 text-xs text-slate-600">
                       {report.blocking_reason || "RAG health passed without a blocking reason."}
                     </p>
                   </div>

@@ -4,18 +4,14 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Layout } from '../components/Layout';
 import { SEO } from '../components/SEO';
 import {
-  Search,
   Filter,
   ArrowUpDown,
-  Check,
-  Plus,
   BookOpen,
   Globe,
   FlaskConical,
   Library,
   Brain,
   ArrowRight,
-  X,
   Info,
   Sparkles,
   Loader2,
@@ -29,8 +25,17 @@ import { useSearch } from '../context/SearchContext';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 import { useAuth } from '../context/AuthContext';
-import { TagsManager } from '../components/TagsManager';
 import { useLanguage } from '../context/LanguageContext';
+
+const relativeTime = (ts: number) => {
+  const diff = Date.now() - ts;
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+};
 
 const getIconForCategory = (category: string) => {
   const cat = category.toLowerCase();
@@ -225,6 +230,23 @@ export const Modules: React.FC = () => {
   const aiUnavailableMsg = 'AI curriculum suggestions require an API key.';
 
   const dbModules = useLiveQuery(() => db.modules.toArray());
+  const allLessons = useLiveQuery(() => db.lessons.toArray()) || [];
+
+  const lessonCountByModuleId = useMemo(
+    () => allLessons.reduce<Record<string, number>>((acc, l) => {
+      acc[l.moduleId] = (acc[l.moduleId] || 0) + 1;
+      return acc;
+    }, {}),
+    [allLessons],
+  );
+
+  const lastActivityByModuleId = useMemo(
+    () => allLessons.reduce<Record<string, number>>((acc, l) => {
+      if (!acc[l.moduleId] || l.createdAt > acc[l.moduleId]) acc[l.moduleId] = l.createdAt;
+      return acc;
+    }, {}),
+    [allLessons],
+  );
 
   const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
   const settingsMap = useMemo(() => Object.fromEntries(dbSettings.map(s => [s.key, s.value])), [dbSettings]);
@@ -418,12 +440,12 @@ export const Modules: React.FC = () => {
       <SEO title="Modules" />
       <div className="space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1 flex-1">
-            <div className="flex items-start md:items-center gap-2 text-accent">
-              <Sparkles className="w-4 h-4 shrink-0 mt-0.5 md:mt-0" />
-              <span className="text-[10px] font-bold uppercase tracking-[0.3em] leading-relaxed">Draft AI-Assisted Content — Pending Curriculum Validation</span>
+          <div className="space-y-3 flex-1">
+            <div className="inline-flex items-center gap-2 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700 dark:border-accent-soft dark:bg-accent-soft dark:text-accent">
+              <Sparkles className="h-4 w-4 shrink-0" />
+              Draft AI-assisted content · Pending curriculum validation
             </div>
-            <h2 className="text-2xl md:text-3xl font-bold text-ink font-sans">{t('actions_create_classroom')}</h2>
+            <h2 className="text-2xl md:text-3xl font-bold text-slate-950 font-sans dark:text-ink">{t('actions_create_classroom')}</h2>
           </div>
           
           <div className="flex items-center gap-4 shrink-0">
@@ -434,17 +456,17 @@ export const Modules: React.FC = () => {
               }}
               disabled={isLoading || !aiAvailable || !isPro}
               title={!aiAvailable ? aiUnavailableMsg : undefined}
-              className="flex items-center gap-2 px-4 py-2 bg-accent/5 text-accent rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-accent/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="ls-button-primary disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
               Regenerate
             </button>
             <div className="group relative inline-block">
-              <button className="w-10 h-10 rounded-full bg-surface-low flex items-center justify-center text-muted hover:text-accent hover:bg-accent/10 transition-colors">
+              <button className="ls-button-secondary h-10 w-10 px-0">
                 <Info className="w-5 h-5" />
               </button>
-              <div className="absolute right-0 top-full mt-2 w-72 p-4 bg-paper border border-ink/5 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                <p className="text-sm text-muted leading-relaxed">
+              <div className="absolute right-0 top-full mt-2 w-72 p-4 ls-card shadow-sm opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                <p className="ls-body-text leading-relaxed">
                   These classrooms are loaded from your Supabase curriculum first. AI can optionally suggest extras for inspiration.
                 </p>
               </div>
@@ -452,16 +474,17 @@ export const Modules: React.FC = () => {
           </div>
         </div>
 
-        {/* Filter Bar - Sticky Editorial */}
-        <div className="sticky top-20 z-30 bg-background/60 backdrop-blur-2xl border-b border-ink/5 -mx-12 px-12">
-          <div className="h-12 flex items-center justify-end gap-10">
-            <div className="flex items-center gap-12">
-              <button className="flex items-center gap-3 text-[10px] font-mono uppercase tracking-[0.2em] text-muted hover:text-ink transition-colors group">
-                <Filter className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
+        {/* Filter Bar */}
+        <div className="sticky top-20 z-30 -mx-12 border-b border-slate-200 bg-white px-12 py-3 dark:border-white/8 dark:bg-paper">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-slate-500 dark:text-ink-muted">Choose a subject to manage curriculum content.</p>
+            <div className="flex items-center gap-2">
+              <button className="ls-button-ghost">
+                <Filter className="w-4 h-4" />
                 Filter
               </button>
-              <button className="flex items-center gap-3 text-[10px] font-mono uppercase tracking-[0.2em] text-muted hover:text-ink transition-colors group">
-                <ArrowUpDown className="w-4 h-4 group-hover:scale-110 transition-transform duration-500" />
+              <button className="ls-button-ghost">
+                <ArrowUpDown className="w-4 h-4" />
                 Sort
               </button>
             </div>
@@ -469,16 +492,16 @@ export const Modules: React.FC = () => {
         </div>
 
         {/* Modules Grid - Visible Grid Aesthetic */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px bg-ink/5 border border-ink/5">
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
           <AnimatePresence mode="popLayout">
             {isLoading ? (
-              <div className="col-span-full py-32 flex flex-col items-center justify-center space-y-4 bg-background">
+              <div className="col-span-full py-32 flex flex-col items-center justify-center space-y-4 bg-white dark:bg-paper">
                 <Loader2 className="w-8 h-8 text-accent animate-spin" />
-                <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-muted">Curating from trusted resources...</p>
+                <p className="text-[10px] font-mono text-slate-500 dark:text-ink-muted">Curating from trusted resources...</p>
               </div>
             ) : filteredModules.length > 0 ? (
               filteredModules.map((module, i) => (
-                <motion.div 
+                <motion.div
                   key={module.id}
                   layout
                   initial={{ opacity: 0, y: 20 }}
@@ -486,106 +509,98 @@ export const Modules: React.FC = () => {
                   exit={{ opacity: 0, scale: 0.95 }}
                   transition={{ delay: i * 0.05, duration: 0.6 }}
                   onClick={() => navigate(`/classroom/${module.id}`)}
-                  className={`group relative p-8 bg-background cursor-pointer transition-all duration-700 overflow-hidden border-r border-b border-ink/5 ${
-                    module.selected ? 'bg-paper/30' : 'hover:bg-paper/10'
-                  }`}
+                  className="ls-interactive-card cursor-pointer p-5"
                 >
-                  <div className="flex items-start justify-between mb-8 relative z-10">
-                    <div className={`w-12 h-12 rounded-2xl border flex items-center justify-center transition-all duration-700 ${
-                      module.selected 
-                        ? 'bg-ink text-paper border-ink shadow-xl shadow-ink/20' 
-                        : 'bg-background border-ink/10 group-hover:border-accent/30 group-hover:text-accent'
-                    }`}>
-                      {module.icon}
-                    </div>
-                    <div className="text-right">
-                      <span className="text-[8px] font-mono tracking-[0.3em] text-muted/30 uppercase block mb-1">{module.category}</span>
-                      <span className="text-[10px] font-mono text-muted group-hover:text-ink transition-colors">{module.code}</span>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-3 relative z-10">
-                    <h3 className="text-2xl font-serif leading-tight group-hover:italic transition-all duration-500">{module.name}</h3>
-                    <p className="text-sm text-muted/60 leading-relaxed font-light line-clamp-3 group-hover:text-muted transition-colors">
-                      {module.description}
-                    </p>
-                    <div className="pt-2" onClick={(e) => e.stopPropagation()}>
-                      <TagsManager 
-                        tags={module.tags || []} 
-                        onAddTag={async (tag) => {
-                          const currentTags = module.tags || [];
-                          if (!currentTags.includes(tag)) {
-                            await db.modules.update(module.id, { tags: [...currentTags, tag] });
-                          }
-                        }}
-                        onRemoveTag={async (tag) => {
-                          const currentTags = module.tags || [];
-                          await db.modules.update(module.id, { tags: currentTags.filter(t => t !== tag) });
-                        }}
-                        maxDisplay={7}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mt-10 flex items-center justify-between relative z-10">
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleModule(module.id);
-                      }}
-                      className="flex items-center gap-2 hover:opacity-80 transition-opacity p-2 -ml-2 rounded-lg"
-                    >
-                      <div className={`w-1.5 h-1.5 rounded-full transition-all duration-700 ${
-                        module.selected ? 'bg-accent shadow-[0_0_8px_rgba(var(--color-accent-rgb),0.6)] scale-125' : 'bg-ink/10'
-                      }`} />
-                      <span className={`text-[8px] font-mono uppercase tracking-[0.2em] transition-colors duration-700 ${
-                        module.selected ? 'text-ink font-bold' : 'text-muted/40'
+                  {/* Header: icon + name + badges */}
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                      <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-colors ${
+                        module.selected ? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950' : 'bg-slate-100 text-slate-700 dark:bg-surface-mid dark:text-ink-secondary'
                       }`}>
-                        {module.selected ? 'Active' : 'Available'}
-                      </span>
-                    </button>
-                    
-                    <AnimatePresence>
-                      {module.selected && (
-                        <motion.div 
-                          initial={{ scale: 0, opacity: 0, rotate: -45 }}
-                          animate={{ scale: 1, opacity: 1, rotate: 0 }}
-                          exit={{ scale: 0, opacity: 0, rotate: 45 }}
-                          className="text-accent"
-                        >
-                          <Check className="w-5 h-5" strokeWidth={3} />
-                        </motion.div>
+                        {module.icon}
+                      </div>
+                      <div>
+                        <h3 className="text-base font-semibold text-slate-950 leading-tight dark:text-ink">{module.name}</h3>
+                        <p className="mt-0.5 text-xs text-slate-500 dark:text-ink-muted">Supabase curriculum subject</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {module.code && module.code !== module.name && (
+                        <span className="ls-badge">{module.code}</span>
                       )}
-                    </AnimatePresence>
+                      {module.category && module.category !== module.name && (
+                        <span className="ls-badge">{module.category}</span>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Selection Background Effect */}
-                  {module.selected && (
-                    <motion.div 
-                      layoutId={`bg-highlight-${module.id}`}
-                      className="absolute inset-0 bg-accent/[0.02] pointer-events-none z-0"
-                    />
-                  )}
+                  {/* Metrics grid */}
+                  <div className="mt-4 grid grid-cols-2 gap-2.5">
+                    <div className="rounded-xl bg-slate-50 p-3 dark:bg-surface-low">
+                      <p className="text-xs font-medium text-slate-500 dark:text-ink-muted">Lessons</p>
+                      <p className="mt-1 text-lg font-semibold text-slate-950 dark:text-ink">
+                        {lessonCountByModuleId[module.id] ?? 0}
+                      </p>
+                    </div>
+                    <div className="rounded-xl bg-slate-50 p-3 dark:bg-surface-low">
+                      <p className="text-xs font-medium text-slate-500 dark:text-ink-muted">Progress</p>
+                      <p className="mt-1 text-lg font-semibold text-slate-950 dark:text-ink">{module.progress}%</p>
+                    </div>
+                    <div className="col-span-2 rounded-xl bg-slate-50 p-3 dark:bg-surface-low">
+                      <p className="text-xs font-medium text-slate-500 dark:text-ink-muted">Last activity</p>
+                      {lastActivityByModuleId[module.id] ? (
+                        <p className="mt-1 text-sm font-semibold text-slate-950 dark:text-ink">
+                          {relativeTime(lastActivityByModuleId[module.id])}
+                        </p>
+                      ) : (
+                        <p className="mt-1 text-sm font-semibold text-slate-400 dark:text-ink-muted">No activity yet</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Footer: status + actions */}
+                  <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 dark:border-white/6">
+                    <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${
+                      module.selected ? 'text-accent' : 'text-emerald-700 dark:text-emerald-400'
+                    }`}>
+                      <span className={`h-1.5 w-1.5 rounded-full ${module.selected ? 'bg-accent' : 'bg-emerald-500'}`} />
+                      {module.selected ? 'Active' : 'Available'}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); toggleModule(module.id); }}
+                        className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:bg-surface-low"
+                      >
+                        {module.selected ? 'Deactivate' : 'Select'}
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); navigate(`/classroom/${module.id}`); }}
+                        className="rounded-xl bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 transition-colors dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
+                      >
+                        Open
+                      </button>
+                    </div>
+                  </div>
                 </motion.div>
               ))
             ) : (
               <motion.div 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="col-span-full py-32 bg-background flex flex-col items-center justify-center text-center space-y-6"
+                className="col-span-full py-32 bg-white dark:bg-paper flex flex-col items-center justify-center text-center space-y-6"
               >
                 <div className="w-20 h-20 bg-accent/5 rounded-full flex items-center justify-center mx-auto">
                   <Sparkles className="w-8 h-8 text-accent" />
                 </div>
                 <div className="space-y-2">
                   <h3 className="text-2xl font-serif">Your classroom is ready to be built.</h3>
-                  <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted/40 max-w-md mx-auto leading-relaxed">
+                  <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-slate-500/40 dark:text-ink-muted/40 max-w-md mx-auto leading-relaxed">
                     Click 'Create' to load your curriculum from Supabase based on your {grade}{bacTrackName ? ` - ${bacTrackName}` : ''}{bacIntOptionName ? ` (${bacIntOptionName})` : ''} settings in {country}.
                   </p>
                 </div>
                 {!aiAvailable && (
-                  <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 max-w-sm">
-                    <p className="text-xs text-amber-800 font-medium">{aiUnavailableMsg}</p>
+                  <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 max-w-sm dark:bg-amber-950/30 dark:border-amber-800/40">
+                    <p className="text-xs text-amber-800 font-medium dark:text-amber-400">{aiUnavailableMsg}</p>
                   </div>
                 )}
                 <button
@@ -593,7 +608,7 @@ export const Modules: React.FC = () => {
                     const plan = getClassroomLoadPlan({ action: 'create_classroom', isPro });
                     fetchCurriculum(plan.includeAiSuggestions);
                   }}
-                  className="px-10 py-4 bg-accent text-paper rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-accent-hover transition-all shadow-xl shadow-accent/20 flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-10 py-4 bg-accent text-white rounded-full text-xs font-medium hover:bg-accent-hover transition-all  flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <PlusCircle className="w-4 h-4" />
                   Create My Classroom
@@ -608,34 +623,34 @@ export const Modules: React.FC = () => {
         <motion.div 
           initial={{ y: 50, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          className="bg-ink text-paper py-8 px-12 rounded-3xl shadow-2xl flex flex-col md:flex-row items-center justify-between gap-8 relative overflow-hidden"
+          className="bg-slate-950 text-white py-8 px-12 rounded-3xl shadow-md flex flex-col md:flex-row items-center justify-between gap-8 relative overflow-hidden"
         >
           <div className="flex items-center gap-12">
             <div className="flex flex-col">
-              <span className="text-[9px] font-mono uppercase tracking-[0.3em] text-paper/40 mb-1">Current Selection</span>
+              <span className="text-[9px] font-mono  text-white/40 mb-1">Current Selection</span>
               <div className="flex items-baseline gap-2">
                 <span className="text-3xl font-serif italic">{selectedCount}</span>
-                <span className="text-[10px] font-mono uppercase tracking-widest text-paper/60">Modules Ready</span>
+                <span className="text-[10px] font-mono  text-white/60">Modules Ready</span>
               </div>
             </div>
-            <div className="h-12 w-px bg-paper/10 hidden md:block"></div>
+            <div className="h-12 w-px bg-white/10 hidden md:block"></div>
             <button 
               onClick={resetSelection}
-              className="text-[10px] font-mono uppercase tracking-[0.2em] text-paper/40 hover:text-paper transition-colors"
+              className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/40 hover:text-white transition-colors"
             >
               Reset Selection
             </button>
           </div>
 
           <div className="flex items-center gap-10">
-            <button className="text-[10px] font-mono uppercase tracking-[0.2em] text-paper/40 hover:text-paper transition-colors">
+            <button className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/40 hover:text-white transition-colors">
               Skip for now
             </button>
             <motion.button 
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => navigate('/dashboard')}
-              className="bg-paper text-ink px-12 py-5 rounded-full text-xs font-mono uppercase tracking-[0.2em] font-bold flex items-center gap-4 hover:bg-accent hover:text-paper transition-all duration-500 shadow-xl shadow-ink/20"
+              className="bg-white text-slate-950 px-12 py-5 rounded-full text-xs font-mono uppercase tracking-[0.2em] font-bold flex items-center gap-4 hover:bg-accent hover:text-white transition-all duration-500 shadow-sm shadow-ink/20 dark:bg-paper dark:text-ink dark:hover:bg-accent dark:hover:text-white"
             >
               {t('dashboard_continue')}
               <ArrowRight className="w-4 h-4" />

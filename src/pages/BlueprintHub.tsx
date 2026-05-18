@@ -130,7 +130,7 @@ export const BlueprintHub: React.FC = () => {
             fills in the content.
           </p>
           <div className="flex items-center gap-3">
-            <span className="text-xs font-bold uppercase tracking-widest text-muted">Net Grounding Resources:</span>
+            <span className="text-xs font-bold uppercase tracking-normal text-muted">Net Grounding Resources:</span>
             <a 
               href="https://www.yool.education/library" 
               target="_blank" 
@@ -144,9 +144,9 @@ export const BlueprintHub: React.FC = () => {
         </section>
 
         {/* Filter Bar */}
-        <div className="sticky top-20 z-30 bg-background/80 backdrop-blur-xl border-b border-ink/5 -mx-6 px-6 md:-mx-10 md:px-10 py-2">
+        <div className="sticky top-20 z-30 bg-background/80  border-b border-ink/5 -mx-6 px-6 md:-mx-10 md:px-10 py-2">
           <div className="flex items-center justify-end gap-6">
-            <button className="hidden md:flex items-center gap-2 px-4 h-10 bg-paper border border-ink/5 rounded-xl text-xs font-bold uppercase tracking-widest text-muted hover:text-ink hover:border-ink/20 transition-all shadow-sm">
+            <button className="hidden md:flex items-center gap-2 px-4 h-10 bg-paper border border-ink/5 rounded-xl text-xs font-bold uppercase tracking-normal text-muted hover:text-ink hover:border-ink/20 transition-all shadow-sm">
               <Filter className="w-4 h-4" />
               Filters
             </button>
@@ -165,11 +165,11 @@ export const BlueprintHub: React.FC = () => {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95 }}
                   transition={{ delay: i * 0.05 }}
-                  className="bg-paper border border-ink/5 rounded-3xl p-8 hover:shadow-xl hover:shadow-ink/5 transition-all duration-500 flex flex-col relative overflow-hidden group"
+                  className="bg-paper border border-ink/5 rounded-3xl p-8 hover:shadow-md hover:shadow-ink/5 transition-all duration-500 flex flex-col relative overflow-hidden group"
                 >
                   {/* Inheritance Indicator */}
                   {bp.parentId && (
-                    <div className="absolute top-0 right-8 px-4 py-1.5 bg-ink/5 rounded-b-lg flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-muted">
+                    <div className="absolute top-0 right-8 px-4 py-1.5 bg-ink/5 rounded-b-lg flex items-center gap-2 text-[10px] font-mono uppercase tracking-normal text-muted">
                       <GitFork className="w-3 h-3" />
                       Forked
                     </div>
@@ -179,12 +179,12 @@ export const BlueprintHub: React.FC = () => {
                     <div className="space-y-3">
                       <div className="flex items-center gap-2">
                         {bp.role === 'instructor' ? (
-                          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-accent/10 text-accent rounded-md text-[10px] font-bold uppercase tracking-widest">
+                          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-accent/10 text-accent rounded-md text-[10px] font-bold uppercase tracking-normal">
                             <GraduationCap className="w-3 h-3" />
                             Instructor
                           </div>
                         ) : (
-                          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-ink/5 text-muted rounded-md text-[10px] font-bold uppercase tracking-widest">
+                          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-ink/5 text-muted rounded-md text-[10px] font-bold uppercase tracking-normal">
                             <User className="w-3 h-3" />
                             Student
                           </div>
@@ -199,7 +199,7 @@ export const BlueprintHub: React.FC = () => {
 
                   {/* Blocks Visualization */}
                   <div className="my-8 space-y-3 flex-grow">
-                    <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-muted mb-4">
+                    <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-normal text-muted mb-4">
                       <Blocks className="w-4 h-4" />
                       Config Structure
                     </div>
@@ -233,10 +233,10 @@ export const BlueprintHub: React.FC = () => {
                     <button 
                       onClick={() => handleFork(bp.id)}
                       disabled={forkedId === bp.id}
-                      className={`flex items-center gap-2 px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-widest transition-all duration-300 ${
+                      className={`flex items-center gap-2 px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-normal transition-all duration-300 ${
                         forkedId === bp.id 
-                          ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' 
-                          : 'bg-ink text-paper hover:bg-accent shadow-lg shadow-ink/10'
+                          ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/20' 
+                          : 'bg-ink text-paper hover:bg-accent shadow-sm shadow-ink/10'
                       }`}
                     >
                       {forkedId === bp.id ? (

@@ -78,12 +78,12 @@ export const Pricing: React.FC = () => {
               whileHover={{ y: -5 }}
               className={`relative p-8 rounded-3xl border transition-all ${
                 plan.highlight
-                  ? 'bg-ink border-ink text-paper shadow-2xl shadow-ink/20'
+                  ? 'bg-ink border-ink text-paper shadow-md shadow-ink/20'
                   : 'bg-paper border-ink/5 text-ink'
               }`}
             >
               {plan.highlight && (
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-accent text-paper text-[10px] font-bold uppercase tracking-widest px-4 py-1 rounded-full shadow-lg">
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-accent text-paper text-[10px] font-bold uppercase tracking-normal px-4 py-1 rounded-full shadow-sm">
                   Most Popular
                 </div>
               )}

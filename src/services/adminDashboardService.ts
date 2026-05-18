@@ -109,16 +109,86 @@ export interface RagMetrics {
   total: number;
   done: number;
   embedded: number;
+  withEmbedding?: number;
+  missingEmbedding?: number;
   linkedToTopic: number;
+  withGrade?: number;
   usable: number;
+  unlinkedToTopic?: number;
+  shortContent?: number;
+  failed?: number;
   pending: number;
   other: number;
+  linkedByLesson?: number;
+  linkedByMetadata?: number;
+  unmatched?: number;
   byStatus: Record<string, number>;
+}
+
+export interface RagChunkHealth {
+  total_chunks: number;
+  usable_chunks: number;
+  with_topic_id: number;
+  with_grade_id: number;
+  without_topic_id: number;
+  with_embedding: number;
+  embedding_done: number;
+  embedding_pending: number;
+  embedding_failed: number;
+  short_content: number;
+  linked_by_lesson: number;
+  linked_by_metadata: number;
+  unmatched: number;
+}
+
+export interface RagTopicRepairResult {
+  before: RagChunkHealth;
+  after: RagChunkHealth;
+  methods: {
+    lesson_id: number;
+    metadata_topic_id: number;
+    title_match: number;
+    single_topic_for_grade_subject: number;
+    unmatched: number;
+  };
+  unmatchedSamples: Array<{
+    id: string;
+    grade_id: string | null;
+    embedding_status: string | null;
+    reason: string;
+    content_preview: string;
+    metadata_title: string | null;
+  }>;
 }
 
 export interface AiReviewStatusCount {
   status: string;
   count: number;
+}
+
+export interface AiTaskLogDebugRow {
+  id: string;
+  task_id: string;
+  agent_name: string;
+  log_type: string;
+  message: string;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface AiExecutionSnapshotDebugRow {
+  id: string;
+  task_id: string;
+  snapshot_type: string;
+  target_table: string | null;
+  record_count: number | null;
+  snapshot_data: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface AiObservabilityDebugData {
+  logs: AiTaskLogDebugRow[];
+  snapshots: AiExecutionSnapshotDebugRow[];
 }
 
 export interface AiRecoveryDashboardKpis {
@@ -179,6 +249,21 @@ const parseApiError = async (response: Response) => {
   } catch {
     return `Request failed with status ${response.status}`;
   }
+};
+
+const loadRagChunkHealthViaAdminApi = async (): Promise<RagChunkHealth> => {
+  const headers = await getAdminApiHeaders();
+  const response = await fetch("/api/admin/rag/health", {
+    method: "GET",
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new Error(await parseApiError(response));
+  }
+
+  const { health } = await response.json() as { health: RagChunkHealth };
+  return health;
 };
 
 const parseObject = (value: unknown): Record<string, unknown> | null => {
@@ -285,10 +370,7 @@ export const loadAdminOverviewKpis = async (): Promise<AdminOverviewKpis> => {
     failedJobs,
     recoveredLessonsNeedsReview,
     studentPublishReadyLessons,
-    ragTotal,
-    ragEmbedded,
-    ragLinkedToTopic,
-    ragUsable,
+    ragHealth,
     users,
   ] = await Promise.all([
     readCount("topics count", supabase.from("topics").select("*", { count: "exact", head: true })),
@@ -307,10 +389,7 @@ export const loadAdminOverviewKpis = async (): Promise<AdminOverviewKpis> => {
         .eq("teaching_contract->>status", "needs_review")
         .eq("teaching_contract->>student_publish_allowed", "true")
     ),
-    readCount("rag chunk count", supabase.from("rag_chunks").select("*", { count: "exact", head: true })),
-    readCount("embedded rag chunk count", supabase.from("rag_embeddings").select("*", { count: "exact", head: true })),
-    readCount("topic-linked rag chunk count", supabase.from("rag_chunks").select("*", { count: "exact", head: true }).not("topic_id", "is", null)),
-    readCount("usable rag chunk count", supabase.from("rag_embeddings").select("chunk_id, rag_chunks!inner(topic_id,status)", { count: "exact", head: true }).not("rag_chunks.topic_id", "is", null).in("rag_chunks.status", ["clean", "embedded"])),
+    loadRagChunkHealthViaAdminApi(),
     readCount("profile count", supabase.from("profiles").select("*", { count: "exact", head: true })),
   ]);
 
@@ -324,11 +403,11 @@ export const loadAdminOverviewKpis = async (): Promise<AdminOverviewKpis> => {
     lessonQueueFailed: failedJobs,
     recoveredLessonsNeedsReview,
     studentPublishReadyLessons,
-    ragTotal,
-    ragDone: ragEmbedded,
-    ragEmbedded,
-    ragLinkedToTopic,
-    ragUsable,
+    ragTotal: ragHealth.total_chunks,
+    ragDone: ragHealth.embedding_done,
+    ragEmbedded: ragHealth.embedding_done,
+    ragLinkedToTopic: ragHealth.with_topic_id,
+    ragUsable: ragHealth.usable_chunks,
     users,
   };
 };
@@ -489,35 +568,39 @@ export const loadAdminQueueMetrics = async (): Promise<{ stats: QueueStatusBreak
 export const loadAdminRagMetrics = async (): Promise<{ ragStats: RagMetrics; ragByGrade: RagByGrade[] }> => {
   ensureConfigured();
 
-  const [total, done, embedded, linkedToTopic, usable, pending, processing, failed, grades] = await Promise.all([
+  const health = await loadRagChunkHealthViaAdminApi();
+
+  const [processing, grades] = await Promise.all([
     // Use exact head counts here. Plain selects are page-limited by PostgREST and cap dashboard metrics at ~1,000 rows.
-    readCount("rag chunk count", supabase.from("rag_chunks").select("*", { count: "exact", head: true })),
-    readCount("done rag chunk count", supabase.from("rag_chunks").select("*", { count: "exact", head: true }).eq("embedding_status", "done")),
-    readCount("embedded rag chunk count", supabase.from("rag_embeddings").select("*", { count: "exact", head: true })),
-    readCount("topic-linked rag chunk count", supabase.from("rag_chunks").select("*", { count: "exact", head: true }).not("topic_id", "is", null)),
-    readCount("usable rag chunk count", supabase.from("rag_embeddings").select("chunk_id, rag_chunks!inner(topic_id,status)", { count: "exact", head: true }).not("rag_chunks.topic_id", "is", null).in("rag_chunks.status", ["clean", "embedded"])),
-    readCount("pending rag chunk count", supabase.from("rag_chunks").select("*", { count: "exact", head: true }).eq("embedding_status", "pending")),
     readCount("processing rag chunk count", supabase.from("rag_chunks").select("*", { count: "exact", head: true }).eq("embedding_status", "processing")),
-    readCount("failed rag chunk count", supabase.from("rag_chunks").select("*", { count: "exact", head: true }).eq("embedding_status", "failed")),
     readRows<any>("grades for rag", supabase.from("grades").select("id, name, grade_order, cycles(cycle_order)")),
   ]);
 
   const byStatus: Record<string, number> = {
-    done,
-    pending,
+    done: health.embedding_done,
+    pending: health.embedding_pending,
     processing,
-    failed,
+    failed: health.embedding_failed,
   };
   const knownStatusTotal = ADMIN_CANONICAL_RAG_STATUSES.reduce((sum, status) => sum + (byStatus[status] || 0), 0);
 
   const ragStats: RagMetrics = {
-    total,
-    done,
-    embedded,
-    linkedToTopic,
-    usable,
-    pending,
-    other: Math.max(0, total - knownStatusTotal),
+    total: health.total_chunks,
+    done: health.embedding_done,
+    embedded: health.embedding_done,
+    withEmbedding: health.with_embedding,
+    missingEmbedding: Math.max(0, health.total_chunks - health.with_embedding),
+    linkedToTopic: health.with_topic_id,
+    withGrade: health.with_grade_id,
+    usable: health.usable_chunks,
+    unlinkedToTopic: health.without_topic_id,
+    shortContent: health.short_content,
+    failed: health.embedding_failed,
+    pending: health.embedding_pending,
+    other: Math.max(0, health.total_chunks - knownStatusTotal),
+    linkedByLesson: health.linked_by_lesson,
+    linkedByMetadata: health.linked_by_metadata,
+    unmatched: health.unmatched,
     byStatus,
   };
 
@@ -570,6 +653,31 @@ export const loadAiRecoveryReviewStatusCounts = async (): Promise<AiReviewStatus
   return Object.entries(counts)
     .map(([status, count]) => ({ status, count }))
     .sort((left, right) => right.count - left.count || left.status.localeCompare(right.status));
+};
+
+export const loadAiObservabilityDebugData = async (): Promise<AiObservabilityDebugData> => {
+  ensureConfigured();
+
+  const [logs, snapshots] = await Promise.all([
+    readRows<AiTaskLogDebugRow>(
+      "latest ai task logs",
+      supabase
+        .from("ai_task_logs")
+        .select("id, task_id, agent_name, log_type, message, metadata, created_at")
+        .order("created_at", { ascending: false })
+        .limit(50)
+    ),
+    readRows<AiExecutionSnapshotDebugRow>(
+      "latest ai execution snapshots",
+      supabase
+        .from("ai_execution_snapshots")
+        .select("id, task_id, snapshot_type, target_table, record_count, snapshot_data, created_at")
+        .order("created_at", { ascending: false })
+        .limit(20)
+    ),
+  ]);
+
+  return { logs, snapshots };
 };
 
 export const loadAiRecoveryDashboardKpis = async (): Promise<AiRecoveryDashboardKpis> => {
@@ -640,4 +748,18 @@ export const repairTopicsFromLessons = async (): Promise<TopicRepairSummary> => 
 
   const payload = await response.json() as { summary: TopicRepairSummary };
   return payload.summary;
+};
+
+export const repairRagTopicLinks = async (): Promise<RagTopicRepairResult> => {
+  const headers = await getAdminApiHeaders();
+  const response = await fetch("/api/admin/rag/repair-topic-links", {
+    method: "POST",
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new Error(await parseApiError(response));
+  }
+
+  return await response.json() as RagTopicRepairResult;
 };

@@ -372,7 +372,7 @@ export const AdminMcpLessons: React.FC = () => {
             <button
               onClick={loadRows}
               disabled={loading}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-ink px-4 py-3 text-xs font-bold uppercase tracking-widest text-paper hover:bg-accent disabled:opacity-60"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-ink px-4 py-3 text-xs font-bold uppercase tracking-normal text-paper hover:bg-accent disabled:opacity-60"
             >
               <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
               Refresh
@@ -381,12 +381,12 @@ export const AdminMcpLessons: React.FC = () => {
         </div>
 
         <div className="rounded-3xl border border-ink/10 bg-paper p-4 shadow-sm">
-          <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-muted">
+          <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-normal text-muted">
             <Filter className="h-4 w-4" />
             Review filters
           </div>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <label className="space-y-1 text-xs font-bold uppercase tracking-widest text-muted">
+            <label className="space-y-1 text-xs font-bold uppercase tracking-normal text-muted">
               <span>Academic Level</span>
               <select
                 value={filters.allGrades ? filters.academicLevel : activeGrade}
@@ -398,7 +398,7 @@ export const AdminMcpLessons: React.FC = () => {
                 {filterOptions.levels.map((level) => <option key={level} value={level}>{level}</option>)}
               </select>
             </label>
-            <label className="space-y-1 text-xs font-bold uppercase tracking-widest text-muted">
+            <label className="space-y-1 text-xs font-bold uppercase tracking-normal text-muted">
               <span>Track / Stream</span>
               <select
                 value={filters.allGrades ? filters.track : activeTrackId}
@@ -413,7 +413,7 @@ export const AdminMcpLessons: React.FC = () => {
             <FilterSelect label="Subject" value={filters.subject} options={filterOptions.subjects} onChange={(value) => setFilter("subject", value)} />
             <FilterSelect label="Topic" value={filters.topic} options={filterOptions.topics} onChange={(value) => setFilter("topic", value)} />
             <FilterSelect label="Status" value={filters.status} options={filterOptions.statuses} onChange={(value) => setFilter("status", value)} />
-            <label className="space-y-1 text-xs font-bold uppercase tracking-widest text-muted">
+            <label className="space-y-1 text-xs font-bold uppercase tracking-normal text-muted">
               <span>Source Type</span>
               <select value={filters.sourceType} onChange={(event) => setFilter("sourceType", event.target.value)} className="w-full rounded-xl border border-ink/10 bg-surface-low px-3 py-2 text-sm font-medium normal-case tracking-normal text-ink outline-none">
                 <option value="">All source types</option>
@@ -421,7 +421,7 @@ export const AdminMcpLessons: React.FC = () => {
                 <option value="legacy">Legacy only</option>
               </select>
             </label>
-            <label className="space-y-1 text-xs font-bold uppercase tracking-widest text-muted">
+            <label className="space-y-1 text-xs font-bold uppercase tracking-normal text-muted">
               <span>Quality Score</span>
               <select value={filters.qualityScore} onChange={(event) => setFilter("qualityScore", event.target.value)} className="w-full rounded-xl border border-ink/10 bg-surface-low px-3 py-2 text-sm font-medium normal-case tracking-normal text-ink outline-none">
                 <option value="">Any quality</option>
@@ -433,13 +433,13 @@ export const AdminMcpLessons: React.FC = () => {
             <div className="flex items-end gap-2">
               <button
                 onClick={() => setFilter("issuesOnly", !filters.issuesOnly)}
-                className={`flex-1 rounded-xl border px-3 py-2 text-xs font-bold uppercase tracking-widest transition-colors ${filters.issuesOnly ? "border-amber-300 bg-amber-100 text-amber-800" : "border-ink/10 bg-surface-low text-muted"}`}
+                className={`flex-1 rounded-xl border px-3 py-2 text-xs font-bold uppercase tracking-normal transition-colors ${filters.issuesOnly ? "border-amber-300 bg-amber-100 text-amber-800" : "border-ink/10 bg-surface-low text-muted"}`}
               >
                 Issues Only
               </button>
               <button
                 onClick={() => setFilter("allGrades", !filters.allGrades)}
-                className={`flex-1 rounded-xl border px-3 py-2 text-xs font-bold uppercase tracking-widest transition-colors ${filters.allGrades ? "border-accent bg-accent text-paper" : "border-ink/10 bg-surface-low text-ink"}`}
+                className={`flex-1 rounded-xl border px-3 py-2 text-xs font-bold uppercase tracking-normal transition-colors ${filters.allGrades ? "border-accent bg-accent text-paper" : "border-ink/10 bg-surface-low text-ink"}`}
               >
                 {filters.allGrades ? "All Grades On" : "Active Session"}
               </button>
@@ -448,7 +448,7 @@ export const AdminMcpLessons: React.FC = () => {
         </div>
 
         <div className="overflow-hidden rounded-3xl border border-ink/10 bg-paper shadow-sm">
-          <div className="grid grid-cols-[1.8fr_1.5fr_1fr_0.8fr_0.8fr_1fr] gap-3 border-b border-ink/10 bg-surface-low px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-muted">
+          <div className="grid grid-cols-[1.8fr_1.5fr_1fr_0.8fr_0.8fr_1fr] gap-3 border-b border-ink/10 bg-surface-low px-4 py-3 ls-micro-label">
             <span>Curriculum Path</span>
             <span>Topic / Lesson</span>
             <span>Status</span>
@@ -458,7 +458,7 @@ export const AdminMcpLessons: React.FC = () => {
           </div>
 
           {loading ? (
-            <div className="flex items-center justify-center gap-3 p-12 text-sm text-muted">
+            <div className="flex items-center justify-center gap-3 p-12 ls-body-text">
               <RefreshCw className="h-4 w-4 animate-spin" />
               Loading MCP lessons...
             </div>
@@ -469,9 +469,9 @@ export const AdminMcpLessons: React.FC = () => {
                 The queue is scoped to {activeGrade || "the current academic level"}. Terminale or legacy lessons stay hidden until you choose All Grades or a matching filter.
               </p>
               <div className="mt-5 flex flex-wrap justify-center gap-2">
-                <button onClick={switchToAllGrades} className="rounded-xl bg-ink px-4 py-2 text-xs font-bold uppercase tracking-widest text-paper">View all grades</button>
-                <a href="/admin/curriculum-review" className="rounded-xl bg-surface-low px-4 py-2 text-xs font-bold uppercase tracking-widest text-ink">Import lessons</a>
-                <button onClick={loadRows} className="rounded-xl bg-accent px-4 py-2 text-xs font-bold uppercase tracking-widest text-paper">Generate review queue</button>
+                <button onClick={switchToAllGrades} className="rounded-xl bg-ink px-4 py-2 text-xs font-bold uppercase tracking-normal text-paper">View all grades</button>
+                <a href="/admin/curriculum-review" className="rounded-xl bg-surface-low px-4 py-2 text-xs font-bold uppercase tracking-normal text-ink">Import lessons</a>
+                <button onClick={loadRows} className="rounded-xl bg-accent px-4 py-2 text-xs font-bold uppercase tracking-normal text-paper">Generate review queue</button>
               </div>
             </div>
           ) : (
@@ -497,7 +497,7 @@ export const AdminMcpLessons: React.FC = () => {
                     </div>
                     <div>
                       <div className="font-bold text-ink">{row.topics?.title || "Untitled topic"}</div>
-                      <div className="mt-1 text-xs text-muted">{row.lesson_title || "No lesson title"}</div>
+                      <div className="mt-1 ls-micro-label">{row.lesson_title || "No lesson title"}</div>
                       <div className="mt-1 text-[10px] font-mono text-muted">{row.generation_pipeline || "legacy"}</div>
                     </div>
                     <div>
@@ -529,7 +529,7 @@ export const AdminMcpLessons: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-4 gap-3 px-4 pb-4 text-xs text-muted">
+                  <div className="grid grid-cols-4 gap-3 px-4 pb-4 ls-micro-label">
                     <span className="inline-flex items-center gap-2"><Layers className="h-3.5 w-3.5" /> Required materials: {rowDetail.requirements.length}</span>
                     <span className="inline-flex items-center gap-2"><FileWarning className="h-3.5 w-3.5" /> Missing materials: {missingMaterials}</span>
                     <span className="inline-flex items-center gap-2"><ShieldCheck className="h-3.5 w-3.5" /> MCP checks: {rowDetail.checks.length}</span>
@@ -555,9 +555,9 @@ export const AdminMcpLessons: React.FC = () => {
 
 const DetailPanel: React.FC<{ title: string; rows: any[]; empty: string }> = ({ title, rows, empty }) => (
   <div className="rounded-2xl border border-ink/10 bg-paper p-4">
-    <h3 className="text-xs font-bold uppercase tracking-widest text-ink">{title}</h3>
+    <h3 className="text-xs font-bold uppercase tracking-normal text-ink">{title}</h3>
     {rows.length === 0 ? (
-      <p className="mt-3 text-xs text-muted">{empty}</p>
+      <p className="mt-3 ls-micro-label">{empty}</p>
     ) : (
       <div className="mt-3 max-h-80 space-y-2 overflow-y-auto pr-1">
         {rows.slice(0, 12).map((row, index) => (
@@ -576,7 +576,7 @@ const FilterSelect: React.FC<{
   options: string[];
   onChange: (value: string) => void;
 }> = ({ label, value, options, onChange }) => (
-  <label className="space-y-1 text-xs font-bold uppercase tracking-widest text-muted">
+  <label className="space-y-1 text-xs font-bold uppercase tracking-normal text-muted">
     <span>{label}</span>
     <select
       value={value}

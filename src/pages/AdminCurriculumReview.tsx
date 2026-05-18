@@ -25,7 +25,7 @@ const CONTENT_TYPE_LABELS: Record<CurriculumReviewContentType, string> = {
 };
 
 const Spinner: React.FC<{ label?: string }> = ({ label = "Loading..." }) => (
-  <div className="flex items-center justify-center gap-3 rounded-3xl border border-ink/10 bg-paper px-6 py-12 text-sm text-muted shadow-sm">
+  <div className="flex items-center justify-center gap-3 rounded-3xl border border-ink/10 bg-paper px-6 py-12 ls-body-text shadow-sm">
     <RefreshCw className="h-4 w-4 animate-spin" />
     {label}
   </div>
@@ -276,7 +276,7 @@ export const AdminCurriculumReview: React.FC = () => {
           </div>
 
           <div className="mt-4 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-sm text-muted">
+            <div className="flex items-center gap-2 ls-body-text">
               <Search className="h-4 w-4" />
               Filters: grade, subject, topic, validation status, and source confidence.
             </div>
@@ -323,7 +323,7 @@ export const AdminCurriculumReview: React.FC = () => {
                 <tbody>
                   {tableRows.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="px-4 py-12 text-center text-sm text-muted">
+                      <td colSpan={8} className="px-4 py-12 text-center ls-body-text">
                         No curriculum review items matched the current filters.
                       </td>
                     </tr>
@@ -337,7 +337,7 @@ export const AdminCurriculumReview: React.FC = () => {
                       <td className="px-4 py-4">
                         <div className="max-w-[340px]">
                           <div className="font-medium text-ink">{item.title}</div>
-                          <p className="mt-1 text-xs text-muted">{item.preview}</p>
+                          <p className="mt-1 ls-micro-label">{item.preview}</p>
                         </div>
                       </td>
                       <td className="px-4 py-4 text-muted">{formatNullable(item.grade)}</td>
@@ -362,8 +362,8 @@ export const AdminCurriculumReview: React.FC = () => {
       </section>
 
       {(selectedItem || detailLoading || detailError) ? (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/30 backdrop-blur-[1px]">
-          <div className="h-full w-full max-w-2xl overflow-y-auto border-l border-ink/10 bg-paper shadow-2xl">
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/30 -[1px]">
+          <div className="h-full w-full max-w-2xl overflow-y-auto border-l border-ink/10 bg-paper shadow-md">
             <div className="sticky top-0 flex items-start justify-between border-b border-ink/10 bg-paper px-6 py-5">
               <div>
                 <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-accent">Curriculum Review</div>
@@ -429,7 +429,7 @@ export const AdminCurriculumReview: React.FC = () => {
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <h3 className="text-lg font-semibold text-ink">AI content preview</h3>
-                        <p className="mt-1 text-sm text-muted">Review the current draft before you decide how it should move through validation.</p>
+                        <p className="mt-1 ls-body-text">Review the current draft before you decide how it should move through validation.</p>
                       </div>
                       <button
                         onClick={() => setEditMode((current) => !current)}
@@ -518,7 +518,7 @@ export const AdminCurriculumReview: React.FC = () => {
                         ) : null}
                       </div>
                     ) : (
-                      <p className="mt-3 text-sm text-muted">No linked curriculum source reference is stored yet.</p>
+                      <p className="mt-3 ls-body-text">No linked curriculum source reference is stored yet.</p>
                     )}
                   </section>
 
@@ -533,7 +533,7 @@ export const AdminCurriculumReview: React.FC = () => {
 
                     {detail.latest_audit ? (
                       <div className="mt-4 space-y-3">
-                        <div className="text-xs text-muted">Latest audit: {formatDateTime(detail.latest_audit.created_at)}</div>
+                        <div className="ls-micro-label">Latest audit: {formatDateTime(detail.latest_audit.created_at)}</div>
                         <JsonPreview value={detail.latest_audit.mismatches || {}} />
                         {detail.latest_audit.recommendation ? (
                           <div className="rounded-2xl border border-ink/10 bg-surface-low p-4 text-sm text-ink">
@@ -542,7 +542,7 @@ export const AdminCurriculumReview: React.FC = () => {
                         ) : null}
                       </div>
                     ) : (
-                      <p className="mt-3 text-sm text-muted">No prior validation audit is stored for this item yet.</p>
+                      <p className="mt-3 ls-body-text">No prior validation audit is stored for this item yet.</p>
                     )}
                   </section>
 

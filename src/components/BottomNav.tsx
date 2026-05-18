@@ -30,7 +30,7 @@ export const BottomNav: React.FC = () => {
   const activeLabel = getActiveItem();
 
   return (
-    <nav className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-paper/60 backdrop-blur-2xl border border-ink/5 px-12 py-6 rounded-full flex gap-16 items-center z-50 shadow-[0_30px_60px_rgba(0,0,0,0.1)]">
+    <nav className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-paper/60  border border-ink/5 px-12 py-6 rounded-full flex gap-16 items-center z-50 shadow-[0_30px_60px_rgba(0,0,0,0.1)]">
       {navItems.map((item, i) => {
         const isActive = item.label === activeLabel;
         return (

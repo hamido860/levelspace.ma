@@ -93,11 +93,11 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-ink/40 backdrop-blur-md">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-ink/40 ">
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        className="bg-paper w-full max-w-xl rounded-[2rem] shadow-2xl overflow-hidden border border-ink/10 relative"
+        className="bg-paper w-full max-w-xl rounded-[2rem] shadow-md overflow-hidden border border-ink/10 relative"
       >
         <div className="absolute inset-0 bg-gradient-to-br from-accent/5 via-transparent to-transparent pointer-events-none" />
         
@@ -124,7 +124,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
               >
                 <div className="relative">
                   <div className="absolute -inset-4 bg-accent/20 blur-2xl rounded-full animate-pulse" />
-                  <div className="relative w-20 h-20 bg-accent rounded-3xl flex items-center justify-center text-paper shadow-xl rotate-3">
+                  <div className="relative w-20 h-20 bg-accent rounded-3xl flex items-center justify-center text-paper shadow-md rotate-3">
                     <Sparkles className="w-8 h-8" />
                   </div>
                 </div>
@@ -166,7 +166,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
                       onClick={() => { setSelectedCycle(cycle.id); setSelectedGrade(""); setSelectedTrack(""); }}
                       className={`p-5 rounded-[1.5rem] border-2 transition-all text-left flex items-start gap-4 group ${
                         selectedCycle === cycle.id 
-                          ? 'bg-accent/5 border-accent shadow-lg shadow-accent/10 scale-[1.02]' 
+                          ? 'bg-accent/5 border-accent shadow-sm shadow-accent/10 scale-[1.02]' 
                           : 'bg-surface-low border-transparent hover:border-accent/30 hover:bg-paper hover:shadow-md'
                       }`}
                     >
@@ -214,7 +214,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
                       onClick={() => { setSelectedGrade(grade); setSelectedTrack(""); }}
                       className={`p-3 rounded-xl border-2 text-sm font-bold transition-all text-center flex items-center justify-center gap-2 ${
                         selectedGrade === grade 
-                          ? 'bg-accent border-accent text-paper shadow-lg shadow-accent/20' 
+                          ? 'bg-accent border-accent text-paper shadow-sm shadow-accent/20' 
                           : 'bg-surface-low border-transparent text-ink hover:border-accent/30 hover:bg-paper'
                       }`}
                     >
@@ -320,7 +320,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
                >
                  <div className="relative">
                    <div className="absolute -inset-6 bg-emerald-500/20 blur-3xl rounded-full" />
-                   <div className="relative w-16 h-16 bg-gradient-to-br from-emerald-500/20 to-emerald-500/5 border border-emerald-500/20 rounded-full flex items-center justify-center text-paper shadow-xl">
+                   <div className="relative w-16 h-16 bg-gradient-to-br from-emerald-500/20 to-emerald-500/5 border border-emerald-500/20 rounded-full flex items-center justify-center text-paper shadow-md">
                      <CheckCircle2 className="w-10 h-10" />
                    </div>
                  </div>
@@ -390,7 +390,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
             ) : (
               <button
                 onClick={handleComplete}
-                className="px-6 py-2.5 text-sm bg-accent text-paper rounded-2xl font-bold flex items-center gap-2 hover:bg-[var(--accent-hover)] transition-all shadow-xl shadow-accent/20 hover:-translate-y-1 group"
+                className="px-6 py-2.5 text-sm bg-accent text-paper rounded-2xl font-bold flex items-center gap-2 hover:bg-[var(--accent-hover)] transition-all shadow-md shadow-accent/20 hover:-translate-y-1 group"
               >
                 Enter Platform
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />

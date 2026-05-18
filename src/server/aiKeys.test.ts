@@ -28,20 +28,23 @@ test("safe metadata never includes encrypted_api_key", () => {
   const metadata = toSafeMetadata({
     provider: "gemini",
     encrypted_api_key: "v1:secret",
-    key_last4: "7890",
+    key_preview: "sk-...7890",
     is_active: true,
+    last_test_status: "success",
+    last_tested_at: "2026-05-13T00:00:00.000Z",
     updated_at: "2026-05-13T00:00:00.000Z",
   });
 
   assert.deepEqual(Object.keys(metadata).sort(), [
-    "configured",
-    "isActive",
-    "keyLast4",
+    "is_active",
+    "key_preview",
+    "last_test_status",
+    "last_tested_at",
     "provider",
-    "updatedAt",
+    "updated_at",
   ]);
-  assert.equal(metadata.configured, true);
-  assert.equal(metadata.keyLast4, "7890");
+  assert.equal(metadata.key_preview, "sk-...7890");
+  assert.equal(metadata.is_active, true);
 });
 
 test("provider validation accepts only supported BYOK providers", () => {

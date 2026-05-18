@@ -4,9 +4,12 @@ import {
   generateContextualExplanation,
   generateEmbedding,
   generateLessonBlocks,
+  getConfiguredAIProvider,
   getDevAdminAiStatus,
+  getPlatformAiProviderStatus,
 } from "../../src/lib/ai/provider";
 import { requireAuthenticatedUser } from "../../src/server/api/aiCommandCenter";
+import { resolveAiKeyOwner } from "../../src/server/aiKeys";
 
 type ApiRequest = VercelRequest;
 type ApiResponse = VercelResponse;
@@ -39,15 +42,20 @@ const isProductionLike = () => process.env.NODE_ENV === "production" || process.
 const resolveCredentialContext = async (req: ApiRequest, body: Record<string, any>) => {
   const wantsByok = body.credentialMode === "byok";
   if (wantsByok && !isProductionLike() && typeof body.requestApiKey === "string" && body.requestApiKey.trim()) {
-    return { credentialMode: "byok" as const, userId: undefined };
+    return { credentialMode: "byok" as const, userId: undefined, ownerRef: undefined };
   }
 
-  if (!wantsByok || !hasBearerToken(req)) {
-    return { credentialMode: "platform" as const, userId: undefined };
+  if (hasBearerToken(req)) {
+    const user = await requireAuthenticatedUser(req);
+    return { credentialMode: wantsByok ? "byok" as const : "platform" as const, userId: user.id, ownerRef: `user:${user.id}` };
   }
 
-  const user = await requireAuthenticatedUser(req);
-  return { credentialMode: "byok" as const, userId: user.id };
+  if (wantsByok) {
+    const owner = await resolveAiKeyOwner(req);
+    return { credentialMode: "byok" as const, userId: owner.userId || undefined, ownerRef: owner.ownerRef };
+  }
+
+  return { credentialMode: "platform" as const, userId: undefined, ownerRef: undefined };
 };
 
 export async function handleAIStatus(req: ApiRequest, res: ApiResponse) {
@@ -55,6 +63,7 @@ export async function handleAIStatus(req: ApiRequest, res: ApiResponse) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
+  const platformProviders = getPlatformAiProviderStatus();
   const geminiConfigured = hasSecret(
     process.env.GEMINI_API_KEY || process.env.GEMINI_KEY_0 || process.env.AI_API_KEY || process.env.VITE_AI_API_KEY,
     "MY_GEMINI_API_KEY",
@@ -63,20 +72,20 @@ export async function handleAIStatus(req: ApiRequest, res: ApiResponse) {
   const openRouterConfigured = hasSecret(process.env.OPENROUTER_API_KEY, "MY_OPENROUTER_API_KEY");
   const openAiConfigured = hasSecret(process.env.OPENAI_API_KEY, "MY_OPENAI_API_KEY");
   const devAdmin = getDevAdminAiStatus();
-  const configuredProvider = String(devAdmin.defaultProvider || process.env.AI_PROVIDER || "gemini").toLowerCase();
+  const configuredProvider = getConfiguredAIProvider();
   const fallbackProvider = String(process.env.AI_FALLBACK_PROVIDER || "").toLowerCase();
 
   return res.status(200).json({
     configured: geminiConfigured || nvidiaConfigured || openRouterConfigured || openAiConfigured || Object.values(devAdmin.providers).some(Boolean),
     providers: {
-      gemini: geminiConfigured,
-      nvidia: nvidiaConfigured,
-      openrouter: openRouterConfigured,
-      openai: openAiConfigured,
+      gemini: platformProviders.gemini && geminiConfigured,
+      nvidia: platformProviders.nvidia && nvidiaConfigured,
+      openrouter: platformProviders.openrouter && openRouterConfigured,
+      openai: platformProviders.openai && openAiConfigured,
     },
     // TODO(auth): temporary developer/admin key status only. Never expose raw DEV_ADMIN_* keys to the browser.
     devAdmin,
-    defaultProvider: ["gemini", "nvidia", "openrouter", "openai"].includes(configuredProvider) ? configuredProvider : "gemini",
+    defaultProvider: configuredProvider,
     fallbackProvider: ["gemini", "nvidia", "openrouter", "openai"].includes(fallbackProvider) ? fallbackProvider : null,
     fallbackEnabled: process.env.AI_FALLBACK_ENABLED !== "false",
     platformCreditsEnabled: process.env.AI_PLATFORM_CREDITS_ENABLED !== "false",
@@ -114,6 +123,7 @@ export async function handleAIGenerate(req: ApiRequest, res: ApiResponse) {
       fallbackEnabled: body.fallbackEnabled,
       credentialMode: credentials.credentialMode,
       userId: credentials.userId,
+      ownerRef: credentials.ownerRef,
       requestApiKey: typeof body.requestApiKey === "string" && !isProductionLike() ? body.requestApiKey : undefined,
     });
     return res.status(200).json(result);
@@ -155,6 +165,7 @@ Return a concise student-friendly answer.`;
       maxOutputTokens: 1200,
       credentialMode: credentials.credentialMode,
       userId: credentials.userId,
+      ownerRef: credentials.ownerRef,
       requestApiKey: typeof body.requestApiKey === "string" && !isProductionLike() ? body.requestApiKey : undefined,
     });
     return res.status(200).json(result);
@@ -184,6 +195,7 @@ export async function handleAILessonBlocks(req: ApiRequest, res: ApiResponse) {
       maxOutputTokens: 4096,
       credentialMode: credentials.credentialMode,
       userId: credentials.userId,
+      ownerRef: credentials.ownerRef,
       requestApiKey: typeof body.requestApiKey === "string" && !isProductionLike() ? body.requestApiKey : undefined,
     });
     return res.status(200).json(result);

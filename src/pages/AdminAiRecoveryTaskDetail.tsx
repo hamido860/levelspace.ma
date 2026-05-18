@@ -340,7 +340,7 @@ export const AdminAiRecoveryTaskDetail: React.FC = () => {
                 onClick={() => navigate(tab.path)}
                 className={`rounded-full border px-4 py-2 text-sm font-medium transition-all ${
                   isActive
-                    ? "border-accent bg-accent text-white shadow-lg shadow-accent/20"
+                    ? "border-accent bg-accent text-white shadow-sm shadow-accent/20"
                     : "border-ink/10 bg-paper text-muted hover:border-accent/40 hover:text-ink"
                 }`}
               >

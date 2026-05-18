@@ -110,18 +110,18 @@ export const ExecuteTaskModal = ({
             <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
                 <RiskBadge level={issue?.severity} />
-                <span className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-white/80">
+                <span className="inline-flex items-center rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white/80">
                   {issue?.issue_type}
                 </span>
               </div>
               <div>
-                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/55">Issue</p>
+                <p className="text-xs font-medium text-white/70">Issue</p>
                 <h3 className="mt-2 text-2xl font-bold">{issue?.title}</h3>
                 <p className="mt-2 max-w-2xl text-sm text-white/70">{issue?.impact}</p>
               </div>
             </div>
             <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/55">Assigned Agent</p>
+              <p className="text-xs font-medium text-white/70">Assigned Agent</p>
               <div className="mt-3">
                 <AgentBadge agent={form.assigned_agent} />
               </div>
@@ -133,29 +133,29 @@ export const ExecuteTaskModal = ({
           <div className="space-y-5">
             <div className="grid gap-4 md:grid-cols-2">
               <label className="space-y-2">
-                <span className="text-xs font-bold uppercase tracking-[0.16em] text-ink-muted">Task Name</span>
+                <span className="ls-micro-label">Task Name</span>
                 <input
                   value={form.task_name}
                   onChange={(event) => updateField("task_name", event.target.value)}
-                  className="w-full rounded-2xl border border-surface-mid bg-paper px-4 py-3 text-sm outline-none transition-colors focus:border-accent"
+                  className="ls-field"
                 />
               </label>
 
               <label className="space-y-2">
-                <span className="text-xs font-bold uppercase tracking-[0.16em] text-ink-muted">Task Type</span>
+                <span className="ls-micro-label">Task Type</span>
                 <input
                   value={form.task_type}
                   onChange={(event) => updateField("task_type", event.target.value)}
-                  className="w-full rounded-2xl border border-surface-mid bg-paper px-4 py-3 text-sm outline-none transition-colors focus:border-accent"
+                  className="ls-field"
                 />
               </label>
 
               <label className="space-y-2">
-                <span className="text-xs font-bold uppercase tracking-[0.16em] text-ink-muted">Priority</span>
+                <span className="ls-micro-label">Priority</span>
                 <select
                   value={form.priority}
                   onChange={(event) => updateField("priority", event.target.value)}
-                  className="w-full rounded-2xl border border-surface-mid bg-paper px-4 py-3 text-sm outline-none transition-colors focus:border-accent"
+                  className="ls-field"
                 >
                   {PRIORITY_OPTIONS.map((option) => (
                     <option key={option} value={option}>{option}</option>
@@ -164,11 +164,11 @@ export const ExecuteTaskModal = ({
               </label>
 
               <label className="space-y-2">
-                <span className="text-xs font-bold uppercase tracking-[0.16em] text-ink-muted">Assigned Agent</span>
+                <span className="ls-micro-label">Assigned Agent</span>
                 <select
                   value={form.assigned_agent}
                   onChange={(event) => updateField("assigned_agent", event.target.value)}
-                  className="w-full rounded-2xl border border-surface-mid bg-paper px-4 py-3 text-sm outline-none transition-colors focus:border-accent"
+                  className="ls-field"
                 >
                   {AI_COMMAND_CENTER_AGENTS.map((agent) => (
                     <option key={agent} value={agent}>{agent}</option>
@@ -179,11 +179,11 @@ export const ExecuteTaskModal = ({
 
             <div className="grid gap-4 md:grid-cols-3">
               <label className="space-y-2">
-                <span className="text-xs font-bold uppercase tracking-[0.16em] text-ink-muted">Execution Mode</span>
+                <span className="ls-micro-label">Execution Mode</span>
                 <select
                   value={form.execution_mode}
                   onChange={(event) => updateField("execution_mode", event.target.value)}
-                  className="w-full rounded-2xl border border-surface-mid bg-paper px-4 py-3 text-sm outline-none transition-colors focus:border-accent"
+                  className="ls-field"
                 >
                   {EXECUTION_MODE_OPTIONS.map((option) => (
                     <option key={option} value={option}>{option}</option>
@@ -192,11 +192,11 @@ export const ExecuteTaskModal = ({
               </label>
 
               <label className="space-y-2">
-                <span className="text-xs font-bold uppercase tracking-[0.16em] text-ink-muted">Safety Level</span>
+                <span className="ls-micro-label">Safety Level</span>
                 <select
                   value={form.safety_level}
                   onChange={(event) => updateField("safety_level", event.target.value)}
-                  className="w-full rounded-2xl border border-surface-mid bg-paper px-4 py-3 text-sm outline-none transition-colors focus:border-accent"
+                  className="ls-field"
                 >
                   {SAFETY_LEVEL_OPTIONS.map((option) => (
                     <option key={option} value={option}>{option}</option>
@@ -205,11 +205,11 @@ export const ExecuteTaskModal = ({
               </label>
 
               <label className="space-y-2">
-                <span className="text-xs font-bold uppercase tracking-[0.16em] text-ink-muted">Target Area</span>
+                <span className="ls-micro-label">Target Area</span>
                 <select
                   value={form.target_area}
                   onChange={(event) => updateField("target_area", event.target.value)}
-                  className="w-full rounded-2xl border border-surface-mid bg-paper px-4 py-3 text-sm outline-none transition-colors focus:border-accent"
+                  className="ls-field"
                 >
                   {TARGET_AREA_OPTIONS.map((option) => (
                     <option key={option} value={option}>{option}</option>
@@ -219,19 +219,19 @@ export const ExecuteTaskModal = ({
             </div>
 
             <label className="space-y-2">
-              <span className="text-xs font-bold uppercase tracking-[0.16em] text-ink-muted">Instructions</span>
+              <span className="ls-micro-label">Instructions</span>
               <textarea
                 rows={6}
                 value={form.instructions}
                 onChange={(event) => updateField("instructions", event.target.value)}
-                className="w-full rounded-[24px] border border-surface-mid bg-paper px-4 py-3 text-sm outline-none transition-colors focus:border-accent"
+                className="ls-field min-h-36"
                 placeholder="Describe the root cause checks, rollback requirements, and validation criteria."
               />
             </label>
           </div>
 
           <div className="space-y-4">
-            <div className="rounded-[28px] border border-surface-mid bg-surface-low/80 p-5">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
               <div className="flex items-start gap-3">
                 <Sparkles className="mt-0.5 h-5 w-5 text-accent" />
                 <div>
@@ -246,7 +246,7 @@ export const ExecuteTaskModal = ({
               </div>
             </div>
 
-            <div className="rounded-[28px] border border-surface-mid bg-paper p-5">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5">
               <div className="flex items-start gap-3">
                 {destructiveBlocked ? (
                   <AlertTriangle className="mt-0.5 h-5 w-5 text-red-600" />
@@ -263,7 +263,7 @@ export const ExecuteTaskModal = ({
                       checked={forceApproval}
                       onChange={(event) => updateField("requires_approval", event.target.checked)}
                       disabled={form.safety_level === "read_only" ? false : true}
-                      className="h-4 w-4 rounded border-surface-mid text-accent focus:ring-accent"
+                      className="h-4 w-4 rounded border-slate-300 text-slate-950"
                     />
                     Require approval before writes
                   </label>
@@ -276,25 +276,25 @@ export const ExecuteTaskModal = ({
           </div>
         </div>
 
-        <div className="flex flex-wrap justify-end gap-3 border-t border-surface-mid pt-5">
+        <div className="flex flex-wrap justify-end gap-3 border-t border-slate-200 pt-5">
           <button
             onClick={onClose}
             disabled={busy}
-            className="rounded-full border border-surface-mid px-5 py-2.5 text-sm font-semibold text-ink-secondary transition-colors hover:bg-surface-low disabled:opacity-50"
+            className="ls-button-secondary disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             onClick={() => submit("audit")}
             disabled={busy}
-            className="rounded-full border border-accent/15 bg-accent-soft px-5 py-2.5 text-sm font-semibold text-accent transition-colors hover:bg-accent/15 disabled:opacity-50"
+            className="ls-button-secondary disabled:opacity-50"
           >
             Run Audit
           </button>
           <button
             onClick={() => submit("create")}
             disabled={busy}
-            className="rounded-full bg-accent px-5 py-2.5 text-sm font-semibold text-paper transition-colors hover:bg-accent-hover disabled:opacity-50"
+            className="ls-button-primary disabled:opacity-50"
           >
             Create Task
           </button>

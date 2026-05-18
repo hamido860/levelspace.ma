@@ -3,16 +3,16 @@ import { AgentBadge } from "./AgentBadge";
 import { RiskBadge } from "./RiskBadge";
 
 const STATUS_META = {
-  pending: { label: "Pending", icon: Clock3, accent: "from-slate-100 to-white" },
-  planning: { label: "Planning", icon: Clock3, accent: "from-violet-100 to-white" },
-  auditing: { label: "Auditing", icon: ShieldAlert, accent: "from-sky-100 to-white" },
-  waiting_for_chunks: { label: "Waiting for Chunks", icon: PauseCircle, accent: "from-cyan-100 to-white" },
-  waiting_approval: { label: "Waiting Approval", icon: PauseCircle, accent: "from-amber-100 to-white" },
-  running: { label: "Running", icon: PlayCircle, accent: "from-emerald-100 to-white" },
-  validating: { label: "Validating", icon: ShieldAlert, accent: "from-green-100 to-white" },
-  completed: { label: "Completed", icon: PlayCircle, accent: "from-emerald-100 to-white" },
-  failed: { label: "Failed", icon: ShieldAlert, accent: "from-rose-100 to-white" },
-  blocked: { label: "Blocked", icon: ShieldAlert, accent: "from-red-100 to-white" },
+  pending: { label: "Pending", icon: Clock3 },
+  planning: { label: "Planning", icon: Clock3 },
+  auditing: { label: "Auditing", icon: ShieldAlert },
+  waiting_for_chunks: { label: "Waiting for Chunks", icon: PauseCircle },
+  waiting_approval: { label: "Waiting Approval", icon: PauseCircle },
+  running: { label: "Running", icon: PlayCircle },
+  validating: { label: "Validating", icon: ShieldAlert },
+  completed: { label: "Completed", icon: PlayCircle },
+  failed: { label: "Failed", icon: ShieldAlert },
+  blocked: { label: "Blocked", icon: ShieldAlert },
 };
 
 const statusOrder = [
@@ -43,23 +43,23 @@ export const TaskStatusBoard = ({ tasks, onSelectTask, selectedTaskId, onRunTask
         return (
           <section
             key={status}
-            className={`rounded-[28px] border border-surface-mid bg-gradient-to-b ${meta.accent} p-4`}
+            className="ls-card-pad"
           >
             <div className="mb-4 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <div className="rounded-2xl bg-paper p-2 text-ink shadow-sm">
+                <div className="ls-icon-tile">
                   <Icon className="h-4 w-4" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-ink">{meta.label}</h3>
-                  <p className="text-xs text-ink-muted">{items.length} task{items.length === 1 ? "" : "s"}</p>
+                  <h3 className="text-sm font-bold text-slate-950">{meta.label}</h3>
+                  <p className="text-xs text-slate-500">{items.length} task{items.length === 1 ? "" : "s"}</p>
                 </div>
               </div>
             </div>
 
             <div className="space-y-3">
               {items.length === 0 ? (
-                <div className="rounded-3xl border border-dashed border-surface-mid bg-paper/60 p-4 text-xs text-ink-muted">
+                <div className="ls-empty-state p-4 text-xs">
                   No tasks in this lane.
                 </div>
               ) : (
@@ -67,26 +67,26 @@ export const TaskStatusBoard = ({ tasks, onSelectTask, selectedTaskId, onRunTask
                   <button
                     key={task.id}
                     onClick={() => onSelectTask(task)}
-                    className={`w-full rounded-[24px] border p-4 text-left transition-colors ${
+                    className={`w-full rounded-2xl border p-4 text-left transition-colors ${
                       selectedTaskId === task.id
-                        ? "border-accent bg-accent-soft/80"
-                        : "border-surface-mid bg-paper hover:border-accent/30"
+                        ? "border-slate-300 bg-slate-50"
+                        : "border-slate-200 bg-white hover:border-slate-300"
                     }`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="space-y-1">
-                        <p className="text-sm font-semibold text-ink">{task.task_name}</p>
-                        <p className="text-xs text-ink-muted">{task.ai_issues?.title || "Linked issue unavailable"}</p>
+                        <p className="text-sm font-semibold text-slate-950">{task.task_name}</p>
+                        <p className="text-xs text-slate-500">{task.ai_issues?.title || "Linked issue unavailable"}</p>
                       </div>
                       <RiskBadge level={task.priority} />
                     </div>
 
                     <div className="mt-3">
-                      <div className="mb-1 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
+                      <div className="mb-1 flex items-center justify-between text-[11px] font-medium text-slate-500">
                         <span>{task.status.replace(/_/g, " ")}</span>
                         <span>{task.progress}%</span>
                       </div>
-                      <div className="h-2 rounded-full bg-surface-mid">
+                      <div className="h-2 rounded-full bg-slate-100">
                         <div
                           className="h-2 rounded-full bg-accent transition-all"
                           style={{ width: `${Math.max(6, task.progress || 0)}%` }}
@@ -99,7 +99,7 @@ export const TaskStatusBoard = ({ tasks, onSelectTask, selectedTaskId, onRunTask
                     </div>
 
                     <div className="mt-3 flex items-center justify-between gap-2">
-                      <p className="line-clamp-2 text-xs text-ink-secondary">
+                      <p className="line-clamp-2 text-xs text-slate-600">
                         {task.latestLogMessage || task.instructions || "Waiting for the next execution step."}
                       </p>
                       {["pending", "waiting_approval", "running", "validating"].includes(task.status) && (
@@ -108,14 +108,14 @@ export const TaskStatusBoard = ({ tasks, onSelectTask, selectedTaskId, onRunTask
                             event.stopPropagation();
                             onRunTask(task);
                           }}
-                          className="rounded-full bg-ink px-3 py-1.5 text-[11px] font-semibold text-paper transition-colors hover:bg-ink-secondary"
+                          className="rounded-xl bg-slate-950 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800"
                         >
                           {task.status === "waiting_approval" ? "Resume" : "Run"}
                         </button>
                       )}
                     </div>
 
-                    <div className="mt-3 text-[11px] text-ink-muted">
+                    <div className="mt-3 text-[11px] text-slate-500">
                       Updated {new Date(task.updated_at).toLocaleString()}
                     </div>
                   </button>

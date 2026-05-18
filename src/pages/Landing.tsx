@@ -29,10 +29,10 @@ export const Landing: React.FC = () => {
   return (
     <div className="min-h-screen bg-background text-ink font-sans selection:bg-accent/10 selection:text-accent overflow-x-hidden lg:scale-[0.85] lg:origin-top">
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-ink/5">
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80  border-b border-ink/5">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-accent rounded-xl flex items-center justify-center text-paper shadow-lg shadow-accent/20">
+            <div className="w-10 h-10 bg-accent rounded-xl flex items-center justify-center text-paper shadow-sm shadow-accent/20">
               <Layers className="w-6 h-6" />
             </div>
             <span className="text-xl font-display font-bold tracking-tight">LevelSpace</span>
@@ -72,7 +72,7 @@ export const Landing: React.FC = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-surface-low text-ink-secondary text-xs font-bold uppercase tracking-widest mb-8 border border-ink/10"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-surface-low text-ink-secondary text-xs font-bold uppercase tracking-normal mb-8 border border-ink/10"
           >
             <Target className="w-4 h-4" />
             <span>{t('academic_region')}</span>
@@ -104,7 +104,7 @@ export const Landing: React.FC = () => {
           >
             <button 
               onClick={handleCTA}
-              className="w-full sm:w-auto px-8 py-4 bg-accent text-paper rounded-full font-bold text-lg shadow-xl shadow-accent/20 hover:bg-accent-hover hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2"
+              className="w-full sm:w-auto px-8 py-4 bg-accent text-paper rounded-full font-bold text-lg shadow-md shadow-accent/20 hover:bg-accent-hover hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2"
             >
               {t('hero_cta_primary')}
               <ArrowRight className="w-5 h-5" />
@@ -128,7 +128,7 @@ export const Landing: React.FC = () => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.8 }}
-              className="md:col-span-2 relative rounded-3xl border border-ink/10 bg-paper shadow-2xl overflow-hidden aspect-[16/9] md:aspect-auto md:h-[400px] group"
+              className="md:col-span-2 relative rounded-3xl border border-ink/10 bg-paper shadow-md overflow-hidden aspect-[16/9] md:aspect-auto md:h-[400px] group"
             >
               <div className="absolute inset-0 bg-ink/10 group-hover:bg-transparent transition-colors z-10"></div>
               <img 
@@ -144,7 +144,7 @@ export const Landing: React.FC = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.8, delay: 0.2 }}
-                className="relative rounded-3xl border border-ink/10 bg-paper shadow-xl overflow-hidden h-[188px] group"
+                className="relative rounded-3xl border border-ink/10 bg-paper shadow-md overflow-hidden h-[188px] group"
               >
                 <div className="absolute inset-0 bg-ink/10 group-hover:bg-transparent transition-colors z-10"></div>
                 <img 
@@ -159,7 +159,7 @@ export const Landing: React.FC = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.8, delay: 0.4 }}
-                className="relative rounded-3xl border border-ink/10 bg-paper shadow-xl overflow-hidden h-[188px] group"
+                className="relative rounded-3xl border border-ink/10 bg-paper shadow-md overflow-hidden h-[188px] group"
               >
                 <div className="absolute inset-0 bg-ink/10 group-hover:bg-transparent transition-colors z-10"></div>
                 <img 
@@ -240,7 +240,7 @@ export const Landing: React.FC = () => {
             </p>
             <button 
               onClick={handleCTA}
-              className="px-10 py-5 bg-accent text-white rounded-full font-bold text-lg shadow-2xl shadow-accent/50 hover:bg-accent-hover hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2 mx-auto"
+              className="px-10 py-5 bg-accent text-white rounded-full font-bold text-lg shadow-md shadow-accent/50 hover:bg-accent-hover hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2 mx-auto"
             >
               {user ? 'Enter Dashboard' : 'Get Started for Free'}
               <ArrowRight className="w-5 h-5" />

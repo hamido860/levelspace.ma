@@ -50,7 +50,7 @@ export const AICrewStatus: React.FC = () => {
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            className="w-80 bg-paper border border-surface-mid rounded-2xl shadow-2xl overflow-hidden pointer-events-auto flex flex-col max-h-[400px]"
+            className="w-80 bg-paper border border-surface-mid rounded-2xl shadow-md overflow-hidden pointer-events-auto flex flex-col max-h-[400px]"
           >
             <div className="p-4 border-b border-surface-mid bg-surface-low/50 flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -58,7 +58,7 @@ export const AICrewStatus: React.FC = () => {
                   <Users size={16} />
                 </div>
                 <div>
-                  <h2 className="text-[10px] font-bold uppercase tracking-widest text-ink">AI Crew</h2>
+                  <h2 className="text-[10px] font-bold uppercase tracking-normal text-ink">AI Crew</h2>
                   <p className="text-[8px] text-ink-muted uppercase tracking-wider">Task Queue</p>
                 </div>
               </div>
@@ -88,7 +88,7 @@ export const AICrewStatus: React.FC = () => {
                         {task.type.replace('_', ' ')}
                       </span>
                     </div>
-                    <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-widest ${
+                    <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-normal ${
                       task.status === 'completed' ? 'bg-success/10 text-success' :
                       task.status === 'failed' ? 'bg-error/10 text-error' :
                       task.status === 'running' ? 'bg-accent/10 text-accent' :
@@ -120,7 +120,7 @@ export const AICrewStatus: React.FC = () => {
 
                   {task.type === 'classroom_audit' && task.status === 'completed' && task.result && (
                     <div className="mt-2 space-y-2 border-t border-ink/5 pt-2">
-                      <p className="text-[8px] font-bold text-accent uppercase tracking-widest flex items-center gap-1">
+                      <p className="text-[8px] font-bold text-accent uppercase tracking-normal flex items-center gap-1">
                         <ShieldCheck size={10} />
                         Audit Recommendations
                       </p>
@@ -166,13 +166,13 @@ export const AICrewStatus: React.FC = () => {
               <div className="p-3 border-t border-surface-mid bg-surface-low/30 flex gap-2">
                 <button 
                   onClick={() => aiCrew.clearCompleted()}
-                  className="flex-1 py-2 text-[9px] font-bold text-ink-muted hover:text-ink uppercase tracking-widest transition-colors text-center border border-ink/5 rounded-lg"
+                  className="flex-1 py-2 text-[9px] font-bold text-ink-muted hover:text-ink uppercase tracking-normal transition-colors text-center border border-ink/5 rounded-lg"
                 >
                   Clear Completed
                 </button>
                 <button 
                   onClick={() => aiCrew.clearAll()}
-                  className="flex-1 py-2 text-[9px] font-bold text-ink-muted hover:text-error uppercase tracking-widest transition-colors text-center border border-ink/5 rounded-lg"
+                  className="flex-1 py-2 text-[9px] font-bold text-ink-muted hover:text-error uppercase tracking-normal transition-colors text-center border border-ink/5 rounded-lg"
                 >
                   Clear All
                 </button>
@@ -188,7 +188,7 @@ export const AICrewStatus: React.FC = () => {
           setIsExpanded(!isExpanded);
           setHasNewUpdate(false);
         }}
-        className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-2xl shadow-xl transition-all border ${
+        className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-2xl shadow-md transition-all border ${
           activeTasks.length > 0 
             ? 'bg-accent text-paper border-accent shadow-accent/20' 
             : 'bg-paper text-ink border-surface-mid shadow-ink/5'
@@ -208,7 +208,7 @@ export const AICrewStatus: React.FC = () => {
         </div>
         
         <div className="flex flex-col items-start">
-          <span className="text-[10px] font-bold uppercase tracking-widest leading-none">
+          <span className="text-[10px] font-bold uppercase tracking-normal leading-none">
             {activeTasks.length > 0 ? 'AI Crew Active' : 'AI Crew'}
           </span>
           <div className="flex items-center gap-1.5 mt-1">

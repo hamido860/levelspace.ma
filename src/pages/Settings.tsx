@@ -453,7 +453,7 @@ export const Settings: React.FC = () => {
                 className="flex items-center gap-3 text-accent"
               >
                 <Sparkles className="w-5 h-5" />
-                <span className="text-[10px] font-bold uppercase tracking-[0.3em]">{t('profile_setup')}</span>
+                <span className="text-[10px] font-bold uppercase tracking-normal">{t('profile_setup')}</span>
               </motion.div>
               <motion.h1 
                 initial={{ opacity: 0, y: 20 }}
@@ -492,7 +492,7 @@ export const Settings: React.FC = () => {
         <div className="flex border-b border-ink/10">
           <button
             onClick={() => setActiveTab('profile')}
-            className={`px-6 py-3 text-sm font-bold uppercase tracking-widest transition-colors border-b-2 ${
+            className={`px-6 py-3 text-sm font-bold uppercase tracking-normal transition-colors border-b-2 ${
               activeTab === 'profile' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-ink'
             }`}
           >
@@ -500,7 +500,7 @@ export const Settings: React.FC = () => {
           </button>
           <button
             onClick={() => setActiveTab('preferences')}
-            className={`px-6 py-3 text-sm font-bold uppercase tracking-widest transition-colors border-b-2 ${
+            className={`px-6 py-3 text-sm font-bold uppercase tracking-normal transition-colors border-b-2 ${
               activeTab === 'preferences' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-ink'
             }`}
           >
@@ -508,7 +508,7 @@ export const Settings: React.FC = () => {
           </button>
           <button
             onClick={() => setActiveTab('aiKeys')}
-            className={`px-6 py-3 text-sm font-bold uppercase tracking-widest transition-colors border-b-2 ${
+            className={`px-6 py-3 text-sm font-bold uppercase tracking-normal transition-colors border-b-2 ${
               activeTab === 'aiKeys' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-ink'
             }`}
           >
@@ -542,15 +542,15 @@ export const Settings: React.FC = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div className="p-4 rounded-2xl border border-ink/5 bg-surface-low space-y-1">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-muted">{t('country')}</span>
+                  <span className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('country')}</span>
                   <p className="text-sm font-semibold text-ink">{currentCountryName || t('not_set')}</p>
                 </div>
                 <div className="p-4 rounded-2xl border border-ink/5 bg-surface-low space-y-1">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-muted">{t('grade')}</span>
+                  <span className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('grade')}</span>
                   <p className="text-sm font-semibold text-ink">{selectedGrade || t('not_set')}</p>
                 </div>
                 <div className="p-4 rounded-2xl border border-ink/5 bg-surface-low space-y-1">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-muted">{t('track')}</span>
+                  <span className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('track')}</span>
                   <p className="text-sm font-semibold text-ink">{selectedTrackName || selectedSectionName || t('not_set')}</p>
                   {selectedOptionName && <p className="text-[11px] text-muted">{selectedOptionName}</p>}
                 </div>
@@ -564,7 +564,7 @@ export const Settings: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-muted">{t('country')}</label>
+                      <label className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('country')}</label>
                       <div className="relative" ref={dropdownRef}>
                         <button
                           onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -580,7 +580,7 @@ export const Settings: React.FC = () => {
                               initial={{ opacity: 0, y: 10 }}
                               animate={{ opacity: 1, y: 0 }}
                               exit={{ opacity: 0, y: 10 }}
-                              className="absolute z-50 left-0 right-0 mt-2 bg-paper border border-ink/10 rounded-2xl shadow-2xl overflow-hidden"
+                              className="absolute z-50 left-0 right-0 mt-2 bg-paper border border-ink/10 rounded-2xl shadow-md overflow-hidden"
                             >
                               <div className="p-3 border-b border-ink/5">
                                 <div className="relative">
@@ -624,7 +624,7 @@ export const Settings: React.FC = () => {
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-muted">{t('grade')}</label>
+                      <label className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('grade')}</label>
                       <div key={selectedCountry} className="grid grid-cols-1 gap-2 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
                         {currentGrades.map((grade, index) => (
                           <button
@@ -632,7 +632,7 @@ export const Settings: React.FC = () => {
                             onClick={() => setSelectedGrade(grade)}
                             className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
                               selectedGrade === grade
-                                ? 'bg-accent border-accent text-paper shadow-lg shadow-accent/20'
+                                ? 'bg-accent border-accent text-paper shadow-sm shadow-accent/20'
                                 : 'bg-background border-ink/5 text-ink hover:border-accent/30'
                             }`}
                           >
@@ -647,7 +647,7 @@ export const Settings: React.FC = () => {
                   {selectedCountry === 'Morocco' && (selectedGrade.includes('Bac') || selectedGrade.includes('Tronc Commun')) && (
                     <div className="space-y-4">
                       <div className="space-y-2">
-                        <label className="text-[10px] font-bold uppercase tracking-widest text-muted">{t('section')}</label>
+                        <label className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('section')}</label>
                         <div className="grid grid-cols-1 gap-2 max-h-[180px] overflow-y-auto pr-2 custom-scrollbar">
                           {dbBacSections.map((section) => (
                             <button
@@ -659,7 +659,7 @@ export const Settings: React.FC = () => {
                               }}
                               className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
                                 bacSection === section.id
-                                  ? 'bg-accent border-accent text-paper shadow-lg shadow-accent/20'
+                                  ? 'bg-accent border-accent text-paper shadow-sm shadow-accent/20'
                                   : 'bg-background border-ink/5 text-ink hover:border-accent/30'
                               }`}
                             >
@@ -672,7 +672,7 @@ export const Settings: React.FC = () => {
 
                       {bacSection && !selectedGrade.includes('Tronc Commun') && (
                         <div className="space-y-2">
-                          <label className="text-[10px] font-bold uppercase tracking-widest text-muted">{t('track')}</label>
+                          <label className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('track')}</label>
                           <div className="grid grid-cols-1 gap-2 max-h-[180px] overflow-y-auto pr-2 custom-scrollbar">
                             {dbBacTracks.filter((track) => track.section_id === bacSection).map((track) => (
                               <button
@@ -683,7 +683,7 @@ export const Settings: React.FC = () => {
                                 }}
                                 className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
                                   bacTrack === track.id
-                                    ? 'bg-accent border-accent text-paper shadow-lg shadow-accent/20'
+                                    ? 'bg-accent border-accent text-paper shadow-sm shadow-accent/20'
                                     : 'bg-background border-ink/5 text-ink hover:border-accent/30'
                                 }`}
                               >
@@ -697,13 +697,13 @@ export const Settings: React.FC = () => {
 
                       {bacTrack && !selectedGrade.includes('Tronc Commun') && dbBacTrackIntOptions.some((item) => item.track_id === bacTrack) && (
                         <div className="space-y-2">
-                          <label className="text-[10px] font-bold uppercase tracking-widest text-muted">{t('international_option')}</label>
+                          <label className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('international_option')}</label>
                           <div className="grid grid-cols-1 gap-2 max-h-[180px] overflow-y-auto pr-2 custom-scrollbar">
                             <button
                               onClick={() => setBacIntOption('')}
                               className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
                                 bacIntOption === ''
-                                  ? 'bg-accent border-accent text-paper shadow-lg shadow-accent/20'
+                                  ? 'bg-accent border-accent text-paper shadow-sm shadow-accent/20'
                                   : 'bg-background border-ink/5 text-ink hover:border-accent/30'
                               }`}
                             >
@@ -721,7 +721,7 @@ export const Settings: React.FC = () => {
                                     onClick={() => setBacIntOption(option.id)}
                                     className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
                                       bacIntOption === option.id
-                                        ? 'bg-accent border-accent text-paper shadow-lg shadow-accent/20'
+                                        ? 'bg-accent border-accent text-paper shadow-sm shadow-accent/20'
                                         : 'bg-background border-ink/5 text-ink hover:border-accent/30'
                                     }`}
                                   >
@@ -752,7 +752,7 @@ export const Settings: React.FC = () => {
 
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted">{t('career_direction')}</label>
+                  <label className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('career_direction')}</label>
                   <div className="grid grid-cols-2 gap-2">
                     {CAREER_GOALS.map((goal) => (
                       <button
@@ -760,7 +760,7 @@ export const Settings: React.FC = () => {
                         onClick={() => setCareerGoal(goal)}
                         className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
                           careerGoal === goal
-                            ? 'bg-ink border-ink text-paper shadow-lg shadow-ink/20'
+                            ? 'bg-ink border-ink text-paper shadow-sm shadow-ink/20'
                             : 'bg-background border-ink/5 text-ink hover:border-accent/30'
                         }`}
                       >
@@ -772,7 +772,7 @@ export const Settings: React.FC = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted">{t('custom_goal')}</label>
+                  <label className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('custom_goal')}</label>
                   <input
                     type="text"
                     value={careerGoalCustom}
@@ -783,7 +783,7 @@ export const Settings: React.FC = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted">{t('hobbies_interests')}</label>
+                  <label className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('hobbies_interests')}</label>
                   <div className="flex gap-2">
                     <input
                       type="text"
@@ -800,7 +800,7 @@ export const Settings: React.FC = () => {
                     />
                     <button
                       onClick={() => addToken(hobbyInput, setHobbies, () => setHobbyInput(''))}
-                      className="px-4 py-3 rounded-xl bg-ink text-paper text-[10px] font-bold uppercase tracking-widest"
+                      className="px-4 py-3 rounded-xl bg-ink text-paper text-[10px] font-bold uppercase tracking-normal"
                     >
                       {t('add')}
                     </button>
@@ -836,7 +836,7 @@ export const Settings: React.FC = () => {
 
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted">{t('target_skills')}</label>
+                  <label className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('target_skills')}</label>
                   <div className="flex gap-2">
                     <input
                       type="text"
@@ -853,7 +853,7 @@ export const Settings: React.FC = () => {
                     />
                     <button
                       onClick={() => addToken(targetSkillInput, setTargetSkills, () => setTargetSkillInput(''))}
-                      className="px-4 py-3 rounded-xl bg-ink text-paper text-[10px] font-bold uppercase tracking-widest"
+                      className="px-4 py-3 rounded-xl bg-ink text-paper text-[10px] font-bold uppercase tracking-normal"
                     >
                       {t('add')}
                     </button>
@@ -876,7 +876,7 @@ export const Settings: React.FC = () => {
 
                 <div className="grid grid-cols-1 gap-3">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted">{t('preferred_tone')}</label>
+                    <label className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('preferred_tone')}</label>
                     <div className="grid grid-cols-2 gap-2">
                       {TONE_OPTIONS.map((option) => (
                         <button
@@ -895,7 +895,7 @@ export const Settings: React.FC = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted">{t('explanation_style')}</label>
+                    <label className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('explanation_style')}</label>
                     <div className="grid grid-cols-2 gap-2">
                       {EXPLANATION_STYLES.map((option) => (
                         <button
@@ -914,7 +914,7 @@ export const Settings: React.FC = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted">{t('motivation_focus')}</label>
+                    <label className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('motivation_focus')}</label>
                     <div className="grid grid-cols-2 gap-2">
                       {MOTIVATION_FOCUS_OPTIONS.map((option) => (
                         <button
@@ -949,7 +949,7 @@ export const Settings: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4 items-center">
                 <div className="p-4 bg-surface-low rounded-2xl border border-ink/5 flex items-center justify-between gap-4">
                   <div className="space-y-1">
-                    <p className="text-xs font-bold text-ink uppercase tracking-widest">{t('supabase_connection')}</p>
+                    <p className="text-xs font-bold text-ink uppercase tracking-normal">{t('supabase_connection')}</p>
                     <p className="text-[10px] text-muted">
                       {t('status')}: <span className={dbConnected ? 'text-success font-bold' : 'text-error font-bold'}>{dbConnected ? t('connected') : t('disconnected')}</span>
                     </p>
@@ -980,7 +980,7 @@ export const Settings: React.FC = () => {
                     }
                   }}
                   disabled={isSyncing || !dbConnected}
-                  className="w-full md:w-auto flex items-center justify-center gap-3 px-6 py-4 bg-accent text-paper rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-accent-hover transition-all shadow-lg shadow-accent/20 disabled:opacity-50"
+                  className="w-full md:w-auto flex items-center justify-center gap-3 px-6 py-4 bg-accent text-paper rounded-2xl font-bold text-xs uppercase tracking-normal hover:bg-accent-hover transition-all shadow-sm shadow-accent/20 disabled:opacity-50"
                 >
                   {isSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Cloud className="w-4 h-4" />}
                   {isSyncing ? t('synchronizing') : t('sync_all_data')}
@@ -1018,7 +1018,7 @@ export const Settings: React.FC = () => {
               
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted">{t('current_session')}</label>
+                  <label className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('current_session')}</label>
                   <input 
                     type="text" 
                     value={currentSession}
@@ -1029,7 +1029,7 @@ export const Settings: React.FC = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted">{t('default_session_duration')}</label>
+                  <label className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('default_session_duration')}</label>
                   <div className="flex items-center gap-3">
                     <input 
                       type="range" 
@@ -1058,7 +1058,7 @@ export const Settings: React.FC = () => {
                     <p className="text-[10px] text-muted/60 leading-tight">Choose provider defaults. Raw API keys stay on the server.</p>
                   </div>
                 </div>
-                <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 ${
+                <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-normal flex items-center gap-2 ${
                   aiStatus?.configured ? 'bg-emerald-500/10 text-emerald-600' : 'bg-amber-500/10 text-amber-600'
                 }`}>
                   <div className={`w-1.5 h-1.5 rounded-full ${aiStatus?.configured ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`} />
@@ -1068,7 +1068,7 @@ export const Settings: React.FC = () => {
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div className="space-y-3">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted">Default provider</label>
+                  <label className="text-[10px] font-bold uppercase tracking-normal text-muted">Default provider</label>
                   <div className="grid grid-cols-2 xl:grid-cols-4 gap-2">
                     {(['gemini', 'nvidia', 'openrouter', 'openai'] as const).map((provider) => {
                       const configured = aiStatus?.providers?.[provider];
@@ -1097,7 +1097,7 @@ export const Settings: React.FC = () => {
                 </div>
 
                 <div className="space-y-3">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted">Default model</label>
+                  <label className="text-[10px] font-bold uppercase tracking-normal text-muted">Default model</label>
                   <input
                     type="text"
                     value={aiModel}
@@ -1135,7 +1135,7 @@ export const Settings: React.FC = () => {
                     <p className="text-[10px] text-muted/60 leading-tight">{t('supabase_cloud_sync_desc')}</p>
                   </div>
                 </div>
-                <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 ${
+                <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-normal flex items-center gap-2 ${
                   dbConnected ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'
                 }`}>
                   <div className={`w-1.5 h-1.5 rounded-full ${dbConnected ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`} />
@@ -1156,17 +1156,17 @@ export const Settings: React.FC = () => {
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                     <div className="p-3 bg-paper rounded-xl border border-ink/5 space-y-1">
-                      <span className="text-[9px] font-mono font-bold text-muted uppercase tracking-widest">Variable 1</span>
+                      <span className="text-[9px] font-mono font-bold text-muted uppercase tracking-normal">Variable 1</span>
                       <code className="block text-[10px] font-mono text-ink bg-ink/5 p-1.5 rounded">VITE_SUPABASE_URL</code>
                     </div>
                     <div className="p-3 bg-paper rounded-xl border border-ink/5 space-y-1">
-                      <span className="text-[9px] font-mono font-bold text-muted uppercase tracking-widest">Variable 2</span>
+                      <span className="text-[9px] font-mono font-bold text-muted uppercase tracking-normal">Variable 2</span>
                       <code className="block text-[10px] font-mono text-ink bg-ink/5 p-1.5 rounded">VITE_SUPABASE_ANON_KEY</code>
                     </div>
                   </div>
                   <button 
                     onClick={refreshDbConnection}
-                    className="w-full py-3 bg-ink text-paper rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-accent transition-all"
+                    className="w-full py-3 bg-ink text-paper rounded-xl text-[10px] font-bold uppercase tracking-normal hover:bg-accent transition-all"
                   >
                     {t('refresh_connection_status')}
                   </button>
@@ -1191,10 +1191,10 @@ export const Settings: React.FC = () => {
 
         {/* Action Bar */}
         <div className="sticky bottom-8 z-40">
-          <div className="p-6 bg-ink text-paper rounded-3xl flex flex-col md:flex-row items-center justify-between gap-6 shadow-2xl border border-paper/10">
+          <div className="p-6 bg-ink text-paper rounded-3xl flex flex-col md:flex-row items-center justify-between gap-6 shadow-md border border-paper/10">
             <div className="flex items-center gap-6">
               <div className="flex flex-col">
-                <span className="text-[9px] font-mono uppercase tracking-[0.3em] text-paper/40 mb-1">{t('status')}</span>
+                <span className="text-[9px] font-mono uppercase tracking-normal text-paper/40 mb-1">{t('status')}</span>
                 <div className="flex items-center gap-2">
                   <div className={`w-2 h-2 rounded-full ${isSaved ? 'bg-emerald-400 animate-pulse' : 'bg-accent'}`} />
                   <span className="text-xs font-bold">{isSaved ? t('settings_saved') : t('pending_changes')}</span>
@@ -1205,7 +1205,7 @@ export const Settings: React.FC = () => {
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   onClick={() => navigate('/modules')}
-                  className="flex items-center gap-2 text-accent text-[10px] font-bold uppercase tracking-widest hover:underline"
+                  className="flex items-center gap-2 text-accent text-[10px] font-bold uppercase tracking-normal hover:underline"
                 >
                   {t('continue_to_classrooms')} <ArrowRight className="w-3 h-3" />
                 </motion.button>
@@ -1215,13 +1215,13 @@ export const Settings: React.FC = () => {
             <div className="flex items-center gap-4">
               <button 
                 onClick={() => navigate('/dashboard')}
-                className="px-6 py-3 text-[10px] font-bold uppercase tracking-widest text-paper/40 hover:text-paper transition-colors"
+                className="px-6 py-3 text-[10px] font-bold uppercase tracking-normal text-paper/40 hover:text-paper transition-colors"
               >
                 {t('cancel')}
               </button>
               <button 
                 onClick={handleSave}
-                className={`px-10 py-4 rounded-full text-xs font-bold uppercase tracking-widest transition-all shadow-xl shadow-ink/20 flex items-center gap-3 ${
+                className={`px-10 py-4 rounded-full text-xs font-bold uppercase tracking-normal transition-all shadow-md shadow-ink/20 flex items-center gap-3 ${
                   isSaved ? 'bg-emerald-500 text-paper' : 'bg-paper text-ink hover:bg-accent hover:text-paper'
                 }`}
               >

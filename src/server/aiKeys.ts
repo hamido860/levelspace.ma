@@ -1,26 +1,49 @@
 import crypto from "node:crypto";
+import type { VercelRequest } from "@vercel/node";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { User } from "@supabase/supabase-js";
+import { AiCommandCenterHttpError, requireAuthenticatedUser } from "./api/aiCommandCenter";
 
-export const USER_AI_KEY_PROVIDERS = ["gemini", "nvidia", "openrouter", "openai"] as const;
+export const USER_AI_KEY_PROVIDERS = ["gemini", "openrouter", "openai"] as const;
 export type UserAiKeyProvider = (typeof USER_AI_KEY_PROVIDERS)[number];
 
 export type UserAiKeyMetadata = {
   provider: UserAiKeyProvider;
-  configured: boolean;
-  keyLast4: string | null;
-  isActive: boolean;
-  updatedAt: string | null;
-};
-
-type UserAiKeyRow = {
-  provider: UserAiKeyProvider;
-  encrypted_api_key: string;
-  key_last4: string | null;
-  is_active: boolean | null;
+  key_preview: string | null;
+  is_active: boolean;
+  last_test_status: string | null;
+  last_tested_at: string | null;
   updated_at: string | null;
 };
 
+type AiProviderKeyRow = {
+  provider: UserAiKeyProvider;
+  encrypted_api_key?: string | null;
+  key_preview: string | null;
+  is_active: boolean | null;
+  last_test_status: string | null;
+  last_tested_at: string | null;
+  updated_at: string | null;
+};
+
+export type AiKeyOwner = {
+  userId: string | null;
+  ownerRef: string;
+  authenticated: boolean;
+  devFallback: boolean;
+  user: User | null;
+};
+
 const ENCRYPTION_ERROR = "AI key encryption is not configured.";
+const AUTH_REQUIRED_ERROR = "Authentication required.";
+
+const isProductionLike = () => process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
+
+const getBearerToken = (req: VercelRequest) => {
+  const header = req.headers.authorization || req.headers.Authorization;
+  if (!header || typeof header !== "string") return null;
+  return header.match(/^Bearer\s+(.+)$/i)?.[1] || null;
+};
 
 export function normalizeUserAiProvider(value: unknown): UserAiKeyProvider | null {
   const provider = String(value || "").toLowerCase();
@@ -69,103 +92,141 @@ export function decryptApiKey(payload: string) {
   ]).toString("utf8");
 }
 
-export function keyLast4(rawKey: string) {
-  return rawKey.trim().slice(-4);
+export function keyPreview(rawKey: string) {
+  const cleaned = rawKey.trim();
+  const suffix = cleaned.slice(-4);
+  const prefix = cleaned.startsWith("sk-") ? "sk-" : cleaned.slice(0, Math.min(4, cleaned.length));
+  return `${prefix}...${suffix || "****"}`;
 }
 
-export function toSafeMetadata(row: Partial<UserAiKeyRow>): UserAiKeyMetadata {
+export function toSafeMetadata(row: Partial<AiProviderKeyRow>): UserAiKeyMetadata {
   return {
     provider: row.provider as UserAiKeyProvider,
-    configured: Boolean(row.encrypted_api_key),
-    keyLast4: row.key_last4 || null,
-    isActive: row.is_active !== false,
-    updatedAt: row.updated_at || null,
+    key_preview: row.key_preview || null,
+    is_active: row.is_active !== false,
+    last_test_status: row.last_test_status || null,
+    last_tested_at: row.last_tested_at || null,
+    updated_at: row.updated_at || null,
   };
 }
 
-export async function listUserAiKeyMetadata(supabase: SupabaseClient, userId: string) {
+export async function resolveAiKeyOwner(req: VercelRequest, options: { requireAuthInProduction?: boolean } = {}): Promise<AiKeyOwner> {
+  if (getBearerToken(req)) {
+    const user = await requireAuthenticatedUser(req);
+    return {
+      user,
+      userId: user.id,
+      ownerRef: `user:${user.id}`,
+      authenticated: true,
+      devFallback: false,
+    };
+  }
+
+  if (isProductionLike() && options.requireAuthInProduction !== false) {
+    throw new AiCommandCenterHttpError(401, AUTH_REQUIRED_ERROR);
+  }
+
+  // DEV ONLY - remove after auth is implemented
+  // DEV ONLY - remove after auth is implemented
+  // DEV ONLY - remove after auth is implemented
+  return {
+    user: null,
+    userId: null,
+    ownerRef: process.env.DEV_ADMIN_OWNER_REF || "dev-admin",
+    authenticated: false,
+    devFallback: true,
+  };
+}
+
+export async function listUserAiKeyMetadata(supabase: SupabaseClient, ownerRef: string) {
   const { data, error } = await supabase
-    .from("user_ai_keys")
-    .select("provider, key_last4, is_active, updated_at")
-    .eq("user_id", userId);
+    .from("ai_provider_keys")
+    .select("provider, key_preview, is_active, last_test_status, last_tested_at, updated_at")
+    .eq("owner_ref", ownerRef)
+    .in("provider", [...USER_AI_KEY_PROVIDERS]);
 
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(`Unable to load saved AI keys: ${error.message}`);
 
-  const byProvider = new Map(
-    (data || []).map((row: any) => [
-      row.provider,
-      toSafeMetadata({ ...row, encrypted_api_key: "configured" }),
-    ]),
-  );
-
-  return USER_AI_KEY_PROVIDERS.map((provider) =>
-    byProvider.get(provider) || {
-      provider,
-      configured: false,
-      keyLast4: null,
-      isActive: false,
-      updatedAt: null,
-    },
-  );
+  return (data || []).map((row: any) => toSafeMetadata(row));
 }
 
 export async function upsertUserAiKey(
   supabase: SupabaseClient,
-  userId: string,
+  owner: AiKeyOwner,
   provider: UserAiKeyProvider,
   rawKey: string,
-  label?: string | null,
 ) {
   const cleanedKey = rawKey.trim();
+  if (!cleanedKey) throw new Error("API key is required.");
+
   const { data, error } = await supabase
-    .from("user_ai_keys")
+    .from("ai_provider_keys")
     .upsert(
       {
-        user_id: userId,
+        user_id: owner.userId,
+        owner_ref: owner.ownerRef,
         provider,
         encrypted_api_key: encryptApiKey(cleanedKey),
-        key_last4: keyLast4(cleanedKey),
-        label: label || null,
+        key_preview: keyPreview(cleanedKey),
         is_active: true,
         updated_at: new Date().toISOString(),
       },
-      { onConflict: "user_id,provider" },
+      { onConflict: "owner_ref,provider" },
     )
-    .select("provider, key_last4, is_active, updated_at")
+    .select("provider, key_preview, is_active, last_test_status, last_tested_at, updated_at")
     .single();
 
   if (error || !data) throw new Error(error?.message || "Unable to save AI key.");
-  return toSafeMetadata({ ...(data as any), encrypted_api_key: "configured" });
+  return toSafeMetadata(data as any);
 }
 
 export async function deleteUserAiKey(
   supabase: SupabaseClient,
-  userId: string,
+  ownerRef: string,
   provider: UserAiKeyProvider,
 ) {
   const { error } = await supabase
-    .from("user_ai_keys")
+    .from("ai_provider_keys")
     .delete()
-    .eq("user_id", userId)
+    .eq("owner_ref", ownerRef)
     .eq("provider", provider);
 
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(`Unable to delete AI key: ${error.message}`);
 }
 
 export async function getDecryptedUserAiKey(
   supabase: SupabaseClient,
-  userId: string,
+  ownerRef: string,
   provider: UserAiKeyProvider,
 ) {
   const { data, error } = await supabase
-    .from("user_ai_keys")
+    .from("ai_provider_keys")
     .select("encrypted_api_key, is_active")
-    .eq("user_id", userId)
+    .eq("owner_ref", ownerRef)
     .eq("provider", provider)
     .eq("is_active", true)
     .maybeSingle();
 
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(`Unable to load saved AI key: ${error.message}`);
   if (!data?.encrypted_api_key) return null;
   return decryptApiKey(String(data.encrypted_api_key));
+}
+
+export async function updateUserAiKeyTestStatus(
+  supabase: SupabaseClient,
+  ownerRef: string,
+  provider: UserAiKeyProvider,
+  status: "passed" | "failed",
+) {
+  const { error } = await supabase
+    .from("ai_provider_keys")
+    .update({
+      last_test_status: status,
+      last_tested_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("owner_ref", ownerRef)
+    .eq("provider", provider);
+
+  if (error) throw new Error(`Unable to update AI key test status: ${error.message}`);
 }

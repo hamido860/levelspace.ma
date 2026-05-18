@@ -108,7 +108,7 @@ export const AITool: React.FC<AIToolProps> = ({ tool, state, onChange, lessonCon
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-accent">
           <Icon className="w-4 h-4" />
-          <h3 className="text-sm font-bold uppercase tracking-widest">{tool.label}</h3>
+          <h3 className="text-sm font-bold uppercase tracking-normal">{tool.label}</h3>
         </div>
         {response && (
           <button
@@ -154,7 +154,7 @@ export const AITool: React.FC<AIToolProps> = ({ tool, state, onChange, lessonCon
                 <div className="absolute inset-0 bg-accent/20 blur-xl rounded-full animate-pulse" />
                 <Brain className="w-12 h-12 text-accent relative z-10 animate-bounce" />
               </div>
-              <p className="text-xs font-bold uppercase tracking-widest animate-pulse">AI is thinking...</p>
+              <p className="text-xs font-bold uppercase tracking-normal animate-pulse">AI is thinking...</p>
             </div>
           ) : response ? (
             <div className="prose prose-sm dark:prose-invert max-w-none text-ink prose-headings:text-ink prose-strong:text-accent prose-code:text-accent prose-code:bg-accent/5 dark:prose-code:bg-accent/15 prose-code:px-1 prose-code:rounded">
@@ -165,14 +165,14 @@ export const AITool: React.FC<AIToolProps> = ({ tool, state, onChange, lessonCon
               <Icon className="w-12 h-12 text-muted" />
               <div className="space-y-1">
                 <p className="text-sm font-bold text-ink">Ready to assist</p>
-                <p className="text-[10px] text-muted uppercase tracking-widest">
+                <p className="text-[10px] text-muted uppercase tracking-normal">
                   {tool.id === 'notes-generator' ? "Click below to generate lesson summary" : "Enter your query above to begin"}
                 </p>
               </div>
               {tool.id === 'notes-generator' && (
                 <button
                   onClick={generateAIResponse}
-                  className="px-6 py-3 bg-accent text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-ink transition-all shadow-lg shadow-accent/20"
+                  className="px-6 py-3 bg-accent text-white rounded-xl text-xs font-bold uppercase tracking-normal hover:bg-ink transition-all shadow-sm shadow-accent/20"
                 >
                   Generate Summary
                 </button>

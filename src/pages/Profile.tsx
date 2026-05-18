@@ -71,7 +71,7 @@ export const Profile: React.FC = () => {
           <div className="absolute top-0 right-0 w-64 h-64 bg-accent/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
           
           <div className="relative flex flex-col md:flex-row items-center gap-8">
-            <div className="w-32 h-32 rounded-3xl bg-accent/10 flex items-center justify-center border-2 border-accent/20 overflow-hidden shadow-xl">
+            <div className="w-32 h-32 rounded-3xl bg-accent/10 flex items-center justify-center border-2 border-accent/20 overflow-hidden shadow-md">
               {profile?.avatar_url ? (
                 <img 
                   src={profile.avatar_url} 
@@ -89,11 +89,11 @@ export const Profile: React.FC = () => {
                 <h1 className="text-3xl font-serif font-medium text-ink">
                   {profile?.full_name || user?.email?.split('@')[0] || 'Scholar'}
                 </h1>
-                <span className="inline-flex px-3 py-1 bg-ink text-paper text-[10px] font-bold uppercase tracking-widest rounded-full self-center md:self-auto whitespace-nowrap">
+                <span className="inline-flex px-3 py-1 bg-ink text-paper text-[10px] font-bold uppercase tracking-normal rounded-full self-center md:self-auto whitespace-nowrap">
                   Academic Level: {selectedGrade}
                 </span>
                 {bacTrackName && (
-                  <span className="inline-flex px-3 py-1 bg-accent/10 text-accent border border-accent/20 text-[10px] font-bold uppercase tracking-widest rounded-full self-center md:self-auto whitespace-nowrap">
+                  <span className="inline-flex px-3 py-1 bg-accent/10 text-accent border border-accent/20 text-[10px] font-bold uppercase tracking-normal rounded-full self-center md:self-auto whitespace-nowrap">
                     Track: {bacTrackName}
                   </span>
                 )}
@@ -137,7 +137,7 @@ export const Profile: React.FC = () => {
                 {stat.icon}
               </div>
               <div className="space-y-1">
-                <p className="text-[10px] font-bold text-muted uppercase tracking-widest">{stat.label}</p>
+                <p className="text-[10px] font-bold text-muted uppercase tracking-normal">{stat.label}</p>
                 <p className="text-2xl font-bold text-ink">{stat.value}</p>
               </div>
             </motion.div>
@@ -152,7 +152,7 @@ export const Profile: React.FC = () => {
                 <h2 className="text-xl font-serif font-medium text-ink">Academic Context</h2>
                 <button 
                   onClick={() => navigate('/settings')}
-                  className="text-xs font-bold text-accent uppercase tracking-widest hover:underline flex items-center gap-1"
+                  className="text-xs font-bold text-accent uppercase tracking-normal hover:underline flex items-center gap-1"
                 >
                   Edit Profile <ChevronRight className="w-3 h-3" />
                 </button>
@@ -165,7 +165,7 @@ export const Profile: React.FC = () => {
                       <GraduationCap className="w-5 h-5" />
                     </div>
                     <div>
-                      <p className="text-[10px] font-bold text-muted uppercase tracking-widest">Grade Level</p>
+                      <p className="text-[10px] font-bold text-muted uppercase tracking-normal">Grade Level</p>
                       <p className="text-sm font-medium text-ink">{selectedGrade}</p>
                     </div>
                   </div>
@@ -176,7 +176,7 @@ export const Profile: React.FC = () => {
                         <BookOpen className="w-5 h-5" />
                       </div>
                       <div>
-                        <p className="text-[10px] font-bold text-muted uppercase tracking-widest">Track</p>
+                        <p className="text-[10px] font-bold text-muted uppercase tracking-normal">Track</p>
                         <p className="text-sm font-medium text-ink">{bacTrackName}</p>
                       </div>
                     </div>
@@ -187,7 +187,7 @@ export const Profile: React.FC = () => {
                       <Globe className="w-5 h-5" />
                     </div>
                     <div>
-                      <p className="text-[10px] font-bold text-muted uppercase tracking-widest">Region</p>
+                      <p className="text-[10px] font-bold text-muted uppercase tracking-normal">Region</p>
                       <p className="text-sm font-medium text-ink">{selectedCountry}</p>
                     </div>
                   </div>
@@ -199,7 +199,7 @@ export const Profile: React.FC = () => {
                       <Brain className="w-5 h-5" />
                     </div>
                     <div>
-                      <p className="text-[10px] font-bold text-muted uppercase tracking-widest">Primary Interest</p>
+                      <p className="text-[10px] font-bold text-muted uppercase tracking-normal">Primary Interest</p>
                       <p className="text-sm font-medium text-ink">Neuroscience</p>
                     </div>
                   </div>
@@ -209,7 +209,7 @@ export const Profile: React.FC = () => {
                       <Target className="w-5 h-5" />
                     </div>
                     <div>
-                      <p className="text-[10px] font-bold text-muted uppercase tracking-widest">Current Goal</p>
+                      <p className="text-[10px] font-bold text-muted uppercase tracking-normal">Current Goal</p>
                       <p className="text-sm font-medium text-ink">{selectedGoal}</p>
                     </div>
                   </div>
@@ -245,12 +245,12 @@ export const Profile: React.FC = () => {
 
           {/* Sidebar Info */}
           <div className="space-y-8">
-            <div className="p-8 bg-ink text-paper rounded-[2rem] shadow-xl space-y-6">
+            <div className="p-8 bg-ink text-paper rounded-[2rem] shadow-md space-y-6">
               <h3 className="text-lg font-serif font-medium">Pro Membership</h3>
               <p className="text-sm text-paper/60 leading-relaxed">
                 Unlock unlimited classrooms, advanced AI tutoring, and detailed progress mapping.
               </p>
-              <button className="w-full py-4 bg-accent text-white rounded-2xl text-xs font-bold uppercase tracking-widest hover:bg-accent/90 transition-colors">
+              <button className="w-full py-4 bg-accent text-white rounded-2xl text-xs font-bold uppercase tracking-normal hover:bg-accent/90 transition-colors">
                 Upgrade to Pro
               </button>
             </div>

@@ -8,19 +8,19 @@ const STATUS_META = {
 
 export const MonitoringRunPanel = ({ runs }) => {
   return (
-    <section className="rounded-[28px] border border-surface-mid bg-paper p-5">
+    <section className="ls-card-pad">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-ink-muted">Monitoring Runs</p>
-          <h3 className="mt-2 text-lg font-bold text-ink">Recent system scans</h3>
+          <p className="ls-micro-label">Monitoring Runs</p>
+          <h3 className="mt-2 ls-card-title">Recent system scans</h3>
         </div>
-        <span className="rounded-full bg-surface-low px-3 py-1 text-xs font-semibold text-ink-secondary">
+        <span className="ls-badge">
           {runs.length} run{runs.length === 1 ? "" : "s"}
         </span>
       </div>
 
       {runs.length === 0 ? (
-        <div className="rounded-3xl border border-dashed border-surface-mid p-5 text-sm text-ink-muted">
+        <div className="ls-empty-state p-5">
           No monitoring runs recorded yet.
         </div>
       ) : (
@@ -29,24 +29,24 @@ export const MonitoringRunPanel = ({ runs }) => {
             const meta = STATUS_META[run.status] || { icon: Activity, className: "text-slate-600 bg-slate-100" };
             const Icon = meta.icon;
             return (
-              <article key={run.id} className="rounded-[24px] border border-surface-mid bg-surface-low/70 p-4">
+              <article key={run.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-start gap-3">
                     <div className={`rounded-2xl p-2 ${meta.className}`}>
                       <Icon className="h-4 w-4" />
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-ink">{run.run_type}</p>
-                      <p className="mt-1 text-xs text-ink-muted">
+                      <p className="text-sm font-semibold text-slate-950">{run.run_type}</p>
+                      <p className="mt-1 text-xs text-slate-500">
                         {run.issues_detected} issue(s) detected • {run.grouped_issues} grouped
                       </p>
                     </div>
                   </div>
-                  <span className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
+                  <span className="ls-badge">
                     {run.status}
                   </span>
                 </div>
-                <div className="mt-3 text-[11px] text-ink-muted">
+                <div className="mt-3 text-[11px] text-slate-500">
                   Started {new Date(run.started_at).toLocaleString()}
                 </div>
               </article>

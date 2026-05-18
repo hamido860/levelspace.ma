@@ -8,29 +8,16 @@ import { searchContextForGeneration } from "./ragService";
 import { transformersService } from "./transformersService";
 import { mcpClient } from "./mcpClient";
 
-export const getCustomApiKey = () =>
-  localStorage.getItem("CUSTOM_GEMINI_API_KEY") || localStorage.getItem("AI_API_KEY") || "";
+export const getCustomApiKey = () => "";
 
 // Flexible provider keys — users configure these instead of provider-specific ones
-export const getAiApiKey = (provider = getAiProvider()) => {
-  const normalizedProvider = String(provider || "").toLowerCase();
-  const providerKey = normalizedProvider ? localStorage.getItem(`AI_API_KEY_${normalizedProvider.toUpperCase()}`) : "";
-  if (providerKey) return providerKey;
-  if (normalizedProvider === "gemini") {
-    const geminiKey = localStorage.getItem("CUSTOM_GEMINI_API_KEY");
-    if (geminiKey) return geminiKey;
-  }
-
-  return !normalizedProvider || localStorage.getItem("ai_provider") === normalizedProvider
-    ? localStorage.getItem("AI_API_KEY") || ""
-    : "";
-};
+export const getAiApiKey = (_provider = getAiProvider()) => "";
 
 export const getAiProvider = () =>
   localStorage.getItem("ai_provider") || "";
 
 export const getAiCredentialMode = () =>
-  localStorage.getItem("ai_credential_mode") || "platform";
+  localStorage.getItem("ai_credential_mode") || "byok";
 
 export const getAiModel = () =>
   localStorage.getItem("ai_model") || "";

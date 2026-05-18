@@ -150,7 +150,7 @@ export const StudyPlanner: React.FC = () => {
         </div>
         <button 
           onClick={() => { setAddModalTab('session'); setShowAddModal(true); }}
-          className="px-6 py-3 bg-ink text-paper rounded-2xl text-xs font-bold uppercase tracking-widest hover:bg-accent transition-all flex items-center gap-2 shadow-lg shadow-ink/10"
+          className="px-6 py-3 bg-ink text-paper rounded-2xl text-xs font-bold uppercase tracking-normal hover:bg-accent transition-all flex items-center gap-2 shadow-sm shadow-ink/10"
         >
           <Target size={16} /> Plan Study Session
         </button>
@@ -185,7 +185,7 @@ export const StudyPlanner: React.FC = () => {
                             <h3 className="text-xs font-bold text-ink truncate max-w-[120px]">{goal.title}</h3>
                             <div className="flex items-center gap-1.5">
                               <div className="w-1 h-1 rounded-full bg-accent/40" />
-                              <p className="text-[7px] font-mono uppercase tracking-widest text-muted">
+                              <p className="text-[7px] font-mono uppercase tracking-normal text-muted">
                                 T-MINUS {Math.ceil((new Date(goal.deadline).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} DAYS
                               </p>
                             </div>
@@ -238,10 +238,10 @@ export const StudyPlanner: React.FC = () => {
                   <motion.div 
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="py-12 text-center border-2 border-dashed border-ink/5 rounded-3xl space-y-3"
+                    className="py-12 text-center border-2 border-solid border-ink/5 rounded-3xl space-y-3"
                   >
                     <Target className="w-6 h-6 text-muted/20 mx-auto" />
-                    <p className="text-xs font-bold uppercase tracking-widest text-muted/40">No goals defined</p>
+                    <p className="text-xs font-bold uppercase tracking-normal text-muted/40">No goals defined</p>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -253,7 +253,7 @@ export const StudyPlanner: React.FC = () => {
             <div className="flex items-center justify-between relative z-10">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-accent animate-pulse" />
-                <span className="text-[10px] font-mono uppercase tracking-widest text-ink/40">System.Productivity_Index</span>
+                <span className="text-[10px] font-mono uppercase tracking-normal text-ink/40">System.Productivity_Index</span>
               </div>
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-1">
@@ -290,7 +290,7 @@ export const StudyPlanner: React.FC = () => {
                     />
                   ))}
                 </div>
-                <span className="text-[8px] font-mono text-ink/30 uppercase tracking-widest">Activity_Log.21d</span>
+                <span className="text-[8px] font-mono text-ink/30 uppercase tracking-normal">Activity_Log.21d</span>
               </div>
             </div>
             
@@ -298,7 +298,7 @@ export const StudyPlanner: React.FC = () => {
               <div className="space-y-2 p-3 bg-paper/30 rounded-xl border border-ink/5">
                 <div className="flex items-center gap-1.5">
                   <Clock className="w-3 h-3 text-ink/30" />
-                  <span className="text-[9px] font-mono uppercase tracking-widest text-ink/40">Active_Time</span>
+                  <span className="text-[9px] font-mono uppercase tracking-normal text-ink/40">Active_Time</span>
                 </div>
                 <div className="flex items-baseline gap-1">
                   <span className="text-2xl font-bold text-ink">12.4</span>
@@ -308,7 +308,7 @@ export const StudyPlanner: React.FC = () => {
               <div className="space-y-2 p-3 bg-paper/30 rounded-xl border border-ink/5">
                 <div className="flex items-center gap-1.5">
                   <Zap className="w-3 h-3 text-ink/30" />
-                  <span className="text-[9px] font-mono uppercase tracking-widest text-ink/40">Cycles_Done</span>
+                  <span className="text-[9px] font-mono uppercase tracking-normal text-ink/40">Cycles_Done</span>
                 </div>
                 <div className="flex items-baseline gap-1">
                   <span className="text-2xl font-bold text-ink">{sessions.filter(s => s.completed).length}</span>
@@ -323,7 +323,7 @@ export const StudyPlanner: React.FC = () => {
                   <div key={i} className={`h-1 w-1 rounded-full ${i < 8 ? 'bg-accent/40' : 'bg-ink/5'}`} />
                 ))}
               </div>
-              <span className="text-[8px] font-mono text-ink/20 uppercase tracking-widest">System_Load: Nominal</span>
+              <span className="text-[8px] font-mono text-ink/20 uppercase tracking-normal">System_Load: Nominal</span>
             </div>
 
             {/* Subtle Grid Pattern Overlay */}
@@ -415,13 +415,13 @@ export const StudyPlanner: React.FC = () => {
             </AnimatePresence>
 
             {sessions.length === 0 && (
-              <div className="py-20 text-center border-2 border-dashed border-ink/5 rounded-3xl space-y-4">
+              <div className="py-20 text-center border-2 border-solid border-ink/5 rounded-3xl space-y-4">
                 <div className="w-12 h-12 bg-background rounded-full flex items-center justify-center mx-auto">
                   <Calendar className="w-5 h-5 text-muted/20" />
                 </div>
                 <div className="space-y-1">
                   <h3 className="text-lg font-bold text-muted/40 tracking-tight">No sessions scheduled</h3>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted/30">Schedule your first study session</p>
+                  <p className="text-[10px] font-bold uppercase tracking-normal text-muted/30">Schedule your first study session</p>
                 </div>
               </div>
             )}
@@ -455,7 +455,7 @@ export const StudyPlanner: React.FC = () => {
           <div className="flex items-center gap-2 p-1 bg-surface-low rounded-2xl border border-ink/5">
             <button 
               onClick={() => setAddModalTab('session')}
-              className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-widest rounded-xl transition-all ${
+              className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-normal rounded-xl transition-all ${
                 addModalTab === 'session' 
                   ? 'bg-paper text-accent shadow-sm' 
                   : 'text-muted hover:text-ink'
@@ -465,7 +465,7 @@ export const StudyPlanner: React.FC = () => {
             </button>
             <button 
               onClick={() => setAddModalTab('goal')}
-              className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-widest rounded-xl transition-all ${
+              className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-normal rounded-xl transition-all ${
                 addModalTab === 'goal' 
                   ? 'bg-paper text-accent shadow-sm' 
                   : 'text-muted hover:text-ink'
@@ -478,7 +478,7 @@ export const StudyPlanner: React.FC = () => {
           {addModalTab === 'session' ? (
             <form onSubmit={addSession} className="space-y-6">
               <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-muted ml-1">Subject or Topic</label>
+                <label className="text-[10px] font-bold uppercase tracking-normal text-muted ml-1">Subject or Topic</label>
                 <input 
                   type="text" 
                   required
@@ -491,7 +491,7 @@ export const StudyPlanner: React.FC = () => {
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted ml-1">Date</label>
+                  <label className="text-[10px] font-bold uppercase tracking-normal text-muted ml-1">Date</label>
                   <input 
                     type="date" 
                     required
@@ -502,7 +502,7 @@ export const StudyPlanner: React.FC = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted ml-1">Start Time</label>
+                  <label className="text-[10px] font-bold uppercase tracking-normal text-muted ml-1">Start Time</label>
                   <input 
                     type="time" 
                     required
@@ -514,7 +514,7 @@ export const StudyPlanner: React.FC = () => {
               </div>
 
               <div className="space-y-3">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-muted ml-1">Duration (Minutes)</label>
+                <label className="text-[10px] font-bold uppercase tracking-normal text-muted ml-1">Duration (Minutes)</label>
                 <div className="grid grid-cols-4 gap-3">
                   {[30, 60, 90, 120].map(dur => (
                     <button
@@ -523,7 +523,7 @@ export const StudyPlanner: React.FC = () => {
                       onClick={() => setNewSession({...newSession, duration: dur})}
                       className={`py-4 rounded-2xl text-xs font-mono font-bold transition-all border-2 ${
                         newSession.duration === dur 
-                          ? 'bg-accent border-accent text-paper shadow-lg shadow-accent/20' 
+                          ? 'bg-accent border-accent text-paper shadow-sm shadow-accent/20' 
                           : 'bg-surface-low border-transparent text-muted hover:border-ink/5 hover:text-ink'
                       }`}
                     >
@@ -537,13 +537,13 @@ export const StudyPlanner: React.FC = () => {
                 <button 
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-6 py-3 text-[10px] font-bold uppercase tracking-widest text-muted hover:text-ink transition-colors"
+                  className="px-6 py-3 text-[10px] font-bold uppercase tracking-normal text-muted hover:text-ink transition-colors"
                 >
                   Cancel
                 </button>
                 <button 
                   type="submit"
-                  className="px-8 py-4 bg-ink text-paper rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-accent transition-all flex items-center gap-2 shadow-xl shadow-ink/10"
+                  className="px-8 py-4 bg-ink text-paper rounded-2xl text-[10px] font-bold uppercase tracking-normal hover:bg-accent transition-all flex items-center gap-2 shadow-md shadow-ink/10"
                 >
                   <Zap size={14} />
                   Save Session
@@ -553,7 +553,7 @@ export const StudyPlanner: React.FC = () => {
           ) : (
             <form onSubmit={addGoal} className="space-y-6">
               <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-muted ml-1">Goal Title</label>
+                <label className="text-[10px] font-bold uppercase tracking-normal text-muted ml-1">Goal Title</label>
                 <input 
                   type="text" 
                   required
@@ -565,7 +565,7 @@ export const StudyPlanner: React.FC = () => {
               </div>
               
               <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-muted ml-1">Deadline</label>
+                <label className="text-[10px] font-bold uppercase tracking-normal text-muted ml-1">Deadline</label>
                 <input 
                   type="date" 
                   required
@@ -579,13 +579,13 @@ export const StudyPlanner: React.FC = () => {
                 <button 
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-6 py-3 text-[10px] font-bold uppercase tracking-widest text-muted hover:text-ink transition-colors"
+                  className="px-6 py-3 text-[10px] font-bold uppercase tracking-normal text-muted hover:text-ink transition-colors"
                 >
                   Cancel
                 </button>
                 <button 
                   type="submit"
-                  className="px-8 py-4 bg-ink text-paper rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-accent transition-all flex items-center gap-2 shadow-xl shadow-ink/10"
+                  className="px-8 py-4 bg-ink text-paper rounded-2xl text-[10px] font-bold uppercase tracking-normal hover:bg-accent transition-all flex items-center gap-2 shadow-md shadow-ink/10"
                 >
                   <Target size={14} />
                   Save Goal

@@ -62,7 +62,7 @@ const CharacterMap: React.FC = () => {
       </div>
       <button 
         onClick={addCharacter}
-        className="w-full py-3 bg-ink text-paper rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-accent transition-all"
+        className="w-full py-3 bg-ink text-paper rounded-xl text-[10px] font-bold uppercase tracking-normal hover:bg-accent transition-all"
       >
         Add Character
       </button>
@@ -75,7 +75,7 @@ const CharacterMap: React.FC = () => {
             className="p-3 bg-background rounded-xl border border-ink/5 flex justify-between items-center"
           >
             <span className="text-xs font-bold text-ink">{c.name}</span>
-            <span className="text-[10px] text-muted uppercase tracking-widest">{c.role}</span>
+            <span className="text-[10px] text-muted uppercase tracking-normal">{c.role}</span>
           </motion.div>
         ))}
       </div>
@@ -121,7 +121,7 @@ const LitDevices: React.FC = () => {
         />
         <button 
           onClick={addDevice}
-          className="w-full py-3 bg-ink text-paper rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-accent transition-all"
+          className="w-full py-3 bg-ink text-paper rounded-xl text-[10px] font-bold uppercase tracking-normal hover:bg-accent transition-all"
         >
           Add Device
         </button>
@@ -134,7 +134,7 @@ const LitDevices: React.FC = () => {
             animate={{ opacity: 1, x: 0 }}
             className="p-4 bg-background rounded-2xl border border-ink/5 border-l-4 border-l-accent"
           >
-            <span className="text-[10px] font-bold text-accent uppercase tracking-widest block mb-1">{d.type}</span>
+            <span className="text-[10px] font-bold text-accent uppercase tracking-normal block mb-1">{d.type}</span>
             <p className="text-xs text-ink leading-relaxed">{d.example}</p>
           </motion.div>
         ))}
@@ -175,7 +175,7 @@ const ThemeTracker: React.FC = () => {
         />
         <button 
           onClick={addTheme}
-          className="w-full py-3 bg-ink text-paper rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-accent transition-all"
+          className="w-full py-3 bg-ink text-paper rounded-xl text-[10px] font-bold uppercase tracking-normal hover:bg-accent transition-all"
         >
           Track Theme
         </button>
@@ -233,7 +233,7 @@ const TimelineTool: React.FC = () => {
       </div>
       <button 
         onClick={addEvent}
-        className="w-full py-3 bg-ink text-paper rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-accent transition-all"
+        className="w-full py-3 bg-ink text-paper rounded-xl text-[10px] font-bold uppercase tracking-normal hover:bg-accent transition-all"
       >
         Add Event
       </button>
@@ -261,18 +261,18 @@ const LabReport: React.FC = () => {
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        <label className="text-[10px] font-bold text-muted uppercase tracking-widest">Hypothesis</label>
+        <label className="text-[10px] font-bold text-muted uppercase tracking-normal">Hypothesis</label>
         <textarea className="w-full p-3 bg-background border border-ink/5 rounded-xl text-xs focus:outline-none focus:border-accent/30 resize-none" rows={2} placeholder="What do you expect to happen?" />
       </div>
       <div className="space-y-2">
-        <label className="text-[10px] font-bold text-muted uppercase tracking-widest">Method</label>
+        <label className="text-[10px] font-bold text-muted uppercase tracking-normal">Method</label>
         <textarea className="w-full p-3 bg-background border border-ink/5 rounded-xl text-xs focus:outline-none focus:border-accent/30 resize-none" rows={3} placeholder="Steps taken during the experiment..." />
       </div>
       <div className="space-y-2">
-        <label className="text-[10px] font-bold text-muted uppercase tracking-widest">Results</label>
+        <label className="text-[10px] font-bold text-muted uppercase tracking-normal">Results</label>
         <textarea className="w-full p-3 bg-background border border-ink/5 rounded-xl text-xs focus:outline-none focus:border-accent/30 resize-none" rows={2} placeholder="What were the outcomes?" />
       </div>
-      <button className="w-full py-3 bg-ink text-paper rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-accent transition-all">
+      <button className="w-full py-3 bg-ink text-paper rounded-xl text-[10px] font-bold uppercase tracking-normal hover:bg-accent transition-all">
         Save Lab Report
       </button>
     </div>
@@ -355,7 +355,7 @@ const CauseEffect: React.FC<{ lessonId: string }> = ({ lessonId }) => {
         </div>
         <button 
           onClick={addPair}
-          className="w-full py-3 bg-ink text-paper rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-accent transition-all"
+          className="w-full py-3 bg-ink text-paper rounded-xl text-[10px] font-bold uppercase tracking-normal hover:bg-accent transition-all"
         >
           Add Relationship
         </button>
@@ -380,12 +380,12 @@ const CauseEffect: React.FC<{ lessonId: string }> = ({ lessonId }) => {
                 <X size={12} />
               </button>
               <div className="space-y-1">
-                <span className="text-[9px] font-bold text-muted uppercase tracking-widest">Cause</span>
+                <span className="text-[9px] font-bold text-muted uppercase tracking-normal">Cause</span>
                 <p className="text-xs text-ink font-medium">{p.cause}</p>
               </div>
               <div className="h-px bg-ink/5" />
               <div className="space-y-1">
-                <span className="text-[9px] font-bold text-accent uppercase tracking-widest">Effect</span>
+                <span className="text-[9px] font-bold text-accent uppercase tracking-normal">Effect</span>
                 <p className="text-xs text-ink">{p.effect}</p>
               </div>
             </div>
@@ -472,7 +472,7 @@ const Flashcards: React.FC<{ lessonId: string }> = ({ lessonId }) => {
         </motion.div>
       </div>
       <div className="flex justify-between items-center px-2">
-        <span className="text-[10px] font-bold text-muted uppercase tracking-widest">Card {currentIndex + 1} of {cards.length}</span>
+        <span className="text-[10px] font-bold text-muted uppercase tracking-normal">Card {currentIndex + 1} of {cards.length}</span>
         <button 
           onClick={(e) => { e.stopPropagation(); nextCard(); }}
           className="flex items-center gap-2 text-xs font-bold text-accent hover:text-ink transition-colors"
@@ -537,7 +537,7 @@ export const PedagogicalTools: React.FC<ToolProps> = ({ category, lessonId }) =>
       case 'flashcards': return <Flashcards lessonId={lessonId} />;
       default:
         return (
-          <div className="p-12 bg-background/50 border border-dashed border-ink/10 rounded-2xl flex flex-col items-center justify-center text-center space-y-4">
+          <div className="p-12 bg-background/50 border border-solid border-ink/10 rounded-2xl flex flex-col items-center justify-center text-center space-y-4">
             <div className="w-16 h-16 rounded-full bg-paper flex items-center justify-center shadow-sm text-accent/40">
               {activeTools.find(t => t.id === activeTool)?.icon}
             </div>
@@ -549,7 +549,7 @@ export const PedagogicalTools: React.FC<ToolProps> = ({ category, lessonId }) =>
             </div>
             <button 
               onClick={() => setActiveTool(null)}
-              className="px-6 py-2 bg-ink text-paper rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-accent transition-all"
+              className="px-6 py-2 bg-ink text-paper rounded-xl text-[10px] font-bold uppercase tracking-normal hover:bg-accent transition-all"
             >
               Got it
             </button>
@@ -562,7 +562,7 @@ export const PedagogicalTools: React.FC<ToolProps> = ({ category, lessonId }) =>
     <div className="flex flex-col items-center space-y-6 w-full py-4">
       <div className="flex flex-col items-center gap-1 mb-4">
         <div className="w-1 h-8 bg-accent/20 rounded-full mb-2" />
-        <span className="text-[8px] font-black text-muted uppercase tracking-[0.3em] vertical-text rotate-180">Tools</span>
+        <span className="text-[8px] font-black text-muted uppercase tracking-normal vertical-text rotate-180">Tools</span>
       </div>
 
       <div className="flex flex-col gap-4">
@@ -587,7 +587,7 @@ export const PedagogicalTools: React.FC<ToolProps> = ({ category, lessonId }) =>
                   initial={{ opacity: 0, x: 20, scale: 0.95 }}
                   animate={{ opacity: 1, x: 0, scale: 1 }}
                   exit={{ opacity: 0, x: 20, scale: 0.95 }}
-                  className="absolute top-0 right-full mr-4 w-64 p-6 bg-ink/95 backdrop-blur-xl text-paper rounded-[32px] shadow-2xl z-50 border border-white/10"
+                  className="absolute top-0 right-full mr-4 w-64 p-6 bg-ink/95  text-paper rounded-[32px] shadow-md z-50 border border-white/10"
                 >
                   <div className="space-y-4">
                     <div className="flex items-center gap-3 text-accent">
@@ -637,7 +637,7 @@ export const PedagogicalTools: React.FC<ToolProps> = ({ category, lessonId }) =>
                 initial={{ opacity: 0, x: 20, scale: 0.95 }}
                 animate={{ opacity: 1, x: 0, scale: 1 }}
                 exit={{ opacity: 0, x: 20, scale: 0.95 }}
-                className="absolute bottom-0 right-full mr-4 w-64 p-6 bg-accent text-white rounded-[32px] shadow-2xl z-50 overflow-hidden"
+                className="absolute bottom-0 right-full mr-4 w-64 p-6 bg-accent text-white rounded-[32px] shadow-md z-50 overflow-hidden"
               >
                 <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_100%_0%,rgba(255,255,255,0.2),transparent)]" />
                 <div className="relative space-y-3">
@@ -666,7 +666,7 @@ export const PedagogicalTools: React.FC<ToolProps> = ({ category, lessonId }) =>
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={() => setActiveTool(null)}
-                className="absolute inset-0 bg-ink/60 backdrop-blur-md"
+                className="absolute inset-0 bg-ink/60 "
               />
               
               {/* Atmospheric Background Glow */}
@@ -679,7 +679,7 @@ export const PedagogicalTools: React.FC<ToolProps> = ({ category, lessonId }) =>
                 initial={{ opacity: 0, scale: 0.9, y: 40 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.9, y: 40 }}
-                className="relative w-full max-w-2xl bg-paper rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+                className="relative w-full max-w-2xl bg-paper rounded-3xl shadow-md overflow-hidden flex flex-col max-h-[90vh]"
               >
                 {/* Modal Header */}
                 <div className="p-8 pb-4 flex justify-between items-start border-b border-ink/5">
@@ -720,11 +720,11 @@ export const PedagogicalTools: React.FC<ToolProps> = ({ category, lessonId }) =>
                 <div className="p-8 pt-4 bg-surface-low border-t border-ink/5 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-success" />
-                    <span className="text-[10px] font-bold text-muted uppercase tracking-widest">Auto-saving active</span>
+                    <span className="text-[10px] font-bold text-muted uppercase tracking-normal">Auto-saving active</span>
                   </div>
                   <button 
                     onClick={() => setActiveTool(null)}
-                    className="px-8 py-3 bg-ink text-paper rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-accent transition-all shadow-xl shadow-ink/10"
+                    className="px-8 py-3 bg-ink text-paper rounded-2xl text-[10px] font-bold uppercase tracking-normal hover:bg-accent transition-all shadow-md shadow-ink/10"
                   >
                     Close Workspace
                   </button>

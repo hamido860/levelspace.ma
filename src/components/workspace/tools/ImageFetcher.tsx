@@ -73,7 +73,7 @@ export const ImageFetcher: React.FC<ImageFetcherProps> = ({ state, onChange, les
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-accent">
           <ImageIcon className="w-4 h-4" />
-          <h3 className="text-sm font-bold uppercase tracking-widest">Educational Diagrams</h3>
+          <h3 className="text-sm font-bold uppercase tracking-normal">Educational Diagrams</h3>
         </div>
       </div>
 
@@ -89,7 +89,7 @@ export const ImageFetcher: React.FC<ImageFetcherProps> = ({ state, onChange, les
         <button
           type="submit"
           disabled={isLoading || !query.trim()}
-          className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-accent text-white rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-ink transition-all disabled:opacity-50"
+          className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-accent text-white rounded-lg text-[10px] font-bold uppercase tracking-normal hover:bg-ink transition-all disabled:opacity-50"
         >
           {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Search'}
         </button>
@@ -111,7 +111,7 @@ export const ImageFetcher: React.FC<ImageFetcherProps> = ({ state, onChange, les
             <ImageIcon className="w-12 h-12 text-muted" />
             <div className="space-y-1">
               <p className="text-sm font-bold text-ink">No images found</p>
-              <p className="text-[10px] text-muted uppercase tracking-widest">Try another search term</p>
+              <p className="text-[10px] text-muted uppercase tracking-normal">Try another search term</p>
             </div>
           </div>
         ) : (
@@ -133,12 +133,12 @@ export const ImageFetcher: React.FC<ImageFetcherProps> = ({ state, onChange, les
                     referrerPolicy="no-referrer"
                   />
                   <div className="absolute inset-0 bg-ink/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
-                    <div className="w-8 h-8 bg-paper rounded-full flex items-center justify-center text-ink shadow-lg">
+                    <div className="w-8 h-8 bg-paper rounded-full flex items-center justify-center text-ink shadow-sm">
                       <Maximize2 size={16} />
                     </div>
                   </div>
                   <div className="absolute bottom-0 inset-x-0 p-2 bg-gradient-to-t from-ink/80 to-transparent">
-                    <p className="text-[9px] font-bold text-paper truncate uppercase tracking-widest">{img.title}</p>
+                    <p className="text-[9px] font-bold text-paper truncate uppercase tracking-normal">{img.title}</p>
                   </div>
                 </motion.div>
               ))}
@@ -166,7 +166,7 @@ export const ImageFetcher: React.FC<ImageFetcherProps> = ({ state, onChange, les
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[10000] flex items-center justify-center p-8 bg-ink/90 backdrop-blur-md"
+            className="fixed inset-0 z-[10000] flex items-center justify-center p-8 bg-ink/90 "
             onClick={() => setSelectedImage(null)}
           >
             <button className="absolute top-8 right-8 text-paper hover:text-accent transition-colors">
@@ -177,7 +177,7 @@ export const ImageFetcher: React.FC<ImageFetcherProps> = ({ state, onChange, les
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 src={selectedImage.url}
-                className="max-w-full max-h-[80vh] rounded-2xl shadow-2xl border border-white/10 object-contain"
+                className="max-w-full max-h-[80vh] rounded-2xl shadow-md border border-white/10 object-contain"
                 referrerPolicy="no-referrer"
                 />
                 <div className="mt-4 flex flex-col items-center text-white">

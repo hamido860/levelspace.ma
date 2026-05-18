@@ -39,7 +39,7 @@ export const Topbar: React.FC<{ isCollapsed?: boolean; gradeOverride?: string }>
 
   return (
     <header
-      className={`h-16 border-b border-ink/5 bg-surface-low/80 backdrop-blur-md fixed top-0 z-30 px-4 md:px-6 flex items-center justify-between gap-4 transition-all duration-300 ${
+      className={`h-16 border-b border-ink/5 bg-surface-low/80  fixed top-0 z-30 px-4 md:px-6 flex items-center justify-between gap-4 transition-all duration-300 ${
         isCollapsed
           ? 'left-0 w-full md:left-[64.9984px] md:w-[calc(100%-64.9984px)]'
           : 'left-0 w-full md:left-[176px] md:w-[calc(100%-176px)]'
@@ -84,11 +84,11 @@ export const Topbar: React.FC<{ isCollapsed?: boolean; gradeOverride?: string }>
             </span>
           </div>
           <div className="flex items-center gap-1.5 mt-0.5">
-            <span className="text-[9px] font-bold text-muted/60 uppercase tracking-widest whitespace-nowrap">
+            <span className="text-[9px] font-bold text-muted/60 uppercase tracking-normal whitespace-nowrap">
               {currentGrade}
             </span>
             <div className="w-0.5 h-0.5 rounded-full bg-muted/20" />
-            <span className="text-[9px] font-bold text-accent uppercase tracking-widest whitespace-nowrap">
+            <span className="text-[9px] font-bold text-accent uppercase tracking-normal whitespace-nowrap">
               {t('active_session')}
             </span>
           </div>
@@ -151,7 +151,7 @@ export const Topbar: React.FC<{ isCollapsed?: boolean; gradeOverride?: string }>
             className="text-muted hover:text-accent hover:bg-surface-mid transition-all px-2.5 py-2 rounded-full flex items-center gap-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
           >
             <Globe size={18} />
-            <span className="text-[10px] font-black uppercase tracking-widest">
+            <span className="text-[10px] font-black uppercase tracking-normal">
               {currentLanguageMeta.short}
             </span>
           </button>

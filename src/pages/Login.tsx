@@ -97,17 +97,17 @@ export const Login: React.FC = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="w-full max-w-md bg-paper rounded-[2rem] shadow-2xl shadow-ink/5 border border-ink/5 overflow-hidden lg:scale-[0.70] lg:origin-center"
+          className="w-full max-w-md bg-paper rounded-[2rem] shadow-md shadow-ink/5 border border-ink/5 overflow-hidden lg:scale-[0.70] lg:origin-center"
         >
           {/* Top Branding Bar */}
           <div className="bg-accent p-6 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-paper/20 backdrop-blur-md rounded-lg flex items-center justify-center border border-paper/30">
+              <div className="w-8 h-8 bg-paper/20  rounded-lg flex items-center justify-center border border-paper/30">
                 <BookOpen className="text-paper w-5 h-5" />
               </div>
               <span className="text-paper font-display font-bold tracking-tight">LevelSpace</span>
             </div>
-            <div className="text-[10px] font-mono font-bold text-paper/60 uppercase tracking-widest">
+            <div className="text-[10px] font-mono font-bold text-paper/60 uppercase tracking-normal">
               MMXXIV
             </div>
           </div>
@@ -132,7 +132,7 @@ export const Login: React.FC = () => {
             <form className="space-y-6" onSubmit={handleAuth}>
               <div className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-mono font-bold text-muted uppercase tracking-widest px-1 flex items-center gap-2">
+                  <label className="text-[10px] font-mono font-bold text-muted uppercase tracking-normal px-1 flex items-center gap-2">
                     <Mail className="w-3 h-3" />
                     Email Address
                   </label>
@@ -147,7 +147,7 @@ export const Login: React.FC = () => {
                 </div>
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between px-1">
-                    <label className="text-[10px] font-mono font-bold text-muted uppercase tracking-widest flex items-center gap-2">
+                    <label className="text-[10px] font-mono font-bold text-muted uppercase tracking-normal flex items-center gap-2">
                       <Lock className="w-3 h-3" />
                       Password
                     </label>
@@ -166,7 +166,7 @@ export const Login: React.FC = () => {
               <button 
                 type="submit"
                 disabled={loading}
-                className="group w-full h-12 bg-ink text-paper rounded-full font-medium text-base shadow-lg shadow-ink/10 hover:bg-accent active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                className="group w-full h-12 bg-ink text-paper rounded-full font-medium text-base shadow-sm shadow-ink/10 hover:bg-accent active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
               >
                 {loading ? 'Processing...' : mode === 'login' ? 'Sign In' : 'Sign Up'}
                 {!loading && <LogIn className="w-4 h-4 group-hover:translate-x-1 transition-transform" />}
@@ -190,7 +190,7 @@ export const Login: React.FC = () => {
                 type="button"
                 disabled={loading}
                 onClick={handleDemoAdminLogin}
-                className="w-full h-11 bg-accent text-paper rounded-full flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-widest hover:bg-accent-hover transition-all disabled:opacity-50"
+                className="w-full h-11 bg-accent text-paper rounded-full flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-normal hover:bg-accent-hover transition-all disabled:opacity-50"
               >
                 Enter Admin Demo
                 <ArrowRight className="w-4 h-4" />
@@ -212,14 +212,14 @@ export const Login: React.FC = () => {
                 className="h-11 bg-background border border-ink/5 rounded-full flex items-center justify-center gap-2 hover:bg-ink/5 transition-all group"
               >
                 <img src="https://www.google.com/favicon.ico" alt="Google" className="w-3.5 h-3.5 grayscale group-hover:grayscale-0 transition-all" />
-                <span className="text-[10px] font-bold text-ink uppercase tracking-widest">Google</span>
+                <span className="text-[10px] font-bold text-ink uppercase tracking-normal">Google</span>
               </button>
               <button 
                 onClick={() => handleSocialLogin('facebook')}
                 className="h-11 bg-background border border-ink/5 rounded-full flex items-center justify-center gap-2 hover:bg-ink/5 transition-all group"
               >
                 <Facebook className="w-3.5 h-3.5 text-[#1877F2]" />
-                <span className="text-[10px] font-bold text-ink uppercase tracking-widest">Facebook</span>
+                <span className="text-[10px] font-bold text-ink uppercase tracking-normal">Facebook</span>
               </button>
             </div>
 
@@ -227,7 +227,7 @@ export const Login: React.FC = () => {
               {mode === 'login' ? "Don't have an account?" : "Already have an account?"} 
               <button 
                 onClick={() => setMode(mode === 'login' ? 'signup' : 'login')} 
-                className="font-bold text-accent hover:underline flex items-center gap-1 mx-auto mt-1 uppercase tracking-widest text-[9px]"
+                className="font-bold text-accent hover:underline flex items-center gap-1 mx-auto mt-1 uppercase tracking-normal text-[9px]"
               >
                 {mode === 'login' ? 'Sign up for free' : 'Sign in instead'}
                 <ArrowRight className="w-3 h-3" />

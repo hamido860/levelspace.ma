@@ -45,8 +45,8 @@ CREATE POLICY "Allow authenticated delete" ON public.bac_track_subjects FOR DELE
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-ink/60 backdrop-blur-md">
-      <div className="bg-paper w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden flex flex-col border border-surface-mid">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-ink/60 ">
+      <div className="bg-paper w-full max-w-3xl rounded-3xl shadow-md overflow-hidden flex flex-col border border-surface-mid">
         <div className="px-6 py-4 border-b border-surface-mid flex items-center justify-between bg-surface-low/50">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-xl bg-accent/10 flex items-center justify-center text-accent">
@@ -67,7 +67,7 @@ CREATE POLICY "Allow authenticated delete" ON public.bac_track_subjects FOR DELE
         
         <div className="p-6 space-y-6 overflow-y-auto max-h-[70vh] custom-scrollbar">
           <div className="p-4 bg-accent/5 border border-accent/20 rounded-xl space-y-2">
-            <h4 className="text-xs font-bold text-accent uppercase tracking-widest">The Problem</h4>
+            <h4 className="text-xs font-bold text-accent uppercase tracking-normal">The Problem</h4>
             <p className="text-sm text-ink-secondary leading-relaxed">
               Currently, subjects are mapped to <strong>Grades</strong> (e.g., "2ème année Bac") but not to specific <strong>Tracks</strong> (e.g., "Littéraire"). This causes all subjects for a grade to appear in the dropdown, regardless of the selected track, leading to mismatches (like Math appearing for Littéraire).
             </p>
@@ -75,10 +75,10 @@ CREATE POLICY "Allow authenticated delete" ON public.bac_track_subjects FOR DELE
 
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h4 className="text-xs font-bold text-ink uppercase tracking-widest">The Solution (SQL Migration)</h4>
+              <h4 className="text-xs font-bold text-ink uppercase tracking-normal">The Solution (SQL Migration)</h4>
               <button
                 onClick={handleCopy}
-                className="flex items-center gap-2 px-3 py-1.5 bg-surface-mid hover:bg-surface-high text-ink-secondary rounded-lg text-[10px] font-bold uppercase tracking-widest transition-colors"
+                className="flex items-center gap-2 px-3 py-1.5 bg-surface-mid hover:bg-surface-high text-ink-secondary rounded-lg text-[10px] font-bold uppercase tracking-normal transition-colors"
               >
                 {copied ? <CheckCircle2 size={12} className="text-success" /> : <Copy size={12} />}
                 {copied ? "Copied!" : "Copy SQL"}
@@ -99,7 +99,7 @@ CREATE POLICY "Allow authenticated delete" ON public.bac_track_subjects FOR DELE
         <div className="px-6 py-4 border-t border-surface-mid bg-surface-low/50 flex justify-end">
           <button
             onClick={onClose}
-            className="px-6 py-2 bg-ink text-paper rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-ink/90 transition-all shadow-lg active:scale-95"
+            className="px-6 py-2 bg-ink text-paper rounded-xl font-bold text-[10px] uppercase tracking-normal hover:bg-ink/90 transition-all shadow-sm active:scale-95"
           >
             Close
           </button>

@@ -85,12 +85,12 @@ export const ConnectionStatusModal: React.FC<ConnectionStatusModalProps> = ({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-ink/40 backdrop-blur-sm">
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-ink/40 ">
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="bg-paper w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border border-ink/5"
+          className="bg-paper w-full max-w-md rounded-3xl shadow-md overflow-hidden border border-ink/5"
         >
           <div className="p-6 border-b border-ink/5 flex items-center justify-between bg-surface-low">
             <div className="flex items-center gap-3">

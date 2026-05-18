@@ -101,7 +101,7 @@ export default function PrivacyPolicy() {
         url={`${window.location.origin}/privacy-policy?lang=${activeLanguage}`}
       />
 
-      <header className="border-b border-[#151515]/10 bg-[#fdfbf5]/80 backdrop-blur">
+      <header className="border-b border-[#151515]/10 bg-[#fdfbf5]/80 ">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-4">
           <Link to="/" className="text-sm font-bold uppercase tracking-[0.22em] text-[#151515]">
             Levelspace.ma

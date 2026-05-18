@@ -71,11 +71,11 @@ export const Progress: React.FC = () => {
                 <div className="w-8 h-8 rounded-lg bg-background flex items-center justify-center text-muted">
                   {React.cloneElement(stat.icon as React.ReactElement<any>, { size: 16 })}
                 </div>
-                <span className="text-[9px] font-bold text-emerald-500 uppercase tracking-widest">{stat.trend}</span>
+                <span className="text-[9px] font-bold text-emerald-500 uppercase tracking-normal">{stat.trend}</span>
               </div>
               
               <div className="space-y-1">
-                <p className="text-[9px] font-bold text-muted uppercase tracking-widest">{stat.label}</p>
+                <p className="text-[9px] font-bold text-muted uppercase tracking-normal">{stat.label}</p>
                 <div className="flex items-baseline gap-1">
                   <span className="text-2xl font-bold text-ink">{stat.value}</span>
                   <span className="text-[10px] font-medium text-muted">{stat.unit}</span>
@@ -89,7 +89,7 @@ export const Progress: React.FC = () => {
         <section className="space-y-6">
           <div className="flex items-end justify-between border-b border-ink/5 pb-4">
             <div className="space-y-1">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted">Temporal Mapping</p>
+              <p className="text-[10px] font-bold uppercase tracking-normal text-muted">Temporal Mapping</p>
               <h3 className="text-xl md:text-2xl font-bold text-ink font-sans tracking-tight">Focus Distribution</h3>
             </div>
           </div>
@@ -144,8 +144,8 @@ export const Progress: React.FC = () => {
           {/* Mastery Section */}
           <section className="lg:col-span-7 space-y-6">
             <div className="flex items-center justify-between">
-              <h3 className="text-[10px] font-bold text-muted uppercase tracking-widest">Subject Mastery</h3>
-              <span className="text-[9px] font-bold text-muted/40 uppercase tracking-widest">Last 30 Days</span>
+              <h3 className="text-[10px] font-bold text-muted uppercase tracking-normal">Subject Mastery</h3>
+              <span className="text-[9px] font-bold text-muted/40 uppercase tracking-normal">Last 30 Days</span>
             </div>
             
             <div className="grid gap-3">
@@ -187,7 +187,7 @@ export const Progress: React.FC = () => {
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <Target size={14} className="text-accent" />
-                  <span className="text-[9px] font-bold uppercase tracking-widest text-white/40">AI Insight</span>
+                  <span className="text-[9px] font-bold uppercase tracking-normal text-white/40">AI Insight</span>
                 </div>
                 <h4 className="text-xl font-bold leading-tight">Your cognitive peak occurs between 10 AM and 12 PM.</h4>
               </div>
@@ -198,7 +198,7 @@ export const Progress: React.FC = () => {
               
               <button 
                 onClick={() => navigate('/schedule')}
-                className="w-full py-3 bg-accent text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-paper hover:text-ink transition-all"
+                className="w-full py-3 bg-accent text-white rounded-xl text-[10px] font-bold uppercase tracking-normal hover:bg-paper hover:text-ink transition-all"
               >
                 Optimize Schedule
               </button>

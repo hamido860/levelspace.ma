@@ -24,6 +24,21 @@ const firstString = (...values: unknown[]) => {
   return "";
 };
 
+const usableChunk = (chunk: Record<string, any>) =>
+  String(chunk.content || "").trim().length > 100 &&
+  Boolean(chunk.topic_id || chunk.grade_id) &&
+  chunk.embedding_status === "done";
+
+const uniqueById = (rows: Array<Record<string, any>>) => {
+  const seen = new Set<string>();
+  return rows.filter((row) => {
+    const id = String(row.id || "");
+    if (!id || seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+};
+
 const readMaybe = async <T>(query: any): Promise<{ data: T | null; error: any | null }> => {
   try {
     const result = await query;
@@ -79,6 +94,8 @@ export const loadMcpContext = async (
     subject: firstString(subjectRow?.name, topicRow.subject),
     domain: firstString(topicRow.domain_name, topicRow.domain_code, topicRow.domain),
   };
+  const gradeId = firstString(gradeRow?.id, topicRow.grade_id);
+  const subjectId = firstString(subjectRow?.id, topicRow.subject_id);
 
   const [
     outlineResult,
@@ -110,27 +127,75 @@ export const loadMcpContext = async (
   if (profileResult.error) throw new Error(`Unable to load MCP profile: ${profileResult.error.message}`);
   if (materialResult.error) throw new Error(`Unable to load material requirements: ${materialResult.error.message}`);
 
-  const ragWithReview = await readMaybe<Record<string, any>[]>(
+  const ragSelect = "id, topic_id, grade_id, content, source_name, source_type, source_url, source_confidence, metadata, embedding_status";
+  const exactTopic = await readMaybe<Record<string, any>[]>(
     supabase
       .from("rag_chunks")
-      .select("id, topic_id, content, source_name, source_type, source_url, source_confidence, metadata, review_status, is_active")
+      .select(ragSelect)
       .eq("topic_id", topicId)
-      .eq("is_active", true)
-      .in("review_status", ["approved", "embedded", "clean"])
+      .eq("embedding_status", "done")
+      .not("embedding", "is", null)
+      .not("grade_id", "is", null)
+      .not("content", "is", null)
       .limit(12),
   );
 
-  const ragFallback = ragWithReview.error
-    ? await readMaybe<Record<string, any>[]>(
+  let ragChunks = asArray<Record<string, any>>(exactTopic.data).filter(usableChunk);
+
+  if (ragChunks.length < 6 && gradeId && subjectId) {
+    const sameSubject = await readMaybe<Record<string, any>[]>(
       supabase
         .from("rag_chunks")
-        .select("id, topic_id, content, source_name, source_type, source_url, source_confidence, metadata")
-        .eq("topic_id", topicId)
+        .select(`${ragSelect}, topics:topic_id!inner(id, grade_id, subject_id)`)
+        .eq("topics.grade_id", gradeId)
+        .eq("topics.subject_id", subjectId)
+        .eq("embedding_status", "done")
+        .not("embedding", "is", null)
+        .not("content", "is", null)
         .limit(12),
-    )
-    : ragWithReview;
+    );
+    ragChunks = uniqueById([...ragChunks, ...asArray<Record<string, any>>(sameSubject.data).filter(usableChunk)]).slice(0, 12);
+  }
 
-  const ragChunks = asArray<Record<string, any>>(ragFallback.data);
+  if (ragChunks.length < 6 && gradeId) {
+    const sameGrade = await readMaybe<Record<string, any>[]>(
+      supabase
+        .from("rag_chunks")
+        .select(ragSelect)
+        .eq("grade_id", gradeId)
+        .eq("embedding_status", "done")
+        .not("embedding", "is", null)
+        .not("content", "is", null)
+        .limit(24),
+    );
+    ragChunks = uniqueById([...ragChunks, ...asArray<Record<string, any>>(sameGrade.data).filter(usableChunk)]).slice(0, 12);
+  }
+
+  if (ragChunks.length < 6 && gradeId) {
+    const metadataFallback = await readMaybe<Record<string, any>[]>(
+      supabase
+        .from("rag_chunks")
+        .select(ragSelect)
+        .is("topic_id", null)
+        .eq("grade_id", gradeId)
+        .eq("embedding_status", "done")
+        .not("embedding", "is", null)
+        .not("content", "is", null)
+        .limit(50),
+    );
+    const normalizedTitle = topic.title.toLowerCase();
+    const normalizedSubject = topic.subject.toLowerCase();
+    const metadataMatches = asArray<Record<string, any>>(metadataFallback.data).filter((chunk) => {
+      const metadata = chunk.metadata || {};
+      const title = firstString(metadata.topic_title, metadata.topic_name, metadata.topic, metadata.title).toLowerCase();
+      const subject = firstString(metadata.subject, metadata.subject_name, metadata.source?.subject, metadata.source?.subject_name).toLowerCase();
+      return usableChunk(chunk) && (
+        (title && (title.includes(normalizedTitle) || normalizedTitle.includes(title))) ||
+        (subject && normalizedSubject && subject === normalizedSubject)
+      );
+    });
+    ragChunks = uniqueById([...ragChunks, ...metadataMatches]).slice(0, 12);
+  }
   const materialRequirements = asArray<McpMaterialRequirement>(materialResult.data);
   const trustedSources = [
     ...ragChunks.map((chunk): McpTrustedSource => ({

@@ -68,12 +68,12 @@ export const Onboarding: React.FC = () => {
                 className="h-full bg-accent rounded-full"
               />
             </div>
-            <span className="text-[10px] font-mono font-bold text-muted uppercase tracking-[0.3em]">Step 01 / 03</span>
+            <span className="text-[10px] font-mono font-bold text-muted uppercase tracking-normal">Step 01 / 03</span>
           </div>
 
           {/* Header */}
           <div className="text-center space-y-6">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-accent/5 rounded-full text-accent text-[10px] font-mono font-bold uppercase tracking-widest mb-4">
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-accent/5 rounded-full text-accent text-[10px] font-mono font-bold uppercase tracking-normal mb-4">
               <Sparkles className="w-3 h-3" />
               Personalization Engine
             </div>
@@ -94,7 +94,7 @@ export const Onboarding: React.FC = () => {
                 onClick={() => setSelectedGrade(grade)}
                 className={`group relative flex items-center justify-between p-6 rounded-3xl border transition-all duration-300 ${
                   selectedGrade === grade 
-                    ? 'bg-ink border-ink text-paper shadow-xl shadow-ink/20' 
+                    ? 'bg-ink border-ink text-paper shadow-md shadow-ink/20' 
                     : 'bg-paper border-ink/5 text-ink hover:border-accent/30 hover:bg-accent/5'
                 }`}
               >
@@ -126,7 +126,7 @@ export const Onboarding: React.FC = () => {
             <button
               onClick={handleContinue}
               disabled={!selectedGrade}
-              className={`group w-full max-w-sm h-16 bg-accent text-paper rounded-full font-medium text-lg flex items-center justify-center gap-3 shadow-xl shadow-accent/20 transition-all duration-300 ${
+              className={`group w-full max-w-sm h-16 bg-accent text-paper rounded-full font-medium text-lg flex items-center justify-center gap-3 shadow-md shadow-accent/20 transition-all duration-300 ${
                 !selectedGrade ? 'opacity-30 grayscale cursor-not-allowed' : 'hover:bg-ink hover:shadow-ink/20 active:scale-[0.98]'
               }`}
             >

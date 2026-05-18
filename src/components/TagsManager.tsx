@@ -99,10 +99,11 @@ export const TagsManager: React.FC<TagsManagerProps> = ({
           ) : (
             <button
               onClick={(e) => { e.stopPropagation(); setIsAdding(true); }}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-dashed border-ink/20 text-muted transition-all hover:border-accent/50 hover:bg-accent/5 hover:text-accent"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800"
               title="Add Tag"
             >
-              <Plus className="h-3 w-3" />
+              <Plus className="h-4 w-4" />
+              Add tag
             </button>
           )}
         </div>

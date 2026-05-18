@@ -44,7 +44,7 @@ export const TimelineTool: React.FC<TimelineToolProps> = ({ state, onChange, les
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-accent">
           <Calendar className="w-4 h-4" />
-          <h3 className="text-sm font-bold uppercase tracking-widest">Historical Timeline</h3>
+          <h3 className="text-sm font-bold uppercase tracking-normal">Historical Timeline</h3>
         </div>
         <div className="flex items-center gap-2 bg-paper border border-ink/5 rounded-lg p-1">
           <button 
@@ -86,7 +86,7 @@ export const TimelineTool: React.FC<TimelineToolProps> = ({ state, onChange, les
                   selectedEventId === event.id ? 'bg-accent scale-125' : 'bg-muted'
                 }`} />
                 <div className="absolute -top-8 text-[10px] font-bold text-accent whitespace-nowrap">{event.year}</div>
-                <div className="absolute -bottom-8 text-[9px] font-bold text-ink whitespace-nowrap uppercase tracking-widest">{event.title}</div>
+                <div className="absolute -bottom-8 text-[9px] font-bold text-ink whitespace-nowrap uppercase tracking-normal">{event.title}</div>
               </motion.button>
             ))}
           </div>
@@ -106,9 +106,9 @@ export const TimelineTool: React.FC<TimelineToolProps> = ({ state, onChange, les
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
                     <h2 className="text-2xl font-bold text-ink">{selectedEvent.title}</h2>
-                    <p className="text-sm font-bold text-accent uppercase tracking-widest">{selectedEvent.year}</p>
+                    <p className="text-sm font-bold text-accent uppercase tracking-normal">{selectedEvent.year}</p>
                   </div>
-                  <span className={`px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest ${
+                  <span className={`px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-normal ${
                     selectedEvent.type === 'cause' ? 'bg-emerald-500/10 text-emerald-600' :
                     selectedEvent.type === 'effect' ? 'bg-error/10 text-error' :
                     'bg-accent/10 text-accent'
@@ -137,7 +137,7 @@ export const TimelineTool: React.FC<TimelineToolProps> = ({ state, onChange, les
                 <History className="w-12 h-12 text-muted" />
                 <div className="space-y-1">
                   <p className="text-sm font-bold text-ink">Explore the Timeline</p>
-                  <p className="text-[10px] text-muted uppercase tracking-widest">Select an event above to see details</p>
+                  <p className="text-[10px] text-muted uppercase tracking-normal">Select an event above to see details</p>
                 </div>
               </div>
             )}

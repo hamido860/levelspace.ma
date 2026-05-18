@@ -43,14 +43,14 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="absolute inset-0 bg-ink/40 backdrop-blur-sm"
+            className="absolute inset-0 bg-ink/40 "
           />
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className={`relative w-full ${maxWidthClass} bg-paper rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]`}
+            className={`relative w-full ${maxWidthClass} bg-paper rounded-3xl shadow-md overflow-hidden flex flex-col max-h-[90vh]`}
             dir={dir}
           >
             <div className="flex items-center justify-between p-6 border-b border-ink/5">

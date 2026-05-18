@@ -88,7 +88,7 @@ export const AdminCurriculumDebug: React.FC = () => {
           <button
             onClick={load}
             disabled={loading}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-paper px-4 py-3 text-xs font-bold uppercase tracking-widest text-ink disabled:opacity-60"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-paper px-4 py-3 text-xs font-bold uppercase tracking-normal text-ink disabled:opacity-60"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             Refresh

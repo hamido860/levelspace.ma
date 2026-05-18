@@ -105,7 +105,7 @@ const BaseLearningBlock: React.FC<LessonBlockComponentProps & { children?: React
         <div className="min-w-0 flex-1">
           <div className="mb-1 flex items-center gap-2">
             <Icon size={15} className={style.accent} />
-            <span className={`text-[11px] font-bold uppercase tracking-widest ${style.accent}`}>
+            <span className={`text-[11px] font-bold uppercase tracking-normal ${style.accent}`}>
               {getBlockEmoji(block)} {TYPE_LABELS[block.type]}
             </span>
           </div>

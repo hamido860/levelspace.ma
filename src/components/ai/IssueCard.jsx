@@ -11,10 +11,10 @@ const ISSUE_TYPE_STYLES = {
 };
 
 const STATUS_STYLES = {
-  open: "text-red-600",
-  fixed: "text-emerald-600",
-  monitoring: "text-blue-600",
-  blocked: "text-amber-600",
+  open: "bg-red-50 text-red-700",
+  fixed: "bg-emerald-50 text-emerald-700",
+  monitoring: "bg-blue-50 text-blue-700",
+  blocked: "bg-amber-50 text-amber-700",
 };
 
 export const IssueCard = ({ issue, latestTask, onExecute, onViewLogs }) => {
@@ -24,20 +24,20 @@ export const IssueCard = ({ issue, latestTask, onExecute, onViewLogs }) => {
       : "{}";
 
   return (
-    <article className="rounded-[28px] border border-surface-mid bg-paper p-5 shadow-sm shadow-ink/5 transition-transform hover:-translate-y-0.5">
+    <article className="ls-interactive-card-pad">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
             <RiskBadge level={issue.severity} />
-            <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ${ISSUE_TYPE_STYLES[issue.issue_type] || "bg-slate-100 text-slate-700"}`}>
+            <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${ISSUE_TYPE_STYLES[issue.issue_type] || "bg-slate-100 text-slate-600"}`}>
               {issue.issue_type}
             </span>
-            <span className={`text-xs font-semibold uppercase tracking-wide ${STATUS_STYLES[issue.status] || "text-slate-500"}`}>
+            <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${STATUS_STYLES[issue.status] || "bg-slate-100 text-slate-600"}`}>
               {issue.status}
             </span>
           </div>
-          <h3 className="max-w-xl text-lg font-bold text-ink">{issue.title}</h3>
-          <p className="text-sm text-ink-secondary">{issue.impact}</p>
+          <h3 className="max-w-xl text-lg font-bold text-slate-950">{issue.title}</h3>
+          <p className="text-sm text-slate-600">{issue.impact}</p>
         </div>
         <div className="rounded-2xl bg-red-50 p-3 text-red-600">
           <AlertTriangle className="h-5 w-5" />
@@ -45,40 +45,40 @@ export const IssueCard = ({ issue, latestTask, onExecute, onViewLogs }) => {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-        <div className="space-y-3 rounded-3xl bg-surface-low/70 p-4">
+        <div className="space-y-3 rounded-2xl bg-slate-50 p-4">
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-ink-muted">Evidence</p>
-            <pre className="mt-2 overflow-x-auto rounded-2xl bg-paper p-3 font-mono text-xs text-ink-secondary">
+            <p className="ls-micro-label">Evidence</p>
+            <pre className="mt-2 overflow-x-auto rounded-2xl bg-white p-3 font-mono text-xs text-slate-600">
               {evidence}
             </pre>
           </div>
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-ink-muted">Suggested Action</p>
-            <p className="mt-2 text-sm text-ink-secondary">{issue.suggested_action}</p>
+            <p className="ls-micro-label">Suggested Action</p>
+            <p className="mt-2 text-sm text-slate-600">{issue.suggested_action}</p>
           </div>
         </div>
 
         <div className="space-y-3">
-          <div className="rounded-3xl border border-surface-mid p-4">
-            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-ink-muted">Affected Area</p>
-            <p className="mt-2 text-sm font-semibold text-ink">{issue.affected_area}</p>
+          <div className="rounded-2xl border border-slate-200 p-4">
+            <p className="ls-micro-label">Affected Area</p>
+            <p className="mt-2 text-sm font-semibold text-slate-950">{issue.affected_area}</p>
           </div>
 
-          <div className="rounded-3xl border border-surface-mid p-4">
-            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-ink-muted">Latest Task</p>
+          <div className="rounded-2xl border border-slate-200 p-4">
+            <p className="ls-micro-label">Latest Task</p>
             {latestTask ? (
               <div className="mt-3 space-y-3">
                 <div className="flex items-center justify-between gap-2">
                   <div>
-                    <p className="text-sm font-semibold text-ink">{latestTask.task_name}</p>
-                    <p className="text-xs text-ink-muted">{latestTask.status} • {latestTask.progress}%</p>
+                    <p className="text-sm font-semibold text-slate-950">{latestTask.task_name}</p>
+                    <p className="text-xs text-slate-500">{latestTask.status} • {latestTask.progress}%</p>
                   </div>
                   <AgentBadge agent={latestTask.assigned_agent} compact />
                 </div>
-                <p className="text-xs text-ink-secondary">{latestTask.instructions || "Task created from AI issue analyzer."}</p>
+                <p className="text-xs text-slate-600">{latestTask.instructions || "Task created from AI issue analyzer."}</p>
               </div>
             ) : (
-              <div className="mt-3 flex items-center gap-2 text-sm text-ink-muted">
+              <div className="mt-3 flex items-center gap-2 text-sm text-slate-500">
                 <FileClock className="h-4 w-4" />
                 No execution task yet.
               </div>
@@ -88,20 +88,20 @@ export const IssueCard = ({ issue, latestTask, onExecute, onViewLogs }) => {
       </div>
 
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
-        <div className="text-xs text-ink-muted">
+        <div className="text-xs text-slate-500">
           Database truth first. No write occurs without logs and approval.
         </div>
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => onViewLogs(issue)}
-            className="inline-flex items-center gap-2 rounded-full border border-surface-mid px-4 py-2 text-sm font-semibold text-ink-secondary transition-colors hover:bg-surface-low"
+            className="ls-button-secondary"
           >
             <ScrollText className="h-4 w-4" />
             View Logs
           </button>
           <button
             onClick={() => onExecute(issue)}
-            className="inline-flex items-center gap-2 rounded-full bg-accent px-4 py-2 text-sm font-semibold text-paper transition-colors hover:bg-accent-hover"
+            className="ls-button-primary"
           >
             <Play className="h-4 w-4" />
             Execute
