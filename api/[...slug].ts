@@ -55,6 +55,7 @@ import {
   loadCurriculumReviewDetail,
   loadCurriculumReviewItems,
 } from "../src/server/api/curriculumValidation";
+import { getServerSupabaseEnv } from "../src/lib/supabase/server";
 
 type JsonBody = Record<string, any>;
 type RouteHandler = (req: VercelRequest, res: VercelResponse, segments: string[]) => Promise<VercelResponse | void>;
@@ -192,6 +193,19 @@ async function handleAiRoot(req: VercelRequest, res: VercelResponse) {
       "/api/ai/lesson-blocks",
       "/api/ai/embed",
     ],
+  });
+}
+
+async function handleSupabasePublicConfig(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== "GET") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  const env = getServerSupabaseEnv();
+  return res.status(200).json({
+    configured: env.urlConfigured && env.anonKeyConfigured,
+    url: env.urlConfigured ? env.url : null,
+    anonKey: env.anonKeyConfigured ? env.anonKey : null,
   });
 }
 
@@ -1131,6 +1145,7 @@ const rootRoutes: Record<string, RouteHandler> = {
   "ai/lesson-blocks": handleAILessonBlocks,
   "ai/embed": handleAIEmbed,
   "ai/status": handleAIStatus,
+  "config/supabase": handleSupabasePublicConfig,
   "health/supabase": handleSupabaseHealth,
   "admin/curriculum-review": handleCurriculumReviewList,
   "admin/curriculum-review-detail": handleCurriculumReviewDetail,

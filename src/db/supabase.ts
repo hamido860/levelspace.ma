@@ -1,9 +1,10 @@
-import { supabase, isBrowserSupabaseConfigured } from "../lib/supabase/client";
+import { supabase, ensureBrowserSupabaseConfigured, isBrowserSupabaseConfigured } from "../lib/supabase/client";
 
 export { supabase };
-export const isSupabaseConfigured = isBrowserSupabaseConfigured;
+export let isSupabaseConfigured = isBrowserSupabaseConfigured;
 
 export const checkSupabaseConnection = async () => {
+  isSupabaseConfigured = await ensureBrowserSupabaseConfigured();
   if (!isSupabaseConfigured) {
     console.warn("Supabase env missing");
     return false;

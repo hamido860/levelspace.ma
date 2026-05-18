@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Layout } from "../components/Layout";
 import { SEO } from "../components/SEO";
-import { isSupabaseConfigured, supabase } from "../db/supabase";
+import { checkSupabaseConnection, supabase } from "../db/supabase";
 import { useAuth } from "../context/AuthContext";
 import { validateMetrics, formatValidationErrors } from "../services/metricsValidator";
 import { getAiApiKey, getAiCredentialMode, getAiModel, getAiProvider } from "../services/geminiService";
@@ -718,7 +718,7 @@ export const Admin: React.FC = () => {
       setRagChunkError("");
       return;
     }
-    if (!isSupabaseConfigured) {
+    if (!(await checkSupabaseConnection())) {
       setRagChunkGradeId(gradeId);
       setRagChunks([]);
       setRagChunkError("Supabase is not configured, so chunk inspection is unavailable.");
@@ -748,7 +748,7 @@ export const Admin: React.FC = () => {
   const browseTable = async (tableName?: string) => {
     const t = tableName ?? selectedTable;
     if (!t) return;
-    if (!isSupabaseConfigured) {
+    if (!(await checkSupabaseConnection())) {
       setBrowseError("Supabase is not configured, so table browsing is unavailable.");
       setBrowseRows([]);
       setBrowseCols([]);

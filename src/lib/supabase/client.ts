@@ -10,7 +10,7 @@ const browserSupabaseAnonKey =
   import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
   import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-export const isBrowserSupabaseConfigured =
+export let isBrowserSupabaseConfigured =
   isValidSupabaseUrl(browserSupabaseUrl) && hasUsableSupabaseKey(browserSupabaseAnonKey);
 
 const createUnavailableClient = () => {
@@ -65,10 +65,55 @@ const createUnavailableClient = () => {
   } as any;
 };
 
-export const supabase: any = isBrowserSupabaseConfigured
+let activeClient: any = isBrowserSupabaseConfigured
   ? createClient<Database>(browserSupabaseUrl, browserSupabaseAnonKey)
   : createUnavailableClient() as any;
 
 if (isBrowserSupabaseConfigured) {
   console.info("Supabase client initialized");
 }
+
+let runtimeConfigPromise: Promise<boolean> | null = null;
+
+export const ensureBrowserSupabaseConfigured = async () => {
+  if (isBrowserSupabaseConfigured) return true;
+  if (runtimeConfigPromise) return runtimeConfigPromise;
+
+  runtimeConfigPromise = fetch("/api/config/supabase", {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  })
+    .then(async (response) => {
+      if (!response.ok) return false;
+      const payload = await response.json() as {
+        configured?: boolean;
+        url?: string | null;
+        anonKey?: string | null;
+      };
+
+      if (!payload.configured || !isValidSupabaseUrl(payload.url || undefined) || !hasUsableSupabaseKey(payload.anonKey || undefined)) {
+        return false;
+      }
+
+      activeClient = createClient<Database>(payload.url, payload.anonKey);
+      isBrowserSupabaseConfigured = true;
+      console.info("Supabase client initialized");
+      return true;
+    })
+    .catch((error) => {
+      console.warn("Supabase runtime config unavailable", error);
+      return false;
+    })
+    .finally(() => {
+      runtimeConfigPromise = null;
+    });
+
+  return runtimeConfigPromise;
+};
+
+export const supabase: any = new Proxy({}, {
+  get(_target, prop) {
+    const value = activeClient[prop as keyof typeof activeClient];
+    return typeof value === "function" ? value.bind(activeClient) : value;
+  },
+});
