@@ -81,6 +81,7 @@ export const shouldRequestAiCurriculumSuggestions = ({
 }): boolean => includeAiSuggestions && aiAvailable;
 
 export type ClassroomLoadAction = 'create_classroom' | 'refresh_suggestions';
+export type CurriculumLoadIntent = 'create_classroom' | 'regenerate_suggestions';
 
 export const getClassroomLoadPlan = ({
   action,
@@ -95,3 +96,9 @@ export const getClassroomLoadPlan = ({
 
   return { includeAiSuggestions: isPro };
 };
+
+export const shouldIncludeAiSuggestions = (intent: CurriculumLoadIntent, aiAvailable: boolean): boolean =>
+  shouldRequestAiCurriculumSuggestions({
+    includeAiSuggestions: intent === 'regenerate_suggestions',
+    aiAvailable,
+  });

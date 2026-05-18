@@ -6,6 +6,7 @@ import {
   mergeModulesWithAiSuggestions,
   shouldRequestAiCurriculumSuggestions,
   getClassroomLoadPlan,
+  shouldIncludeAiSuggestions,
 } from '../classroomLoader.ts';
 
 test('mapSubjectsToModules keeps UUID ids and does not require AI services', () => {
@@ -166,4 +167,15 @@ test('getClassroomLoadPlan keeps free users on Supabase-first classroom loading'
     getClassroomLoadPlan({ action: 'refresh_suggestions', isPro: true }),
     { includeAiSuggestions: true },
   );
+});
+
+
+test('free users can create classroom without AI calls', () => {
+  assert.strictEqual(shouldIncludeAiSuggestions('create_classroom', true), false);
+  assert.strictEqual(shouldIncludeAiSuggestions('create_classroom', false), false);
+});
+
+test('AI suggestions are optional and only used for regenerate flow', () => {
+  assert.strictEqual(shouldIncludeAiSuggestions('regenerate_suggestions', true), true);
+  assert.strictEqual(shouldIncludeAiSuggestions('regenerate_suggestions', false), false);
 });
