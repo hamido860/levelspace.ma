@@ -7,9 +7,9 @@ import {
   getConfiguredAIProvider,
   getDevAdminAiStatus,
   getPlatformAiProviderStatus,
-} from "../../src/lib/ai/provider";
-import { requireAuthenticatedUser } from "../../src/server/api/aiCommandCenter";
-import { resolveAiKeyOwner } from "../../src/server/aiKeys";
+} from "../../lib/ai/provider";
+import { resolveAiKeyOwner } from "../aiKeys";
+import { requireAuthenticatedUser } from "./aiCommandCenter";
 
 type ApiRequest = VercelRequest;
 type ApiResponse = VercelResponse;
@@ -24,7 +24,8 @@ const readPrompt = (body: Record<string, any>) => {
   return "";
 };
 
-const readConfig = (body: Record<string, any>) => body.config && typeof body.config === "object" ? body.config : {};
+const readConfig = (body: Record<string, any>) =>
+  body.config && typeof body.config === "object" ? body.config : {};
 
 const hasSecret = (value: string | undefined, placeholder: string) =>
   !!value && value.trim().length > 0 && value !== placeholder;
@@ -83,7 +84,6 @@ export async function handleAIStatus(req: ApiRequest, res: ApiResponse) {
       openrouter: platformProviders.openrouter && openRouterConfigured,
       openai: platformProviders.openai && openAiConfigured,
     },
-    // TODO(auth): temporary developer/admin key status only. Never expose raw DEV_ADMIN_* keys to the browser.
     devAdmin,
     defaultProvider: configuredProvider,
     fallbackProvider: ["gemini", "nvidia", "openrouter", "openai"].includes(fallbackProvider) ? fallbackProvider : null,

@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { createServerSupabaseClient, getServerSupabaseEnv } from "../../src/lib/supabase/server";
-import { createSupabaseAdminClient } from "../../src/lib/supabase/admin";
+import { createSupabaseAdminClient } from "../../lib/supabase/admin";
+import { createServerSupabaseClient, getServerSupabaseEnv } from "../../lib/supabase/server";
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handleSupabaseHealth(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "GET") {
     return res.status(405).json({ error: "Method not allowed" });
   }

@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import axios from "axios";
-import handleSupabaseHealth from "./health/supabase";
-import { handleAIEmbed, handleAIGenerate, handleAIExplain, handleAILessonBlocks, handleAIStatus } from "./ai/shared";
+import handleSupabaseHealth from "../src/server/api/supabaseHealth";
+import { handleAIEmbed, handleAIGenerate, handleAIExplain, handleAILessonBlocks, handleAIStatus } from "../src/server/api/aiHandlers";
 import { generateAIResponse, type AIProviderName, type AICredentialMode } from "../src/lib/ai/provider";
 import { handleDeleteUserAiKey, handleTestUserAiKey, handleUserAiKeys } from "../src/server/api/userAiKeys";
 import { backfillTopicsFromLessons } from "../lib/topicSync";
