@@ -31,6 +31,7 @@ import {
   MAX_AUTOMATIC_RETRIES,
   requireAdminUser,
   requireAiAdmin,
+  requireAuthenticatedUser,
   repairRagTopicLinks,
   resetAiRecoveryTask,
   runAiRecoverySafetyCheck,
@@ -148,6 +149,12 @@ async function handleNvidiaProxy(req: VercelRequest, res: VercelResponse) {
 
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  try {
+    await requireAuthenticatedUser(req);
+  } catch (error) {
+    return sendError(res, error, "Authentication failed");
   }
 
   const apiKey = process.env.NVIDIA_API_KEY;
