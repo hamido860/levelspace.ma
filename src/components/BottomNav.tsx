@@ -37,7 +37,8 @@ export const BottomNav: React.FC = () => {
           <button 
             key={i}
             onClick={() => navigate(item.path)}
-            className={`flex flex-col items-center gap-2 transition-all duration-500 group ${
+            aria-label={item.label}
+            className={`flex flex-col items-center gap-2 transition-all duration-500 group rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 ${
               isActive ? 'text-accent scale-110' : 'text-muted hover:text-ink'
             }`}
           >
