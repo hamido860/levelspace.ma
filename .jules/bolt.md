@@ -1,3 +1,6 @@
 ## 2024-05-09 - Memoize Dexie live query derived values
 **Learning:** In React components using Dexie.js `useLiveQuery`, derived data structures from query arrays (e.g. `Object.fromEntries(dbSettings.map(...))`) create new object references on every render. Because `useLiveQuery` re-evaluates frequently or whenever the database changes, these new references cause expensive, cascading re-renders in child components.
 **Action:** Always wrap data derived from `useLiveQuery` results (like `.map`, `.filter`, or `Object.fromEntries`) with `useMemo` using the raw live query results as the dependency array.
+## 2024-06-25 - Prevent cascading re-renders in Modules page
+**Learning:** In React, passing non-memoized derived arrays/sets (such as `modules`, `trustedSubjectNames`, `trustedSubjectSet`) derived from `useLiveQuery` into JSX loops or further `filter`/`map` chains causes the component to completely re-render those branches when any state triggers an update, even if the actual data hasn't changed.
+**Action:** Always wrap expensive derived collections (like lists built from mapping/filtering `dbModules`) in `useMemo`, ensuring that downstream variables like `filteredModules` or `selectedCount` only recalculate when their specific dependencies change.
