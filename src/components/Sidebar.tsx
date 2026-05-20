@@ -74,7 +74,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
           {setIsCollapsed && (
             <button 
               onClick={() => setIsCollapsed(!isCollapsed)}
-              className="p-1.5 rounded-lg hover:bg-ink/5 text-muted hover:text-ink transition-all"
+              className="p-1.5 rounded-lg hover:bg-ink/5 text-muted hover:text-ink transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
+              aria-label={isCollapsed ? t("expand", { defaultValue: "Expand sidebar" }) : t("collapse", { defaultValue: "Collapse sidebar" })}
             >
               {isCollapsed 
                 ? (language === 'ar' ? <ChevronLeft size={20} /> : <ChevronRight size={20} />) 
@@ -93,7 +94,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
                 key={item.path}
                 onClick={() => navigate(item.path)}
                 title={isCollapsed ? item.label : undefined}
-                className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3 px-3'} py-2.5 rounded-lg font-medium text-sm transition-all duration-200 ease-in-out ${
+                className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3 px-3'} py-2.5 rounded-lg font-medium text-sm transition-all duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 ${
                   isActive 
                     ? 'bg-accent text-white shadow-sm shadow-accent/20' 
                     : 'text-muted hover:bg-ink/5'
@@ -119,7 +120,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
                 key={item.path}
                 onClick={() => navigate(item.path)}
                 title={isCollapsed ? item.label : undefined}
-                className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3 px-3'} py-2.5 rounded-lg font-medium text-sm transition-all duration-200 ease-in-out ${
+                className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3 px-3'} py-2.5 rounded-lg font-medium text-sm transition-all duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 ${
                   isActive 
                     ? 'bg-accent text-white shadow-sm shadow-accent/20' 
                     : 'text-muted hover:bg-ink/5'
@@ -136,7 +137,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
           <button
             onClick={() => signOut()}
             title={isCollapsed ? t('logout') : undefined}
-            className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3 px-3'} py-2.5 rounded-lg font-medium text-sm text-muted hover:bg-error/5 hover:text-error transition-all duration-200 ease-in-out mt-1`}
+            className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3 px-3'} py-2.5 rounded-lg font-medium text-sm text-muted hover:bg-error/5 hover:text-error transition-all duration-200 ease-in-out mt-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1`}
           >
             <LogOut size={20} />
             {!isCollapsed && <span>{t('logout')}</span>}
@@ -154,7 +155,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
             <button
               key={`mobile-${item.path}`}
               onClick={() => navigate(item.path)}
-              className={`flex flex-col items-center justify-center gap-1 h-full px-3 min-w-[72px] shrink-0 transition-all duration-300 ${
+              className={`flex flex-col items-center justify-center gap-1 h-full px-3 min-w-[72px] shrink-0 transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 ${
                 isActive 
                   ? 'text-accent' 
                   : 'text-muted'
