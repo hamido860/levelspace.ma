@@ -256,7 +256,7 @@ export const Library: React.FC = () => {
 
   const saveToLibrary = (title: string, author: string, category: string, content: string) => {
     const item: LibraryItem = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: crypto.randomUUID(),
       title,
       author,
       format: 'txt',
@@ -287,7 +287,7 @@ export const Library: React.FC = () => {
   const addItem = (e: React.FormEvent) => {
     e.preventDefault();
     const item: LibraryItem = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: crypto.randomUUID(),
       title: newItem.title || newItem.url,
       author: 'Web Resource',
       format: 'link',
