@@ -83,6 +83,26 @@ export const Dashboard: React.FC = () => {
   const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
   const settingsMap = useMemo(() => Object.fromEntries(dbSettings.map(s => [s.key, s.value])), [dbSettings]);
 
+  // Memoize derived data to avoid expensive recalculation and cascading re-renders
+  // since `reminders` and `schedule` come from Dexie's `useLiveQuery` which
+  // can trigger frequent re-renders.
+  const upcomingExams = useMemo(() => {
+    return reminders
+      .filter(r => (r.type === 'exam' || r.type === 'controle') && !r.completed)
+      .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''));
+  }, [reminders]);
+
+  const generalReminders = useMemo(() => {
+    return reminders
+      .filter(r => r.type !== 'exam' && r.type !== 'controle' && !r.completed);
+  }, [reminders]);
+
+  const upcomingSchedule = useMemo(() => {
+    return schedule
+      .filter(e => e.date?.includes('-'))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }, [schedule]);
+
   const selectedGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
   const selectedCountry = settingsMap['selected_country'] || localStorage.getItem('selected_country') || '';
   const currentSession = settingsMap['current_session'] || localStorage.getItem('current_session') || 'Fall 2024';
@@ -541,10 +561,7 @@ export const Dashboard: React.FC = () => {
                   </button>
                 </div>
                 <div className="space-y-2">
-                  {reminders
-                    .filter(r => (r.type === 'exam' || r.type === 'controle') && !r.completed)
-                    .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
-                    .slice(0, 3)
+                  {upcomingExams.slice(0, 3)
                     .map((reminder) => (
                       <div key={reminder.id} className="flex items-center gap-3 p-3 bg-accent/5 border border-accent/10 rounded-xl">
                         <div className="w-8 h-8 bg-accent/10 rounded-lg flex items-center justify-center shrink-0">
@@ -564,7 +581,7 @@ export const Dashboard: React.FC = () => {
                         </button>
                       </div>
                     ))}
-                  {reminders.filter(r => (r.type === 'exam' || r.type === 'controle') && !r.completed).length === 0 && (
+                  {upcomingExams.length === 0 && (
                     <p className="text-[10px] text-slate-500 italic px-2 dark:text-ink-muted">{t('no_pending_reminders')}</p>
                   )}
                 </div>
@@ -577,10 +594,7 @@ export const Dashboard: React.FC = () => {
                   <button className="text-[9px] font-bold text-accent ">{t('view_all')}</button>
                 </div>
                 <div className="space-y-2">
-                  {reminders
-                    .filter(r => r.type !== 'exam' && r.type !== 'controle' && !r.completed)
-                    .slice(0, 3)
-                    .map((reminder) => (
+                  {generalReminders.slice(0, 3).map((reminder) => (
                       <div key={reminder.id} onClick={() => toggleReminder(reminder.id)} className="flex items-center gap-3 p-3 ls-card cursor-pointer hover:border-accent/20 transition-all">
                         <div className={`w-4 h-4 rounded border flex items-center justify-center ${reminder.completed ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-200 dark:border-white/15'}`}>
                           {reminder.completed && <Check size={10} />}
@@ -606,10 +620,8 @@ export const Dashboard: React.FC = () => {
                 <CalendarIcon className="w-4 h-4 text-slate-500 dark:text-ink-muted" />
               </div>
               <div className="space-y-4">
-                {schedule.filter(e => e.date?.includes('-')).length > 0 ? (
-                  schedule
-                    .filter(e => e.date?.includes('-'))
-                    .sort((a, b) => a.date.localeCompare(b.date))
+                {upcomingSchedule.length > 0 ? (
+                  upcomingSchedule
                     .slice(0, 3)
                     .map((event) => {
                       const d = new Date(event.date);
