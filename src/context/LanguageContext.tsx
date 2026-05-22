@@ -10,6 +10,8 @@ interface LanguageContextType {
 
 const translations: Record<Language, Record<string, string>> = {
   en: {
+    expand_sidebar: 'Expand sidebar',
+    collapse_sidebar: 'Collapse sidebar',
     dashboard: 'Dashboard',
     classrooms: 'Classrooms',
     blueprints: 'Blueprints',
@@ -138,6 +140,8 @@ const translations: Record<Language, Record<string, string>> = {
     dashboard_explore: "Explore your space",
   },
   fr: {
+    expand_sidebar: 'Agrandir la barre latérale',
+    collapse_sidebar: 'Réduire la barre latérale',
     dashboard: 'Tableau de bord',
     classrooms: 'Salles de classe',
     blueprints: 'Schémas',
@@ -266,6 +270,8 @@ const translations: Record<Language, Record<string, string>> = {
     dashboard_explore: "Explore ton espace",
   },
   ar: {
+    expand_sidebar: 'توسيع الشريط الجانبي',
+    collapse_sidebar: 'طي الشريط الجانبي',
     dashboard: 'لوحة القيادة',
     classrooms: 'الفصول الدراسية',
     blueprints: 'المخططات',
@@ -394,6 +400,8 @@ const translations: Record<Language, Record<string, string>> = {
     dashboard_explore: "Explore your space",
   },
   es: {
+    expand_sidebar: 'Expandir barra lateral',
+    collapse_sidebar: 'Colapsar barra lateral',
     dashboard: 'Tablero',
     classrooms: 'Aulas',
     blueprints: 'Planos',
@@ -522,6 +530,8 @@ const translations: Record<Language, Record<string, string>> = {
     dashboard_explore: "Explore your space",
   },
   de: {
+    expand_sidebar: 'Seitenleiste erweitern',
+    collapse_sidebar: 'Seitenleiste minimieren',
     dashboard: 'Dashboard',
     classrooms: 'Klassenzimmer',
     blueprints: 'Entwürfe',
