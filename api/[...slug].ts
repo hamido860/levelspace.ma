@@ -30,6 +30,7 @@ import {
   loadRagChunkHealth,
   MAX_AUTOMATIC_RETRIES,
   requireAdminUser,
+  requireAuthenticatedUser,
   requireAiAdmin,
   repairRagTopicLinks,
   resetAiRecoveryTask,
@@ -140,7 +141,7 @@ async function handleNvidiaProxy(req: VercelRequest, res: VercelResponse) {
   if (req.method === "OPTIONS") {
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Nvidia-Api-Key");
     return res.status(200).end();
   }
 
@@ -150,7 +151,14 @@ async function handleNvidiaProxy(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const apiKey = process.env.NVIDIA_API_KEY;
+  try {
+    await requireAuthenticatedUser(req);
+  } catch (authError: any) {
+    return res.status(401).json({ error: authError.message || "Unauthorized" });
+  }
+
+  const userApiKey = req.headers['x-nvidia-api-key'] as string | undefined;
+  const apiKey = userApiKey || process.env.NVIDIA_API_KEY;
 
   if (!apiKey || apiKey === "MY_NVIDIA_API_KEY") {
     return res.status(503).json({ error: "NVIDIA API key not configured." });
