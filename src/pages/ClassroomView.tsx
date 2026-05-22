@@ -34,6 +34,13 @@ import {
 const normalizeLessonTitle = (title: string | null | undefined) =>
   String(title || '').trim().toLocaleLowerCase();
 
+const isDevAdminModeEnabled = () =>
+  String(import.meta.env.VITE_ENABLE_DEV_ADMIN_AI_KEYS || '').toLowerCase() === 'true';
+
+const shouldUseDemoAdminHeader = () =>
+  isDevAdminModeEnabled() ||
+  (typeof localStorage !== 'undefined' && localStorage.getItem('demo_admin_logged_in') === 'true');
+
 type SupabaseLessonRow = {
   id?: string;
   topic_id?: string | null;
@@ -139,7 +146,32 @@ const CLASSROOM_TAB_CONFIG = {
   },
 } as const;
 
-const resolveCurriculumIds = async (grade: string, subject: string, category?: string | null) => {
+const resolveCurriculumIds = async (
+  grade: string,
+  subject: string,
+  category?: string | null,
+  scopedIds?: { gradeId?: string; subjectId?: string },
+) => {
+  if (scopedIds?.gradeId && scopedIds?.subjectId) {
+    const { data, error } = await supabase
+      .from('grade_subjects')
+      .select('grade_id, subject_id')
+      .eq('grade_id', scopedIds.gradeId)
+      .eq('subject_id', scopedIds.subjectId)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (data) {
+      return {
+        gradeId: scopedIds.gradeId,
+        subjectId: scopedIds.subjectId,
+        subjectIds: [scopedIds.subjectId],
+      };
+    }
+
+    console.warn('[ClassroomView] Rejected invalid stored grade/subject ids.', scopedIds);
+  }
+
   const gradeCandidates = getGradeCandidates(grade);
   const subjectCandidates = getSubjectCandidates(subject, category);
 
@@ -207,6 +239,8 @@ export const ClassroomView: React.FC = () => {
   const settingsMap = useMemo(() => Object.fromEntries(dbSettings.map(s => [s.key, s.value])), [dbSettings]);
 
   const currentGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
+  const currentGradeId = settingsMap['selected_grade_id'] || localStorage.getItem('selected_grade_id') || '';
+  const currentSubjectId = settingsMap['selected_subject_id'] || localStorage.getItem('selected_subject_id') || '';
   const currentCountry = settingsMap['selected_country'] || localStorage.getItem('selected_country') || '';
   const selectedBacTrack = settingsMap['selected_bac_track'] || localStorage.getItem('selected_bac_track') || '';
   const gradeCandidates = useMemo(() => getGradeCandidates(currentGrade), [currentGrade]);
@@ -390,7 +424,10 @@ export const ClassroomView: React.FC = () => {
     if (!module) return [] as SupabaseLessonRow[];
 
     const subjectCandidates = getSubjectCandidates(module.name, module.category);
-    const { gradeId, subjectId, subjectIds } = await resolveCurriculumIds(currentGrade, module.name, module.category);
+    const { gradeId, subjectId, subjectIds } = await resolveCurriculumIds(currentGrade, module.name, module.category, {
+      gradeId: currentGradeId,
+      subjectId: currentSubjectId || module.id,
+    });
     const fetchAttempt = async (includeValidation: boolean) => {
       const selectColumns = getLessonSelectColumns({ includeValidation, includeTags: true });
 
@@ -471,7 +508,10 @@ export const ClassroomView: React.FC = () => {
   const fetchSupabaseTopics = async () => {
     if (!module) return [] as SupabaseTopicRow[];
 
-    const { gradeId, subjectId, subjectIds } = await resolveCurriculumIds(currentGrade, module.name, module.category);
+    const { gradeId, subjectId, subjectIds } = await resolveCurriculumIds(currentGrade, module.name, module.category, {
+      gradeId: currentGradeId,
+      subjectId: currentSubjectId || module.id,
+    });
     if (!gradeId || (!subjectId && subjectIds.length === 0)) return [] as SupabaseTopicRow[];
 
     const fetchTopics = async (includeDomains: boolean) => supabase
@@ -691,7 +731,10 @@ export const ClassroomView: React.FC = () => {
       // Fetch existing topics from Supabase if they exist
       let existingTopics: string[] = [];
       try {
-        const { gradeId, subjectId, subjectIds } = await resolveCurriculumIds(currentGrade, module.name, module.category);
+        const { gradeId, subjectId, subjectIds } = await resolveCurriculumIds(currentGrade, module.name, module.category, {
+          gradeId: currentGradeId,
+          subjectId: currentSubjectId || module.id,
+        });
 
         if (gradeId && (subjectIds.length > 0 || subjectId)) {
           const { data: topics } = await supabase
@@ -785,14 +828,20 @@ export const ClassroomView: React.FC = () => {
     return combined.length > maxChars ? combined.substring(0, maxChars) + '...' : combined;
   };
 
-  const getAdminApiHeaders = async () => {
+  const getAdminApiHeaders = async (): Promise<Record<string, string>> => {
     const { data } = await supabase.auth.getSession();
     const accessToken = data?.session?.access_token;
-
-    return {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
     };
+
+    if (accessToken) {
+      headers.Authorization = `Bearer ${accessToken}`;
+    } else if (shouldUseDemoAdminHeader()) {
+      headers['x-levelspace-demo-admin'] = 'true';
+    }
+
+    return headers;
   };
 
   const handleGenerateLesson = async (title?: string, autoNavigate = false) => {
@@ -1021,7 +1070,11 @@ export const ClassroomView: React.FC = () => {
       await db.modules.update(module.id, { strictRAG: false });
     } catch (err: any) {
       console.error(err);
-      toast.error(`Failed to generate starter lessons: ${err.message}`);
+      const message =
+        err?.message === 'Failed to fetch'
+          ? 'API server is not reachable. Start or restart the dev server and try again.'
+          : err?.message || 'Unknown error';
+      toast.error(`Failed to generate starter lessons: ${message}`);
     } finally {
       setIsGeneratingStarterLessons(false);
     }
@@ -1061,7 +1114,7 @@ export const ClassroomView: React.FC = () => {
       <Layout>
         <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
           <BookOpen className="w-12 h-12 text-slate-500/20" />
-          <p className="text-slate-950 font-medium">{t('classroom_not_found')}</p>
+          <p className="text-slate-950 dark:text-ink font-medium">{t('classroom_not_found')}</p>
           <button onClick={() => navigate('/dashboard')} className="text-accent hover:underline">{t('return_to_dashboard')}</button>
         </div>
       </Layout>
@@ -1076,7 +1129,7 @@ export const ClassroomView: React.FC = () => {
           <div className="space-y-4">
             <button 
               onClick={() => navigate('/dashboard')}
-              className="flex items-center gap-2 text-xs font-bold  text-slate-500 hover:text-slate-950 transition-colors"
+              className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-950 transition-colors dark:text-ink-muted dark:hover:text-ink"
             >
               <ArrowLeft size={14} />
               {t('back_to_dashboard')}
@@ -1084,9 +1137,9 @@ export const ClassroomView: React.FC = () => {
             <div className="space-y-2">
               <div className="flex items-center gap-3">
                 <span className="bg-accent/10 text-accent text-xs font-medium px-2 py-0.5 rounded ">{module.code}</span>
-                <span className="text-slate-500 text-xs font-medium">{module.category}</span>
+                <span className="text-slate-500 text-xs font-medium dark:text-ink-muted">{module.category}</span>
               </div>
-              <h1 className="text-5xl md:text-6xl font-bold font-display leading-[0.88] tracking-tight text-slate-950 editorial-title">{module.name}</h1>
+              <h1 className="text-5xl md:text-6xl font-bold font-display leading-[0.88] tracking-tight text-slate-950 dark:text-ink editorial-title">{module.name}</h1>
               <p className="ls-body-text max-w-2xl leading-relaxed">{module.description}</p>
             </div>
           </div>
@@ -1097,7 +1150,7 @@ export const ClassroomView: React.FC = () => {
                 <button
                   onClick={handleSeedFromSupabase}
                   disabled={isSeeding}
-                  className="flex items-center gap-2 bg-slate-50 text-slate-950 px-4 py-3 rounded-xl text-xs font-medium transition-all border border-slate-200 hover:border-accent/30 hover:text-accent disabled:opacity-50"
+                  className="flex items-center gap-2 bg-slate-50 text-slate-950 px-4 py-3 rounded-xl text-xs font-medium transition-all border border-slate-200 hover:border-accent/30 hover:text-accent disabled:opacity-50 dark:bg-paper dark:text-ink dark:border-white/10 dark:hover:bg-surface-low"
                 >
                   {isSeeding ? <Loader2 size={14} className="animate-spin" /> : <Database size={14} />}
                   {isSeeding ? 'Loading Units' : 'Load from Supabase'}
@@ -1108,7 +1161,7 @@ export const ClassroomView: React.FC = () => {
                   {isAdmin && hasLessons && (
                     <button
                       onClick={handleAuditClassroom}
-                      className="flex items-center gap-2 bg-slate-50 text-slate-500 hover:text-accent px-4 py-3 rounded-xl text-xs font-medium transition-all border border-slate-200"
+                      className="flex items-center gap-2 bg-slate-50 text-slate-500 hover:text-accent px-4 py-3 rounded-xl text-xs font-medium transition-all border border-slate-200 dark:bg-paper dark:text-ink-muted dark:border-white/10 dark:hover:bg-surface-low"
                     >
                       <ShieldCheck size={14} />
                       Audit
@@ -1117,14 +1170,14 @@ export const ClassroomView: React.FC = () => {
                   <button
                     onClick={() => handleGenerateLesson()}
                     disabled={!!generatingTitle}
-                    className="flex items-center gap-2 bg-slate-950 text-white px-6 py-3 rounded-xl text-xs font-bold  hover:bg-accent transition-all shadow-sm shadow-ink/10 disabled:opacity-50"
+                    className="flex items-center gap-2 bg-slate-950 text-white px-6 py-3 rounded-xl text-xs font-bold  hover:bg-accent transition-all shadow-sm shadow-ink/10 disabled:opacity-50 dark:bg-surface-low dark:text-ink dark:hover:bg-surface-high"
                   >
                     {generatingTitle === module.name ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
                     {hasLessons ? 'Generate Lesson' : 'Generate First Lesson'}
                   </button>
                 </>
               ) : (
-                <div className="px-4 py-3 rounded-xl border border-amber-200 bg-amber-50 text-amber-800 text-xs font-medium">
+                <div className="px-4 py-3 rounded-xl border border-amber-200 bg-amber-50 text-amber-800 text-xs font-medium dark:border-amber-500/30 dark:bg-amber-950/20 dark:text-amber-200">
                   AI features need an API key
                 </div>
               )}
@@ -1134,25 +1187,25 @@ export const ClassroomView: React.FC = () => {
 
         {/* Admin Controls */}
         {isAdmin && (
-          <div className="bg-slate-50/70 rounded-2xl p-4 border border-slate-200">
+          <div className="bg-slate-50/70 rounded-2xl p-4 border border-slate-200 dark:bg-surface-low/70 dark:border-white/10">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div className="space-y-1">
                 <p className="text-xs font-medium text-accent">Admin Controls</p>
-                <p className="text-sm text-slate-950 font-medium">Keep this classroom grounded in certified content before using AI.</p>
+                <p className="text-sm text-slate-950 font-medium dark:text-ink">Keep this classroom grounded in certified content before using AI.</p>
               </div>
               <div className="flex flex-wrap items-center gap-3">
-                <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-white border border-slate-200">
+                <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-white border border-slate-200 dark:bg-surface-mid dark:border-white/10">
                   <div>
                     <p className="ls-micro-label">Strict RAG</p>
-                    <p className="text-[11px] text-slate-500">Use lesson context only</p>
+                    <p className="text-[11px] text-slate-500 dark:text-ink-muted">Use lesson context only</p>
                   </div>
                   <button
                     onClick={async () => {
                       await db.modules.update(module.id, { strictRAG: !module.strictRAG });
                     }}
-                    className={`w-12 h-6 rounded-full transition-colors relative ${module.strictRAG ? 'bg-accent' : 'bg-slate-950/20'}`}
+                    className={`w-12 h-6 rounded-full transition-colors relative ${module.strictRAG ? 'bg-accent' : 'bg-slate-950/20 dark:bg-surface-mid/50'}`}
                   >
-                    <div className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${module.strictRAG ? 'translate-x-6' : 'translate-x-0'}`} />
+                    <div className={`absolute top-1 left-1 bg-white dark:bg-surface-low w-4 h-4 rounded-full transition-transform ${module.strictRAG ? 'translate-x-6' : 'translate-x-0'}`} />
                   </button>
                 </div>
               </div>
@@ -1162,7 +1215,7 @@ export const ClassroomView: React.FC = () => {
 
         {/* Stats Grid */}
         {isHydratingSupabase && !hasLessons && !hasTopicFallback && (
-          <div className="bg-slate-50/50 border border-slate-200 rounded-3xl p-6 flex items-center gap-3 ls-body-text">
+          <div className="bg-slate-50/50 border border-slate-200 rounded-3xl p-6 flex items-center gap-3 ls-body-text dark:bg-surface-low/50 dark:border-white/10">
             <Loader2 className="h-4 w-4 animate-spin text-accent" />
             Checking Supabase for existing lessons, topics, and outlines...
           </div>
@@ -1208,17 +1261,17 @@ export const ClassroomView: React.FC = () => {
             <div className="ls-card p-6 space-y-2">
               <p className="ls-micro-label">Progress</p>
               <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-bold text-slate-950">{module.progress}%</span>
+                <span className="text-3xl font-bold text-slate-950 dark:text-ink">{module.progress}%</span>
                 <span className="ls-micro-label">Complete</span>
               </div>
-              <div className="w-full h-1.5 bg-slate-50 rounded-full overflow-hidden">
+              <div className="w-full h-1.5 bg-slate-50 rounded-full overflow-hidden dark:bg-surface-mid">
                 <div className="h-full bg-accent" style={{ width: `${module.progress}%` }} />
               </div>
             </div>
             <div className="ls-card p-6 space-y-2">
               <p className="ls-micro-label">Lessons</p>
               <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-bold text-slate-950">{hasLessons ? lessons.length : topicFallbackRows.length}</span>
+                <span className="text-3xl font-bold text-slate-950 dark:text-ink">{hasLessons ? lessons.length : topicFallbackRows.length}</span>
                 <span className="ls-micro-label">{hasLessons ? 'Units Curated' : 'Topics need starter lessons'}</span>
               </div>
             </div>
@@ -1226,18 +1279,18 @@ export const ClassroomView: React.FC = () => {
         )}
 
         {showSetupState ? (
-          <div className="bg-slate-50/50 border border-solid border-slate-200 rounded-3xl p-10 md:p-14 flex flex-col items-center justify-center text-center space-y-6">
-            <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm">
+          <div className="bg-slate-50/50 border border-solid border-slate-200 rounded-3xl p-10 md:p-14 flex flex-col items-center justify-center text-center space-y-6 dark:bg-surface-low/50 dark:border-white/10">
+            <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm dark:bg-surface-mid">
               <BookOpen size={24} className="text-accent" />
             </div>
             <div className="space-y-2 max-w-md">
-              <p className="text-xl font-bold text-slate-950">Set up this classroom</p>
+              <p className="text-xl font-bold text-slate-950 dark:text-ink">Set up this classroom</p>
               <p className="ls-body-text">Start with teacher-reviewed or officially validated curriculum units, then add draft AI content only when you need it.</p>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-2 ls-micro-label">
-              <span className="px-3 py-1 rounded-full bg-white border border-slate-200">Supabase First</span>
-              <span className="px-3 py-1 rounded-full bg-white border border-slate-200">Local Classroom</span>
-              <span className="px-3 py-1 rounded-full bg-white border border-slate-200">{module.strictRAG ? 'Strict RAG On' : 'Strict RAG Off'}</span>
+              <span className="px-3 py-1 rounded-full bg-white border border-slate-200 dark:bg-surface-mid dark:border-white/10 dark:text-ink">Supabase First</span>
+              <span className="px-3 py-1 rounded-full bg-white border border-slate-200 dark:bg-surface-mid dark:border-white/10 dark:text-ink">Local Classroom</span>
+              <span className="px-3 py-1 rounded-full bg-white border border-slate-200 dark:bg-surface-mid dark:border-white/10 dark:text-ink">{module.strictRAG ? 'Strict RAG On' : 'Strict RAG Off'}</span>
             </div>
             {!aiAvailable && (
               <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 w-full max-w-md">
@@ -1257,7 +1310,7 @@ export const ClassroomView: React.FC = () => {
                 <button
                   onClick={() => handleGenerateLesson()}
                   disabled={!!generatingTitle}
-                  className="flex-1 flex items-center justify-center gap-2 bg-white text-slate-950 px-4 py-3 rounded-xl text-xs font-bold  border border-slate-200 hover:border-accent/30 hover:text-accent transition-all disabled:opacity-50"
+                  className="flex-1 flex items-center justify-center gap-2 bg-white text-slate-950 px-4 py-3 rounded-xl text-xs font-bold  border border-slate-200 hover:border-accent/30 hover:text-accent transition-all disabled:opacity-50 dark:bg-paper dark:text-ink dark:border-white/10 dark:hover:bg-surface-low"
                 >
                   {generatingTitle === module.name ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
                   Generate First Lesson
@@ -1269,7 +1322,7 @@ export const ClassroomView: React.FC = () => {
           <>
             {/* Tabs */}
             {showTabs && (
-              <div className="flex gap-2 border-b border-slate-200 overflow-x-auto pb-2">
+              <div className="flex gap-2 border-b border-slate-200 dark:border-white/10 overflow-x-auto pb-2">
                 {(['lessons', 'quizzes', 'exercises'] as const).map((tabKey) => {
                   const tabConfig = CLASSROOM_TAB_CONFIG[tabKey];
                   const TabIcon = tabConfig.icon;
@@ -1278,13 +1331,13 @@ export const ClassroomView: React.FC = () => {
                     <button
                       key={tabKey}
                       onClick={() => setActiveTab(tabKey)}
-                      className={`flex items-center gap-2 rounded-t-2xl px-4 py-3 text-sm font-bold  transition-all border-b-2 whitespace-nowrap ${
+                      className={`flex items-center gap-2 rounded-t-2xl px-4 py-3 text-sm font-bold transition-all border-b-2 whitespace-nowrap ${
                         isActive
                           ? tabConfig.activeClass
-                          : 'border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-950'
+                          : 'border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-950 dark:text-ink-muted dark:hover:bg-surface-low dark:hover:text-ink'
                       }`}
                     >
-                      <TabIcon size={16} className={isActive ? tabConfig.iconClass : 'text-slate-500'} />
+                      <TabIcon size={16} className={isActive ? tabConfig.iconClass : 'text-slate-500 dark:text-ink-muted'} />
                       {t(tabKey)}
                     </button>
                   );
@@ -1307,7 +1360,7 @@ export const ClassroomView: React.FC = () => {
                   </div>
                 )}
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-bold text-slate-950 flex items-center gap-2">
+                  <h3 className="text-lg font-bold text-slate-950 dark:text-ink flex items-center gap-2">
                     <BookOpen size={20} className="text-accent" />
                     {hasTopicFallback ? t('curriculum_topics') : t('curriculum_units')}
                   </h3>
@@ -1325,14 +1378,14 @@ export const ClassroomView: React.FC = () => {
                 </div>
 
                 {showDomainTabs && (
-                  <div className="rounded-2xl border border-slate-200 bg-white p-2">
+                  <div className="rounded-2xl border border-slate-200 bg-white p-2 dark:border-white/10 dark:bg-paper">
                     <div className="flex gap-2 overflow-x-auto">
                       <button
                         onClick={() => setActiveDomainKey('all')}
                         className={`shrink-0 rounded-xl px-4 py-2 text-xs font-medium transition-all ${
                           activeDomainKey === 'all'
                             ? 'bg-accent text-white shadow-sm'
-                            : 'text-slate-500 hover:bg-slate-50 hover:text-slate-950'
+                            : 'text-slate-500 dark:text-ink-muted hover:bg-slate-50 dark:hover:bg-surface-low hover:text-slate-950 dark:hover:text-ink'
                         }`}
                       >
                         {t('all')}
@@ -1344,7 +1397,7 @@ export const ClassroomView: React.FC = () => {
                           className={`shrink-0 rounded-xl px-4 py-2 text-xs font-medium transition-all ${
                             activeDomainKey === domain.key
                               ? 'bg-accent text-white shadow-sm'
-                              : 'text-slate-500 hover:bg-slate-50 hover:text-slate-950'
+                              : 'text-slate-500 dark:text-ink-muted hover:bg-slate-50 dark:hover:bg-surface-low hover:text-slate-950 dark:hover:text-ink'
                           }`}
                         >
                           {domain.name}
@@ -1364,16 +1417,16 @@ export const ClassroomView: React.FC = () => {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: i * 0.05 }}
                         onClick={() => navigate(`/lesson/${lesson.id}`)}
-                        className="bg-white border border-slate-200 p-5 rounded-2xl flex items-center justify-between group cursor-pointer hover:border-accent/30 hover:shadow-sm hover:shadow-ink/5 transition-all"
+                        className="bg-white border border-slate-200 p-5 rounded-2xl flex items-center justify-between group cursor-pointer hover:border-accent/30 hover:shadow-sm hover:shadow-ink/5 transition-all dark:bg-paper dark:border-white/10"
                       >
                         <div className="flex items-center gap-4">
                           <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors ${
-                            lesson.status === 'done' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-500 group-hover:bg-accent/10 group-hover:text-accent'
+                            lesson.status === 'done' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400' : 'bg-slate-50 text-slate-500 group-hover:bg-accent/10 group-hover:text-accent dark:bg-surface-mid dark:text-ink-secondary'
                           }`}>
                             {lesson.status === 'done' ? <CheckCircle2 size={24} /> : <Play size={20} className="ml-1" />}
                           </div>
                           <div>
-                            <h4 className="text-base font-bold text-slate-950 group-hover:text-accent transition-colors">{lesson.title}</h4>
+                            <h4 className="text-base font-bold text-slate-950 group-hover:text-accent transition-colors dark:text-ink">{lesson.title}</h4>
                             <div className="mt-2 flex flex-wrap items-center gap-2">
                               <span className={getCurriculumValidationBadgeClass(lesson.validation_status, !!lesson.is_ai_generated)}>
                                 {getCurriculumValidationLabel(lesson.validation_status, !!lesson.is_ai_generated)}
@@ -1385,9 +1438,9 @@ export const ClassroomView: React.FC = () => {
                               ) : null}
                             </div>
                             <div className="flex items-center gap-3 mt-2">
-                              <span className="text-[10px] font-mono  text-slate-500/60">Unit {i + 1}</span>
-                              <span className="w-1 h-1 rounded-full bg-slate-950/10" />
-                              <span className="text-[10px] font-mono  text-slate-500/60">~15 min</span>
+                              <span className="text-[10px] font-mono  text-slate-500/60 dark:text-ink-muted/60">Unit {i + 1}</span>
+                              <span className="w-1 h-1 rounded-full bg-slate-950/10 dark:bg-ink/20" />
+                              <span className="text-[10px] font-mono  text-slate-500/60 dark:text-ink-muted/60">~15 min</span>
                             </div>
                             <div className="mt-2" onClick={(e) => e.stopPropagation()}>
                               <TagsManager 
@@ -1407,11 +1460,11 @@ export const ClassroomView: React.FC = () => {
                             </div>
                           </div>
                         </div>
-                        <ChevronRight size={20} className="text-slate-500/30 group-hover:text-accent group-hover:translate-x-1 transition-all" />
+                        <ChevronRight size={20} className="text-slate-500/30 group-hover:text-accent group-hover:translate-x-1 transition-all dark:text-ink-muted/60" />
                       </motion.div>
                     )) : (
-                      <div className="rounded-2xl border border-solid border-slate-200 bg-white p-5">
-                        <p className="text-sm font-semibold text-slate-950">No lessons in this domain yet.</p>
+                      <div className="rounded-2xl border border-solid border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-paper">
+                        <p className="text-sm font-semibold text-slate-950 dark:text-ink">No lessons in this domain yet.</p>
                         <p className="mt-1 ls-micro-label">Switch back to {t('all')} to see every available lesson for this classroom.</p>
                       </div>
                     )
@@ -1422,14 +1475,14 @@ export const ClassroomView: React.FC = () => {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: i * 0.03 }}
-                        className="bg-white border border-solid border-slate-200 p-5 rounded-2xl"
+                        className="bg-white border border-solid border-slate-200 p-5 rounded-2xl dark:bg-paper dark:border-white/10"
                       >
                         <div className="flex items-start gap-4">
-                          <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center">
+                          <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300 flex items-center justify-center">
                             <Clock size={22} />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <h4 className="text-base font-bold text-slate-950">{topic.title}</h4>
+                            <h4 className="text-base font-bold text-slate-950 dark:text-ink">{topic.title}</h4>
                             <div className="mt-2 flex flex-wrap items-center gap-2">
                               <span className="pill pill--warn">needs lesson generation</span>
                               <span className="pill pill--neutral">topic from Supabase</span>
@@ -1437,27 +1490,27 @@ export const ClassroomView: React.FC = () => {
                               <span className="pill pill--neutral">RAG disabled until reviewed</span>
                             </div>
                             {topic.outlines.length > 0 ? (
-                              <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
+                              <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/60 p-3 dark:border-white/10 dark:bg-surface-low/60">
                                 <p className="ls-micro-label">Available outline</p>
                                 <div className="mt-2 space-y-2">
                                   {topic.outlines.slice(0, 3).map((outline) => (
-                                    <div key={outline.id} className="rounded-xl bg-white/70 px-3 py-2">
-                                      <p className="text-sm font-semibold text-slate-950">{outline.title || 'Untitled outline item'}</p>
+                                    <div key={outline.id} className="rounded-xl bg-white/70 px-3 py-2 dark:bg-surface-mid/80">
+                                      <p className="text-sm font-semibold text-slate-950 dark:text-ink">{outline.title || 'Untitled outline item'}</p>
                                       {outline.description && (
-                                        <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-500">{outline.description}</p>
+                                        <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-500 dark:text-ink-muted">{outline.description}</p>
                                       )}
                                     </div>
                                   ))}
                                 </div>
                                 {topic.outlines.length > 3 && (
-                                  <p className="mt-2 text-xs font-medium text-slate-500">+{topic.outlines.length - 3} more outline items</p>
+                                  <p className="mt-2 text-xs font-medium text-slate-500 dark:text-ink-muted">+{topic.outlines.length - 3} more outline items</p>
                                 )}
                               </div>
                             ) : (
                               <p className="mt-3 ls-micro-label">No outline rows available yet for this topic.</p>
                             )}
                             <div className="flex items-center gap-3 mt-2">
-                              <span className="text-[10px] font-mono  text-slate-500/60">Topic {i + 1}</span>
+                              <span className="text-[10px] font-mono  text-slate-500/60 dark:text-ink-muted/60">Topic {i + 1}</span>
                             </div>
                           </div>
                         </div>
@@ -1473,7 +1526,7 @@ export const ClassroomView: React.FC = () => {
         {activeTab === 'quizzes' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-slate-950 flex items-center gap-2">
+              <h3 className="text-lg font-bold text-slate-950 dark:text-ink flex items-center gap-2">
                 <Target size={20} className="text-accent" />
                 {t('available_quizzes')}
               </h3>
@@ -1483,19 +1536,19 @@ export const ClassroomView: React.FC = () => {
             ) : quizzes.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {quizzes.map((quiz) => (
-                  <div key={quiz.id} className="bg-white border border-slate-200 p-5 rounded-2xl hover:border-accent/30 transition-all cursor-pointer">
-                    <h4 className="font-bold text-slate-950">{quiz.title}</h4>
+                  <div key={quiz.id} className="bg-white border border-slate-200 p-5 rounded-2xl hover:border-accent/30 transition-all cursor-pointer dark:bg-paper dark:border-white/10">
+                    <h4 className="font-bold text-slate-950 dark:text-ink">{quiz.title}</h4>
                     <p className="ls-body-text mt-1">{quiz.description}</p>
                     <div className="flex items-center gap-3 mt-4">
-                      <span className="text-xs font-medium bg-slate-50 px-2 py-1 rounded text-slate-500">{quiz.difficulty}</span>
-                      <span className="text-xs font-medium bg-slate-50 px-2 py-1 rounded text-slate-500">{quiz.questions?.length || 0} Questions</span>
+                      <span className="text-xs font-medium bg-slate-50 px-2 py-1 rounded text-slate-500 dark:bg-surface-mid dark:text-ink-muted">{quiz.difficulty}</span>
+                      <span className="text-xs font-medium bg-slate-50 px-2 py-1 rounded text-slate-500 dark:bg-surface-mid dark:text-ink-muted">{quiz.questions?.length || 0} Questions</span>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="bg-slate-50/50 border border-solid border-slate-200 rounded-3xl p-16 text-center">
-                <p className="text-slate-500">{t('no_quizzes_for_lessons')}</p>
+              <div className="bg-slate-50/50 border border-solid border-slate-200 rounded-3xl p-16 text-center dark:bg-surface-low/50 dark:border-white/10">
+                <p className="text-slate-500 dark:text-ink-muted">{t('no_quizzes_for_lessons')}</p>
               </div>
             )}
           </div>
@@ -1504,7 +1557,7 @@ export const ClassroomView: React.FC = () => {
         {activeTab === 'exercises' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-slate-950 flex items-center gap-2">
+              <h3 className="text-lg font-bold text-slate-950 dark:text-ink flex items-center gap-2">
                 <Dumbbell size={20} className="text-accent" />
                 {t('practice_exercises')}
               </h3>
@@ -1514,18 +1567,18 @@ export const ClassroomView: React.FC = () => {
             ) : exercises.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {exercises.map((exercise) => (
-                  <div key={exercise.id} className="bg-white border border-slate-200 p-5 rounded-2xl hover:border-accent/30 transition-all cursor-pointer">
-                    <h4 className="font-bold text-slate-950">{exercise.title}</h4>
+                  <div key={exercise.id} className="bg-white border border-slate-200 p-5 rounded-2xl hover:border-accent/30 transition-all cursor-pointer dark:bg-paper dark:border-white/10">
+                    <h4 className="font-bold text-slate-950 dark:text-ink">{exercise.title}</h4>
                     <p className="ls-body-text mt-1 line-clamp-2">{exercise.prompt}</p>
                     <div className="flex items-center gap-3 mt-4">
-                      <span className="text-xs font-medium bg-slate-50 px-2 py-1 rounded text-slate-500">{exercise.difficulty}</span>
+                      <span className="text-xs font-medium bg-slate-50 px-2 py-1 rounded text-slate-500 dark:bg-surface-mid dark:text-ink-muted">{exercise.difficulty}</span>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="bg-slate-50/50 border border-solid border-slate-200 rounded-3xl p-16 text-center">
-                <p className="text-slate-500">{t('no_exercises_for_lessons')}</p>
+              <div className="bg-slate-50/50 border border-solid border-slate-200 rounded-3xl p-16 text-center dark:bg-surface-low/50 dark:border-white/10">
+                <p className="text-slate-500 dark:text-ink-muted">{t('no_exercises_for_lessons')}</p>
               </div>
             )}
           </div>
@@ -1538,10 +1591,10 @@ export const ClassroomView: React.FC = () => {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              className="space-y-4 pt-8 border-t border-slate-200"
+              className="space-y-4 pt-8 border-t border-slate-200 dark:border-white/10"
             >
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-bold text-slate-950 flex items-center gap-2">
+                <h3 className="text-lg font-bold text-slate-950 dark:text-ink flex items-center gap-2">
                   <Sparkles size={20} className="text-accent" />
                   Suggested Units
                 </h3>
@@ -1550,7 +1603,7 @@ export const ClassroomView: React.FC = () => {
                     <button 
                       onClick={handleCurateSelected}
                       disabled={!!generatingTitle}
-                      className="text-xs font-medium text-blue-700 hover:underline disabled:opacity-50"
+                      className="text-xs font-medium text-blue-700 hover:underline disabled:opacity-50 dark:text-accent"
                     >
                       {generatingTitle === 'selected' ? <Loader2 size={10} className="animate-spin inline mr-1" /> : null}
                       Curate Selected ({selectedSuggestions.length})
@@ -1559,7 +1612,7 @@ export const ClassroomView: React.FC = () => {
                     <button 
                       onClick={handleCurateAll}
                       disabled={!!generatingTitle}
-                      className="text-xs font-medium text-blue-700 hover:underline disabled:opacity-50"
+                      className="text-xs font-medium text-blue-700 hover:underline disabled:opacity-50 dark:text-accent"
                     >
                       {generatingTitle === 'all' ? <Loader2 size={10} className="animate-spin inline mr-1" /> : null}
                       Curate All
@@ -1567,7 +1620,7 @@ export const ClassroomView: React.FC = () => {
                   )}
                   <button 
                     onClick={() => setSuggestions([])}
-                    className="ls-micro-label hover:text-slate-950"
+                    className="ls-micro-label hover:text-slate-950 dark:hover:text-ink"
                   >
                     Close Gallery
                   </button>
@@ -1593,8 +1646,8 @@ export const ClassroomView: React.FC = () => {
                             : [...prev, suggestion.title]
                         );
                       }}
-                      className={`bg-white border p-6 rounded-2xl space-y-4 transition-all group cursor-pointer relative ${
-                        isSelected ? 'border-accent ring-1 ring-accent/20 bg-accent/[0.02]' : 'border-slate-200 hover:border-accent/30'
+                      className={`bg-white border p-6 rounded-2xl space-y-4 transition-all group cursor-pointer relative dark:bg-paper dark:border-white/10 ${
+                        isSelected ? 'border-accent ring-1 ring-accent/20 bg-accent/[0.02] dark:bg-accent/[0.04]' : 'border-slate-200 hover:border-accent/30 dark:border-white/10'
                       } ${anyGenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                       {isSelected && (
@@ -1603,7 +1656,7 @@ export const ClassroomView: React.FC = () => {
                         </div>
                       )}
                       <div className="space-y-1">
-                        <h4 className={`text-base font-bold transition-colors ${isSelected ? 'text-accent' : 'text-slate-950 group-hover:text-accent'}`}>
+                        <h4 className={`text-base font-bold transition-colors ${isSelected ? 'text-accent' : 'text-slate-950 dark:text-ink group-hover:text-accent'}`}>
                           {suggestion.title}
                         </h4>
                         <p className="ls-micro-label leading-relaxed">{suggestion.description}</p>
@@ -1626,7 +1679,7 @@ export const ClassroomView: React.FC = () => {
                             handleGenerateLesson(suggestion.title, true);
                           }}
                           disabled={anyGenerating}
-                          className="flex items-center gap-2 text-xs font-medium text-slate-950  hover:underline disabled:opacity-50"
+                          className="flex items-center gap-2 text-xs font-medium text-slate-950 dark:text-ink hover:underline disabled:opacity-50 dark:hover:text-white"
                         >
                           {isThisGenerating ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
                           Curate & Launch

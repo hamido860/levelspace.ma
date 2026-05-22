@@ -102,8 +102,15 @@ function sendError(res: VercelResponse, error: unknown, fallbackMessage: string)
     return res.status(error.status).json({ error: error.message });
   }
 
+  const message =
+    error instanceof Error
+      ? error.message
+      : error && typeof error === "object" && "message" in error && typeof (error as { message?: unknown }).message === "string"
+        ? (error as { message: string }).message
+        : fallbackMessage;
+
   return res.status(500).json({
-    error: error instanceof Error ? error.message : fallbackMessage,
+    error: message,
   });
 }
 

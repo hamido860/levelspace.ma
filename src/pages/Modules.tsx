@@ -20,6 +20,7 @@ import {
 import { generateCurriculum, checkAIProvider } from '../services/geminiService';
 import { getClassroomLoadPlan, mapSubjectsToModules, mergeModulesWithAiSuggestions, shouldRequestAiCurriculumSuggestions } from '../services/classroomLoader';
 import { getGradeCandidates, getSubjectCandidates, normalizeCurriculumValue } from '../services/curriculumMatching';
+import { getSubjectsForGrade } from '../services/curriculumService';
 import { supabase } from '../db/supabase';
 import { useSearch } from '../context/SearchContext';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -48,45 +49,11 @@ const getIconForCategory = (category: string) => {
 
 const MODULES_SCOPE_VERSION = 'v2';
 
-const MOROCCAN_SCOPE_SUBJECTS: Record<string, string[]> = {
-  'tronc commun::tronc commun scientifique': [
-    'Mathématiques',
-    'Physique-Chimie',
-    'Sciences de la Vie et de la Terre (SVT)',
-    'Français',
-    'Informatique',
-    'Arabe',
-    'Education Islamique',
-    'Histoire-Géographie',
-  ],
-  'tronc commun::tronc commun litteraire': [
-    'Arabe',
-    'Français',
-    'Histoire-Géographie',
-    'Education Islamique',
-    'Mathématiques',
-    'Informatique',
-  ],
-  'tronc commun::tronc commun technologique': [
-    'Mathématiques',
-    'Physique-Chimie',
-    "Sciences de l'Ingénieur",
-    'Français',
-    'Informatique',
-  ],
-};
-
-const buildTrustedSubjectNames = (country: string, grade: string, track: string) => {
-  if (normalizeCurriculumValue(country) !== 'morocco') return [];
-  return MOROCCAN_SCOPE_SUBJECTS[`${normalizeCurriculumValue(grade)}::${normalizeCurriculumValue(track)}`] || [];
-};
+const filterBySelectedSubject = <T extends { id: string }>(items: T[], selectedSubjectId: string) =>
+  selectedSubjectId ? items.filter((item) => item.id === selectedSubjectId) : items;
 
 const buildTrustedSubjectSet = (subjectNames: string[]) =>
-  new Set(
-    subjectNames
-      .flatMap((name) => getSubjectCandidates(name))
-      .map((name) => normalizeCurriculumValue(name)),
-  );
+  new Set(subjectNames.map((name) => normalizeCurriculumValue(name)));
 
 const moduleMatchesTrustedSubjects = (
   module: { name: string; category: string; code: string },
@@ -103,18 +70,6 @@ const moduleMatchesTrustedSubjects = (
 
   return Array.from(candidates).some((candidate) => trustedSubjects.has(candidate));
 };
-
-const buildFallbackTrustedModules = (subjectNames: string[]) =>
-  subjectNames.map((name) => ({
-    id: `trusted-${normalizeCurriculumValue(name).replace(/\s+/g, '-')}`,
-    name,
-    code: name,
-    description: 'Trusted Moroccan curriculum subject',
-    category: name,
-    progress: 0,
-    selected: false,
-    createdAt: Date.now(),
-  }));
 
 const getNestedSingle = <T,>(value: T | T[] | null | undefined): T | null => {
   if (Array.isArray(value)) return value[0] || null;
@@ -252,12 +207,17 @@ export const Modules: React.FC = () => {
   const settingsMap = useMemo(() => Object.fromEntries(dbSettings.map(s => [s.key, s.value])), [dbSettings]);
 
   const country = settingsMap['selected_country'] || localStorage.getItem('selected_country') || '';
+  const selectedGradeId = settingsMap['selected_grade_id'] || localStorage.getItem('selected_grade_id') || '';
   const grade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
+  const selectedSubjectId = settingsMap['selected_subject_id'] || localStorage.getItem('selected_subject_id') || '';
+  const selectedSubjectName = settingsMap['selected_subject'] || localStorage.getItem('selected_subject') || '';
   const selectedBacTrackId = settingsMap['selected_bac_track'] || localStorage.getItem('selected_bac_track') || '';
   const selectedBacIntOptionId = settingsMap['selected_bac_int_option'] || localStorage.getItem('selected_bac_int_option') || '';
   const classroomScopeKey = [
     'modules',
     MODULES_SCOPE_VERSION,
+    selectedGradeId,
+    selectedSubjectId,
     normalizeCurriculumValue(country),
     normalizeCurriculumValue(grade),
     normalizeCurriculumValue(String(selectedBacTrackId || '')),
@@ -267,7 +227,7 @@ export const Modules: React.FC = () => {
 
   const [bacTrackName, setBacTrackName] = useState<string>('');
   const [bacIntOptionName, setBacIntOptionName] = useState<string>('');
-  const trustedSubjectNames = buildTrustedSubjectNames(country, grade, bacTrackName || selectedBacTrackId);
+  const trustedSubjectNames = selectedSubjectName ? [selectedSubjectName] : [];
   const trustedSubjectSet = buildTrustedSubjectSet(trustedSubjectNames);
   const modules = (dbModules || [])
     .filter((module) => moduleMatchesTrustedSubjects(module, trustedSubjectSet))
@@ -313,28 +273,33 @@ export const Modules: React.FC = () => {
 
     const plan = getClassroomLoadPlan({ action: 'create_classroom', isPro });
     fetchCurriculum(plan.includeAiSuggestions);
-  }, [classroomScopeKey, country, dbModules, grade, isPro, modules.length, storedClassroomScopeKey]);
+  }, [classroomScopeKey, country, dbModules, grade, isPro, modules.length, selectedGradeId, selectedSubjectId, storedClassroomScopeKey]);
 
   const fetchCurriculum = async (includeAiSuggestions = false, bypassAiCache = false) => {
     setIsLoading(true);
     try {
-      const scopedSubjectRows = await fetchSubjectsForCurrentGrade(country, grade);
-      let subjectRows = scopedSubjectRows;
+      if (!selectedGradeId) {
+        console.warn('[Modules] Cannot load classroom curriculum without selected_grade_id.');
+        return;
+      }
 
-      if (subjectRows === null) {
-        const { data, error } = await supabase.from('subjects').select('*').limit(500);
-        if (error) throw error;
-        subjectRows = data || [];
+      const scopedSubjectRows = await getSubjectsForGrade(selectedGradeId);
+      const subjectRows = filterBySelectedSubject(scopedSubjectRows, selectedSubjectId);
+
+      if (subjectRows.length === 0) {
+        console.warn('[Modules] No Supabase subjects matched the selected onboarding grade/subject.', {
+          selectedGradeId,
+          selectedSubjectId,
+          grade,
+          selectedSubjectName,
+        });
       }
 
       const supabaseModules = mapSubjectsToModules((subjectRows || []) as any[]);
       let modulesToStore = supabaseModules;
 
       if (trustedSubjectSet.size > 0) {
-        const scopedSupabaseModules = supabaseModules.filter((module) => moduleMatchesTrustedSubjects(module, trustedSubjectSet));
-        modulesToStore = scopedSupabaseModules.length > 0
-          ? scopedSupabaseModules
-          : buildFallbackTrustedModules(trustedSubjectNames);
+        modulesToStore = supabaseModules.filter((module) => moduleMatchesTrustedSubjects(module, trustedSubjectSet));
       }
 
       if (shouldRequestAiCurriculumSuggestions({ includeAiSuggestions, aiAvailable })) {
@@ -390,15 +355,13 @@ export const Modules: React.FC = () => {
           };
         });
 
-        if (scopedSubjectRows !== null) {
-          const nextIds = new Set(mergedModules.map((module) => module.id));
-          const staleModuleIds = (dbModules || [])
-            .filter((module) => !nextIds.has(module.id))
-            .map((module) => module.id);
+        const nextIds = new Set(mergedModules.map((module) => module.id));
+        const staleModuleIds = (dbModules || [])
+          .filter((module) => !nextIds.has(module.id))
+          .map((module) => module.id);
 
-          if (staleModuleIds.length > 0) {
-            await db.modules.bulkDelete(staleModuleIds);
-          }
+        if (staleModuleIds.length > 0) {
+          await db.modules.bulkDelete(staleModuleIds);
         }
 
         await db.modules.bulkPut(mergedModules);
