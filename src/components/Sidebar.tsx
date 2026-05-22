@@ -74,6 +74,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
           {setIsCollapsed && (
             <button 
               onClick={() => setIsCollapsed(!isCollapsed)}
+              aria-expanded={!isCollapsed}
+              aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
               className="p-1.5 rounded-lg hover:bg-ink/5 text-muted hover:text-ink transition-all"
             >
               {isCollapsed 
@@ -91,6 +93,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
             return (
               <button
                 key={item.path}
+                aria-label={item.label}
                 onClick={() => navigate(item.path)}
                 title={isCollapsed ? item.label : undefined}
                 className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3 px-3'} py-2.5 rounded-lg font-medium text-sm transition-all duration-200 ease-in-out ${
@@ -117,6 +120,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
             return (
               <button
                 key={item.path}
+                aria-label={item.label}
                 onClick={() => navigate(item.path)}
                 title={isCollapsed ? item.label : undefined}
                 className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3 px-3'} py-2.5 rounded-lg font-medium text-sm transition-all duration-200 ease-in-out ${
@@ -135,6 +139,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
           
           <button
             onClick={() => signOut()}
+            aria-label={t("logout")}
             title={isCollapsed ? t('logout') : undefined}
             className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3 px-3'} py-2.5 rounded-lg font-medium text-sm text-muted hover:bg-error/5 hover:text-error transition-all duration-200 ease-in-out mt-1`}
           >
@@ -153,6 +158,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
           return (
             <button
               key={`mobile-${item.path}`}
+              aria-label={item.label}
               onClick={() => navigate(item.path)}
               className={`flex flex-col items-center justify-center gap-1 h-full px-3 min-w-[72px] shrink-0 transition-all duration-300 ${
                 isActive 
