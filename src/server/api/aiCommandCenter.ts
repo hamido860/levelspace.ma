@@ -4,6 +4,7 @@ import type { VercelRequest } from "@vercel/node";
 import postgres from "postgres";
 import { createSupabaseAdminClient } from "../../lib/supabase/admin";
 import { createServerSupabaseClient } from "../../lib/supabase/server";
+import { getPlatformAiKey } from "../../lib/envDiagnostics";
 
 type JsonRecord = Record<string, any>;
 
@@ -2373,8 +2374,8 @@ async function callGeminiSqlGenerator(prompt: string, apiKey: string): Promise<A
 }
 
 async function generateSqlWithConfiguredProvider(prompt: string) {
-  const nvidiaKey = process.env.NVIDIA_API_KEY;
-  const geminiKey = process.env.GEMINI_API_KEY || process.env.GEMINI_KEY_0;
+  const nvidiaKey = getPlatformAiKey("nvidia");
+  const geminiKey = getPlatformAiKey("gemini");
   const errors: string[] = [];
 
   if (nvidiaKey && nvidiaKey !== "MY_NVIDIA_API_KEY") {

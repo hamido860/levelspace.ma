@@ -3,11 +3,9 @@ import type { Database } from "../../types/supabase";
 import { hasUsableSupabaseKey, isValidSupabaseUrl } from "./env";
 
 const browserSupabaseUrl =
-  import.meta.env.NEXT_PUBLIC_SUPABASE_URL ||
   import.meta.env.VITE_SUPABASE_URL;
 
 const browserSupabaseAnonKey =
-  import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
   import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 export let isBrowserSupabaseConfigured =

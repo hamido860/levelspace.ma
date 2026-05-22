@@ -1,3 +1,5 @@
+import { getPlatformAiKey } from "../../envDiagnostics";
+
 export type OpenAIGenerateOptions = {
   prompt: string;
   apiKey?: string;
@@ -10,7 +12,7 @@ export type OpenAIGenerateOptions = {
 
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
 
-const getOpenAIApiKey = () => process.env.OPENAI_API_KEY || "";
+const getOpenAIApiKey = () => getPlatformAiKey("openai");
 
 export async function generateWithOpenAI(options: OpenAIGenerateOptions) {
   const apiKey = options.apiKey || getOpenAIApiKey();

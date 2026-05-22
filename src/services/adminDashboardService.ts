@@ -221,9 +221,35 @@ export interface TopicRepairSummary {
 
 const ensureConfigured = async () => {
   const configured = await checkSupabaseConnection();
-  if (!configured) {
-    throw new Error("Supabase is not configured for the admin dashboard. Add valid Supabase environment variables before loading live metrics.");
+  if (configured) return;
+
+  try {
+    const response = await fetch("/api/diagnostics/env", { cache: "no-store" });
+    const diagnostics = await response.json().catch(() => null) as null | {
+      hasSupabaseClientConfig?: boolean;
+      hasSupabaseServerConfig?: boolean;
+      warnings?: string[];
+    };
+
+    if (diagnostics) {
+      if (!diagnostics.hasSupabaseClientConfig) {
+        throw new Error("Supabase client config missing. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.");
+      }
+      if (!diagnostics.hasSupabaseServerConfig) {
+        throw new Error("Supabase server config missing. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SECRET_KEY.");
+      }
+      const supabaseWarning = diagnostics.warnings?.find((warning) => warning.toLowerCase().includes("supabase"));
+      if (supabaseWarning) {
+        throw new Error(supabaseWarning);
+      }
+    }
+  } catch (error) {
+    if (error instanceof Error && !/failed to fetch/i.test(error.message)) {
+      throw error;
+    }
   }
+
+  throw new Error("Supabase health check failed for the admin dashboard. Restart the API dev server and verify /api/health/supabase.");
 };
 
 const getAdminApiHeaders = async () => {

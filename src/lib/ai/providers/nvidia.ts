@@ -1,3 +1,5 @@
+import { getPlatformAiKey } from "../../envDiagnostics";
+
 export type NvidiaGenerateOptions = {
   prompt: string;
   apiKey?: string;
@@ -11,7 +13,7 @@ export type NvidiaGenerateOptions = {
 const NVIDIA_API_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
 const DEFAULT_NVIDIA_MODEL = "google/gemma-3-27b-it";
 
-const getNvidiaApiKey = () => process.env.NVIDIA_API_KEY || "";
+const getNvidiaApiKey = () => getPlatformAiKey("nvidia");
 
 export async function generateWithNvidia(options: NvidiaGenerateOptions) {
   const apiKey = options.apiKey || getNvidiaApiKey();

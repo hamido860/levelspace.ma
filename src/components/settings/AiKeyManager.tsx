@@ -3,7 +3,7 @@ import { AlertCircle, CheckCircle2, Key, Loader2, Save, Server, ShieldCheck, Tra
 import { toast } from 'sonner';
 import { supabase } from '../../db/supabase';
 
-type Provider = 'gemini' | 'openrouter' | 'openai';
+type Provider = 'gemini' | 'openrouter' | 'openai' | 'nvidia';
 type CredentialMode = 'byok' | 'platform';
 
 type KeyMetadata = {
@@ -20,18 +20,45 @@ type PlatformStatus = {
   platformCreditsEnabled: boolean;
   defaultProvider: string;
   fallbackProvider: string | null;
+  fallbackEnabled: boolean;
   providers: Record<string, boolean>;
   devAdmin?: {
     enabled: boolean;
     providers: Partial<Record<Provider, boolean>>;
     defaultProvider: string | null;
   };
+  savedDevAdminKeys?: Partial<Record<Provider, boolean>>;
+  diagnostics?: {
+    aiProvider: string | null;
+    fallbackProvider: string | null;
+    fallbackEnabled: boolean;
+    hasGeminiKey: boolean;
+    hasOpenRouterKey: boolean;
+    hasOpenAIKey: boolean;
+    hasNvidiaKey: boolean;
+    devAdminKeysEnabled: boolean;
+    hasDevAdminProviderKey: boolean;
+    hasEncryptionSecret: boolean;
+    hasSupabaseClientConfig: boolean;
+    hasSupabaseServerConfig: boolean;
+    warnings: string[];
+  };
+};
+
+type KeysResponse = {
+  keys?: KeyMetadata[];
+  adminConfigured?: boolean;
+  keyPersistenceEnabled?: boolean;
+  ownerMode?: 'user' | 'dev-admin';
+  warning?: string | null;
+  error?: string;
 };
 
 const PROVIDERS: { id: Provider; label: string; placeholder: string }[] = [
   { id: 'gemini', label: 'Gemini', placeholder: 'AIza...' },
   { id: 'openrouter', label: 'OpenRouter', placeholder: 'sk-or-...' },
   { id: 'openai', label: 'OpenAI', placeholder: 'sk-...' },
+  { id: 'nvidia', label: 'NVIDIA', placeholder: 'nvapi-...' },
 ];
 
 const authHeaders = async () => {
@@ -48,17 +75,19 @@ const authHeaders = async () => {
 
 export const AiKeyManager: React.FC = () => {
   const [keys, setKeys] = useState<KeyMetadata[]>([]);
-  const [drafts, setDrafts] = useState<Record<Provider, string>>({ gemini: '', openrouter: '', openai: '' });
+  const [drafts, setDrafts] = useState<Record<Provider, string>>({ gemini: '', openrouter: '', openai: '', nvidia: '' });
   const [mode, setMode] = useState<CredentialMode>(() => (localStorage.getItem('ai_credential_mode') === 'platform' ? 'platform' : 'byok'));
   const [selectedProvider, setSelectedProvider] = useState<Provider>(() => {
     const stored = localStorage.getItem('ai_provider');
-    return stored === 'openrouter' || stored === 'openai' || stored === 'gemini' ? stored : 'gemini';
+    return stored === 'openrouter' || stored === 'openai' || stored === 'gemini' || stored === 'nvidia' ? stored : 'gemini';
   });
   const [busy, setBusy] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [platformStatus, setPlatformStatus] = useState<PlatformStatus | null>(null);
   const [authenticated, setAuthenticated] = useState(false);
   const [loadError, setLoadError] = useState('');
+  const [keyStorageWarning, setKeyStorageWarning] = useState('');
+  const [ownerMode, setOwnerMode] = useState<'user' | 'dev-admin' | 'unknown'>('unknown');
 
   const loadKeys = async () => {
     setLoading(true);
@@ -75,12 +104,15 @@ export const AiKeyManager: React.FC = () => {
       }
 
       const keysResponse = await fetch('/api/settings/ai-keys', { headers });
-      const keysData = await keysResponse.json().catch(() => ({}));
+      const keysData = await keysResponse.json().catch(() => ({})) as KeysResponse;
       if (!keysResponse.ok) throw new Error(keysData.error || 'Unable to load AI keys.');
       setKeys(keysData.keys || []);
+      setOwnerMode(keysData.ownerMode || (hasSession ? 'user' : 'unknown'));
+      setKeyStorageWarning(keysData.warning || '');
     } catch (error: any) {
       setKeys([]);
       setLoadError(error.message || 'Unable to load AI keys.');
+      setOwnerMode('unknown');
     } finally {
       setLoading(false);
     }
@@ -92,7 +124,7 @@ export const AiKeyManager: React.FC = () => {
 
   useEffect(() => {
     const devDefault = platformStatus?.devAdmin?.defaultProvider;
-    if (!localStorage.getItem('ai_provider') && (devDefault === 'gemini' || devDefault === 'openrouter' || devDefault === 'openai')) {
+    if (!localStorage.getItem('ai_provider') && (devDefault === 'gemini' || devDefault === 'openrouter' || devDefault === 'openai' || devDefault === 'nvidia')) {
       setSelectedProvider(devDefault);
       localStorage.setItem('ai_provider', devDefault);
     }
@@ -181,9 +213,31 @@ export const AiKeyManager: React.FC = () => {
     .filter(([, configured]) => configured)
     .map(([provider]) => provider);
   const devAdminEnabled = Boolean(platformStatus?.devAdmin?.enabled);
-  const devAdminProviderLabels = Object.entries(platformStatus?.devAdmin?.providers || {})
+  const savedDevAdminKeys = platformStatus?.savedDevAdminKeys || {};
+  const savedDevAdminProviderLabels = Object.entries(savedDevAdminKeys)
     .filter(([, configured]) => configured)
     .map(([provider]) => provider);
+  const diagnostics = platformStatus?.diagnostics;
+  const providerLabel = (provider: Provider) => PROVIDERS.find((item) => item.id === provider)?.label || provider;
+  const selectedLabel = providerLabel(selectedProvider);
+
+  const diagnosticRows = [
+    ['Selected provider', selectedLabel],
+    ['Fallback provider', diagnostics?.fallbackEnabled ? diagnostics?.fallbackProvider || 'none' : 'disabled'],
+    ['Fallback enabled', diagnostics?.fallbackEnabled ? 'yes' : 'no'],
+    ['Dev/admin keys enabled', diagnostics?.devAdminKeysEnabled ? 'yes' : 'no'],
+    ['Encryption secret configured', diagnostics?.hasEncryptionSecret ? 'yes' : 'no'],
+    ['Platform Gemini key configured', diagnostics?.hasGeminiKey ? 'yes' : 'no'],
+    ['Platform OpenRouter key configured', diagnostics?.hasOpenRouterKey ? 'yes' : 'no'],
+    ['Platform NVIDIA key configured', diagnostics?.hasNvidiaKey ? 'yes' : 'no'],
+    ['Platform OpenAI key configured', diagnostics?.hasOpenAIKey ? 'yes' : 'no'],
+    ['Saved dev/admin Gemini key exists', savedDevAdminKeys.gemini ? 'yes' : 'no'],
+    ['Saved dev/admin OpenRouter key exists', savedDevAdminKeys.openrouter ? 'yes' : 'no'],
+    ['Saved dev/admin NVIDIA key exists', savedDevAdminKeys.nvidia ? 'yes' : 'no'],
+    ['Saved dev/admin OpenAI key exists', savedDevAdminKeys.openai ? 'yes' : 'no'],
+    ['Supabase client config status', diagnostics?.hasSupabaseClientConfig ? 'configured' : 'missing'],
+    ['Supabase server config status', diagnostics?.hasSupabaseServerConfig ? 'configured' : 'missing'],
+  ] as const;
 
   return (
     <div className="space-y-5">
@@ -208,18 +262,18 @@ export const AiKeyManager: React.FC = () => {
               Platform AI
             </div>
             <div className="mt-2 space-y-1">
-              <p>{platformStatus?.platformCreditsEnabled === false ? 'Platform credits disabled' : 'Platform credits available when server keys exist'}</p>
+              <p>{platformStatus?.platformCreditsEnabled === false ? 'Platform/server keys disabled' : 'Platform/server keys available when .env keys exist'}</p>
               <p>
-                Server providers:{' '}
+                Platform keys:{' '}
                 <span className="font-semibold text-slate-950">
                   {platformProviderLabels.length > 0 ? platformProviderLabels.join(', ') : 'none detected'}
                 </span>
               </p>
               {devAdminEnabled && (
                 <p>
-                  Developer keys:{' '}
+                  Saved dev/admin keys:{' '}
                   <span className="font-semibold text-slate-950">
-                    {devAdminProviderLabels.length > 0 ? devAdminProviderLabels.join(', ') : 'enabled, no provider key detected'}
+                    {savedDevAdminProviderLabels.length > 0 ? savedDevAdminProviderLabels.join(', ') : 'enabled, no saved key detected'}
                   </span>
                 </p>
               )}
@@ -297,9 +351,20 @@ export const AiKeyManager: React.FC = () => {
               {loadError}
             </section>
           )}
+          {platformStatus?.diagnostics?.hasEncryptionSecret === false && (
+            <section className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 text-sm text-amber-800 space-y-1">
+              <p className="font-semibold text-amber-900">AI key storage is disabled because AI_KEYS_ENCRYPTION_SECRET is missing.</p>
+              <p>Platform .env keys remain usable, but saved user/dev-admin keys cannot be persisted.</p>
+            </section>
+          )}
+          {keyStorageWarning && (
+            <section className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 text-sm text-amber-800">
+              {keyStorageWarning}
+            </section>
+          )}
           {mode === 'byok' && !selectedMetadata?.key_preview && (
             <section className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 text-sm text-amber-800">
-              No API key saved for this provider. Add it once in AI Keys settings.
+              No {selectedLabel} key configured. Save a key below, enable a platform/server key, or choose another provider.
             </section>
           )}
           {devAdminEnabled ? (
@@ -307,17 +372,58 @@ export const AiKeyManager: React.FC = () => {
               <p className="font-semibold text-amber-900">
                 Developer AI key mode is enabled
               </p>
-              <p>Using temporary admin/developer key from server environment variables.</p>
+              <p>Unauthenticated saves use the temporary dev/admin owner until auth is implemented.</p>
+              <p>Current key owner: {ownerMode === 'dev-admin' ? 'dev/admin' : ownerMode === 'user' ? 'authenticated user' : 'not loaded'}.</p>
               <p>Temporary development mode. Replace with authenticated per-user keys before production.</p>
             </section>
           ) : !authenticated && (
             <section className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 text-sm text-amber-800">
-              Development fallback is active until auth is implemented. Production refuses unauthenticated key saving.
+              Dev/admin key mode is disabled. Sign in to save user keys, or set ENABLE_DEV_ADMIN_AI_KEYS=true and VITE_ENABLE_DEV_ADMIN_AI_KEYS=true for temporary development access.
             </section>
           )}
+          <section className="ls-card-pad space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-950">AI environment diagnostics</h2>
+                <p className="ls-body-text">Only boolean status is shown. Raw keys and secrets are never returned to the browser.</p>
+              </div>
+              <button
+                type="button"
+                onClick={loadKeys}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-950"
+              >
+                <Loader2 className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                Refresh
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {diagnosticRows.map(([label, value]) => (
+                <div key={label} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2">
+                  <span className="text-xs font-semibold text-slate-600">{label}</span>
+                  <span className={`text-xs font-bold ${value === 'yes' || value === 'configured' || value === selectedLabel ? 'text-emerald-700' : value === 'no' || value === 'missing' ? 'text-amber-700' : 'text-slate-950'}`}>
+                    {value}
+                  </span>
+                </div>
+              ))}
+            </div>
+            {diagnostics?.warnings?.length ? (
+              <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-sm text-amber-900">
+                <div className="font-semibold">Warnings</div>
+                <ul className="mt-1 space-y-1">
+                  {diagnostics.warnings.map((warning) => (
+                    <li key={warning}>{warning}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm font-semibold text-emerald-800">
+                No environment warnings detected.
+              </div>
+            )}
+          </section>
           {PROVIDERS.map((provider) => {
             const metadata = metadataFor(provider.id);
-            const devConfigured = Boolean(platformStatus?.devAdmin?.providers?.[provider.id]);
+            const devConfigured = Boolean(savedDevAdminKeys[provider.id] || platformStatus?.devAdmin?.providers?.[provider.id]);
             const configured = Boolean(metadata?.is_active && metadata.key_preview);
             const canTest = Boolean(configured || drafts[provider.id].trim());
             return (
@@ -330,7 +436,7 @@ export const AiKeyManager: React.FC = () => {
                       {configured
                         ? `Saved as ${metadata?.key_preview}`
                         : devConfigured
-                          ? 'Using temporary admin/developer key'
+                          ? savedDevAdminKeys[provider.id] ? 'Saved dev/admin key exists' : 'Using server dev/admin env key'
                           : 'Missing'}
                     </div>
                     {metadata?.last_test_status && (

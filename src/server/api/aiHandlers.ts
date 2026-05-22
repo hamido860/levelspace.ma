@@ -8,8 +8,10 @@ import {
   getDevAdminAiStatus,
   getPlatformAiProviderStatus,
 } from "../../lib/ai/provider";
-import { resolveAiKeyOwner } from "../aiKeys";
-import { requireAuthenticatedUser } from "./aiCommandCenter";
+import { getEnvDiagnostics } from "../../lib/envDiagnostics";
+import { getDevAdminOwnerRef, listUserAiKeyMetadata, resolveAiKeyOwner } from "../aiKeys";
+import { getServerSupabase, requireAuthenticatedUser } from "./aiCommandCenter";
+import { getServerSupabaseEnv } from "../../lib/supabase/server";
 
 type ApiRequest = VercelRequest;
 type ApiResponse = VercelResponse;
@@ -26,9 +28,6 @@ const readPrompt = (body: Record<string, any>) => {
 
 const readConfig = (body: Record<string, any>) =>
   body.config && typeof body.config === "object" ? body.config : {};
-
-const hasSecret = (value: string | undefined, placeholder: string) =>
-  !!value && value.trim().length > 0 && value !== placeholder;
 
 const isConfigurationError = (message: string) =>
   /no ai provider configured|not configured/i.test(message);
@@ -65,30 +64,58 @@ export async function handleAIStatus(req: ApiRequest, res: ApiResponse) {
   }
 
   const platformProviders = getPlatformAiProviderStatus();
-  const geminiConfigured = hasSecret(
-    process.env.GEMINI_API_KEY || process.env.GEMINI_KEY_0 || process.env.AI_API_KEY || process.env.VITE_AI_API_KEY,
-    "MY_GEMINI_API_KEY",
-  );
-  const nvidiaConfigured = hasSecret(process.env.NVIDIA_API_KEY, "MY_NVIDIA_API_KEY");
-  const openRouterConfigured = hasSecret(process.env.OPENROUTER_API_KEY, "MY_OPENROUTER_API_KEY");
-  const openAiConfigured = hasSecret(process.env.OPENAI_API_KEY, "MY_OPENAI_API_KEY");
   const devAdmin = getDevAdminAiStatus();
   const configuredProvider = getConfiguredAIProvider();
-  const fallbackProvider = String(process.env.AI_FALLBACK_PROVIDER || "").toLowerCase();
+  const diagnostics = getEnvDiagnostics();
+  const savedDevAdminKeys = {
+    gemini: false,
+    openrouter: false,
+    openai: false,
+    nvidia: false,
+  };
+
+  if (diagnostics.devAdminKeysEnabled && getServerSupabaseEnv().serviceRoleConfigured) {
+    try {
+      const metadata = await listUserAiKeyMetadata(getServerSupabase(), getDevAdminOwnerRef());
+      for (const key of metadata) {
+        savedDevAdminKeys[key.provider] = Boolean(key.is_active && key.key_preview);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to load saved dev/admin AI key metadata.";
+      console.warn("[AI Status] Saved dev/admin key metadata unavailable:", message);
+    }
+  }
+  const statusDiagnostics = {
+    ...diagnostics,
+    warnings:
+      diagnostics.fallbackEnabled &&
+      diagnostics.fallbackProvider &&
+      savedDevAdminKeys[diagnostics.fallbackProvider]
+        ? diagnostics.warnings.filter((warning) => !warning.includes("AI_FALLBACK_ENABLED=true"))
+        : diagnostics.warnings,
+  };
 
   return res.status(200).json({
-    configured: geminiConfigured || nvidiaConfigured || openRouterConfigured || openAiConfigured || Object.values(devAdmin.providers).some(Boolean),
+    configured:
+      diagnostics.hasGeminiKey ||
+      diagnostics.hasNvidiaKey ||
+      diagnostics.hasOpenRouterKey ||
+      diagnostics.hasOpenAIKey ||
+      Object.values(devAdmin.providers).some(Boolean) ||
+      Object.values(savedDevAdminKeys).some(Boolean),
     providers: {
-      gemini: platformProviders.gemini && geminiConfigured,
-      nvidia: platformProviders.nvidia && nvidiaConfigured,
-      openrouter: platformProviders.openrouter && openRouterConfigured,
-      openai: platformProviders.openai && openAiConfigured,
+      gemini: platformProviders.gemini,
+      nvidia: platformProviders.nvidia,
+      openrouter: platformProviders.openrouter,
+      openai: platformProviders.openai,
     },
     devAdmin,
+    savedDevAdminKeys,
     defaultProvider: configuredProvider,
-    fallbackProvider: ["gemini", "nvidia", "openrouter", "openai"].includes(fallbackProvider) ? fallbackProvider : null,
-    fallbackEnabled: process.env.AI_FALLBACK_ENABLED !== "false",
+    fallbackProvider: diagnostics.fallbackProvider,
+    fallbackEnabled: diagnostics.fallbackEnabled,
     platformCreditsEnabled: process.env.AI_PLATFORM_CREDITS_ENABLED !== "false",
+    diagnostics: statusDiagnostics,
     models: {
       gemini: process.env.GEMINI_MODEL || "gemini-2.5-flash",
       nvidia: process.env.NVIDIA_MODEL || "google/gemma-3-27b-it",

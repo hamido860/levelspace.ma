@@ -4,9 +4,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
+import { logStartupEnvDiagnostics } from "./src/lib/envDiagnostics";
 
 dotenv.config({ path: ".env.local" });
 dotenv.config();
+logStartupEnvDiagnostics();
 
 type ApiHandlerModule = {
   default: (req: Request, res: Response) => unknown | Promise<unknown>;

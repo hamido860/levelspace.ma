@@ -55,7 +55,8 @@ import {
   loadCurriculumReviewDetail,
   loadCurriculumReviewItems,
 } from "../src/server/api/curriculumValidation";
-import { getServerSupabaseEnv } from "../src/lib/supabase/server";
+import { getEnvDiagnostics, getPlatformAiKey } from "../src/lib/envDiagnostics";
+import { hasUsableSupabaseKey, isValidSupabaseUrl } from "../src/lib/supabase/env";
 
 type JsonBody = Record<string, any>;
 type RouteHandler = (req: VercelRequest, res: VercelResponse, segments: string[]) => Promise<VercelResponse | void>;
@@ -150,7 +151,7 @@ async function handleNvidiaProxy(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const apiKey = process.env.NVIDIA_API_KEY;
+  const apiKey = getPlatformAiKey("nvidia");
 
   if (!apiKey || apiKey === "MY_NVIDIA_API_KEY") {
     return res.status(503).json({ error: "NVIDIA API key not configured." });
@@ -201,12 +202,22 @@ async function handleSupabasePublicConfig(req: VercelRequest, res: VercelRespons
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const env = getServerSupabaseEnv();
+  const url = process.env.VITE_SUPABASE_URL || "";
+  const anonKey = process.env.VITE_SUPABASE_ANON_KEY || "";
+  const configured = isValidSupabaseUrl(url) && hasUsableSupabaseKey(anonKey);
   return res.status(200).json({
-    configured: env.urlConfigured && env.anonKeyConfigured,
-    url: env.urlConfigured ? env.url : null,
-    anonKey: env.anonKeyConfigured ? env.anonKey : null,
+    configured,
+    url: configured ? url : null,
+    anonKey: configured ? anonKey : null,
   });
+}
+
+async function handleEnvDiagnostics(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== "GET") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  return res.status(200).json(getEnvDiagnostics());
 }
 
 async function handleAiPlanTask(req: VercelRequest, res: VercelResponse) {
@@ -1145,6 +1156,7 @@ const rootRoutes: Record<string, RouteHandler> = {
   "ai/lesson-blocks": handleAILessonBlocks,
   "ai/embed": handleAIEmbed,
   "ai/status": handleAIStatus,
+  "diagnostics/env": handleEnvDiagnostics,
   "config/supabase": handleSupabasePublicConfig,
   "health/supabase": handleSupabaseHealth,
   "admin/curriculum-review": handleCurriculumReviewList,
