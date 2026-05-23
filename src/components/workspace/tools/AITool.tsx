@@ -8,6 +8,41 @@ import { ToolConfig } from '../config';
 import { useAuth } from '../../../context/AuthContext';
 import { useAppSettings } from '../../../context/AppSettingsContext';
 
+
+const getPromptForTool = (toolId: string, input: string, lessonContext: any, subjectId: string): string => {
+  switch (toolId) {
+    case 'ai-explainer':
+      return `Explain the biological concept of "${input}" for a ${lessonContext.grade} student in ${lessonContext.country}. Use analogies and simple terms. Context: ${lessonContext.title}`;
+    case 'notes-generator':
+      return `Generate a structured summary and key points for the lesson: "${lessonContext.title}". Content: ${lessonContext.content}. Include 3 flashcard-style Q&A pairs.`;
+    case 'writing-assistant':
+      return `Analyze and improve the following text for clarity, grammar, and tone (academic but accessible): "${input}". Provide the improved version and a brief explanation of changes. Subject: ${subjectId}`;
+    case 'argument-builder':
+      return `Help me build a structured philosophical argument for: "${input}". Provide a thesis, two supporting arguments with examples, and a conclusion. Detect any logical fallacies. Context: ${lessonContext.title}`;
+    default:
+      return `As an AI study assistant, help me with: "${input}". Subject: ${subjectId}, Context: ${lessonContext.title}`;
+  }
+};
+
+const getPlaceholderForTool = (toolId: string): string => {
+  switch (toolId) {
+    case 'ai-explainer': return "Enter a concept to explain...";
+    case 'writing-assistant': return "Paste your text to improve...";
+    case 'argument-builder': return "Enter your thesis or topic...";
+    default: return "How can I help you?";
+  }
+};
+
+const getToolIcon = (toolId: string) => {
+  return {
+    'ai-assistant': Brain,
+    'ai-explainer': Sparkles,
+    'notes-generator': Zap,
+    'writing-assistant': PenTool,
+    'argument-builder': MessageSquare
+  }[toolId] || Brain;
+};
+
 interface AIToolProps {
   tool: ToolConfig;
   state: any;
@@ -32,23 +67,7 @@ export const AITool: React.FC<AIToolProps> = ({ tool, state, onChange, lessonCon
     
     setIsGenerating(true);
     try {
-      let prompt = "";
-      switch (tool.id) {
-        case 'ai-explainer':
-          prompt = `Explain the biological concept of "${input}" for a ${lessonContext.grade} student in ${lessonContext.country}. Use analogies and simple terms. Context: ${lessonContext.title}`;
-          break;
-        case 'notes-generator':
-          prompt = `Generate a structured summary and key points for the lesson: "${lessonContext.title}". Content: ${lessonContext.content}. Include 3 flashcard-style Q&A pairs.`;
-          break;
-        case 'writing-assistant':
-          prompt = `Analyze and improve the following text for clarity, grammar, and tone (academic but accessible): "${input}". Provide the improved version and a brief explanation of changes. Subject: ${subjectId}`;
-          break;
-        case 'argument-builder':
-          prompt = `Help me build a structured philosophical argument for: "${input}". Provide a thesis, two supporting arguments with examples, and a conclusion. Detect any logical fallacies. Context: ${lessonContext.title}`;
-          break;
-        default:
-          prompt = `As an AI study assistant, help me with: "${input}". Subject: ${subjectId}, Context: ${lessonContext.title}`;
-      }
+      const prompt = getPromptForTool(tool.id, input, lessonContext, subjectId);
 
       const modelToUse = determineModel(prompt, lessonContext.content?.length || 0);
 
@@ -79,13 +98,7 @@ export const AITool: React.FC<AIToolProps> = ({ tool, state, onChange, lessonCon
     }
   };
 
-  const Icon = {
-    'ai-assistant': Brain,
-    'ai-explainer': Sparkles,
-    'notes-generator': Zap,
-    'writing-assistant': PenTool,
-    'argument-builder': MessageSquare
-  }[tool.id] || Brain;
+  const Icon = getToolIcon(tool.id);
 
   if (!hasAiAccess) {
     return (
@@ -128,12 +141,7 @@ export const AITool: React.FC<AIToolProps> = ({ tool, state, onChange, lessonCon
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder={
-                tool.id === 'ai-explainer' ? "Enter a concept to explain..." :
-                tool.id === 'writing-assistant' ? "Paste your text to improve..." :
-                tool.id === 'argument-builder' ? "Enter your thesis or topic..." :
-                "How can I help you?"
-              }
+              placeholder={getPlaceholderForTool(tool.id)}
               className="w-full p-4 pr-12 bg-paper border border-ink/10 rounded-xl text-sm outline-none focus:ring-2 focus:ring-accent/20 transition-all shadow-sm resize-none h-24"
             />
             <button
