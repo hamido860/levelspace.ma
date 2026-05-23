@@ -207,17 +207,8 @@ const getQualityChecklist = () =>
     .map((item) => `- ${item}`)
     .join("\n");
 
-export const buildMcpLessonPrompt = (input: BuildMcpLessonPromptInput) => {
-  const { pipelineType, topic, topicOutlines, trustedSources, materialRequirements, learnerContext } = input;
-  const adminHeavy = pipelineType === "admin_heavy";
-
-  const curriculumContext = buildCurriculumContext(topic);
-  const learnerBlock = buildLearnerBlock(learnerContext);
-  const outlines = buildOutlines(topicOutlines);
-  const sources = buildSources(trustedSources);
-  const materials = buildMaterials(materialRequirements);
-
-  const schema = adminHeavy
+const getSchema = (pipelineType: McpPipelineType) =>
+  pipelineType === "admin_heavy"
     ? `{
   "lesson_title": "string",
   "content": "markdown string",
@@ -238,7 +229,7 @@ export const buildMcpLessonPrompt = (input: BuildMcpLessonPromptInput) => {
     "notes": ["string"]
   }
 }`
-  : `{
+    : `{
   "mode": "${pipelineType}",
   "topic": "string",
   "explanation": "string",
