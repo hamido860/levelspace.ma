@@ -128,62 +128,94 @@ const getSubjectRules = (subject: string) => {
   return "Use subject-appropriate terminology, examples, and practice tasks. Avoid unsupported claims.";
 };
 
+
+const buildCurriculumContext = (topic: McpPromptTopic) => [
+  `Topic ID: ${topic.id}`,
+  `Topic: ${topic.title}`,
+  `Grade: ${topic.grade}`,
+  `Cycle: ${topic.cycle || "unknown"}`,
+  `Subject: ${topic.subject}`,
+  `Domain: ${topic.domain || "not specified"}`,
+].join("\n");
+
+const buildLearnerBlock = (learnerContext?: McpLearnerContext) =>
+  learnerContext
+    ? [
+        `Level: ${learnerContext.level || "not specified"}`,
+        `Prior knowledge: ${learnerContext.priorKnowledge || "not specified"}`,
+        `Common difficulties: ${learnerContext.commonDifficulties || "not specified"}`,
+        `Preferred explanation style: ${learnerContext.preferredExplanationStyle || "not specified"}`,
+        `Learning goal: ${learnerContext.learningGoal || "not specified"}`,
+      ].join("\n")
+    : "No individual learner context supplied. Use the exact grade as the main adaptation signal.";
+
+const buildOutlines = (topicOutlines: McpTopicOutline[]) =>
+  listOrFallback(
+    topicOutlines,
+    (outline, index) =>
+      `${index + 1}. ${clean(outline.title) || "Untitled outline"}${
+        clean(outline.description) ? `: ${clean(outline.description)}` : ""
+      }`,
+    "No topic_outlines available. Build a cautious draft and mark missing outline evidence in the quality report.",
+  );
+
+const buildSources = (trustedSources: McpTrustedSource[]) =>
+  listOrFallback(
+    trustedSources,
+    (source, index) =>
+      [
+        `${index + 1}. ${clean(source.source_name) || "Unnamed source"}`,
+        `type=${clean(source.source_type) || "unknown"}`,
+        `tier=${clean(source.trust_tier) || "unknown"}`,
+        `license=${clean(source.license_type) || "unknown"}`,
+        `confidence=${source.confidence ?? "unknown"}`,
+        clean(source.source_url) ? `url=${clean(source.source_url)}` : "",
+        clean(source.used_for) ? `used_for=${clean(source.used_for)}` : "",
+        clean(source.excerpt) ? `excerpt=${clean(source.excerpt)}` : "",
+      ]
+        .filter(Boolean)
+        .join(" | "),
+    "No trusted source excerpts available. Use topic_outlines only and mark source_grounding as warning.",
+  );
+
+const buildMaterials = (materialRequirements: McpMaterialRequirement[]) =>
+  listOrFallback(
+    materialRequirements,
+    (requirement, index) =>
+      [
+        `${index + 1}. ${clean(requirement.material_type) || "material"}`,
+        clean(requirement.title) || "Untitled material requirement",
+        `required=${requirement.required === false ? "false" : "true"}`,
+        clean(requirement.purpose) ? `purpose=${clean(requirement.purpose)}` : "",
+        clean(requirement.search_query) ? `search_query=${clean(requirement.search_query)}` : "",
+        clean(requirement.status) ? `status=${clean(requirement.status)}` : "",
+      ]
+        .filter(Boolean)
+        .join(" | "),
+    "No explicit material requirements. If the lesson needs a map, diagram, chart, formula display, or experiment protocol, create a material_request in the JSON.",
+  );
+
+const getQualityChecklist = () =>
+  [
+    "Curriculum sections match the topic outlines.",
+    "Grade language and examples match the exact grade.",
+    "Every source-backed claim has source_refs or is clearly draft.",
+    "Every mentioned map/diagram/chart/experiment/formula has a matching material or material_request.",
+    "No official/published wording is used for needs_review content.",
+    "JSON is valid and matches the schema exactly.",
+  ]
+    .map((item) => `- ${item}`)
+    .join("\n");
+
 export const buildMcpLessonPrompt = (input: BuildMcpLessonPromptInput) => {
   const { pipelineType, topic, topicOutlines, trustedSources, materialRequirements, learnerContext } = input;
   const adminHeavy = pipelineType === "admin_heavy";
 
-  const curriculumContext = [
-    `Topic ID: ${topic.id}`,
-    `Topic: ${topic.title}`,
-    `Grade: ${topic.grade}`,
-    `Cycle: ${topic.cycle || "unknown"}`,
-    `Subject: ${topic.subject}`,
-    `Domain: ${topic.domain || "not specified"}`,
-  ].join("\n");
-
-  const learnerBlock = learnerContext
-    ? [
-      `Level: ${learnerContext.level || "not specified"}`,
-      `Prior knowledge: ${learnerContext.priorKnowledge || "not specified"}`,
-      `Common difficulties: ${learnerContext.commonDifficulties || "not specified"}`,
-      `Preferred explanation style: ${learnerContext.preferredExplanationStyle || "not specified"}`,
-      `Learning goal: ${learnerContext.learningGoal || "not specified"}`,
-    ].join("\n")
-    : "No individual learner context supplied. Use the exact grade as the main adaptation signal.";
-
-  const outlines = listOrFallback(
-    topicOutlines,
-    (outline, index) => `${index + 1}. ${clean(outline.title) || "Untitled outline"}${clean(outline.description) ? `: ${clean(outline.description)}` : ""}`,
-    "No topic_outlines available. Build a cautious draft and mark missing outline evidence in the quality report.",
-  );
-
-  const sources = listOrFallback(
-    trustedSources,
-    (source, index) => [
-      `${index + 1}. ${clean(source.source_name) || "Unnamed source"}`,
-      `type=${clean(source.source_type) || "unknown"}`,
-      `tier=${clean(source.trust_tier) || "unknown"}`,
-      `license=${clean(source.license_type) || "unknown"}`,
-      `confidence=${source.confidence ?? "unknown"}`,
-      clean(source.source_url) ? `url=${clean(source.source_url)}` : "",
-      clean(source.used_for) ? `used_for=${clean(source.used_for)}` : "",
-      clean(source.excerpt) ? `excerpt=${clean(source.excerpt)}` : "",
-    ].filter(Boolean).join(" | "),
-    "No trusted source excerpts available. Use topic_outlines only and mark source_grounding as warning.",
-  );
-
-  const materials = listOrFallback(
-    materialRequirements,
-    (requirement, index) => [
-      `${index + 1}. ${clean(requirement.material_type) || "material"}`,
-      clean(requirement.title) || "Untitled material requirement",
-      `required=${requirement.required === false ? "false" : "true"}`,
-      clean(requirement.purpose) ? `purpose=${clean(requirement.purpose)}` : "",
-      clean(requirement.search_query) ? `search_query=${clean(requirement.search_query)}` : "",
-      clean(requirement.status) ? `status=${clean(requirement.status)}` : "",
-    ].filter(Boolean).join(" | "),
-    "No explicit material requirements. If the lesson needs a map, diagram, chart, formula display, or experiment protocol, create a material_request in the JSON.",
-  );
+  const curriculumContext = buildCurriculumContext(topic);
+  const learnerBlock = buildLearnerBlock(learnerContext);
+  const outlines = buildOutlines(topicOutlines);
+  const sources = buildSources(trustedSources);
+  const materials = buildMaterials(materialRequirements);
 
   const schema = adminHeavy
     ? `{
@@ -246,14 +278,7 @@ export const buildMcpLessonPrompt = (input: BuildMcpLessonPromptInput) => {
     getSubjectRules(topic.subject),
     "",
     "QUALITY CHECKLIST",
-    [
-      "Curriculum sections match the topic outlines.",
-      "Grade language and examples match the exact grade.",
-      "Every source-backed claim has source_refs or is clearly draft.",
-      "Every mentioned map/diagram/chart/experiment/formula has a matching material or material_request.",
-      "No official/published wording is used for needs_review content.",
-      "JSON is valid and matches the schema exactly.",
-    ].map((item) => `- ${item}`).join("\n"),
+    getQualityChecklist(),
     "",
     "STRICT OUTPUT",
     "Return ONLY valid JSON. No markdown fence. No commentary outside JSON.",
