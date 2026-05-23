@@ -162,7 +162,8 @@ export const CalendarWidget: React.FC = () => {
         <div className="flex items-center gap-0.5">
           <button
             onClick={() => setCurrentMonth(m => subMonths(m, 1))}
-            className="p-1.5 rounded-lg hover:bg-surface-low transition-colors dark:hover:bg-surface-mid"
+            aria-label="Previous month"
+            className="p-1.5 rounded-lg hover:bg-surface-low transition-colors dark:hover:bg-surface-mid focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
           >
             <ChevronLeft size={13} className="text-slate-500 dark:text-ink-muted" />
           </button>
@@ -174,7 +175,8 @@ export const CalendarWidget: React.FC = () => {
           </button>
           <button
             onClick={() => setCurrentMonth(m => addMonths(m, 1))}
-            className="p-1.5 rounded-lg hover:bg-surface-low transition-colors dark:hover:bg-surface-mid"
+            aria-label="Next month"
+            className="p-1.5 rounded-lg hover:bg-surface-low transition-colors dark:hover:bg-surface-mid focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
           >
             <ChevronRight size={13} className="text-slate-500 dark:text-ink-muted" />
           </button>
@@ -285,7 +287,8 @@ export const CalendarWidget: React.FC = () => {
                   {ev.id && (
                     <button
                       onClick={() => handleDelete(ev.id!)}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-black/10"
+                      aria-label="Delete event"
+                      className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity p-0.5 rounded hover:bg-black/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                     >
                       <X size={10} />
                     </button>
@@ -335,7 +338,8 @@ export const CalendarWidget: React.FC = () => {
                 </div>
                 <button
                   onClick={() => setShowAdd(false)}
-                  className="w-8 h-8 rounded-full bg-surface-low flex items-center justify-center text-slate-500 hover:text-slate-950 transition-colors dark:bg-surface-mid dark:text-ink-muted dark:hover:text-ink"
+                  aria-label="Close"
+                  className="w-8 h-8 rounded-full bg-surface-low flex items-center justify-center text-slate-500 hover:text-slate-950 transition-colors dark:bg-surface-mid dark:text-ink-muted dark:hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
                 >
                   <X size={14} />
                 </button>
