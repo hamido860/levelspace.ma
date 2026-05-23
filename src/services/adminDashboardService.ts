@@ -220,10 +220,7 @@ export interface TopicRepairSummary {
 }
 
 const ensureConfigured = async () => {
-  const configured = await checkSupabaseConnection();
-  if (!configured) {
-    throw new Error("Supabase is not configured for the admin dashboard. Add valid Supabase environment variables before loading live metrics.");
-  }
+  return await checkSupabaseConnection();
 };
 
 const getAdminApiHeaders = async () => {
@@ -362,7 +359,9 @@ const readRows = async <T = any>(
 };
 
 export const loadAdminOverviewKpis = async (): Promise<AdminOverviewKpis> => {
-  await ensureConfigured();
+  if (!(await ensureConfigured())) {
+    return { topics: 0, completedJobs: 0, pendingJobs: 0, failedJobs: 0, lessonQueueDone: 0, lessonQueuePending: 0, lessonQueueFailed: 0, recoveredLessonsNeedsReview: 0, studentPublishReadyLessons: 0, ragTotal: 0, ragDone: 0, ragEmbedded: 0, ragLinkedToTopic: 0, ragUsable: 0, users: 0 };
+  }
 
   const [
     topics,
@@ -414,7 +413,7 @@ export const loadAdminOverviewKpis = async (): Promise<AdminOverviewKpis> => {
 };
 
 export const loadAdminTableHealth = async (): Promise<AdminTableHealth[]> => {
-  await ensureConfigured();
+  if (!(await ensureConfigured())) return [];
 
   const results = await Promise.all(
     CONFIRMED_ADMIN_TABLES.map(async (table_name) => {
@@ -446,7 +445,7 @@ export const loadAdminTableHealth = async (): Promise<AdminTableHealth[]> => {
 };
 
 export const loadAdminGradeMetrics = async (): Promise<AdminGradeRow[]> => {
-  await ensureConfigured();
+  if (!(await ensureConfigured())) return [];
 
   const [grades, topics, lessons, queue] = await Promise.all([
     readRows<any>("grades", supabase.from("grades").select("id, name, grade_order, cycles(name, cycle_order)")),
@@ -513,7 +512,9 @@ export const loadAdminGradeMetrics = async (): Promise<AdminGradeRow[]> => {
 };
 
 export const loadAdminQueueMetrics = async (): Promise<{ stats: QueueStatusBreakdown; failedJobs: FailedQueueJob[] }> => {
-  await ensureConfigured();
+  if (!(await ensureConfigured())) {
+    return { stats: { done: 0, pending: 0, failed: 0, processing: 0, other: 0, unresolvedTopicJobs: 0, otherStatuses: [] }, failedJobs: [] };
+  }
 
   const [queueRows, failedJobs, topics] = await Promise.all([
     readRows<any>("queue statuses", supabase.from("lesson_gen_queue").select("status, topic_id")),
@@ -567,7 +568,9 @@ export const loadAdminQueueMetrics = async (): Promise<{ stats: QueueStatusBreak
 };
 
 export const loadAdminRagMetrics = async (): Promise<{ ragStats: RagMetrics; ragByGrade: RagByGrade[] }> => {
-  await ensureConfigured();
+  if (!(await ensureConfigured())) {
+    return { ragStats: { total: 0, done: 0, embedded: 0, withEmbedding: 0, missingEmbedding: 0, linkedToTopic: 0, withGrade: 0, usable: 0, unlinkedToTopic: 0, shortContent: 0, failed: 0, pending: 0, other: 0, linkedByLesson: 0, linkedByMetadata: 0, unmatched: 0, byStatus: {} }, ragByGrade: [] };
+  }
 
   const health = await loadRagChunkHealthViaAdminApi();
 
@@ -637,7 +640,7 @@ export const loadAdminRagMetrics = async (): Promise<{ ragStats: RagMetrics; rag
 };
 
 export const loadAiRecoveryReviewStatusCounts = async (): Promise<AiReviewStatusCount[]> => {
-  await ensureConfigured();
+  if (!(await ensureConfigured())) return [];
 
   const tasks = await readRows<any>("ai task review statuses", supabase.from("ai_tasks").select("id, target_area, result"));
   const counts = tasks
@@ -657,7 +660,7 @@ export const loadAiRecoveryReviewStatusCounts = async (): Promise<AiReviewStatus
 };
 
 export const loadAiObservabilityDebugData = async (): Promise<AiObservabilityDebugData> => {
-  await ensureConfigured();
+  if (!(await ensureConfigured())) return { logs: [], snapshots: [] };
 
   const [logs, snapshots] = await Promise.all([
     readRows<AiTaskLogDebugRow>(
@@ -682,7 +685,9 @@ export const loadAiObservabilityDebugData = async (): Promise<AiObservabilityDeb
 };
 
 export const loadAiRecoveryDashboardKpis = async (): Promise<AiRecoveryDashboardKpis> => {
-  await ensureConfigured();
+  if (!(await ensureConfigured())) {
+    return { failedJobs: 0, pendingAiTasks: 0, completedAiTasks: 0, lessonsNeedingReview: 0, approvedRecoveredLessons: 0, rejectedRecoveredLessons: 0 };
+  }
 
   const [
     failedJobs,
