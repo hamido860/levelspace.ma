@@ -30,6 +30,7 @@ import {
   loadRagChunkHealth,
   MAX_AUTOMATIC_RETRIES,
   requireAdminUser,
+  requireAuthenticatedUser,
   requireAiAdmin,
   repairRagTopicLinks,
   resetAiRecoveryTask,
@@ -157,6 +158,7 @@ async function handleNvidiaProxy(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    await requireAuthenticatedUser(req);
     const response = await axios.post(
       "https://integrate.api.nvidia.com/v1/chat/completions",
       req.body,
@@ -171,6 +173,9 @@ async function handleNvidiaProxy(req: VercelRequest, res: VercelResponse) {
 
     return res.status(response.status).json(response.data);
   } catch (error: any) {
+    if (error instanceof AiCommandCenterHttpError) {
+      return res.status(error.status).json({ error: error.message });
+    }
     const message = error?.response?.data?.detail || error?.response?.data?.message || error.message;
     console.error("[NVIDIA Proxy] Error:", message);
     return res
