@@ -118,7 +118,7 @@
 }
 
 .glass-card {
-  @apply border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-paper;
+  @apply border border-surface-mid bg-paper shadow-sm;
 }
 
 @layer components {
@@ -131,37 +131,37 @@
   }
 
   .ls-page-title {
-    @apply text-3xl font-bold tracking-tight text-slate-950 dark:text-ink;
+    @apply text-3xl font-bold tracking-tight text-ink ;
   }
 
   .ls-section-title {
-    @apply text-xl font-semibold text-slate-950 dark:text-ink;
+    @apply text-xl font-semibold text-ink ;
   }
 
   .ls-card-title {
-    @apply text-lg font-semibold text-slate-950 dark:text-ink;
+    @apply text-lg font-semibold text-ink ;
   }
 
   .ls-body-text {
-    @apply text-sm text-slate-500 dark:text-ink-muted;
+    @apply text-sm text-ink-muted ;
   }
 
   .ls-micro-label {
-    @apply text-xs font-medium text-slate-500 dark:text-ink-muted;
+    @apply text-xs font-medium text-ink-muted ;
   }
 
   .ls-card {
-    @apply rounded-2xl border border-slate-200 bg-white dark:border-white/8 dark:bg-paper;
+    @apply rounded-2xl border border-surface-mid bg-paper  ;
     box-shadow: var(--ls-shadow);
   }
 
   .ls-card-pad {
-    @apply rounded-2xl border border-slate-200 bg-white p-5 dark:border-white/8 dark:bg-paper;
+    @apply rounded-2xl border border-surface-mid bg-paper p-5  ;
     box-shadow: var(--ls-shadow);
   }
 
   .ls-interactive-card {
-    @apply rounded-2xl border border-slate-200 bg-white transition hover:border-slate-300 dark:border-white/8 dark:bg-paper dark:hover:border-white/15;
+    @apply rounded-2xl border border-surface-mid bg-paper transition hover:border-ink/15   ;
     box-shadow: var(--ls-shadow);
   }
 
@@ -170,7 +170,7 @@
   }
 
   .ls-interactive-card-pad {
-    @apply rounded-2xl border border-slate-200 bg-white p-5 transition hover:border-slate-300 dark:border-white/8 dark:bg-paper dark:hover:border-white/15;
+    @apply rounded-2xl border border-surface-mid bg-paper p-5 transition hover:border-ink/15   ;
     box-shadow: var(--ls-shadow);
   }
 
@@ -179,12 +179,12 @@
   }
 
   .ls-metric-card {
-    @apply rounded-2xl border border-slate-200 bg-white p-5 dark:border-white/8 dark:bg-paper;
+    @apply rounded-2xl border border-surface-mid bg-paper p-5  ;
     box-shadow: var(--ls-shadow);
   }
 
   .ls-badge {
-    @apply inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600 dark:bg-surface-mid dark:text-ink-secondary;
+    @apply inline-flex items-center rounded-full bg-surface-mid px-2.5 py-1 text-[11px] font-semibold text-ink-secondary  ;
   }
 
   .ls-status-badge {
@@ -192,7 +192,7 @@
   }
 
   .ls-status-badge--neutral {
-    @apply bg-slate-100 text-slate-600 dark:bg-surface-mid dark:text-ink-secondary;
+    @apply bg-surface-mid text-ink-secondary;
   }
 
   .ls-status-badge--warning {
@@ -204,7 +204,7 @@
   }
 
   .ls-icon-tile {
-    @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700 dark:bg-surface-mid dark:text-ink-secondary;
+    @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-mid text-ink-secondary  ;
   }
 
   .ls-icon-tile--accent {
@@ -212,29 +212,29 @@
   }
 
   .ls-button-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-ink px-3 py-2 text-sm font-medium text-paper transition hover:bg-ink-secondary disabled:cursor-not-allowed disabled:opacity-50   ;
   }
 
   .ls-button-secondary {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:border-white/20 dark:hover:bg-surface-low;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-surface-mid bg-paper px-3 py-2 text-sm font-medium text-ink-secondary transition hover:border-ink/15 hover:bg-surface-low disabled:cursor-not-allowed disabled:opacity-50     ;
   }
 
   .ls-button-ghost {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-50 dark:text-ink-muted dark:hover:bg-surface-low dark:hover:text-ink;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-ink-secondary transition hover:bg-surface-mid hover:text-ink disabled:cursor-not-allowed disabled:opacity-50   ;
   }
 
   .ls-toolbar {
-    @apply flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3 sm:flex-row sm:items-center dark:border-white/8 dark:bg-paper;
+    @apply flex flex-col gap-3 rounded-2xl border border-surface-mid bg-paper p-3 sm:flex-row sm:items-center  ;
     box-shadow: var(--ls-shadow);
   }
 
   .ls-empty-state {
-    @apply rounded-2xl border border-slate-200 bg-white p-10 text-center dark:border-white/8 dark:bg-paper;
+    @apply rounded-2xl border border-surface-mid bg-paper p-10 text-center  ;
     box-shadow: var(--ls-shadow);
   }
 
   .ls-field {
-    @apply rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-slate-300 dark:border-white/8 dark:bg-paper dark:text-ink dark:placeholder:text-ink-muted dark:focus:border-white/15;
+    @apply rounded-xl border border-surface-mid bg-paper px-3 py-2 text-sm text-ink outline-none transition placeholder:text-slate-400 focus:border-ink/15     ;
   }
 }
 
@@ -263,15 +263,15 @@
 }
 
 .lesson-reader-outline-button {
-  @apply inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 lg:hidden dark:border-white/8 dark:bg-paper dark:text-ink-secondary dark:hover:border-white/15 dark:hover:bg-surface-low;
+  @apply inline-flex items-center justify-center gap-2 rounded-xl border border-surface-mid bg-paper px-3 py-2 text-sm font-medium text-ink-secondary transition-colors hover:border-ink/15 hover:bg-surface-low lg:hidden     ;
 }
 
 .lesson-reader-hero {
-  @apply mb-6 rounded-2xl border border-slate-200 bg-white px-5 py-7 shadow-sm md:px-8 md:py-9 dark:border-white/8 dark:bg-paper;
+  @apply mb-6 rounded-2xl border border-surface-mid bg-paper px-5 py-7 shadow-sm md:px-8 md:py-9  ;
 }
 
 .lesson-reader-hero__meta {
-  @apply mb-3 flex flex-wrap gap-x-3 gap-y-1 text-xs font-medium text-slate-500 dark:text-ink-muted;
+  @apply mb-3 flex flex-wrap gap-x-3 gap-y-1 text-xs font-medium text-ink-muted ;
 }
 
 .lesson-reader-hero h1 {
@@ -287,7 +287,7 @@
 }
 
 .lesson-reader-progress {
-  @apply sticky top-0 z-30 mb-5 flex flex-col gap-3 border-y border-slate-200 bg-background/95 py-3 md:flex-row md:items-center md:justify-between dark:border-white/8;
+  @apply sticky top-0 z-30 mb-5 flex flex-col gap-3 border-y border-surface-mid bg-background/95 py-3 md:flex-row md:items-center md:justify-between ;
 }
 
 .lesson-reader-progress div {
@@ -295,11 +295,11 @@
 }
 
 .lesson-reader-progress span {
-  @apply inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600 dark:bg-surface-mid dark:text-ink-secondary;
+  @apply inline-flex items-center rounded-full bg-surface-mid px-2.5 py-1 text-[11px] font-semibold text-ink-secondary  ;
 }
 
 .lesson-reader-continue {
-  @apply inline-flex items-center justify-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100;
+  @apply inline-flex items-center justify-center gap-2 rounded-xl bg-ink px-3 py-2 text-sm font-medium text-paper transition-colors hover:bg-ink-secondary   ;
 }
 
 .lesson-reader-domains {
@@ -331,7 +331,7 @@
 }
 
 .lesson-reader-block {
-  @apply rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:p-7 dark:border-white/8 dark:bg-paper;
+  @apply rounded-2xl border border-surface-mid bg-paper p-5 shadow-sm md:p-7  ;
   box-shadow: var(--ls-shadow);
 }
 
@@ -340,11 +340,11 @@
 }
 
 .lesson-reader-block__icon {
-  @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700 dark:bg-surface-mid dark:text-ink-secondary;
+  @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-mid text-ink-secondary  ;
 }
 
 .lesson-reader-eyebrow {
-  @apply text-xs font-medium text-slate-500 dark:text-ink-muted;
+  @apply text-xs font-medium text-ink-muted ;
 }
 
 .lesson-reader-block__title {
@@ -352,7 +352,7 @@
 }
 
 .lesson-reader-block__status {
-  @apply hidden items-center rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600 md:inline-flex dark:bg-surface-mid dark:text-ink-secondary;
+  @apply hidden items-center rounded-full bg-surface-mid px-2.5 py-1 text-[11px] font-semibold text-ink-secondary md:inline-flex  ;
 }
 
 .lesson-reader-block__status--viewed {
@@ -403,7 +403,7 @@
 }
 
 .lesson-reader-option {
-  @apply flex w-full items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-medium text-slate-950 transition-colors hover:border-slate-300 disabled:cursor-default dark:border-white/8 dark:bg-paper dark:text-ink dark:hover:border-white/15;
+  @apply flex w-full items-center justify-between gap-3 rounded-2xl border border-surface-mid bg-paper px-4 py-3 text-left text-sm font-medium text-ink transition-colors hover:border-ink/15 disabled:cursor-default    ;
 }
 
 .lesson-reader-option--correct {
@@ -444,7 +444,7 @@
 }
 
 .lesson-reader-outline {
-  @apply sticky top-20 hidden max-h-[calc(100vh-7rem)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 lg:block dark:border-white/8 dark:bg-paper;
+  @apply sticky top-20 hidden max-h-[calc(100vh-7rem)] overflow-y-auto rounded-2xl border border-surface-mid bg-paper p-4 lg:block  ;
   box-shadow: var(--ls-shadow);
 }
 
@@ -469,7 +469,7 @@
 }
 
 .lesson-reader-outline__label {
-  @apply text-xs font-medium text-slate-500 dark:text-ink-muted;
+  @apply text-xs font-medium text-ink-muted ;
 }
 
 .lesson-reader-outline__copy strong {
@@ -481,11 +481,11 @@
 }
 
 .lesson-reader-drawer__backdrop {
-  @apply absolute inset-0 bg-slate-950/40;
+  @apply absolute inset-0 bg-ink/40;
 }
 
 .lesson-reader-drawer__panel {
-  @apply absolute bottom-0 left-0 right-0 max-h-[82vh] overflow-y-auto rounded-t-3xl border border-slate-200 bg-white p-5 shadow-md;
+  @apply absolute bottom-0 left-0 right-0 max-h-[82vh] overflow-y-auto rounded-t-3xl border border-surface-mid bg-paper p-5 shadow-md;
 }
 
 .lesson-reader-drawer__header {
@@ -501,11 +501,11 @@
 }
 
 .lesson-tools-menu__trigger {
-  @apply inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50;
+  @apply inline-flex items-center justify-center gap-2 rounded-xl border border-surface-mid bg-paper px-3 py-2 text-sm font-medium text-ink-secondary transition-colors hover:border-ink/15 hover:bg-surface-low;
 }
 
 .lesson-tools-menu__panel {
-  @apply absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-md;
+  @apply absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-2xl border border-surface-mid bg-paper p-2 shadow-md;
 }
 
 .lesson-tools-menu__item {
@@ -513,11 +513,11 @@
 }
 
 .lesson-tools-menu__hint {
-  @apply mt-2 flex gap-2 border-t border-slate-200 px-3 py-3 text-xs leading-relaxed text-slate-500;
+  @apply mt-2 flex gap-2 border-t border-surface-mid px-3 py-3 text-xs leading-relaxed text-ink-muted;
 }
 
 .lesson-reader-empty {
-  @apply rounded-2xl border border-slate-200 bg-slate-50 p-10 text-center text-sm text-slate-500;
+  @apply rounded-2xl border border-surface-mid bg-surface-low p-10 text-center text-sm text-ink-muted;
 }
 
 .lesson-reader-empty h2 {
@@ -534,10 +534,10 @@
 .pill--success { @apply bg-success-soft text-success; }
 .pill--warn { @apply bg-warning-soft text-warning; }
 .pill--danger { @apply bg-error-soft text-error; }
-.pill--neutral { @apply bg-slate-100 text-slate-600; }
+.pill--neutral { @apply bg-surface-mid text-ink-secondary; }
 
 .lesson-header {
-  @apply mb-2.5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5;
+  @apply mb-2.5 rounded-2xl border border-surface-mid bg-paper p-4 shadow-sm md:p-5;
 }
 .lesson-header__meta {
   @apply flex flex-wrap gap-1.5 mb-2.5;
@@ -566,16 +566,16 @@
 .btn-fork { @apply text-[11px] font-medium px-2.5 py-0.5 rounded-full border border-surface-mid bg-transparent text-accent cursor-pointer transition-colors hover:bg-accent-soft; }
 
 .lesson-cockpit {
-  @apply mb-8 space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm;
+  @apply mb-8 space-y-4 rounded-2xl border border-surface-mid bg-paper p-4 shadow-sm;
 }
 .lesson-cockpit__stats {
   @apply grid grid-cols-1 gap-3 md:grid-cols-3;
 }
 .lesson-cockpit__stat {
-  @apply rounded-2xl bg-slate-50 p-4;
+  @apply rounded-2xl bg-surface-low p-4;
 }
 .lesson-cockpit__stat-label {
-  @apply mb-1 block text-xs font-medium text-slate-500;
+  @apply mb-1 block text-xs font-medium text-ink-muted;
 }
 .lesson-cockpit__stat-value {
   @apply block text-sm font-semibold text-ink;
@@ -584,10 +584,10 @@
   @apply flex flex-wrap gap-2;
 }
 .lesson-cockpit__button {
-  @apply inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50;
+  @apply inline-flex items-center justify-center gap-2 rounded-xl border border-surface-mid bg-paper px-3 py-2 text-sm font-medium text-ink-secondary transition-colors hover:border-ink/15 hover:bg-surface-low;
 }
 .lesson-cockpit__button--primary {
-  @apply border-slate-950 bg-slate-950 text-white hover:bg-slate-800;
+  @apply border-slate-950 bg-ink text-paper hover:bg-ink-secondary;
 }
 .lesson-map {
   @apply space-y-3;
@@ -596,19 +596,19 @@
   @apply flex items-center justify-between gap-3;
 }
 .lesson-map__eyebrow {
-  @apply text-xs font-medium text-slate-500;
+  @apply text-xs font-medium text-ink-muted;
 }
 .lesson-map__link {
-  @apply text-xs font-medium text-slate-600 transition-colors hover:text-slate-950;
+  @apply text-xs font-medium text-ink-secondary transition-colors hover:text-ink;
 }
 .lesson-map__rail {
   @apply flex gap-3 overflow-x-auto pb-1;
 }
 .lesson-map__chip {
-  @apply flex min-w-[220px] items-start gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-3 text-left shadow-sm transition hover:border-slate-300 hover:shadow-md;
+  @apply flex min-w-[220px] items-start gap-3 rounded-2xl border border-surface-mid bg-paper px-3 py-3 text-left shadow-sm transition hover:border-ink/15 hover:shadow-md;
 }
 .lesson-map__chip--active {
-  @apply border-slate-300 bg-slate-50;
+  @apply border-ink/15 bg-surface-low;
 }
 .lesson-map__chip--done .lesson-map__chip-index {
   @apply bg-success-soft text-success;
@@ -633,7 +633,7 @@
   @apply flex w-full flex-col gap-3;
 }
 .lesson-tool-card {
-  @apply rounded-2xl border border-slate-200 bg-white p-4 shadow-sm;
+  @apply rounded-2xl border border-surface-mid bg-paper p-4 shadow-sm;
 }
 .lesson-tool-card--wide {
   @apply min-w-0;
@@ -642,13 +642,13 @@
   @apply flex items-start gap-3;
 }
 .lesson-tool-card__icon {
-  @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700;
+  @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-mid text-ink-secondary;
 }
 .lesson-tool-card__icon--accent {
   @apply bg-accent/8 text-accent;
 }
 .lesson-tool-card__eyebrow {
-  @apply mb-1 text-xs font-medium text-slate-500;
+  @apply mb-1 text-xs font-medium text-ink-muted;
 }
 .lesson-tool-card__title {
   @apply text-sm font-semibold text-ink;
@@ -657,7 +657,7 @@
   @apply mt-3 text-[12px] leading-relaxed text-ink-secondary;
 }
 .lesson-tool-card__button {
-  @apply mt-3 inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50;
+  @apply mt-3 inline-flex items-center justify-center rounded-xl border border-surface-mid bg-paper px-4 py-2 text-sm font-medium text-ink-secondary transition-colors hover:border-ink/15 hover:bg-surface-low disabled:cursor-not-allowed disabled:opacity-50;
 }
 .lesson-tool-actions {
   @apply mt-4 flex flex-wrap items-center gap-2;
@@ -666,10 +666,10 @@
   @apply mt-4 grid gap-3 md:grid-cols-3;
 }
 .lesson-flow-chip {
-  @apply rounded-2xl border border-slate-200 bg-slate-50 p-4;
+  @apply rounded-2xl border border-surface-mid bg-surface-low p-4;
 }
 .lesson-flow-chip__label {
-  @apply mb-1 block text-xs font-medium text-slate-500;
+  @apply mb-1 block text-xs font-medium text-ink-muted;
 }
 .lesson-flow-chip__value {
   @apply block text-sm font-semibold text-ink;
@@ -678,16 +678,16 @@
   @apply mt-4 grid gap-4 md:grid-cols-2;
 }
 .lesson-tag-panel__group {
-  @apply rounded-2xl border border-slate-200 bg-slate-50 p-4;
+  @apply rounded-2xl border border-surface-mid bg-surface-low p-4;
 }
 .lesson-tag-panel__top {
   @apply mb-3 flex items-center justify-between gap-3;
 }
 .lesson-tag-panel__label {
-  @apply text-xs font-medium text-slate-500;
+  @apply text-xs font-medium text-ink-muted;
 }
 .lesson-tag-panel__value {
-  @apply inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600;
+  @apply inline-flex items-center rounded-full bg-surface-mid px-2.5 py-1 text-[11px] font-semibold text-ink-secondary;
 }
 .lesson-tag-panel__empty {
   @apply text-[12px] leading-relaxed text-ink-secondary;
@@ -696,16 +696,16 @@
   @apply flex flex-wrap gap-2;
 }
 .lesson-suggested-tag {
-  @apply inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600;
+  @apply inline-flex items-center rounded-full bg-surface-mid px-2.5 py-1 text-[11px] font-semibold text-ink-secondary;
 }
 .lesson-outline-preview {
   @apply mt-4 flex flex-col gap-2;
 }
 .lesson-outline-preview__item {
-  @apply flex items-start gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-slate-300 hover:shadow-md;
+  @apply flex items-start gap-3 rounded-2xl border border-surface-mid bg-paper p-3 text-left shadow-sm transition hover:border-ink/15 hover:shadow-md;
 }
 .lesson-outline-preview__item--active {
-  @apply border-slate-300 bg-slate-50;
+  @apply border-ink/15 bg-surface-low;
 }
 .lesson-outline-preview__index {
   @apply flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-paper text-[11px] font-bold text-ink-muted;
@@ -720,7 +720,7 @@
   @apply mt-1 text-[11px] leading-relaxed text-ink-secondary;
 }
 .lesson-workspace-button {
-  @apply inline-flex items-center justify-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800;
+  @apply inline-flex items-center justify-center gap-2 rounded-xl bg-ink px-3 py-2 text-sm font-medium text-paper transition-colors hover:bg-ink-secondary;
 }
 .outline-summary {
   @apply grid grid-cols-3 gap-3;
@@ -729,16 +729,16 @@
   @apply rounded-2xl bg-surface-low p-4 text-center;
 }
 .outline-summary__label {
-  @apply mb-1 block text-xs font-medium text-slate-500;
+  @apply mb-1 block text-xs font-medium text-ink-muted;
 }
 .outline-summary__value {
   @apply block text-sm font-semibold text-ink;
 }
 .outline-item {
-  @apply flex items-stretch gap-3 rounded-2xl border border-slate-200 bg-white p-3 transition;
+  @apply flex items-stretch gap-3 rounded-2xl border border-surface-mid bg-paper p-3 transition;
 }
 .outline-item--reading {
-  @apply border-slate-300 bg-slate-50;
+  @apply border-ink/15 bg-surface-low;
 }
 .outline-item__main {
   @apply flex flex-1 items-start gap-3 text-left;
@@ -1032,7 +1032,7 @@
 .katex .mclose             { color: var(--math-bracket);  } /* delimiters: ( ) [ ] */
 
 /* Scoped admin-page palette remap so legacy light-only utility classes inherit theme tokens */
-.dark .admin-theme-scope .bg-white {
+.dark .admin-theme-scope .bg-paper {
   background-color: var(--paper) !important;
 }
 

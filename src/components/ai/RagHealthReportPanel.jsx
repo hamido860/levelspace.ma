@@ -14,7 +14,7 @@ export const RagHealthReportPanel = ({ reports }) => {
           <p className="ls-micro-label">RAG Health</p>
           <h3 className="mt-2 ls-card-title">Latest chunk reports</h3>
         </div>
-        <DatabaseZap className="h-5 w-5 text-slate-500" />
+        <DatabaseZap className="h-5 w-5 text-ink-muted" />
       </div>
 
       {reports.length === 0 ? (
@@ -24,27 +24,27 @@ export const RagHealthReportPanel = ({ reports }) => {
       ) : (
         <div className="space-y-3">
           {reports.map((report) => {
-            const meta = STATUS_META[report.status] || { icon: DatabaseZap, className: "text-slate-600 bg-slate-100" };
+            const meta = STATUS_META[report.status] || { icon: DatabaseZap, className: "text-ink-secondary bg-surface-mid" };
             const Icon = meta.icon;
             return (
-              <article key={report.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <article key={report.id} className="rounded-2xl border border-surface-mid bg-surface-low p-4">
                 <div className="flex items-start gap-3">
                   <div className={`rounded-2xl p-2 ${meta.className}`}>
                     <Icon className="h-4 w-4" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-3">
-                      <p className="truncate text-sm font-semibold text-slate-950">
+                      <p className="truncate text-sm font-semibold text-ink">
                         {report.ai_issues?.title || "Unlinked RAG report"}
                       </p>
                       <span className="ls-badge">
                         {report.status}
                       </span>
                     </div>
-                    <p className="mt-1 text-xs text-slate-500">
+                    <p className="mt-1 text-xs text-ink-muted">
                       {report.chunk_count} chunk(s) • relevance {report.relevance_score}
                     </p>
-                    <p className="mt-2 text-xs text-slate-600">
+                    <p className="mt-2 text-xs text-ink-secondary">
                       {report.blocking_reason || "RAG health passed without a blocking reason."}
                     </p>
                   </div>

@@ -15,11 +15,11 @@ export const ApprovalPanel = ({ task, approval, onApprove, onReject, busy }) => 
   if (!approval) {
     return (
       <section className="ls-card-pad">
-        <div className="flex items-start gap-3 rounded-2xl bg-slate-50 p-5">
-          <ShieldAlert className="mt-0.5 h-5 w-5 text-slate-500" />
+        <div className="flex items-start gap-3 rounded-2xl bg-surface-low p-5">
+          <ShieldAlert className="mt-0.5 h-5 w-5 text-ink-muted" />
           <div>
-            <p className="text-sm font-semibold text-slate-950">No approval request on file</p>
-            <p className="mt-2 text-sm text-slate-600">
+            <p className="text-sm font-semibold text-ink">No approval request on file</p>
+            <p className="mt-2 text-sm text-ink-secondary">
               Read-only audits do not require approval. If this task should write to the database, create or refresh the task plan first.
             </p>
           </div>
@@ -39,25 +39,25 @@ export const ApprovalPanel = ({ task, approval, onApprove, onReject, busy }) => 
       </div>
 
       <div className="space-y-4">
-        <div className="rounded-2xl bg-slate-50 p-4">
+        <div className="rounded-2xl bg-surface-low p-4">
           <p className="ls-micro-label">Proposed Action</p>
-          <p className="mt-2 text-sm text-slate-600">{approval.proposed_action}</p>
+          <p className="mt-2 text-sm text-ink-secondary">{approval.proposed_action}</p>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <div className="rounded-2xl border border-slate-200 p-4">
+          <div className="rounded-2xl border border-surface-mid p-4">
             <p className="ls-micro-label">Affected Records</p>
-            <p className="mt-2 text-sm font-semibold text-slate-950">{approval.affected_records ?? "Pending audit estimate"}</p>
+            <p className="mt-2 text-sm font-semibold text-ink">{approval.affected_records ?? "Pending audit estimate"}</p>
           </div>
-          <div className="rounded-2xl border border-slate-200 p-4">
+          <div className="rounded-2xl border border-surface-mid p-4">
             <p className="ls-micro-label">Rollback Plan</p>
-            <p className="mt-2 text-sm text-slate-600">{approval.rollback_plan || "Restore the latest execution snapshot and re-run validation."}</p>
+            <p className="mt-2 text-sm text-ink-secondary">{approval.rollback_plan || "Restore the latest execution snapshot and re-run validation."}</p>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 p-4">
+        <div className="rounded-2xl border border-surface-mid p-4">
           <p className="ls-micro-label">Generated SQL Preview</p>
-          <pre className="mt-3 overflow-x-auto rounded-2xl bg-gray-950 p-4 font-mono text-xs text-slate-100">
+          <pre className="mt-3 overflow-x-auto rounded-2xl bg-gray-950 p-4 font-mono text-xs text-paper">
             {approval.sql_preview || "-- Read-only diagnostic path. No write SQL preview required."}
           </pre>
         </div>
@@ -74,7 +74,7 @@ export const ApprovalPanel = ({ task, approval, onApprove, onReject, busy }) => 
           <button
             onClick={onApprove}
             disabled={busy || approval.status !== "pending"}
-            className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-xl bg-ink px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:opacity-50"
           >
             <CheckCircle2 className="h-4 w-4" />
             Approve
