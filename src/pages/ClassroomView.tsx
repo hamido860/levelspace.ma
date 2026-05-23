@@ -998,26 +998,51 @@ export const ClassroomView: React.FC = () => {
       let inserted = 0;
       let skipped = 0;
 
+      const batches = [];
       for (let start = 0; start < topicIds.length; start += 25) {
-        const batch = topicIds.slice(start, start + 25);
-        const res = await fetch('/api/admin/lessons/seed-starter', {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ topic_ids: batch }),
-        });
+        batches.push(topicIds.slice(start, start + 25));
+      }
 
-        const responseText = await res.text();
-        const payload = responseText ? (() => {
-          try {
-            return JSON.parse(responseText);
-          } catch {
-            return {};
+      const concurrencyLimit = 3;
+      for (let i = 0; i < batches.length; i += concurrencyLimit) {
+        const chunk = batches.slice(i, i + concurrencyLimit);
+
+        const results = await Promise.allSettled(chunk.map(async (batch) => {
+          const res = await fetch('/api/admin/lessons/seed-starter', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ topic_ids: batch }),
+          });
+
+          const responseText = await res.text();
+          const payload = responseText ? (() => {
+            try {
+              return JSON.parse(responseText);
+            } catch {
+              return {};
+            }
+          })() : {};
+          if (!res.ok) throw new Error(payload.error || responseText || `Request failed with status ${res.status}`);
+
+          return {
+            inserted: Number(payload.summary?.insertedLessons ?? 0),
+            skipped: Number(payload.summary?.skippedLessons ?? 0)
+          };
+        }));
+
+        const errors = [];
+        for (const result of results) {
+          if (result.status === 'fulfilled') {
+            inserted += result.value.inserted;
+            skipped += result.value.skipped;
+          } else {
+            errors.push(result.reason);
           }
-        })() : {};
-        if (!res.ok) throw new Error(payload.error || responseText || `Request failed with status ${res.status}`);
+        }
 
-        inserted += Number(payload.summary?.insertedLessons ?? 0);
-        skipped += Number(payload.summary?.skippedLessons ?? 0);
+        if (errors.length > 0) {
+          throw new Error(`Encountered ${errors.length} errors during batch processing. First error: ${errors[0].message || errors[0]}`);
+        }
       }
 
       toast.success(`Generated ${inserted} starter lessons. Skipped ${skipped} existing topics.`);
