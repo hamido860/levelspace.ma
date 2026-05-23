@@ -1,46 +1,23 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import {
-  GraduationCap, ArrowRight, CheckCircle2, Sparkles, BookOpen, Layers,
-  BookA, BrainCircuit, LibraryBig, Globe
-} from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { updateProfile } from '../db/supabase';
 import { db } from '../db/db';
+
+import {
+  WelcomeStep,
+  CycleStep,
+  GradeStep,
+  TrackStep,
+  LanguageOptionStep,
+  SummaryStep
+} from './onboarding';
 
 interface OnboardingModalProps {
   isOpen: boolean;
   onComplete: () => void;
 }
-
-const CYCLES = [
-  { id: 'primary', name: 'Primary Education', desc: 'Enseignement Primaire', icon: BookA },
-  { id: 'college', name: 'Middle School', desc: 'Collège', icon: LibraryBig },
-  { id: 'lycee', name: 'High School', desc: 'Lycée', icon: GraduationCap },
-  { id: 'higher', name: 'Higher Education', desc: 'Classes Préparatoires / Univ', icon: BrainCircuit },
-];
-
-const GRADES_MAP: Record<string, string[]> = {
-  primary: [
-    '1ère année primaire', '2ème année primaire', '3ème année primaire', 
-    '4ème année primaire', '5ème année primaire', '6ème année primaire'
-  ],
-  college: [
-    '1ère année collège', '2ème année collège', '3ème année collège'
-  ],
-  lycee: [
-    'Tronc Commun', '1ère année Bac', '2ème année Bac'
-  ],
-  higher: [
-    'CPGE (1ère année)', 'CPGE (2ème année)'
-  ]
-};
-
-const TRACKS_MAP: Record<string, string[]> = {
-  'Tronc Commun': ['Tronc Commun Scientifique', 'Tronc Commun Littéraire', 'Tronc Commun Technologique'],
-  '1ère année Bac': ['Sciences Mathématiques', 'Sciences Expérimentales', 'Sciences et Technologies', 'Lettres et Sciences Humaines', 'Sciences Économiques et Gestion'],
-  '2ème année Bac': ['Sciences Mathématiques A', 'Sciences Mathématiques B', 'Sciences Physiques', 'SVT', 'Sciences Agronomiques', 'Lettres', 'Sciences Humaines', 'Sciences Économiques', 'Techniques de Gestion Comptable']
-};
 
 export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComplete }) => {
   const { profile, user } = useAuth();
@@ -113,248 +90,58 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
         <div className="p-6 md:p-10 min-h-[425px] flex flex-col">
           <AnimatePresence mode="wait">
             
-            {/* STEP 0: WELCOME */}
-            {step === 0 && (
-              <motion.div
-                key="step-0"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="flex-1 flex flex-col items-center justify-center text-center space-y-8"
-              >
-                <div className="relative">
-                  <div className="absolute -inset-4 bg-accent/20 blur-2xl rounded-full animate-pulse" />
-                  <div className="relative w-20 h-20 bg-accent rounded-3xl flex items-center justify-center text-paper shadow-md rotate-3">
-                    <Sparkles className="w-8 h-8" />
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  <h1 className="text-xl sm:text-3xl font-display font-bold text-ink leading-[1.1] tracking-tight">
-                    Welcome, <span className="text-accent capitalize">{userName}</span><br />
-                    Let's personalize your space
-                  </h1>
-                  <p className="text-muted text-sm max-w-sm mx-auto font-medium leading-relaxed">
-                    We'll tailor your academic curriculum to match your exact level and track.
-                  </p>
-                </div>
-              </motion.div>
-            )}
+            {step === 0 && <WelcomeStep key="step-0" userName={userName} />}
 
-            {/* STEP 1: CYCLE */}
             {step === 1 && (
-              <motion.div
+              <CycleStep
                 key="step-1"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="flex-1 flex flex-col"
-              >
-                <div className="flex items-center gap-4 mb-8">
-                  <div className="w-10 h-10 bg-gradient-to-b from-accent/10 to-transparent border border-accent/10 rounded-xl flex items-center justify-center text-accent shadow-sm">
-                    <Layers className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-display font-semibold text-ink tracking-tight">Academic Phase</h2>
-                    <p className="text-muted">Select your current educational cycle.</p>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {CYCLES.map(cycle => (
-                    <button
-                      key={cycle.id}
-                      onClick={() => { setSelectedCycle(cycle.id); setSelectedGrade(""); setSelectedTrack(""); }}
-                      className={`p-5 rounded-[1.5rem] border-2 transition-all text-left flex items-start gap-4 group ${
-                        selectedCycle === cycle.id 
-                          ? 'bg-accent/5 border-accent shadow-sm shadow-accent/10 scale-[1.02]' 
-                          : 'bg-surface-low border-transparent hover:border-accent/30 hover:bg-paper hover:shadow-md'
-                      }`}
-                    >
-                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 transition-colors ${
-                        selectedCycle === cycle.id ? 'bg-accent text-paper' : 'bg-surface-mid text-ink-secondary group-hover:bg-accent/10 group-hover:text-accent'
-                      }`}>
-                        <cycle.icon className="w-5 h-5" />
-                      </div>
-                      <div className="flex-1">
-                        <h3 className={`font-bold text-base leading-tight mb-1 ${selectedCycle === cycle.id ? 'text-accent' : 'text-ink'}`}>
-                          {cycle.name}
-                        </h3>
-                        <p className="text-xs text-muted font-medium">{cycle.desc}</p>
-                      </div>
-                      {selectedCycle === cycle.id && <CheckCircle2 className="w-5 h-5 text-accent shrink-0" />}
-                    </button>
-                  ))}
-                </div>
-              </motion.div>
+                selectedCycle={selectedCycle}
+                onSelectCycle={(cycleId) => {
+                  setSelectedCycle(cycleId);
+                  setSelectedGrade('');
+                  setSelectedTrack('');
+                }}
+              />
             )}
 
-            {/* STEP 2: GRADE */}
             {step === 2 && (
-              <motion.div
+              <GradeStep
                 key="step-2"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="flex-1 flex flex-col"
-              >
-                <div className="flex items-center gap-4 mb-8">
-                  <div className="w-10 h-10 bg-gradient-to-b from-accent/10 to-transparent border border-accent/10 rounded-xl flex items-center justify-center text-accent shadow-sm">
-                    <GraduationCap className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-display font-semibold text-ink tracking-tight">Select Grade</h2>
-                    <p className="text-muted">Which specific year are you currently in?</p>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-3 overflow-y-auto max-h-[300px] pr-2 custom-scrollbar">
-                  {GRADES_MAP[selectedCycle]?.map(grade => (
-                    <button
-                      key={grade}
-                      onClick={() => { setSelectedGrade(grade); setSelectedTrack(""); }}
-                      className={`p-3 rounded-xl border-2 text-sm font-bold transition-all text-center flex items-center justify-center gap-2 ${
-                        selectedGrade === grade 
-                          ? 'bg-accent border-accent text-paper shadow-sm shadow-accent/20' 
-                          : 'bg-surface-low border-transparent text-ink hover:border-accent/30 hover:bg-paper'
-                      }`}
-                    >
-                      {grade}
-                      {selectedGrade === grade && <CheckCircle2 className="w-4 h-4" />}
-                    </button>
-                  ))}
-                </div>
-              </motion.div>
+                selectedCycle={selectedCycle}
+                selectedGrade={selectedGrade}
+                onSelectGrade={(grade) => {
+                  setSelectedGrade(grade);
+                  setSelectedTrack('');
+                }}
+              />
             )}
 
-            {/* STEP 3: TRACK (For Lycée) */}
             {step === 3 && requiresTrack && (
-              <motion.div
+              <TrackStep
                 key="step-3"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="flex-1 flex flex-col"
-              >
-                <div className="flex items-center gap-4 mb-8">
-                  <div className="w-10 h-10 bg-gradient-to-b from-accent/10 to-transparent border border-accent/10 rounded-xl flex items-center justify-center text-accent shadow-sm">
-                    <BookOpen className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-display font-semibold text-ink tracking-tight">Specialty / Track</h2>
-                    <p className="text-muted">Choose your specific focus area.</p>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-1 gap-3 overflow-y-auto max-h-[300px] pr-2 custom-scrollbar">
-                  {TRACKS_MAP[selectedGrade]?.map(track => (
-                    <button
-                      key={track}
-                      onClick={() => setSelectedTrack(track)}
-                      className={`p-3 rounded-xl border-2 text-sm font-bold transition-all text-left flex items-center justify-between group ${
-                        selectedTrack === track 
-                          ? 'bg-accent/10 border-accent text-accent shadow-md' 
-                          : 'bg-surface-low border-transparent text-ink hover:border-accent/30 hover:bg-paper'
-                      }`}
-                    >
-                      {track}
-                      {selectedTrack === track && <CheckCircle2 className="w-5 h-5" />}
-                    </button>
-                  ))}
-                </div>
-              </motion.div>
+                selectedGrade={selectedGrade}
+                selectedTrack={selectedTrack}
+                onSelectTrack={setSelectedTrack}
+              />
             )}
 
-            {/* STEP 4: INTERNATIONAL OPTION (If applicable) */}
             {step === (requiresTrack ? 4 : 3) && (
-              <motion.div
-                 key="step-option"
-                 initial={{ opacity: 0, x: 20 }}
-                 animate={{ opacity: 1, x: 0 }}
-                 exit={{ opacity: 0, x: -20 }}
-                 className="flex-1 flex flex-col"
-              >
-                <div className="flex items-center gap-4 mb-8">
-                  <div className="w-10 h-10 bg-gradient-to-b from-accent/10 to-transparent border border-accent/10 rounded-xl flex items-center justify-center text-accent shadow-sm">
-                    <Globe className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-display font-semibold text-ink tracking-tight">Language Option</h2>
-                    <p className="text-muted">In which language do you study scientific subjects?</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4">
-                  {[
-                    { id: 'biof_fr', name: 'Option Français (BIOF)', desc: 'Math, Physics, and SVT are taught in French' },
-                    { id: 'general_ar', name: 'Option Arabe (Général)', desc: 'Scientific subjects taught in Arabic' },
-                    { id: 'biof_en', name: 'Option Anglais (BIOF)', desc: 'Starting slowly in some regions' }
-                  ].map(opt => (
-                    <button
-                      key={opt.id}
-                      onClick={() => setSelectedOption(opt.id)}
-                      className={`p-4 rounded-xl border-2 text-sm transition-all text-left flex items-start justify-between group ${
-                        selectedOption === opt.id 
-                          ? 'bg-accent/5 border-accent shadow-md' 
-                          : 'bg-surface-low border-transparent hover:border-accent/30 hover:bg-paper'
-                      }`}
-                    >
-                      <div>
-                        <h3 className={`font-bold text-base mb-1 ${selectedOption === opt.id ? 'text-accent' : 'text-ink'}`}>{opt.name}</h3>
-                        <p className="text-xs text-muted">{opt.desc}</p>
-                      </div>
-                      {selectedOption === opt.id && <CheckCircle2 className="w-5 h-5 text-accent mt-2" />}
-                    </button>
-                  ))}
-                </div>
-              </motion.div>
+              <LanguageOptionStep
+                key="step-option"
+                selectedOption={selectedOption}
+                onSelectOption={setSelectedOption}
+              />
             )}
 
-            {/* STEP: DONE SUMMARY */}
             {step === totalSteps && (
-               <motion.div
-                 key="step-final"
-                 initial={{ opacity: 0, scale: 0.95 }}
-                 animate={{ opacity: 1, scale: 1 }}
-                 exit={{ opacity: 0, scale: 0.95 }}
-                 className="flex-1 flex flex-col items-center justify-center text-center space-y-10"
-               >
-                 <div className="relative">
-                   <div className="absolute -inset-6 bg-emerald-500/20 blur-3xl rounded-full" />
-                   <div className="relative w-16 h-16 bg-gradient-to-br from-emerald-500/20 to-emerald-500/5 border border-emerald-500/20 rounded-full flex items-center justify-center text-paper shadow-md">
-                     <CheckCircle2 className="w-10 h-10" />
-                   </div>
-                 </div>
-
-                 <div className="space-y-2">
-                   <h2 className="text-xl sm:text-3xl font-display font-bold text-ink tracking-tight">
-                     Workspace Ready
-                   </h2>
-                   <p className="text-muted font-medium text-base">Your academic profile is perfectly configured.</p>
-                 </div>
-
-                 <div className="w-full bg-surface-low border border-ink/5 rounded-2xl p-5 text-left text-sm space-y-4">
-                   <div className="flex justify-between border-b border-ink/5 pb-3">
-                     <span className="text-muted font-bold uppercase text-sm tracking-wider">Cycle</span>
-                     <span className="font-bold text-ink">{CYCLES.find(c => c.id === selectedCycle)?.name}</span>
-                   </div>
-                   <div className="flex justify-between border-b border-ink/5 pb-3">
-                     <span className="text-muted font-bold uppercase text-sm tracking-wider">Grade</span>
-                     <span className="font-bold text-ink">{selectedGrade}</span>
-                   </div>
-                   {requiresTrack && selectedTrack && (
-                     <div className="flex justify-between border-b border-ink/5 pb-3">
-                       <span className="text-muted font-bold uppercase text-sm tracking-wider">Track</span>
-                       <span className="font-bold text-ink text-right max-w-[200px] truncate">{selectedTrack}</span>
-                     </div>
-                   )}
-                   {selectedOption && (
-                     <div className="flex justify-between">
-                       <span className="text-muted font-bold uppercase text-sm tracking-wider">Option</span>
-                       <span className="font-bold text-ink truncate max-w-[200px]">{selectedOption === 'biof_fr' ? 'Français' : (selectedOption === 'general_ar' ? 'Arabe' : 'Anglais')}</span>
-                     </div>
-                   )}
-                 </div>
-               </motion.div>
+              <SummaryStep
+                key="step-final"
+                selectedCycle={selectedCycle}
+                selectedGrade={selectedGrade}
+                selectedTrack={selectedTrack}
+                selectedOption={selectedOption}
+                requiresTrack={requiresTrack}
+              />
             )}
 
           </AnimatePresence>
