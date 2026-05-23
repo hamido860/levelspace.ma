@@ -854,7 +854,7 @@ export const ClassroomView: React.FC = () => {
     try {
       const existingContext = await buildChainContext();
 
-      for (const title of selectedSuggestions) {
+      const generatePromises = selectedSuggestions.map(async (title) => {
         const seedLesson = await generateSeedLesson(title, currentGrade, currentCountry, 2, module.strictRAG, existingContext);
         if (seedLesson) {
           await db.lessons.add({
@@ -883,7 +883,8 @@ export const ClassroomView: React.FC = () => {
             await db.lessons.delete(existingSuggestion.id);
           }
         }
-      }
+      });
+      await Promise.all(generatePromises);
       setSuggestions(prev => prev.filter(s => !selectedSuggestions.includes(s.title)));
       setSelectedSuggestions([]);
     } catch (error) {
@@ -900,7 +901,7 @@ export const ClassroomView: React.FC = () => {
       const existingContext = await buildChainContext();
 
       const titles = suggestions.map(s => s.title);
-      for (const title of titles) {
+      const generatePromises = titles.map(async (title) => {
         const seedLesson = await generateSeedLesson(title, currentGrade, currentCountry, 2, module.strictRAG, existingContext);
         if (seedLesson) {
           await db.lessons.add({
@@ -929,7 +930,8 @@ export const ClassroomView: React.FC = () => {
             await db.lessons.delete(existingSuggestion.id);
           }
         }
-      }
+      });
+      await Promise.all(generatePromises);
       setSuggestions([]);
       setSelectedSuggestions([]);
     } catch (error) {
