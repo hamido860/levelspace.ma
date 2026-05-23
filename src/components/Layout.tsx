@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Sidebar } from './Sidebar';
-import { Topbar } from './Topbar';
+import { Topbar } from './topbar';
 
 interface LayoutProps {
   children: React.ReactNode;
