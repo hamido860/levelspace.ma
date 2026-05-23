@@ -194,7 +194,7 @@ export const AiKeyManager: React.FC = () => {
               <ShieldCheck className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="text-2xl font-serif text-slate-950">AI API keys</h1>
+              <h1 className="text-2xl font-serif text-ink">AI API keys</h1>
               <p className="ls-body-text max-w-2xl">
                 Your API key is encrypted and stored securely. It is only decrypted on the server when making AI requests.
                 The full key is never shown again after saving.
@@ -203,7 +203,7 @@ export const AiKeyManager: React.FC = () => {
           </div>
 
           <div className="ls-card-pad ls-micro-label lg:min-w-72">
-            <div className="flex items-center gap-2 font-semibold text-slate-950">
+            <div className="flex items-center gap-2 font-semibold text-ink">
               <Server className="w-4 h-4" />
               Platform AI
             </div>
@@ -211,21 +211,21 @@ export const AiKeyManager: React.FC = () => {
               <p>{platformStatus?.platformCreditsEnabled === false ? 'Platform credits disabled' : 'Platform credits available when server keys exist'}</p>
               <p>
                 Server providers:{' '}
-                <span className="font-semibold text-slate-950">
+                <span className="font-semibold text-ink">
                   {platformProviderLabels.length > 0 ? platformProviderLabels.join(', ') : 'none detected'}
                 </span>
               </p>
               {devAdminEnabled && (
                 <p>
                   Developer keys:{' '}
-                  <span className="font-semibold text-slate-950">
+                  <span className="font-semibold text-ink">
                     {devAdminProviderLabels.length > 0 ? devAdminProviderLabels.join(', ') : 'enabled, no provider key detected'}
                   </span>
                 </p>
               )}
               <p>
                 Default:{' '}
-                <span className="font-semibold text-slate-950">{platformStatus?.defaultProvider || 'gemini'}</span>
+                <span className="font-semibold text-ink">{platformStatus?.defaultProvider || 'gemini'}</span>
                 {platformStatus?.fallbackProvider ? `, fallback ${platformStatus.fallbackProvider}` : ''}
               </p>
             </div>
@@ -237,12 +237,12 @@ export const AiKeyManager: React.FC = () => {
             type="button"
             aria-pressed={mode === 'byok'}
             onClick={() => saveMode('byok')}
-            className={`flex items-center gap-3 rounded-xl border p-3 text-left transition-colors ${mode === 'byok' ? 'bg-slate-950 text-white border-ink' : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'}`}
+            className={`flex items-center gap-3 rounded-xl border p-3 text-left transition-colors ${mode === 'byok' ? 'bg-ink text-paper border-ink' : 'bg-paper border-surface-mid text-ink-secondary hover:border-ink/15'}`}
           >
             <Key className="w-4 h-4" />
             <span>
               <span className="block text-sm font-semibold">Use my own API key</span>
-              <span className={`block text-[10px] ${mode === 'byok' ? 'text-white/60' : 'text-slate-500'}`}>
+              <span className={`block text-[10px] ${mode === 'byok' ? 'text-paper/60' : 'text-ink-muted'}`}>
                 {configuredByokCount} saved provider{configuredByokCount === 1 ? '' : 's'}
               </span>
             </span>
@@ -251,12 +251,12 @@ export const AiKeyManager: React.FC = () => {
             type="button"
             aria-pressed={mode === 'platform'}
             onClick={() => saveMode('platform')}
-            className={`flex items-center gap-3 rounded-xl border p-3 text-left transition-colors ${mode === 'platform' ? 'bg-slate-950 text-white border-ink' : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'}`}
+            className={`flex items-center gap-3 rounded-xl border p-3 text-left transition-colors ${mode === 'platform' ? 'bg-ink text-paper border-ink' : 'bg-paper border-surface-mid text-ink-secondary hover:border-ink/15'}`}
           >
             <Zap className="w-4 h-4" />
             <span>
               <span className="block text-sm font-semibold">Use platform AI credits if available</span>
-              <span className={`block text-[10px] ${mode === 'platform' ? 'text-white/60' : 'text-slate-500'}`}>
+              <span className={`block text-[10px] ${mode === 'platform' ? 'text-paper/60' : 'text-ink-muted'}`}>
                 {platformStatus?.configured ? 'Server key detected' : 'No server key detected'}
               </span>
             </span>
@@ -271,11 +271,11 @@ export const AiKeyManager: React.FC = () => {
                 key={provider.id}
                 type="button"
                 onClick={() => saveSelectedProvider(provider.id)}
-                className={`rounded-xl border p-3 text-left text-sm font-semibold transition-colors ${selectedProvider === provider.id ? 'bg-accent text-white border-accent' : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'}`}
+                className={`rounded-xl border p-3 text-left text-sm font-semibold transition-colors ${selectedProvider === provider.id ? 'bg-accent text-paper border-accent' : 'bg-paper border-surface-mid text-ink-secondary hover:border-ink/15'}`}
               >
                 <span className="block">{provider.label}</span>
                 {devAdminEnabled && (
-                  <span className={`block text-[10px] ${selectedProvider === provider.id ? 'text-white/70' : platformStatus?.devAdmin?.providers?.[provider.id] ? 'text-emerald-600' : 'text-slate-500'}`}>
+                  <span className={`block text-[10px] ${selectedProvider === provider.id ? 'text-paper/70' : platformStatus?.devAdmin?.providers?.[provider.id] ? 'text-emerald-600' : 'text-ink-muted'}`}>
                     {platformStatus?.devAdmin?.providers?.[provider.id] ? 'Developer key available' : 'No developer key'}
                   </span>
                 )}
@@ -324,7 +324,7 @@ export const AiKeyManager: React.FC = () => {
               <section key={provider.id} className="ls-card-pad space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <div>
-                    <h2 className="text-lg font-semibold text-slate-950">{provider.label}</h2>
+                    <h2 className="text-lg font-semibold text-ink">{provider.label}</h2>
                     <div className={`mt-1 inline-flex items-center gap-2 text-xs font-semibold ${configured || devConfigured ? 'text-emerald-600' : 'text-amber-600'}`}>
                       {configured || devConfigured ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
                       {configured
@@ -352,13 +352,13 @@ export const AiKeyManager: React.FC = () => {
                     value={drafts[provider.id]}
                     onChange={(event) => setDrafts((current) => ({ ...current, [provider.id]: event.target.value }))}
                     placeholder={configured ? 'Paste a new key to replace the saved key' : provider.placeholder}
-                    className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-300"
+                    className="min-w-0 flex-1 rounded-xl border border-surface-mid bg-paper px-3 py-2 text-sm outline-none focus:border-ink/15"
                   />
                   <button
                     type="button"
                     onClick={() => saveKey(provider.id)}
                     disabled={busy === `${provider.id}:save`}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-ink px-4 py-2 text-sm font-semibold text-paper disabled:opacity-60"
                   >
                     {busy === `${provider.id}:save` ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                     Save
@@ -367,7 +367,7 @@ export const AiKeyManager: React.FC = () => {
                     type="button"
                     onClick={() => testKey(provider.id)}
                     disabled={!canTest || busy === `${provider.id}:test`}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50"
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-surface-mid px-4 py-2 text-sm font-semibold text-ink disabled:opacity-50"
                   >
                     {busy === `${provider.id}:test` ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
                     Test

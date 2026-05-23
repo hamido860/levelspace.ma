@@ -107,10 +107,10 @@ const ProgressBar: React.FC<{ val: number; total: number }> = ({ val, total }) =
     p === 0 ? "bg-red-400" : p < 100 ? "bg-amber-400" : "bg-emerald-500";
   return (
     <div className="flex items-center gap-2">
-      <div className="w-24 h-2 rounded-full bg-gray-100 overflow-hidden">
+      <div className="w-24 h-2 rounded-full bg-surface-mid overflow-hidden">
         <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${p}%` }} />
       </div>
-      <span className="text-xs text-gray-400">{p}%</span>
+      <span className="text-xs text-ink-muted">{p}%</span>
     </div>
   );
 };
@@ -123,7 +123,7 @@ const Pill: React.FC<{ status: "done" | "pending" | "failed" | "empty" | "partia
     empty:     "bg-red-100 text-red-700",
     partial:   "bg-amber-100 text-amber-700",
     populated: "bg-emerald-100 text-emerald-700",
-    unknown:   "bg-gray-100 text-gray-600",
+    unknown:   "bg-surface-mid text-ink-secondary",
     missing:   "bg-red-100 text-red-700",
     restricted:"bg-slate-100 text-slate-700",
   };
@@ -136,7 +136,7 @@ const Pill: React.FC<{ status: "done" | "pending" | "failed" | "empty" | "partia
 
 const ValidationPill: React.FC<{ value?: string | null }> = ({ value }) => {
   const normalized = String(value ?? "").trim().toLowerCase();
-  let classes = "bg-gray-100 text-gray-600";
+  let classes = "bg-surface-mid text-ink-secondary";
   if (["passed", "valid", "approved", "success"].includes(normalized)) {
     classes = "bg-emerald-100 text-emerald-800";
   } else if (["failed", "invalid", "rejected", "error"].includes(normalized)) {
@@ -226,7 +226,7 @@ const formatDebugJson = (value: unknown) => {
 };
 
 const Spinner: React.FC = () => (
-  <div className="flex items-center justify-center py-10 text-gray-400 gap-3 text-sm">
+  <div className="flex items-center justify-center py-10 text-ink-muted gap-3 text-sm">
     <RefreshCw className="w-4 h-4 animate-spin" />
     Loading…
   </div>
@@ -236,16 +236,16 @@ const KPI: React.FC<{ label: string; value: number | string; sub?: string; varia
   label, value, sub, variant = "default",
 }) => {
   const colors = {
-    default: "text-gray-900",
+    default: "text-ink",
     warn:    "text-amber-500",
     danger:  "text-red-500",
     success: "text-emerald-600",
   };
   return (
-    <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
-      <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">{label}</div>
+    <div className="bg-paper rounded-xl border border-surface-mid p-4 shadow-sm">
+      <div className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-1">{label}</div>
       <div className={`text-3xl font-extrabold ${colors[variant]}`}>{value}</div>
-      {sub && <div className="text-xs text-gray-400 mt-1">{sub}</div>}
+      {sub && <div className="text-xs text-ink-muted mt-1">{sub}</div>}
     </div>
   );
 };
@@ -803,15 +803,15 @@ export const Admin: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-extrabold text-gray-900">Admin Panel</h1>
-          <p className="text-sm text-gray-400 mt-0.5">
+          <h1 className="text-2xl font-extrabold text-ink">Admin Panel</h1>
+          <p className="text-sm text-ink-muted mt-0.5">
             {lastRefresh ? `Last refreshed: ${lastRefresh}` : "Loading live data…"}
           </p>
         </div>
         <button
           onClick={refreshAll}
           disabled={loading}
-          className="flex items-center gap-2 bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-red-500 transition-colors disabled:opacity-50"
+          className="flex items-center gap-2 bg-ink text-paper px-4 py-2 rounded-lg text-sm font-semibold hover:bg-red-500 transition-colors disabled:opacity-50"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           Refresh
@@ -826,7 +826,7 @@ export const Admin: React.FC = () => {
       )}
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-gray-100 mb-6 overflow-x-auto pb-2">
+      <div className="flex gap-2 border-b border-surface-mid mb-6 overflow-x-auto pb-2">
         {tabs.map((tabKey) => {
           const tabConfig = ADMIN_TAB_CONFIG[tabKey];
           const TabIcon = tabConfig.icon;
@@ -838,10 +838,10 @@ export const Admin: React.FC = () => {
             className={`flex items-center gap-2 rounded-t-2xl px-4 py-2.5 text-sm font-semibold border-b-2 transition-all whitespace-nowrap ${
               isActive
                 ? tabConfig.activeClass
-                : "border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-800"
+                : "border-transparent text-ink-muted hover:bg-surface-low hover:text-ink"
             }`}
           >
-            <TabIcon className={`w-4 h-4 ${isActive ? tabConfig.iconClass : "text-gray-400"}`} />
+            <TabIcon className={`w-4 h-4 ${isActive ? tabConfig.iconClass : "text-ink-muted"}`} />
             {tabConfig.label}
           </button>
         )})}
@@ -881,7 +881,7 @@ export const Admin: React.FC = () => {
                 <button
                   onClick={handleRepairTopics}
                   disabled={topicRepairLoading}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-amber-700 disabled:opacity-60"
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-paper transition-colors hover:bg-amber-700 disabled:opacity-60"
                 >
                   {topicRepairLoading ? (
                     <>
@@ -896,19 +896,19 @@ export const Admin: React.FC = () => {
             </div>
           )}
 
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-6">
-            <div className="px-5 py-3 border-b border-gray-50 flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-gray-400" />
+          <div className="bg-paper rounded-xl border border-surface-mid shadow-sm overflow-hidden mb-6">
+            <div className="px-5 py-3 border-b border-white/10 flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-ink-muted" />
               <h2 className="font-bold text-sm">AI Recovery Review Status</h2>
             </div>
             {loading ? <Spinner /> : aiReviewStatuses.length === 0 ? (
-              <div className="p-5 text-sm text-gray-500">No `lesson_generation` AI task review statuses were found in Supabase.</div>
+              <div className="p-5 text-sm text-ink-muted">No `lesson_generation` AI task review statuses were found in Supabase.</div>
             ) : (
               <div className="flex flex-wrap gap-3 p-5">
                 {aiReviewStatuses.map((item) => (
-                  <div key={item.status} className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
-                    <div className="text-xs uppercase tracking-wide text-gray-500">{item.status}</div>
-                    <div className="text-lg font-bold text-gray-900">{item.count}</div>
+                  <div key={item.status} className="rounded-lg border border-surface-mid bg-surface-low px-3 py-2">
+                    <div className="text-xs uppercase tracking-wide text-ink-muted">{item.status}</div>
+                    <div className="text-lg font-bold text-ink">{item.count}</div>
                   </div>
                 ))}
               </div>
@@ -916,20 +916,20 @@ export const Admin: React.FC = () => {
  
           </div>
 
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="px-5 py-3 border-b border-gray-50 flex items-center gap-2">
-              <Database className="w-4 h-4 text-gray-400" />
+          <div className="bg-paper rounded-xl border border-surface-mid shadow-sm overflow-hidden">
+            <div className="px-5 py-3 border-b border-white/10 flex items-center gap-2">
+              <Database className="w-4 h-4 text-ink-muted" />
               <h2 className="font-bold text-sm">Table Health</h2>
-              <span className="ml-auto text-xs bg-gray-50 border border-gray-100 px-2 py-0.5 rounded-full text-gray-500">
+              <span className="ml-auto text-xs bg-surface-low border border-surface-mid px-2 py-0.5 rounded-full text-ink-muted">
                 {tableHealth.length} tables
               </span>
             </div>
             {loading ? <Spinner /> : tableHealth.length === 0 ? (
-              <div className="p-5 text-sm text-gray-500">No confirmed admin tables were available to inspect.</div>
+              <div className="p-5 text-sm text-ink-muted">No confirmed admin tables were available to inspect.</div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+                  <thead className="bg-surface-low text-xs text-ink-muted uppercase tracking-wide">
                     <tr>
                       <th className="px-4 py-2 text-left">Table</th>
                       <th className="px-4 py-2 text-left">Rows</th>
@@ -943,7 +943,7 @@ export const Admin: React.FC = () => {
                         : t.health_status === "empty" ? "empty"
                         : t.health_status;
                       return (
-                        <tr key={t.table_name} className="border-t border-gray-50 hover:bg-gray-50/50">
+                        <tr key={t.table_name} className="border-t border-white/10 hover:bg-surface-low/50">
                           <td className="px-4 py-2 font-medium">{t.table_name}</td>
                           <td className="px-4 py-2">{t.row_count === null ? "—" : t.row_count.toLocaleString()}</td>
                           <td className="px-4 py-2">
@@ -969,9 +969,9 @@ export const Admin: React.FC = () => {
 
       {/* ── GRADE COVERAGE ── */}
       {tab === "grades" && (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="px-5 py-3 border-b border-gray-50 flex items-center gap-2">
-            <BookOpen className="w-4 h-4 text-gray-400" />
+        <div className="bg-paper rounded-xl border border-surface-mid shadow-sm overflow-hidden">
+          <div className="px-5 py-3 border-b border-white/10 flex items-center gap-2">
+            <BookOpen className="w-4 h-4 text-ink-muted" />
             <h2 className="font-bold text-sm">Grade-by-Grade Content Coverage</h2>
           </div>
           {topicsTableCount === 0 && lessonsTableCount > 0 && (
@@ -985,11 +985,11 @@ export const Admin: React.FC = () => {
             </div>
           )}
           {loading ? <Spinner /> : gradeData.length === 0 ? (
-            <div className="p-5 text-sm text-gray-500">No grade rows were returned from Supabase.</div>
+            <div className="p-5 text-sm text-ink-muted">No grade rows were returned from Supabase.</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+                <thead className="bg-surface-low text-xs text-ink-muted uppercase tracking-wide">
                   <tr>
                     <th className="px-4 py-2 text-left">Grade</th>
                     <th className="px-4 py-2 text-left">Topics</th>
@@ -1010,13 +1010,13 @@ export const Admin: React.FC = () => {
                       return (
                         <React.Fragment key={i}>
                           {header && (
-                            <tr className="bg-gray-100">
-                              <td colSpan={8} className="px-4 py-2 font-bold text-xs text-gray-600">
+                            <tr className="bg-surface-mid">
+                              <td colSpan={8} className="px-4 py-2 font-bold text-xs text-ink-secondary">
                                 🎓 {row.cycle}
                               </td>
                             </tr>
                           )}
-                          <tr className="border-t border-gray-50 hover:bg-gray-50/40">
+                          <tr className="border-t border-white/10 hover:bg-surface-low/40">
                             <td className="px-4 py-2">{row.grade}</td>
                             <td className="px-4 py-2">{row.total_topics}</td>
                             <td className="px-4 py-2">
@@ -1034,7 +1034,7 @@ export const Admin: React.FC = () => {
                             <td className="px-4 py-2">
                               {row.q_failed > 0
                                 ? <Pill status="failed" label={row.q_failed} />
-                                : <span className="text-gray-300 text-xs">0</span>}
+                                : <span className="text-ink-muted text-xs">0</span>}
                             </td>
                             <td className="px-4 py-2"><Pill status={row.needs_review > 0 ? "pending" : "done"} label={row.needs_review} /></td>
                           </tr>
@@ -1067,17 +1067,17 @@ export const Admin: React.FC = () => {
             </div>
           )}
 
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-4">
-            <div className="px-5 py-3 border-b border-gray-50 flex items-center gap-2">
-              <Clock className="w-4 h-4 text-gray-400" />
+          <div className="bg-paper rounded-xl border border-surface-mid shadow-sm overflow-hidden mb-4">
+            <div className="px-5 py-3 border-b border-white/10 flex items-center gap-2">
+              <Clock className="w-4 h-4 text-ink-muted" />
               <h2 className="font-bold text-sm">Generation Queue — by Grade</h2>
             </div>
             {loading ? <Spinner /> : gradeData.length === 0 ? (
-              <div className="p-5 text-sm text-gray-500">No queue-to-grade mappings were returned from Supabase.</div>
+              <div className="p-5 text-sm text-ink-muted">No queue-to-grade mappings were returned from Supabase.</div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+                  <thead className="bg-surface-low text-xs text-ink-muted uppercase tracking-wide">
                     <tr>
                       <th className="px-4 py-2 text-left">Grade</th>
                       <th className="px-4 py-2 text-left">Done</th>
@@ -1096,20 +1096,20 @@ export const Admin: React.FC = () => {
                         return (
                           <React.Fragment key={i}>
                             {header && (
-                              <tr className="bg-gray-100">
-                                <td colSpan={5} className="px-4 py-2 font-bold text-xs text-gray-600">
+                              <tr className="bg-surface-mid">
+                                <td colSpan={5} className="px-4 py-2 font-bold text-xs text-ink-secondary">
                                   {row.cycle}
                                 </td>
                               </tr>
                             )}
-                            <tr className="border-t border-gray-50 hover:bg-gray-50/40">
+                            <tr className="border-t border-white/10 hover:bg-surface-low/40">
                               <td className="px-4 py-2">{row.grade}</td>
                               <td className="px-4 py-2"><Pill status="done" label={row.q_done} /></td>
                               <td className="px-4 py-2"><Pill status="pending" label={row.q_pending} /></td>
                               <td className="px-4 py-2">
                                 {row.q_failed > 0
                                   ? <Pill status="failed" label={row.q_failed} />
-                                  : <span className="text-gray-300 text-xs">0</span>}
+                                  : <span className="text-ink-muted text-xs">0</span>}
                               </td>
                               <td className="px-4 py-2"><ProgressBar val={row.q_done} total={total || 1} /></td>
                             </tr>
@@ -1123,11 +1123,11 @@ export const Admin: React.FC = () => {
             )}
           </div>
 
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="px-5 py-3 border-b border-gray-50 flex items-center gap-2">
+          <div className="bg-paper rounded-xl border border-surface-mid shadow-sm overflow-hidden">
+            <div className="px-5 py-3 border-b border-white/10 flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-red-400" />
               <h2 className="font-bold text-sm">Recent Failed Jobs</h2>
-              <span className="ml-auto text-xs text-gray-400">latest 10 rows from `lesson_gen_queue`</span>
+              <span className="ml-auto text-xs text-ink-muted">latest 10 rows from `lesson_gen_queue`</span>
             </div>
             {loading ? <Spinner /> : failedJobs.length === 0 ? (
               <div className="flex items-center gap-2 p-5 text-emerald-600 text-sm">
@@ -1136,7 +1136,7 @@ export const Admin: React.FC = () => {
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+                  <thead className="bg-surface-low text-xs text-ink-muted uppercase tracking-wide">
                     <tr>
                       <th className="px-4 py-2 text-left">Topic</th>
                       <th className="px-4 py-2 text-left">Track ID</th>
@@ -1147,12 +1147,12 @@ export const Admin: React.FC = () => {
                   </thead>
                   <tbody>
                     {failedJobs.map((j: any) => (
-                      <tr key={j.id} className="border-t border-gray-50 hover:bg-gray-50/40">
+                      <tr key={j.id} className="border-t border-white/10 hover:bg-surface-low/40">
                         <td className="px-4 py-2">{(j.topics as any)?.title ?? j.topic_id}</td>
-                        <td className="px-4 py-2 font-mono text-xs text-gray-500">{j.track_id ?? "—"}</td>
+                        <td className="px-4 py-2 font-mono text-xs text-ink-muted">{j.track_id ?? "—"}</td>
                         <td className="px-4 py-2">{j.attempts}</td>
                         <td className="px-4 py-2 text-red-500 text-xs max-w-xs truncate">{(j.last_error ?? "").substring(0, 100)}</td>
-                        <td className="px-4 py-2 text-xs text-gray-400">{new Date(j.created_at).toLocaleDateString()}</td>
+                        <td className="px-4 py-2 text-xs text-ink-muted">{new Date(j.created_at).toLocaleDateString()}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -1175,7 +1175,7 @@ export const Admin: React.FC = () => {
             <KPI label="Unlinked" value={(ragStats.unlinkedToTopic ?? 0).toLocaleString()} sub="topic_id is null" variant="warn" />
           </div>
 
-          <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="mb-6 rounded-2xl border border-slate-200 bg-paper p-5 shadow-sm">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-slate-950">Fix RAG Topic Links</h2>
@@ -1194,7 +1194,7 @@ export const Admin: React.FC = () => {
                 type="button"
                 onClick={handleRepairRagTopicLinks}
                 disabled={ragRepairLoading}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:opacity-50"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-sm font-medium text-paper transition-colors hover:bg-slate-800 disabled:opacity-50"
               >
                 {ragRepairLoading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Wrench className="h-4 w-4" />}
                 Fix RAG Topic Links
@@ -1226,7 +1226,7 @@ export const Admin: React.FC = () => {
                     {ragRepairResult.unmatchedSamples.length === 0 ? (
                       <p className="text-sm text-slate-500">No unmatched chunks returned.</p>
                     ) : ragRepairResult.unmatchedSamples.map((chunk) => (
-                      <div key={chunk.id} className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-600">
+                      <div key={chunk.id} className="rounded-xl border border-slate-200 bg-paper p-3 text-xs text-slate-600">
                         <div className="mb-1 flex flex-wrap gap-2">
                           <span className="font-mono text-slate-500">{chunk.id.slice(0, 8)}</span>
                           <span>{chunk.embedding_status}</span>
@@ -1241,18 +1241,18 @@ export const Admin: React.FC = () => {
             )}
           </div>
 
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="px-5 py-3 border-b border-gray-50 flex items-center gap-2">
-              <Layers className="w-4 h-4 text-gray-400" />
+          <div className="bg-paper rounded-xl border border-surface-mid shadow-sm overflow-hidden">
+            <div className="px-5 py-3 border-b border-white/10 flex items-center gap-2">
+              <Layers className="w-4 h-4 text-ink-muted" />
               <h2 className="font-bold text-sm">RAG Chunks — by Grade</h2>
-              <span className="ml-auto text-xs text-gray-400">Click a row to inspect the latest 100 chunks for that grade</span>
+              <span className="ml-auto text-xs text-ink-muted">Click a row to inspect the latest 100 chunks for that grade</span>
             </div>
             {loading ? <Spinner /> : ragByGrade.length === 0 ? (
-              <div className="p-5 text-sm text-gray-500">No RAG chunks were returned from Supabase for any grade.</div>
+              <div className="p-5 text-sm text-ink-muted">No RAG chunks were returned from Supabase for any grade.</div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+                  <thead className="bg-surface-low text-xs text-ink-muted uppercase tracking-wide">
                     <tr>
                       <th className="px-4 py-2 text-left">Grade</th>
                       <th className="px-4 py-2 text-left">Total</th>
@@ -1266,7 +1266,7 @@ export const Admin: React.FC = () => {
                   <tbody>
                     {ragByGrade.map((row, i) => (
                       <React.Fragment key={i}>
-                        <tr className="border-t border-gray-50 hover:bg-gray-50/40">
+                        <tr className="border-t border-white/10 hover:bg-surface-low/40">
                           <td className="px-4 py-2">{row.grade}</td>
                           <td className="px-4 py-2">{row.total.toLocaleString()}</td>
                           <td className="px-4 py-2"><Pill status="done" label={row.done.toLocaleString()} /></td>
@@ -1275,7 +1275,7 @@ export const Admin: React.FC = () => {
                           <td className="px-4 py-2"><ProgressBar val={row.done} total={row.total || 1} /></td>
                           <td className="px-4 py-2">
                             <button onClick={() => loadRagChunks(row.id)}
-                              className="flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
+                              className="flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium bg-surface-mid text-ink-secondary hover:bg-surface-mid transition-colors">
                               <ChevronDown className={`w-3 h-3 transition-transform ${ragChunkGradeId === row.id ? "rotate-180" : ""}`} />
                               {ragChunkGradeId === row.id ? "Hide" : "Browse"}
                             </button>
@@ -1283,24 +1283,24 @@ export const Admin: React.FC = () => {
                         </tr>
                         {ragChunkGradeId === row.id && (
                           <tr>
-                            <td colSpan={7} className="bg-gray-50 px-4 py-3">
+                            <td colSpan={7} className="bg-surface-low px-4 py-3">
                               {ragChunkLoading ? <Spinner /> : ragChunkError ? (
                                 <p className="text-xs text-red-500">{ragChunkError}</p>
                               ) : ragChunks.length === 0 ? (
-                                <p className="text-xs text-gray-400">No chunks found.</p>
+                                <p className="text-xs text-ink-muted">No chunks found.</p>
                               ) : (
                                 <div className="space-y-2 max-h-80 overflow-y-auto">
                                   {ragChunks.map((c: any) => (
-                                    <div key={c.id} className="bg-white rounded-lg border border-gray-100 p-3 flex items-start gap-3">
+                                    <div key={c.id} className="bg-paper rounded-lg border border-surface-mid p-3 flex items-start gap-3">
                                       <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-1">
                                           <Pill
                                             status={c.embedding_status === "done" ? "done" : c.embedding_status === "pending" ? "pending" : "failed"}
                                             label={c.embedding_status}
                                           />
-                                          {c.source_url && <span className="text-xs text-gray-400 truncate max-w-[200px]">{c.source_url}</span>}
+                                          {c.source_url && <span className="text-xs text-ink-muted truncate max-w-[200px]">{c.source_url}</span>}
                                         </div>
-                                        <p className="text-xs text-gray-600 leading-relaxed line-clamp-2">{c.content}</p>
+                                        <p className="text-xs text-ink-secondary leading-relaxed line-clamp-2">{c.content}</p>
                                       </div>
                                     </div>
                                   ))}
@@ -1321,11 +1321,11 @@ export const Admin: React.FC = () => {
 
       {/* ── TABLE BROWSER ── */}
       {tab === "browser" && (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="px-5 py-3 border-b border-gray-50 flex items-center gap-2">
-            <Table2 className="w-4 h-4 text-gray-400" />
+        <div className="bg-paper rounded-xl border border-surface-mid shadow-sm overflow-hidden">
+          <div className="px-5 py-3 border-b border-white/10 flex items-center gap-2">
+            <Table2 className="w-4 h-4 text-ink-muted" />
             <h2 className="font-bold text-sm">Table Browser</h2>
-            <span className="ml-auto text-xs text-gray-400">
+            <span className="ml-auto text-xs text-ink-muted">
               {browseRows.length > 0 && selectedTable
                 ? `${browseRows.length} row(s) from ${selectedTable}`
                 : "Select a table to inspect rows"}
@@ -1336,19 +1336,19 @@ export const Admin: React.FC = () => {
                   getText={() => formatRowsAsTSV(browseCols, browseRows)}
                   label="Copy TSV"
                   iconClass="w-3.5 h-3.5"
-                  className="text-xs font-medium text-gray-600 hover:text-gray-900 px-2.5 py-1 rounded border border-gray-200 hover:border-gray-300 transition-colors"
+                  className="text-xs font-medium text-ink-secondary hover:text-ink px-2.5 py-1 rounded border border-surface-mid hover:border-gray-300 transition-colors"
                 />
                 <CopyButton
                   getText={() => JSON.stringify(browseRows, null, 2)}
                   label="Copy JSON"
                   iconClass="w-3.5 h-3.5"
-                  className="text-xs font-medium text-gray-600 hover:text-gray-900 px-2.5 py-1 rounded border border-gray-200 hover:border-gray-300 transition-colors"
+                  className="text-xs font-medium text-ink-secondary hover:text-ink px-2.5 py-1 rounded border border-surface-mid hover:border-gray-300 transition-colors"
                 />
               </>
             )}
           </div>
           <div className="p-5">
-            <div className="mb-4 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-xs text-gray-600">
+            <div className="mb-4 rounded-xl border border-surface-mid bg-surface-low px-4 py-3 text-xs text-ink-secondary">
               Read-only inspector for confirmed Supabase tables. Broken write actions were removed from the dashboard until protected server routes exist.
             </div>
             {/* Table selector */}
@@ -1359,8 +1359,8 @@ export const Admin: React.FC = () => {
                   onClick={() => { setSelectedTable(t.table_name); browseTable(t.table_name); }}
                   className={`px-3 py-1.5 border rounded-lg text-xs font-medium transition-all ${
                     selectedTable === t.table_name
-                      ? "bg-gray-900 text-white border-gray-900"
-                      : "bg-white text-gray-600 border-gray-200 hover:border-red-400 hover:text-red-500"
+                      ? "bg-ink text-paper border-gray-900"
+                      : "bg-paper text-ink-secondary border-surface-mid hover:border-red-400 hover:text-red-500"
                   }`}
                 >
                   {t.table_name}
@@ -1375,20 +1375,20 @@ export const Admin: React.FC = () => {
                 type="number"
                 value={browseLimit}
                 onChange={(e) => setBrowseLimit(Number(e.target.value))}
-                className="w-16 border border-gray-200 rounded-lg px-2 py-1.5 text-sm"
+                className="w-16 border border-surface-mid rounded-lg px-2 py-1.5 text-sm"
                 min={1} max={200}
               />
-              <span className="text-xs text-gray-400">rows</span>
+              <span className="text-xs text-ink-muted">rows</span>
               <input
                 value={browseFilter}
                 onChange={(e) => setBrowseFilter(e.target.value)}
                 placeholder="Filter: column=value (e.g. status=failed)"
-                className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm"
+                className="flex-1 border border-surface-mid rounded-lg px-3 py-1.5 text-sm"
               />
               <button
                 onClick={() => browseTable()}
                 disabled={!selectedTable}
-                className="bg-gray-900 text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-red-500 transition-colors disabled:opacity-40"
+                className="bg-ink text-paper px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-red-500 transition-colors disabled:opacity-40"
               >
                 Query
               </button>
@@ -1398,15 +1398,15 @@ export const Admin: React.FC = () => {
             {browseLoading && <Spinner />}
             {browseError && <p className="text-red-500 text-sm">{browseError}</p>}
             {!browseLoading && !browseError && browseRows.length === 0 && !selectedTable && (
-              <p className="text-gray-400 text-sm">Select a table above to start browsing.</p>
+              <p className="text-ink-muted text-sm">Select a table above to start browsing.</p>
             )}
             {!browseLoading && !browseError && browseRows.length === 0 && selectedTable && (
-              <p className="text-gray-400 text-sm">No rows returned.</p>
+              <p className="text-ink-muted text-sm">No rows returned.</p>
             )}
             {!browseLoading && browseRows.length > 0 && (
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
-                  <thead className="bg-gray-50 text-gray-500 uppercase tracking-wide">
+                  <thead className="bg-surface-low text-ink-muted uppercase tracking-wide">
                     <tr>
                       {browseCols.map((c) => (
                         <th key={c} className="px-3 py-2 text-left font-semibold whitespace-nowrap">{c}</th>
@@ -1415,10 +1415,10 @@ export const Admin: React.FC = () => {
                   </thead>
                   <tbody>
                     {browseRows.map((row, i) => (
-                      <tr key={i} className="border-t border-gray-50 hover:bg-gray-50/60">
+                      <tr key={i} className="border-t border-white/10 hover:bg-surface-low/60">
                         {browseCols.map((c) => {
                           let v = row[c];
-                          if (v === null || v === undefined) return <td key={c} className="px-3 py-2 text-gray-300">null</td>;
+                          if (v === null || v === undefined) return <td key={c} className="px-3 py-2 text-ink-muted">null</td>;
                           if (typeof v === "object") v = JSON.stringify(v).substring(0, 80) + "…";
                           const s = String(v);
                           return (
@@ -1431,34 +1431,34 @@ export const Admin: React.FC = () => {
                     ))}
                   </tbody>
                 </table>
-                <p className="text-xs text-gray-400 mt-2">{browseRows.length} row(s) from <strong>{selectedTable}</strong></p>
+                <p className="text-xs text-ink-muted mt-2">{browseRows.length} row(s) from <strong>{selectedTable}</strong></p>
               </div>
             )}
 
             {/* ── Edit row modal ── */}
             {editRow && (
               <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-                <div className="bg-white rounded-2xl shadow-sm w-full max-w-lg max-h-[80vh] flex flex-col">
-                  <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                <div className="bg-paper rounded-2xl shadow-sm w-full max-w-lg max-h-[80vh] flex flex-col">
+                  <div className="flex items-center justify-between px-5 py-4 border-b border-surface-mid">
                     <h3 className="font-bold text-sm">Edit Row — {selectedTable}</h3>
-                    <button onClick={() => setEditRow(null)} className="text-gray-400 hover:text-gray-700">✕</button>
+                    <button onClick={() => setEditRow(null)} className="text-ink-muted hover:text-ink-secondary">✕</button>
                   </div>
                   <div className="overflow-y-auto p-5 space-y-3 flex-1">
                     {Object.entries(editRow.row).filter(([k]) => k !== "id" && k !== "created_at" && k !== "updated_at").map(([k, v]) => (
                       <div key={k}>
-                        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{k}</label>
+                        <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">{k}</label>
                         <input
                           value={typeof v === "object" ? JSON.stringify(v) : String(v ?? "")}
                           onChange={(e) => setEditRow(prev => prev ? { ...prev, row: { ...prev.row, [k]: e.target.value } } : null)}
-                          className="w-full mt-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm"
+                          className="w-full mt-1 border border-surface-mid rounded-lg px-3 py-1.5 text-sm"
                         />
                       </div>
                     ))}
                   </div>
-                  <div className="flex gap-2 justify-end px-5 py-4 border-t border-gray-100">
-                    <button onClick={() => setEditRow(null)} className="px-4 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100">Cancel</button>
+                  <div className="flex gap-2 justify-end px-5 py-4 border-t border-surface-mid">
+                    <button onClick={() => setEditRow(null)} className="px-4 py-2 rounded-lg text-sm text-ink-secondary hover:bg-surface-mid">Cancel</button>
                     <button onClick={saveRowEdit} disabled={editSaving}
-                      className="px-4 py-2 rounded-lg text-sm font-semibold bg-gray-900 text-white hover:bg-red-500 disabled:opacity-50">
+                      className="px-4 py-2 rounded-lg text-sm font-semibold bg-ink text-paper hover:bg-red-500 disabled:opacity-50">
                       {editSaving ? "Saving…" : "Save"}
                     </button>
                   </div>
@@ -1471,24 +1471,24 @@ export const Admin: React.FC = () => {
       {/* ── AI ANALYST ── */}
       {tab === "ai" && (
         <div>
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-5">
-            <div className="px-5 py-3 border-b border-gray-50 flex items-center gap-2">
-              <Database className="w-4 h-4 text-gray-400" />
+          <div className="bg-paper rounded-xl border border-surface-mid shadow-sm overflow-hidden mb-5">
+            <div className="px-5 py-3 border-b border-white/10 flex items-center gap-2">
+              <Database className="w-4 h-4 text-ink-muted" />
               <h2 className="font-bold text-sm">AI Observability</h2>
-              <span className="ml-auto text-xs text-gray-400">
+              <span className="ml-auto text-xs text-ink-muted">
                 latest {aiObservability.logs.length}/50 logs · {aiObservability.snapshots.length}/20 snapshots
               </span>
             </div>
             {loading ? <Spinner /> : (
               <div className="grid gap-0 xl:grid-cols-2 xl:divide-x xl:divide-gray-100">
                 <div className="min-w-0">
-                  <div className="px-5 py-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Task Logs</div>
+                  <div className="px-5 py-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">Task Logs</div>
                   {aiObservability.logs.length === 0 ? (
-                    <div className="px-5 pb-5 text-sm text-gray-500">No rows in `ai_task_logs` yet.</div>
+                    <div className="px-5 pb-5 text-sm text-ink-muted">No rows in `ai_task_logs` yet.</div>
                   ) : (
                     <div className="max-h-96 overflow-auto">
                       <table className="w-full text-xs">
-                        <thead className="sticky top-0 bg-gray-50 text-gray-500 uppercase tracking-wide">
+                        <thead className="sticky top-0 bg-surface-low text-ink-muted uppercase tracking-wide">
                           <tr>
                             <th className="px-4 py-2 text-left">Time</th>
                             <th className="px-4 py-2 text-left">Event</th>
@@ -1498,13 +1498,13 @@ export const Admin: React.FC = () => {
                         </thead>
                         <tbody>
                           {aiObservability.logs.map((log: AiTaskLogDebugRow) => (
-                            <tr key={log.id} className="border-t border-gray-50 align-top">
-                              <td className="px-4 py-2 whitespace-nowrap text-gray-500">{formatDebugTime(log.created_at)}</td>
-                              <td className="px-4 py-2 font-semibold text-gray-800">{log.log_type}</td>
-                              <td className="px-4 py-2 font-mono text-[11px] text-gray-500">{getDebugMetadataValue(log.metadata, "job_id")}</td>
-                              <td className="px-4 py-2 text-gray-600">
+                            <tr key={log.id} className="border-t border-white/10 align-top">
+                              <td className="px-4 py-2 whitespace-nowrap text-ink-muted">{formatDebugTime(log.created_at)}</td>
+                              <td className="px-4 py-2 font-semibold text-ink">{log.log_type}</td>
+                              <td className="px-4 py-2 font-mono text-[11px] text-ink-muted">{getDebugMetadataValue(log.metadata, "job_id")}</td>
+                              <td className="px-4 py-2 text-ink-secondary">
                                 <div>{log.message}</div>
-                                <div className="mt-1 font-mono text-[11px] text-gray-400">
+                                <div className="mt-1 font-mono text-[11px] text-ink-muted">
                                   topic {getDebugMetadataValue(log.metadata, "topic_id")} · {getDebugMetadataValue(log.metadata, "duration_ms")} ms
                                 </div>
                               </td>
@@ -1516,13 +1516,13 @@ export const Admin: React.FC = () => {
                   )}
                 </div>
                 <div className="min-w-0">
-                  <div className="px-5 py-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Execution Snapshots</div>
+                  <div className="px-5 py-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">Execution Snapshots</div>
                   {aiObservability.snapshots.length === 0 ? (
-                    <div className="px-5 pb-5 text-sm text-gray-500">No rows in `ai_execution_snapshots` yet.</div>
+                    <div className="px-5 pb-5 text-sm text-ink-muted">No rows in `ai_execution_snapshots` yet.</div>
                   ) : (
                     <div className="max-h-96 overflow-auto">
                       <table className="w-full text-xs">
-                        <thead className="sticky top-0 bg-gray-50 text-gray-500 uppercase tracking-wide">
+                        <thead className="sticky top-0 bg-surface-low text-ink-muted uppercase tracking-wide">
                           <tr>
                             <th className="px-4 py-2 text-left">Time</th>
                             <th className="px-4 py-2 text-left">Type</th>
@@ -1532,12 +1532,12 @@ export const Admin: React.FC = () => {
                         </thead>
                         <tbody>
                           {aiObservability.snapshots.map((snapshot: AiExecutionSnapshotDebugRow) => (
-                            <tr key={snapshot.id} className="border-t border-gray-50 align-top">
-                              <td className="px-4 py-2 whitespace-nowrap text-gray-500">{formatDebugTime(snapshot.created_at)}</td>
-                              <td className="px-4 py-2 font-semibold text-gray-800">{snapshot.snapshot_type}</td>
-                              <td className="px-4 py-2 text-gray-500">{snapshot.target_table ?? "—"}</td>
+                            <tr key={snapshot.id} className="border-t border-white/10 align-top">
+                              <td className="px-4 py-2 whitespace-nowrap text-ink-muted">{formatDebugTime(snapshot.created_at)}</td>
+                              <td className="px-4 py-2 font-semibold text-ink">{snapshot.snapshot_type}</td>
+                              <td className="px-4 py-2 text-ink-muted">{snapshot.target_table ?? "—"}</td>
                               <td className="px-4 py-2">
-                                <div className="max-w-md truncate font-mono text-[11px] text-gray-500" title={formatDebugJson(snapshot.snapshot_data)}>
+                                <div className="max-w-md truncate font-mono text-[11px] text-ink-muted" title={formatDebugJson(snapshot.snapshot_data)}>
                                   {formatDebugJson(snapshot.snapshot_data)}
                                 </div>
                               </td>
@@ -1552,14 +1552,14 @@ export const Admin: React.FC = () => {
             )}
           </div>
           {/* Header card */}
-          <div className="bg-gradient-to-r from-gray-900 to-gray-800 rounded-xl p-5 mb-5 text-white flex items-start gap-4">
+          <div className="bg-gradient-to-r from-gray-900 to-gray-800 rounded-xl p-5 mb-5 text-paper flex items-start gap-4">
             <div className="w-10 h-10 rounded-lg bg-red-500 flex items-center justify-center flex-shrink-0">
               <Sparkles className="w-5 h-5" />
             </div>
             <div className="flex-1">
               <h2 className="font-bold text-base">AI Analyst Agent</h2>
-              <p className="text-gray-400 text-sm mt-0.5">
-                Powered by <span className="text-white font-medium">qwen/qwen3-coder-480b-a35b-instruct</span> via NVIDIA NIM.
+              <p className="text-ink-muted text-sm mt-0.5">
+                Powered by <span className="text-paper font-medium">qwen/qwen3-coder-480b-a35b-instruct</span> via NVIDIA NIM.
                 Reads your live database metrics and returns insights, tasks, and strategy.
               </p>
             </div>
@@ -1578,8 +1578,8 @@ export const Admin: React.FC = () => {
                 disabled={aiLoading}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all disabled:opacity-50 ${
                   activeAITab === a.id
-                    ? "bg-gray-900 text-white border-gray-900"
-                    : "bg-white text-gray-600 border-gray-200 hover:border-gray-900 hover:text-gray-900"
+                    ? "bg-ink text-paper border-gray-900"
+                    : "bg-paper text-ink-secondary border-surface-mid hover:border-gray-900 hover:text-ink"
                 }`}
               >
                 {a.icon}
@@ -1590,8 +1590,8 @@ export const Admin: React.FC = () => {
 
           {/* Loading */}
           {aiLoading && (
-            <div className="bg-white rounded-xl border border-gray-100 p-8 flex flex-col items-center gap-3 text-gray-400">
-              <div className="w-8 h-8 border-2 border-gray-200 border-t-red-500 rounded-full animate-spin" />
+            <div className="bg-paper rounded-xl border border-surface-mid p-8 flex flex-col items-center gap-3 text-ink-muted">
+              <div className="w-8 h-8 border-2 border-surface-mid border-t-red-500 rounded-full animate-spin" />
               <p className="text-sm">Agent is reading your metrics and thinking…</p>
             </div>
           )}
@@ -1607,12 +1607,12 @@ export const Admin: React.FC = () => {
           {/* ── INSIGHTS ── */}
           {aiInsights && !aiLoading && activeAITab === "insights" && (
             <div className="space-y-4">
-              <div className="bg-white rounded-xl border border-gray-100 p-5">
+              <div className="bg-paper rounded-xl border border-surface-mid p-5">
                 <div className="flex items-center gap-2 mb-3">
                   <Info className="w-4 h-4 text-blue-500" />
                   <h3 className="font-bold text-sm">Executive Summary</h3>
                 </div>
-                <p className="text-gray-700 text-sm leading-relaxed">{aiInsights.summary}</p>
+                <p className="text-ink-secondary text-sm leading-relaxed">{aiInsights.summary}</p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1631,30 +1631,30 @@ export const Admin: React.FC = () => {
                     <div key={i} className={`rounded-xl border-l-4 p-4 ${colors[h.type]}`}>
                       <div className="flex items-center gap-2 mb-1">
                         {icons[h.type]}
-                        <span className="font-semibold text-sm text-gray-800">{h.title}</span>
+                        <span className="font-semibold text-sm text-ink">{h.title}</span>
                       </div>
-                      <p className="text-xs text-gray-600 leading-relaxed">{h.detail}</p>
+                      <p className="text-xs text-ink-secondary leading-relaxed">{h.detail}</p>
                     </div>
                   );
                 })}
               </div>
 
               {aiInsights.bottlenecks?.length > 0 && (
-                <div className="bg-white rounded-xl border border-gray-100 p-5">
+                <div className="bg-paper rounded-xl border border-surface-mid p-5">
                   <h3 className="font-bold text-sm mb-3 flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4 text-red-400" /> Top Bottlenecks
                   </h3>
                   <div className="space-y-3">
                     {aiInsights.bottlenecks.map((b, i) => {
-                      const sev = { high: "bg-red-100 text-red-700", medium: "bg-amber-100 text-amber-700", low: "bg-gray-100 text-gray-600" };
+                      const sev = { high: "bg-red-100 text-red-700", medium: "bg-amber-100 text-amber-700", low: "bg-surface-mid text-ink-secondary" };
                       return (
                         <div key={i} className="flex items-start gap-3">
                           <span className={`mt-0.5 px-2 py-0.5 rounded-full text-xs font-bold flex-shrink-0 ${sev[b.severity]}`}>
                             {b.severity}
                           </span>
                           <div>
-                            <div className="font-semibold text-sm text-gray-800">{b.area}</div>
-                            <div className="text-xs text-gray-500 mt-0.5">{b.description}</div>
+                            <div className="font-semibold text-sm text-ink">{b.area}</div>
+                            <div className="text-xs text-ink-muted mt-0.5">{b.description}</div>
                           </div>
                         </div>
                       );
@@ -1667,27 +1667,27 @@ export const Admin: React.FC = () => {
 
           {/* ── TASK LIST ── */}
           {aiTaskList && !aiLoading && activeAITab === "tasks" && (
-            <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-              <div className="px-5 py-3 border-b border-gray-50 flex items-center gap-2">
-                <ListChecks className="w-4 h-4 text-gray-400" />
+            <div className="bg-paper rounded-xl border border-surface-mid overflow-hidden">
+              <div className="px-5 py-3 border-b border-white/10 flex items-center gap-2">
+                <ListChecks className="w-4 h-4 text-ink-muted" />
                 <h3 className="font-bold text-sm">Prioritized Action Items</h3>
-                <span className="ml-auto text-xs bg-gray-50 border border-gray-100 px-2 py-0.5 rounded-full text-gray-500">
+                <span className="ml-auto text-xs bg-surface-low border border-surface-mid px-2 py-0.5 rounded-full text-ink-muted">
                   {aiTaskList.tasks?.length ?? 0} tasks
                 </span>
                 <CopyButton
                   getText={() => formatTaskListForCopy(aiTaskList.tasks ?? [])}
                   label="Copy all"
                   iconClass="w-3.5 h-3.5"
-                  className="text-xs font-medium text-gray-600 hover:text-gray-900 px-2.5 py-1 rounded border border-gray-200 hover:border-gray-300 transition-colors"
+                  className="text-xs font-medium text-ink-secondary hover:text-ink px-2.5 py-1 rounded border border-surface-mid hover:border-gray-300 transition-colors"
                 />
               </div>
               <div className="divide-y divide-gray-50">
                 {aiTaskList.tasks?.map((t) => {
                   const pColors = {
-                    critical: "bg-red-500 text-white",
-                    high:     "bg-orange-400 text-white",
-                    medium:   "bg-amber-400 text-white",
-                    low:      "bg-gray-200 text-gray-600",
+                    critical: "bg-red-500 text-paper",
+                    high:     "bg-orange-400 text-paper",
+                    medium:   "bg-amber-400 text-paper",
+                    low:      "bg-surface-mid text-ink-secondary",
                   };
                   const aColors = {
                     fix:      "bg-red-50 text-red-700",
@@ -1696,13 +1696,13 @@ export const Admin: React.FC = () => {
                     optimize: "bg-teal-50 text-teal-700",
                   };
                   return (
-                    <div key={t.id} className="p-4 flex items-start gap-3 hover:bg-gray-50/50">
+                    <div key={t.id} className="p-4 flex items-start gap-3 hover:bg-surface-low/50">
                       <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5 ${pColors[t.priority]}`}>
                         {t.id}
                       </span>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <span className="font-semibold text-sm text-gray-900">{t.title}</span>
+                          <span className="font-semibold text-sm text-ink">{t.title}</span>
                           <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${aColors[t.action_type]}`}>
                             {t.action_type}
                           </span>
@@ -1710,19 +1710,19 @@ export const Admin: React.FC = () => {
                             {t.priority}
                           </span>
                         </div>
-                        <p className="text-xs text-gray-600 mb-1.5">{t.description}</p>
-                        <div className="flex gap-4 text-xs text-gray-400 flex-wrap">
-                          <span><strong className="text-gray-500">Based on:</strong> {t.metric_basis}</span>
-                          <span><strong className="text-gray-500">Impact:</strong> {t.estimated_impact}</span>
+                        <p className="text-xs text-ink-secondary mb-1.5">{t.description}</p>
+                        <div className="flex gap-4 text-xs text-ink-muted flex-wrap">
+                          <span><strong className="text-ink-muted">Based on:</strong> {t.metric_basis}</span>
+                          <span><strong className="text-ink-muted">Impact:</strong> {t.estimated_impact}</span>
                         </div>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
-                        <span className="px-2.5 py-1 rounded text-xs font-semibold bg-gray-100 text-gray-500">
+                        <span className="px-2.5 py-1 rounded text-xs font-semibold bg-surface-mid text-ink-muted">
                           Planning only
                         </span>
                         <CopyButton
                           getText={() => formatTaskForCopy(t)}
-                          className="text-gray-400 hover:text-gray-700 p-1.5 rounded hover:bg-gray-100"
+                          className="text-ink-muted hover:text-ink-secondary p-1.5 rounded hover:bg-surface-mid"
                         />
                       </div>
                     </div>
@@ -1735,42 +1735,42 @@ export const Admin: React.FC = () => {
           {/* ── STRATEGY PLAN ── */}
           {aiStrategy && !aiLoading && activeAITab === "strategy" && (
             <div className="space-y-4">
-              <div className="bg-gradient-to-r from-gray-900 to-gray-800 rounded-xl p-5 text-white">
+              <div className="bg-gradient-to-r from-gray-900 to-gray-800 rounded-xl p-5 text-paper">
                 <div className="flex items-center gap-2 mb-1">
                   <Zap className="w-4 h-4 text-yellow-400" />
-                  <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Strategic Goal</span>
+                  <span className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Strategic Goal</span>
                 </div>
                 <p className="text-base font-semibold">{aiStrategy.goal}</p>
               </div>
 
               <div className="space-y-3">
                 {aiStrategy.phases?.map((ph) => (
-                  <div key={ph.phase} className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-                    <div className="px-5 py-3 bg-gray-50 border-b border-gray-100 flex items-center gap-3">
-                      <span className="w-7 h-7 rounded-full bg-gray-900 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">
+                  <div key={ph.phase} className="bg-paper rounded-xl border border-surface-mid overflow-hidden">
+                    <div className="px-5 py-3 bg-surface-low border-b border-surface-mid flex items-center gap-3">
+                      <span className="w-7 h-7 rounded-full bg-ink text-paper text-xs font-bold flex items-center justify-center flex-shrink-0">
                         {ph.phase}
                       </span>
                       <div>
-                        <div className="font-bold text-sm text-gray-900">{ph.name}</div>
-                        <div className="text-xs text-gray-400">{ph.duration} · Key metric: {ph.key_metric}</div>
+                        <div className="font-bold text-sm text-ink">{ph.name}</div>
+                        <div className="text-xs text-ink-muted">{ph.duration} · Key metric: {ph.key_metric}</div>
                       </div>
                     </div>
                     <div className="p-4 grid sm:grid-cols-2 gap-4">
                       <div>
-                        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Objectives</div>
+                        <div className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-2">Objectives</div>
                         <ul className="space-y-1">
                           {ph.objectives?.map((o, i) => (
-                            <li key={i} className="flex items-start gap-2 text-xs text-gray-700">
-                              <ChevronRight className="w-3 h-3 mt-0.5 text-gray-400 flex-shrink-0" />{o}
+                            <li key={i} className="flex items-start gap-2 text-xs text-ink-secondary">
+                              <ChevronRight className="w-3 h-3 mt-0.5 text-ink-muted flex-shrink-0" />{o}
                             </li>
                           ))}
                         </ul>
                       </div>
                       <div>
-                        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Actions</div>
+                        <div className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-2">Actions</div>
                         <ul className="space-y-1">
                           {ph.actions?.map((a, i) => (
-                            <li key={i} className="flex items-start gap-2 text-xs text-gray-700">
+                            <li key={i} className="flex items-start gap-2 text-xs text-ink-secondary">
                               <ChevronRight className="w-3 h-3 mt-0.5 text-red-400 flex-shrink-0" />{a}
                             </li>
                           ))}
@@ -1809,10 +1809,10 @@ export const Admin: React.FC = () => {
 
           {/* Empty state */}
           {!aiLoading && !aiError && !aiInsights && !aiTaskList && !aiStrategy && (
-            <div className="bg-white rounded-xl border border-solid border-gray-200 p-10 flex flex-col items-center gap-3 text-center">
-              <Sparkles className="w-8 h-8 text-gray-300" />
-              <p className="text-gray-500 text-sm">Click an action above to run the AI Analyst against your live metrics.</p>
-              <p className="text-gray-400 text-xs">The agent reads all grade coverage, queue status, and RAG data before responding.</p>
+            <div className="bg-paper rounded-xl border border-solid border-surface-mid p-10 flex flex-col items-center gap-3 text-center">
+              <Sparkles className="w-8 h-8 text-ink-muted" />
+              <p className="text-ink-muted text-sm">Click an action above to run the AI Analyst against your live metrics.</p>
+              <p className="text-ink-muted text-xs">The agent reads all grade coverage, queue status, and RAG data before responding.</p>
             </div>
           )}
         </div>
@@ -1821,23 +1821,23 @@ export const Admin: React.FC = () => {
       {/* ── Execute Task Modal ── */}
       {execModal?.open && execModal.task && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-sm max-w-md w-full max-h-[90vh] overflow-y-auto">
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
+          <div className="bg-paper rounded-xl shadow-sm max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="px-6 py-4 border-b border-surface-mid flex items-center gap-2">
               <Zap className="w-5 h-5 text-amber-600" />
               <h3 className="font-bold text-lg">Queue in Command Center</h3>
             </div>
 
             <div className="px-6 py-4 space-y-4">
               {/* Task Summary */}
-              <div className="bg-gray-50 rounded-lg p-3 space-y-2">
+              <div className="bg-surface-low rounded-lg p-3 space-y-2">
                 <div className="flex items-center gap-2">
-                  <span className="font-semibold text-sm text-gray-900">{execModal.task.title}</span>
+                  <span className="font-semibold text-sm text-ink">{execModal.task.title}</span>
                   <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
                     {execModal.task.action_type}
                   </span>
                 </div>
-                <p className="text-xs text-gray-600">{execModal.task.description}</p>
-                <div className="text-xs text-gray-500 space-y-1">
+                <p className="text-xs text-ink-secondary">{execModal.task.description}</p>
+                <div className="text-xs text-ink-muted space-y-1">
                   <div><strong>Metric:</strong> {execModal.task.metric_basis}</div>
                   <div><strong>Impact:</strong> {execModal.task.estimated_impact}</div>
                 </div>
@@ -1877,18 +1877,18 @@ export const Admin: React.FC = () => {
               )}
 
               {/* Actions */}
-              <div className="flex gap-3 pt-4 border-t border-gray-100">
+              <div className="flex gap-3 pt-4 border-t border-surface-mid">
                 <button
                   onClick={() => setExecModal(null)}
                   disabled={execLoading}
-                  className="flex-1 px-4 py-2 rounded-lg border border-gray-200 text-gray-700 font-semibold hover:bg-gray-50 disabled:opacity-40 transition-colors"
+                  className="flex-1 px-4 py-2 rounded-lg border border-surface-mid text-ink-secondary font-semibold hover:bg-surface-low disabled:opacity-40 transition-colors"
                 >
                   {execResult?.created ? "Close" : "Cancel"}
                 </button>
                 {execResult?.created ? (
                   <button
                     onClick={() => navigate("/admin/ai-command-center")}
-                    className="flex-1 px-4 py-2 rounded-lg bg-gray-900 text-white font-semibold hover:bg-black transition-colors"
+                    className="flex-1 px-4 py-2 rounded-lg bg-ink text-paper font-semibold hover:bg-black transition-colors"
                   >
                     Open Command Center
                   </button>
@@ -1896,7 +1896,7 @@ export const Admin: React.FC = () => {
                   <button
                     onClick={() => sendTaskToCommandCenter(execModal.task)}
                     disabled={execLoading}
-                    className="flex-1 px-4 py-2 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700 disabled:opacity-40 transition-colors flex items-center justify-center gap-2"
+                    className="flex-1 px-4 py-2 rounded-lg bg-emerald-600 text-paper font-semibold hover:bg-emerald-700 disabled:opacity-40 transition-colors flex items-center justify-center gap-2"
                   >
                     {execLoading ? (
                       <>

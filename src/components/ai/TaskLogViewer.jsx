@@ -6,7 +6,7 @@ const LOG_META = {
   error: { icon: ShieldAlert, className: "bg-red-50 text-red-700" },
   sql: { icon: TerminalSquare, className: "bg-violet-50 text-violet-700" },
   validation: { icon: ShieldCheck, className: "bg-emerald-50 text-emerald-700" },
-  approval: { icon: Code2, className: "bg-slate-100 text-slate-600" },
+  approval: { icon: Code2, className: "bg-surface-mid text-ink-secondary" },
 };
 
 export const TaskLogViewer = ({ task, logs }) => {
@@ -40,7 +40,7 @@ export const TaskLogViewer = ({ task, logs }) => {
               : null;
 
             return (
-              <article key={log.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <article key={log.id} className="rounded-2xl border border-surface-mid bg-surface-low p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-start gap-3">
                     <div className={`rounded-2xl p-2 ${meta.className}`}>
@@ -48,26 +48,26 @@ export const TaskLogViewer = ({ task, logs }) => {
                     </div>
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-semibold text-slate-950">{log.agent_name}</p>
+                        <p className="text-sm font-semibold text-ink">{log.agent_name}</p>
                         <span className="ls-badge">
                           {log.log_type}
                         </span>
                       </div>
-                      <p className="mt-2 text-sm text-slate-600">{log.message}</p>
+                      <p className="mt-2 text-sm text-ink-secondary">{log.message}</p>
                     </div>
                   </div>
-                  <time className="text-[11px] text-slate-500">
+                  <time className="text-[11px] text-ink-muted">
                     {new Date(log.created_at).toLocaleString()}
                   </time>
                 </div>
 
                 {metadata && (
-                  <details className="mt-3 rounded-2xl bg-white p-3">
-                    <summary className="flex cursor-pointer items-center gap-2 text-xs font-medium text-slate-500">
+                  <details className="mt-3 rounded-2xl bg-paper p-3">
+                    <summary className="flex cursor-pointer items-center gap-2 text-xs font-medium text-ink-muted">
                       <FileJson className="h-4 w-4" />
                       Metadata
                     </summary>
-                    <pre className="mt-3 overflow-x-auto whitespace-pre-wrap font-mono text-xs text-slate-600">
+                    <pre className="mt-3 overflow-x-auto whitespace-pre-wrap font-mono text-xs text-ink-secondary">
                       {metadata}
                     </pre>
                   </details>

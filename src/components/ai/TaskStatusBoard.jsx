@@ -51,8 +51,8 @@ export const TaskStatusBoard = ({ tasks, onSelectTask, selectedTaskId, onRunTask
                   <Icon className="h-4 w-4" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-slate-950">{meta.label}</h3>
-                  <p className="text-xs text-slate-500">{items.length} task{items.length === 1 ? "" : "s"}</p>
+                  <h3 className="text-sm font-bold text-ink">{meta.label}</h3>
+                  <p className="text-xs text-ink-muted">{items.length} task{items.length === 1 ? "" : "s"}</p>
                 </div>
               </div>
             </div>
@@ -69,24 +69,24 @@ export const TaskStatusBoard = ({ tasks, onSelectTask, selectedTaskId, onRunTask
                     onClick={() => onSelectTask(task)}
                     className={`w-full rounded-2xl border p-4 text-left transition-colors ${
                       selectedTaskId === task.id
-                        ? "border-slate-300 bg-slate-50"
-                        : "border-slate-200 bg-white hover:border-slate-300"
+                        ? "border-ink/15 bg-surface-low"
+                        : "border-surface-mid bg-paper hover:border-ink/15"
                     }`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="space-y-1">
-                        <p className="text-sm font-semibold text-slate-950">{task.task_name}</p>
-                        <p className="text-xs text-slate-500">{task.ai_issues?.title || "Linked issue unavailable"}</p>
+                        <p className="text-sm font-semibold text-ink">{task.task_name}</p>
+                        <p className="text-xs text-ink-muted">{task.ai_issues?.title || "Linked issue unavailable"}</p>
                       </div>
                       <RiskBadge level={task.priority} />
                     </div>
 
                     <div className="mt-3">
-                      <div className="mb-1 flex items-center justify-between text-[11px] font-medium text-slate-500">
+                      <div className="mb-1 flex items-center justify-between text-[11px] font-medium text-ink-muted">
                         <span>{task.status.replace(/_/g, " ")}</span>
                         <span>{task.progress}%</span>
                       </div>
-                      <div className="h-2 rounded-full bg-slate-100">
+                      <div className="h-2 rounded-full bg-surface-mid">
                         <div
                           className="h-2 rounded-full bg-accent transition-all"
                           style={{ width: `${Math.max(6, task.progress || 0)}%` }}
@@ -99,7 +99,7 @@ export const TaskStatusBoard = ({ tasks, onSelectTask, selectedTaskId, onRunTask
                     </div>
 
                     <div className="mt-3 flex items-center justify-between gap-2">
-                      <p className="line-clamp-2 text-xs text-slate-600">
+                      <p className="line-clamp-2 text-xs text-ink-secondary">
                         {task.latestLogMessage || task.instructions || "Waiting for the next execution step."}
                       </p>
                       {["pending", "waiting_approval", "running", "validating"].includes(task.status) && (
@@ -108,14 +108,14 @@ export const TaskStatusBoard = ({ tasks, onSelectTask, selectedTaskId, onRunTask
                             event.stopPropagation();
                             onRunTask(task);
                           }}
-                          className="rounded-xl bg-slate-950 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800"
+                          className="rounded-xl bg-ink px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800"
                         >
                           {task.status === "waiting_approval" ? "Resume" : "Run"}
                         </button>
                       )}
                     </div>
 
-                    <div className="mt-3 text-[11px] text-slate-500">
+                    <div className="mt-3 text-[11px] text-ink-muted">
                       Updated {new Date(task.updated_at).toLocaleString()}
                     </div>
                   </button>

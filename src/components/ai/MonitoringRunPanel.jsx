@@ -26,18 +26,18 @@ export const MonitoringRunPanel = ({ runs }) => {
       ) : (
         <div className="space-y-3">
           {runs.map((run) => {
-            const meta = STATUS_META[run.status] || { icon: Activity, className: "text-slate-600 bg-slate-100" };
+            const meta = STATUS_META[run.status] || { icon: Activity, className: "text-ink-secondary bg-surface-mid" };
             const Icon = meta.icon;
             return (
-              <article key={run.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <article key={run.id} className="rounded-2xl border border-surface-mid bg-surface-low p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-start gap-3">
                     <div className={`rounded-2xl p-2 ${meta.className}`}>
                       <Icon className="h-4 w-4" />
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-slate-950">{run.run_type}</p>
-                      <p className="mt-1 text-xs text-slate-500">
+                      <p className="text-sm font-semibold text-ink">{run.run_type}</p>
+                      <p className="mt-1 text-xs text-ink-muted">
                         {run.issues_detected} issue(s) detected • {run.grouped_issues} grouped
                       </p>
                     </div>
@@ -46,7 +46,7 @@ export const MonitoringRunPanel = ({ runs }) => {
                     {run.status}
                   </span>
                 </div>
-                <div className="mt-3 text-[11px] text-slate-500">
+                <div className="mt-3 text-[11px] text-ink-muted">
                   Started {new Date(run.started_at).toLocaleString()}
                 </div>
               </article>
