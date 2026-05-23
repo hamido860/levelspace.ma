@@ -508,14 +508,21 @@ export const ClassroomView: React.FC = () => {
     const outlinesByTopicId = new Map<string, SupabaseTopicOutlineRow[]>();
     const topicIds = topics.map((topic) => topic.id);
 
+    const batchPromises = [];
     for (let start = 0; start < topicIds.length; start += 100) {
       const batch = topicIds.slice(start, start + 100);
-      const { data: outlineRows, error: outlinesError } = await supabase
-        .from('topic_outlines')
-        .select('id, topic_id, title, description, outline_order')
-        .in('topic_id', batch)
-        .order('outline_order', { ascending: true });
+      batchPromises.push(
+        supabase
+          .from('topic_outlines')
+          .select('id, topic_id, title, description, outline_order')
+          .in('topic_id', batch)
+          .order('outline_order', { ascending: true })
+      );
+    }
 
+    const batchResults = await Promise.all(batchPromises);
+
+    for (const { data: outlineRows, error: outlinesError } of batchResults) {
       if (outlinesError) {
         console.warn('[ClassroomView] topic_outlines unavailable for topic fallback:', outlinesError);
         continue;
