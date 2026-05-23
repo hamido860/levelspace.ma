@@ -791,6 +791,7 @@ export const ClassroomView: React.FC = () => {
 
     return {
       'Content-Type': 'application/json',
+      'x-levelspace-demo-admin': 'true',
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
     };
   };
@@ -1169,34 +1170,22 @@ export const ClassroomView: React.FC = () => {
         )}
 
         {hasTopicFallback && (
-          <div className="rounded-3xl border border-blue-200 bg-blue-50 px-5 py-4 text-blue-950">
+          <div className="rounded-2xl border border-slate-200 bg-white px-6 py-5 shadow-sm">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div className="flex items-start gap-3">
-                <BookOpen className="mt-0.5 h-5 w-5 shrink-0" />
-                <div>
-                  <p className="text-sm font-semibold">Topics found, but lessons are not generated yet.</p>
-                  <p className="mt-1 text-sm text-blue-800">
-                    {topicFallbackRows.length} curriculum topics are available from Supabase. Outlines are shown below when available; starter lessons stay out of RAG until reviewed.
-                  </p>
-                  {topicFallbackDomains.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {topicFallbackDomains.map((domain) => (
-                        <span key={domain.key} className="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-800">
-                          {domain.name}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
+              <div>
+                <p className="text-lg font-bold text-slate-950">{t('curriculum_topics') || 'Curriculum Topics'}</p>
+                <p className="mt-1 text-sm text-slate-500">
+                  {topicFallbackRows.length} {t('topics_available') || 'topics found. Generate lessons to start learning.'}
+                </p>
               </div>
               {isAdmin && (
                 <button
                   onClick={handleGenerateStarterLessons}
                   disabled={isGeneratingStarterLessons}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 py-3 text-xs font-medium text-white transition-colors hover:bg-blue-800 disabled:opacity-60"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-slate-800 disabled:opacity-60"
                 >
-                  {isGeneratingStarterLessons ? <Loader2 size={14} className="animate-spin" /> : <Database size={14} />}
-                  {isGeneratingStarterLessons ? 'Generating...' : 'Generate starter lessons'}
+                  {isGeneratingStarterLessons ? <Loader2 size={16} className="animate-spin" /> : <Database size={16} />}
+                  {isGeneratingStarterLessons ? t('generating') || 'Generating...' : t('generate_starter_lessons') || 'Generate All Lessons'}
                 </button>
               )}
             </div>
@@ -1231,38 +1220,33 @@ export const ClassroomView: React.FC = () => {
               <BookOpen size={24} className="text-accent" />
             </div>
             <div className="space-y-2 max-w-md">
-              <p className="text-xl font-bold text-slate-950">Set up this classroom</p>
-              <p className="ls-body-text">Start with teacher-reviewed or officially validated curriculum units, then add draft AI content only when you need it.</p>
-            </div>
-            <div className="flex flex-wrap items-center justify-center gap-2 ls-micro-label">
-              <span className="px-3 py-1 rounded-full bg-white border border-slate-200">Supabase First</span>
-              <span className="px-3 py-1 rounded-full bg-white border border-slate-200">Local Classroom</span>
-              <span className="px-3 py-1 rounded-full bg-white border border-slate-200">{module.strictRAG ? 'Strict RAG On' : 'Strict RAG Off'}</span>
+              <p className="text-2xl font-bold text-slate-950">{t('start_here') || 'Set up this classroom'}</p>
+              <p className="ls-body-text">{t('start_here_desc') || 'Generate draft AI content, or load officially validated units.'}</p>
             </div>
             {!aiAvailable && (
               <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 w-full max-w-md">
-                <p className="text-xs text-amber-800 font-medium">AI features need an API key, but you can still load certified units right now.</p>
+                <p className="text-xs text-amber-800 font-medium">{t('ai_key_needed') || 'AI features need an API key, but you can still load certified units right now.'}</p>
               </div>
             )}
-            <div className="flex flex-col sm:flex-row gap-3 w-full max-w-md">
-              <button
-                onClick={handleSeedFromSupabase}
-                disabled={isSeeding}
-                className="flex-1 flex items-center justify-center gap-2 bg-slate-950 text-white px-4 py-3 rounded-xl text-xs font-bold  hover:bg-accent transition-all disabled:opacity-50"
-              >
-                {isSeeding ? <Loader2 size={14} className="animate-spin" /> : <Database size={14} />}
-                {isSeeding ? 'Loading...' : 'Load from Supabase'}
-              </button>
+            <div className="flex flex-col sm:flex-row gap-3 w-full max-w-md mt-4">
               {aiAvailable && (
                 <button
                   onClick={() => handleGenerateLesson()}
                   disabled={!!generatingTitle}
-                  className="flex-1 flex items-center justify-center gap-2 bg-white text-slate-950 px-4 py-3 rounded-xl text-xs font-bold  border border-slate-200 hover:border-accent/30 hover:text-accent transition-all disabled:opacity-50"
+                  className="flex-1 flex items-center justify-center gap-2 bg-accent text-white px-4 py-3.5 rounded-xl text-sm font-bold shadow-sm shadow-accent/20 hover:bg-accent/90 transition-all disabled:opacity-50"
                 >
-                  {generatingTitle === module.name ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-                  Generate First Lesson
+                  {generatingTitle === module.name ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+                  {t('generate_first_lesson') || 'Generate First Lesson'}
                 </button>
               )}
+              <button
+                onClick={handleSeedFromSupabase}
+                disabled={isSeeding}
+                className="flex-1 flex items-center justify-center gap-2 bg-white text-slate-950 px-4 py-3.5 rounded-xl text-sm font-bold border border-slate-200 hover:border-accent/30 hover:text-accent transition-all disabled:opacity-50"
+              >
+                {isSeeding ? <Loader2 size={16} className="animate-spin" /> : <Database size={16} />}
+                {isSeeding ? t('loading') || 'Loading...' : t('load_from_supabase') || 'Load from Supabase'}
+              </button>
             </div>
           </div>
         ) : (
@@ -1355,7 +1339,7 @@ export const ClassroomView: React.FC = () => {
                   </div>
                 )}
                 
-                <div className="grid grid-cols-1 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {Array.isArray(lessons) && lessons.length > 0 ? (
                     visibleLessons.length > 0 ? visibleLessons.map((lesson, i) => (
                       <motion.div 
@@ -1363,54 +1347,43 @@ export const ClassroomView: React.FC = () => {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: i * 0.05 }}
-                        onClick={() => navigate(`/lesson/${lesson.id}`)}
-                        className="bg-white border border-slate-200 p-5 rounded-2xl flex items-center justify-between group cursor-pointer hover:border-accent/30 hover:shadow-sm hover:shadow-ink/5 transition-all"
+                        className="bg-white border border-slate-200 p-5 rounded-2xl flex flex-col group hover:border-accent/30 hover:shadow-sm hover:shadow-ink/5 transition-all"
                       >
-                        <div className="flex items-center gap-4">
-                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors ${
-                            lesson.status === 'done' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-500 group-hover:bg-accent/10 group-hover:text-accent'
-                          }`}>
-                            {lesson.status === 'done' ? <CheckCircle2 size={24} /> : <Play size={20} className="ml-1" />}
-                          </div>
-                          <div>
-                            <h4 className="text-base font-bold text-slate-950 group-hover:text-accent transition-colors">{lesson.title}</h4>
-                            <div className="mt-2 flex flex-wrap items-center gap-2">
-                              <span className={getCurriculumValidationBadgeClass(lesson.validation_status, !!lesson.is_ai_generated)}>
-                                {getCurriculumValidationLabel(lesson.validation_status, !!lesson.is_ai_generated)}
-                              </span>
-                              {lesson.source_confidence ? (
-                                <span className="pill pill--neutral">
-                                  {Math.round(Number(lesson.source_confidence) * 100)}% source confidence
-                                </span>
-                              ) : null}
+                        <div className="flex-1 cursor-pointer" onClick={() => navigate(`/lesson/${lesson.id}`)}>
+                            <div className="flex items-center gap-3 mb-3">
+                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
+                                lesson.status === 'done' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-400 group-hover:bg-accent/10 group-hover:text-accent'
+                              }`}>
+                                {lesson.status === 'done' ? <CheckCircle2 size={18} /> : <Play size={16} className="ml-0.5" />}
+                              </div>
+                              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Module {i + 1}</span>
                             </div>
-                            <div className="flex items-center gap-3 mt-2">
-                              <span className="text-[10px] font-mono  text-slate-500/60">Unit {i + 1}</span>
-                              <span className="w-1 h-1 rounded-full bg-slate-950/10" />
-                              <span className="text-[10px] font-mono  text-slate-500/60">~15 min</span>
+                            
+                            <h4 className="text-base font-bold text-slate-950 mb-2 line-clamp-2 group-hover:text-accent transition-colors" title={lesson.title}>{lesson.title}</h4>
+                            
+                            <div className="mt-2 flex flex-wrap gap-1 mb-4">
+                              {lesson.tags?.slice(0, 3).map(tag => (
+                                <span key={tag} className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">{tag}</span>
+                              ))}
                             </div>
-                            <div className="mt-2" onClick={(e) => e.stopPropagation()}>
-                              <TagsManager 
-                                tags={lesson.tags || []} 
-                                onAddTag={async (tag) => {
-                                  const currentTags = lesson.tags || [];
-                                  if (!currentTags.includes(tag)) {
-                                    await db.lessons.update(lesson.id, { tags: [...currentTags, tag] });
-                                  }
-                                }}
-                                onRemoveTag={async (tag) => {
-                                  const currentTags = lesson.tags || [];
-                                  await db.lessons.update(lesson.id, { tags: currentTags.filter(t => t !== tag) });
-                                }}
-                                maxDisplay={7}
-                              />
-                            </div>
-                          </div>
                         </div>
-                        <ChevronRight size={20} className="text-slate-500/30 group-hover:text-accent group-hover:translate-x-1 transition-all" />
+
+                        <div className="mt-auto pt-4 border-t border-slate-100 flex items-center justify-between">
+                            <span className={`text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wide ${
+                                lesson.status === 'done' ? 'text-emerald-600 bg-emerald-50' : 'text-slate-500 bg-slate-50'
+                            }`}>
+                              {lesson.status === 'done' ? t('completed') || 'Completed' : t('draft') || 'Draft'}
+                            </span>
+                            <button
+                              onClick={() => navigate(`/lesson/${lesson.id}`)}
+                              className="text-xs font-bold text-slate-600 bg-slate-50 hover:bg-slate-950 hover:text-white px-4 py-2 rounded-lg transition-all"
+                            >
+                              {t('view') || 'View'}
+                            </button>
+                        </div>
                       </motion.div>
                     )) : (
-                      <div className="rounded-2xl border border-solid border-slate-200 bg-white p-5">
+                      <div className="col-span-full rounded-2xl border border-solid border-slate-200 bg-white p-5">
                         <p className="text-sm font-semibold text-slate-950">No lessons in this domain yet.</p>
                         <p className="mt-1 ls-micro-label">Switch back to {t('all')} to see every available lesson for this classroom.</p>
                       </div>
@@ -1422,44 +1395,38 @@ export const ClassroomView: React.FC = () => {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: i * 0.03 }}
-                        className="bg-white border border-solid border-slate-200 p-5 rounded-2xl"
+                        className="bg-white border border-slate-200 p-5 rounded-2xl flex flex-col hover:border-accent/30 hover:shadow-sm transition-all"
                       >
-                        <div className="flex items-start gap-4">
-                          <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center">
-                            <Clock size={22} />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <h4 className="text-base font-bold text-slate-950">{topic.title}</h4>
-                            <div className="mt-2 flex flex-wrap items-center gap-2">
-                              <span className="pill pill--warn">needs lesson generation</span>
-                              <span className="pill pill--neutral">topic from Supabase</span>
-                              {topic.domain_name && <span className="pill pill--neutral">{topic.domain_name}</span>}
-                              <span className="pill pill--neutral">RAG disabled until reviewed</span>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-3">
+                            <div className="w-10 h-10 rounded-xl bg-slate-50 text-slate-400 flex items-center justify-center">
+                              <BookOpen size={18} />
                             </div>
-                            {topic.outlines.length > 0 ? (
-                              <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
-                                <p className="ls-micro-label">Available outline</p>
-                                <div className="mt-2 space-y-2">
-                                  {topic.outlines.slice(0, 3).map((outline) => (
-                                    <div key={outline.id} className="rounded-xl bg-white/70 px-3 py-2">
-                                      <p className="text-sm font-semibold text-slate-950">{outline.title || 'Untitled outline item'}</p>
-                                      {outline.description && (
-                                        <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-500">{outline.description}</p>
-                                      )}
-                                    </div>
-                                  ))}
-                                </div>
-                                {topic.outlines.length > 3 && (
-                                  <p className="mt-2 text-xs font-medium text-slate-500">+{topic.outlines.length - 3} more outline items</p>
-                                )}
-                              </div>
-                            ) : (
-                              <p className="mt-3 ls-micro-label">No outline rows available yet for this topic.</p>
-                            )}
-                            <div className="flex items-center gap-3 mt-2">
-                              <span className="text-[10px] font-mono  text-slate-500/60">Topic {i + 1}</span>
-                            </div>
+                            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Module {i + 1}</span>
                           </div>
+                          
+                          <h4 className="text-base font-bold text-slate-950 mb-2 line-clamp-2" title={topic.title}>{topic.title}</h4>
+                          
+                          {topic.outlines.length > 0 ? (
+                            <p className="text-xs text-slate-500 line-clamp-2 mb-4">
+                              {topic.outlines[0]?.description || topic.outlines[0]?.title}
+                            </p>
+                          ) : (
+                            <p className="text-xs text-slate-400 italic mb-4">No outline available</p>
+                          )}
+                        </div>
+                        
+                        <div className="mt-auto pt-4 border-t border-slate-100 flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-amber-500 bg-amber-50 px-2 py-1 rounded-md uppercase tracking-wide">
+                            {t('not_started') || 'Not Started'}
+                          </span>
+                          <button
+                            onClick={() => handleGenerateLesson(topic.title, true)}
+                            disabled={!!generatingTitle}
+                            className="text-xs font-bold text-accent bg-accent/10 hover:bg-accent hover:text-white px-4 py-2 rounded-lg transition-all"
+                          >
+                            {generatingTitle === topic.title ? <Loader2 size={14} className="animate-spin" /> : (t('generate') || 'Generate')}
+                          </button>
                         </div>
                       </motion.div>
                     ))

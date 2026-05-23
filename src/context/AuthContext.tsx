@@ -84,38 +84,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [dbConnected, user?.id]);
 
   useEffect(() => {
-    refreshDbConnection();
+    let subscription: any = null;
 
-    // 1. Listen for Supabase Auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session);
-      
-      if (session?.user) {
-        setUser(session.user);
+    const initialize = async () => {
+      await refreshDbConnection();
 
-        // Try to load from cache first
-        const cachedProfile = await db.settings.get(`profile_${session.user.id}`);
-        if (cachedProfile) {
-          setProfile(cachedProfile.value);
+      // 1. Listen for Supabase Auth changes
+      const { data } = supabase.auth.onAuthStateChange(async (_event: any, session: any) => {
+        setSession(session);
+        
+        if (session?.user) {
+          setUser(session.user);
+
+          // Try to load from cache first
+          const cachedProfile = await db.settings.get(`profile_${session.user.id}`);
+          if (cachedProfile) {
+            setProfile(cachedProfile.value);
+          }
+
+          const userProfile = await getProfile(session.user.id);
+          if (userProfile) {
+            setProfile(userProfile);
+            await db.settings.put({ key: `profile_${session.user.id}`, value: userProfile });
+          }
+        } else if (localStorage.getItem(DEMO_ADMIN_STORAGE_KEY) === 'true') {
+          await applyDemoAdminAuth();
+        } else {
+          localStorage.removeItem(DEMO_ADMIN_STORAGE_KEY);
+          setUser(null);
+          setProfile(null);
         }
+        setLoading(false);
+      });
 
-        const userProfile = await getProfile(session.user.id);
-        if (userProfile) {
-          setProfile(userProfile);
-          await db.settings.put({ key: `profile_${session.user.id}`, value: userProfile });
-        }
-      } else if (localStorage.getItem(DEMO_ADMIN_STORAGE_KEY) === 'true') {
-        await applyDemoAdminAuth();
-      } else {
-        localStorage.removeItem(DEMO_ADMIN_STORAGE_KEY);
-        setUser(null);
-        setProfile(null);
+      if (data?.subscription) {
+        subscription = data.subscription;
       }
-      setLoading(false);
-    });
 
-    // 2. Initial session check
-    const initAuth = async () => {
+      // 2. Initial session check
       const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
       
@@ -143,10 +149,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
     };
 
-    initAuth();
+    initialize();
 
     return () => {
-      subscription.unsubscribe();
+      if (subscription) {
+        subscription.unsubscribe();
+      }
     };
   }, []);
 

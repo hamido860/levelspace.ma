@@ -41,6 +41,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
   const location = useLocation();
   const { language, t } = useLanguage();
   const { signOut, isAdmin } = useAuth();
+  const [isAdvancedOpen, setIsAdvancedOpen] = React.useState(false);
 
   const mainNavItems: NavItem[] = [
     { label: t('dashboard'), icon: <LayoutDashboard size={20} />, path: '/dashboard' },
@@ -49,11 +50,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
     { label: t('library'), icon: <BookMarked size={20} />, path: '/library' },
     { label: t('blueprints'), icon: <Layers3 size={20} />, path: '/blueprints' },
     { label: t('schedule'), icon: <Calendar size={20} />, path: '/schedule' },
-    { label: t('progress'), icon: <BarChart3 size={20} />, path: '/progress' },
-    { label: 'AI Keys', icon: <KeyRound size={20} />, path: '/settings/ai-keys', matchPrefix: true },
+    { label: t('progress'), icon: <BarChart3 size={20} />, path: '/progress' }
   ];
 
   const toolNavItems: NavItem[] = isAdmin ? [
+    { label: 'AI Keys', icon: <KeyRound size={20} />, path: '/settings/ai-keys', matchPrefix: true },
     { label: 'Admin', icon: <ShieldCheck size={20} />, path: '/admin', matchPrefix: false },
     { label: 'Curriculum', icon: <Database size={20} />, path: '/admin/curriculum-debug', matchPrefix: true },
     { label: 'MCP Lessons', icon: <PackageSearch size={20} />, path: '/admin/mcp-lessons', matchPrefix: true },
@@ -109,29 +110,52 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
         </nav>
 
         <div className="mt-auto flex flex-col gap-1 pt-4 border-t border-ink/5">
-          {!isCollapsed && <p className="text-[10px] font-bold text-muted uppercase tracking-normal px-3 mb-2 opacity-50">{t('tools')}</p>}
-          {toolNavItems.map((item) => {
-            const isActive = item.matchPrefix
-              ? location.pathname === item.path || location.pathname.startsWith(`${item.path}/`)
-              : location.pathname === item.path;
-            return (
+          {toolNavItems.length > 0 && (
+            <>
               <button
-                key={item.path}
-                onClick={() => navigate(item.path)}
-                title={isCollapsed ? item.label : undefined}
-                className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3 px-3'} py-2.5 rounded-lg font-medium text-sm transition-all duration-200 ease-in-out ${
-                  isActive 
-                    ? 'bg-accent text-white shadow-sm shadow-accent/20' 
-                    : 'text-muted hover:bg-ink/5'
-                }`}
+                onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
+                className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between px-3'} py-2.5 rounded-lg font-medium text-sm text-muted hover:bg-ink/5 transition-all duration-200 ease-in-out`}
+                title={isCollapsed ? "Advanced Tools" : undefined}
               >
-                <span className={isActive ? 'text-white' : 'text-muted'}>
-                  {item.icon}
-                </span>
-                {!isCollapsed && <span>{item.label}</span>}
+                <div className="flex items-center gap-3">
+                  <Wrench size={20} />
+                  {!isCollapsed && <span>{t('advanced') || 'Advanced'}</span>}
+                </div>
+                {!isCollapsed && (
+                  <div className={`transition-transform duration-200 ${isAdvancedOpen ? 'rotate-180' : ''}`}>
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                )}
               </button>
-            );
-          })}
+
+              <div className={`flex flex-col gap-1 overflow-hidden transition-all duration-200 ${isAdvancedOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
+                {toolNavItems.map((item) => {
+                  const isActive = item.matchPrefix
+                    ? location.pathname === item.path || location.pathname.startsWith(`${item.path}/`)
+                    : location.pathname === item.path;
+                  return (
+                    <button
+                      key={item.path}
+                      onClick={() => navigate(item.path)}
+                      title={isCollapsed ? item.label : undefined}
+                      className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3 px-3'} py-2 rounded-lg font-medium text-xs transition-all duration-200 ease-in-out ${
+                        isActive 
+                          ? 'bg-accent/10 text-accent' 
+                          : 'text-muted hover:bg-ink/5 hover:text-ink'
+                      }`}
+                    >
+                      <span className={isActive ? 'text-accent' : 'text-muted'}>
+                        {React.cloneElement(item.icon as React.ReactElement<any>, { size: 16 })}
+                      </span>
+                      {!isCollapsed && <span>{item.label}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
           
           <button
             onClick={() => signOut()}

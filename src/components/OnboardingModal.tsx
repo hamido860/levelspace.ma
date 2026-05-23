@@ -5,7 +5,7 @@ import {
   BookA, BrainCircuit, LibraryBig, Globe
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { updateProfile } from '../db/supabase';
+import { updateProfile, supabase } from '../db/supabase';
 import { db } from '../db/db';
 
 interface OnboardingModalProps {
@@ -54,23 +54,45 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
   const userName = profile?.full_name || (user?.email ? user.email.split('@')[0] : 'Explorer');
 
   const requiresTrack = selectedCycle === 'lycee';
-  const totalSteps = requiresTrack ? 5 : 4; // 0=Welcome, 1=Cycle, 2=Grade, 3=Track(if lycee), 4/option=Done 
+  const totalSteps = requiresTrack ? 5 : 3; // 0=Welcome, 1=Cycle, 2=Grade, 3=Track(if lycee)/Done(others), 4=Option(if lycee), 5=Done(if lycee)
 
   const handleNext = () => setStep(s => Math.min(s + 1, totalSteps));
   const handleBack = () => setStep(s => Math.max(s - 1, 0));
 
   const handleComplete = async () => {
+    let finalTrackValue = selectedTrack || '';
+
+    // If a track is selected, try to map it to its Supabase UUID
+    if (selectedTrack) {
+      try {
+        const { data: tracksData } = await supabase
+          .from('bac_tracks')
+          .select('id, name');
+        
+        if (tracksData && Array.isArray(tracksData)) {
+          const matchedTrack = tracksData.find(
+            (t: any) => t.name.trim().toLowerCase() === selectedTrack.trim().toLowerCase()
+          );
+          if (matchedTrack) {
+            finalTrackValue = matchedTrack.id;
+          }
+        }
+      } catch (err: any) {
+        console.error('Failed to map track name to UUID:', err.message);
+      }
+    }
+
     localStorage.setItem('selected_country', 'Morocco');
     localStorage.setItem('selected_cycle', selectedCycle);
     localStorage.setItem('selected_grade', selectedGrade);
-    if (selectedTrack) localStorage.setItem('selected_bac_track', selectedTrack);
+    if (finalTrackValue) localStorage.setItem('selected_bac_track', finalTrackValue);
     if (selectedOption) localStorage.setItem('selected_option', selectedOption);
     localStorage.setItem('has_completed_onboarding', 'true');
 
     await db.settings.put({ key: 'selected_country', value: 'Morocco' });
     await db.settings.put({ key: 'selected_cycle', value: selectedCycle });
     await db.settings.put({ key: 'selected_grade', value: selectedGrade });
-    if (selectedTrack) await db.settings.put({ key: 'selected_bac_track', value: selectedTrack });
+    if (finalTrackValue) await db.settings.put({ key: 'selected_bac_track', value: finalTrackValue });
     if (selectedOption) await db.settings.put({ key: 'selected_option', value: selectedOption });
     await db.settings.put({ key: 'has_completed_onboarding', value: 'true' });
 
@@ -80,7 +102,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
         await updateProfile(user.id, {
           onboarding_completed: true,
           selected_grade: selectedGrade,
-          selected_bac_track: selectedTrack || null,
+          selected_bac_track: finalTrackValue || null,
         });
       } catch (err: any) {
         console.error('Failed to persist onboarding to database:', err.message);
@@ -265,7 +287,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
             )}
 
             {/* STEP 4: INTERNATIONAL OPTION (If applicable) */}
-            {step === (requiresTrack ? 4 : 3) && (
+            {step === 4 && requiresTrack && (
               <motion.div
                  key="step-option"
                  initial={{ opacity: 0, x: 20 }}
@@ -380,7 +402,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
                   (step === 1 && !selectedCycle) || 
                   (step === 2 && !selectedGrade) || 
                   (step === 3 && requiresTrack && !selectedTrack) ||
-                  (step === (requiresTrack ? 4 : 3) && !selectedOption)
+                  (step === 4 && requiresTrack && !selectedOption)
                 }
                 className="px-5 py-2 text-sm bg-ink text-paper rounded-xl font-semibold flex items-center gap-2 hover:bg-ink/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:-translate-y-0.5"
               >

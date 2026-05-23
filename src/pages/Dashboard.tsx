@@ -323,330 +323,224 @@ export const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Hero Section - Minimal & Clean */}
-        <section className="relative overflow-hidden ls-card-pad mx-4 p-8">
-          <div className="relative z-10 max-w-lg space-y-6">
-            <div className="space-y-2">
-              <div className="flex items-center gap-3">
-                <p className="ls-status-badge">
-                  {t('personalized_for', { grade: selectedGrade })}
-                </p>
-                <div className="w-1 h-1 rounded-full bg-slate-950/20" />
-                <p className="text-xs font-medium text-slate-500 dark:text-ink-muted">
-                  {currentSession}
-                </p>
+        {/* Simple Welcome Header */}
+        <div className="px-4 pt-6 pb-2">
+          <h1 className="text-2xl font-bold text-slate-950 dark:text-ink">
+            {t('welcome_back', { name: profile?.first_name || 'Student' }) || `Welcome back${profile?.first_name ? `, ${profile.first_name}` : ''}`}
+          </h1>
+          <p className="text-sm text-slate-500 mt-1 dark:text-ink-muted">
+            {t('dashboard_continue') || "Here's what's happening in your classes today."}
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 px-4">
+          
+          {/* Main Content Column */}
+          <div className="lg:col-span-8 space-y-10">
+            
+            {/* Course Modules */}
+            <section className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-bold text-slate-950 dark:text-ink">{t('course_modules') || 'Course Modules'}</h2>
+                <button onClick={() => navigate('/modules')} className="text-sm font-bold text-accent hover:underline">
+                  {t('view_all') || 'View All'}
+                </button>
               </div>
-              <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
-                {t('motivation_power')}
-              </h1>
-            </div>
 
-            <div className="flex flex-wrap gap-3">
-              <button 
-                onClick={() => navigate('/modules')}
-                className="ls-button-primary"
-              >
-                {t('dashboard_explore')}
-              </button>
-              <button 
-                onClick={() => navigate('/blueprints')}
-                className="ls-button-secondary"
-              >
-                {t('view_blueprints')}
-              </button>
-            </div>
-          </div>
-        </section>
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 px-4">
-          {/* Main Content - Classrooms */}
-          <div className="lg:col-span-8 space-y-8">
-            {/* Last Lesson Quick Action */}
-            {visibleLastLesson && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                onClick={() => navigate(`/lesson/${visibleLastLesson.id}`)}
-                className="ls-interactive-card-pad flex items-center justify-between group cursor-pointer"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="ls-icon-tile">
-                    <BookOpen size={20} />
-                  </div>
-                  <div>
-                    <p className="ls-micro-label">Continue Learning</p>
-                    <h3 className="text-sm font-bold text-slate-950 dark:text-ink">{visibleLastLesson.title}</h3>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 text-slate-600 dark:text-ink-secondary">
-                  <span className="text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">Resume</span>
-                  <ChevronRight size={18} />
-                </div>
-              </motion.div>
-            )}
-
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <h2 className="ls-section-title">{t('active_classrooms')}</h2>
-                <p className="ls-body-text">{t('active_paths_desc')}</p>
-              </div>
-              <button 
-                onClick={() => navigate('/modules')}
-                className="ls-button-secondary"
-              >
-                {t('manage')} <ArrowRight className="w-3 h-3" />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {allModules.length > 0 ? (
-                allModules.map((module, i) => (
-                  <motion.div
-                    key={module.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.05 }}
-                    onClick={() => handleModuleClick(module.id, module.name)}
-                    className="group relative ls-interactive-card cursor-pointer p-6 space-y-6"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="ls-badge">
-                        {module.code}
-                      </span>
-                      <div className="flex items-center gap-1.5">
-                        <span className={module.selected ? 'ls-status-badge' : 'ls-badge'}>{module.selected ? t('active') : t('inactive')}</span>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {allModules.length > 0 ? (
+                  allModules.map((module, i) => (
+                    <motion.div
+                      key={module.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.05 }}
+                      onClick={() => handleModuleClick(module.id, module.name)}
+                      className="bg-white border border-slate-200 p-5 rounded-2xl flex flex-col group cursor-pointer hover:border-accent/30 hover:shadow-sm transition-all dark:bg-paper dark:border-white/8"
+                    >
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-accent/10 group-hover:text-accent transition-colors dark:bg-surface-low">
+                          <BookOpen size={18} />
+                        </div>
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{module.code}</span>
                       </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <h3 className="text-xl font-bold text-slate-950 leading-tight group-hover:text-accent transition-colors dark:text-ink">
+                      
+                      <h3 className="text-base font-bold text-slate-950 mb-1 line-clamp-1 group-hover:text-accent transition-colors dark:text-ink">
                         {module.name}
                       </h3>
-                      <p className="ls-body-text line-clamp-2 leading-relaxed">
-                        {module.description}
-                      </p>
-                    </div>
-
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between ls-micro-label">
-                        <span>{t('progress')}</span>
-                        <span>{module.progress}%</span>
-                      </div>
-                      <div className="h-[4.5px] bg-surface-low rounded-full overflow-hidden dark:bg-surface-mid">
-                        <motion.div 
-                          initial={{ width: 0 }}
-                          animate={{ width: `${module.progress}%` }}
-                          className="h-full bg-accent"
-                        />
-                      </div>
-                    </div>
-                  </motion.div>
-                ))
-              ) : (
-                <div className="col-span-full py-20 bg-slate-50/30 border border-slate-200 rounded-2xl flex flex-col items-center justify-center text-center space-y-4 dark:bg-surface-low/20 dark:border-white/8">
-                  <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center dark:bg-surface-mid" style={{ boxShadow: 'var(--ls-shadow)' }}>
-                    <BookOpen className="w-6 h-6 text-slate-500 dark:text-ink-muted" />
-                  </div>
-                  <div className="space-y-1">
-                    <p className="font-bold text-slate-950 dark:text-ink">{t('dashboard_explore')}</p>
-                    <p className="ls-micro-label">{t('dashboard_continue')}</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Sidebar - Focus & Agenda */}
-          <div className="lg:col-span-4 space-y-8">
-            {/* Focus Timer Card */}
-            <section className="bg-[#0D1117] text-white rounded-2xl p-6 space-y-6">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-medium text-white/60">{t('deep_focus')}</h3>
-                <div className="flex items-center gap-1.5">
-                  <div className={`w-1.5 h-1.5 rounded-full ${isTimerRunning ? 'bg-accent animate-pulse' : 'bg-white/20'}`} />
-                  <span className="text-xs font-medium text-white/60 ">
-                    {isTimerRunning ? t('active') : t('idle')}
-                  </span>
-                </div>
-              </div>
-              
-              <div className="text-center">
-                <div className="text-5xl font-bold tracking-tighter mb-1">
-                  {formatTime(timerSeconds)}
-                </div>
-                <p className="text-xs font-medium text-white/40 ">{t('pomodoro_session')}</p>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setIsTimerRunning(!isTimerRunning)}
-                  className={`flex-1 py-3 rounded-xl font-bold text-[10px] transition-all ${
-                    isTimerRunning
-                      ? 'bg-white/10 text-white hover:bg-white/20'
-                      : 'bg-accent text-white hover:bg-white hover:text-[#0D1117]'
-                  }`}
-                >
-                  {isTimerRunning ? t('pause') : t('dashboard_start')}
-                </button>
-                <button
-                  onClick={() => setIsPlanSessionOpen(true)}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-white/10 border border-white/10 rounded-xl text-[10px] font-bold text-white hover:bg-white/20 transition-all"
-                >
-                  <Brain className="w-3 h-3" />
-                  Plan
-                </button>
-                <button
-                  onClick={() => { setIsTimerRunning(false); setTimerSeconds(defaultDuration * 60); }}
-                  className="w-10 h-10 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center hover:bg-white/10 transition-all shrink-0"
-                >
-                  <RefreshCw className="w-3.5 h-3.5 text-white/60" />
-                </button>
-              </div>
-            </section>
-
-            {/* Calendar Widget */}
-            <CalendarWidget />
-
-            {/* Learning Stats */}
-            <section className="bg-white rounded-2xl p-6 border border-slate-200 dark:bg-paper dark:border-white/8">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <p className="text-[9px] font-bold text-slate-500 dark:text-ink-muted">{t('modules')}</p>
-                  <span className="ls-section-title">{activeModules.length}</span>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-[9px] font-bold text-slate-500 dark:text-ink-muted">{t('avg_completion')}</p>
-                  <span className="ls-section-title">
-                    {Math.round(activeModules.reduce((acc, m) => acc + m.progress, 0) / (activeModules.length || 1))}%
-                  </span>
-                </div>
-              </div>
-            </section>
-
-            {/* Reminders & Exams */}
-            <section className="space-y-6">
-              {/* Upcoming Exams & Controles */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-medium text-blue-700 flex items-center gap-2 dark:text-accent">
-                    <AlertCircle className="w-3 h-3" />
-                    {t('upcoming_exams')}
-                  </h3>
-                  <button 
-                    onClick={() => setIsReminderModalOpen(true)}
-                    className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Add
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  {reminders
-                    .filter(r => (r.type === 'exam' || r.type === 'controle') && !r.completed)
-                    .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
-                    .slice(0, 3)
-                    .map((reminder) => (
-                      <div key={reminder.id} className="flex items-center gap-3 p-3 bg-accent/5 border border-accent/10 rounded-xl">
-                        <div className="w-8 h-8 bg-accent/10 rounded-lg flex items-center justify-center shrink-0">
-                          <Brain className="w-4 h-4 text-accent" />
+                      
+                      <div className="mt-auto pt-6">
+                        <div className="flex items-center justify-between text-xs mb-2">
+                          <span className="font-medium text-slate-500 dark:text-ink-muted">{t('progress') || 'Progress'}</span>
+                          <span className="font-bold text-slate-950 dark:text-ink">{module.progress}%</span>
                         </div>
-                        <div className="flex-grow min-w-0">
-                          <h4 className="text-xs font-bold text-slate-950 truncate dark:text-ink">{reminder.title}</h4>
-                          <p className="text-[9px] font-bold text-accent ">
-                            {reminder.type === 'exam' ? t('exam') : t('controle')} • {reminder.dueDate ? format(new Date(reminder.dueDate), 'MMM dd') : 'No date'}
-                          </p>
+                        <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden dark:bg-surface-mid">
+                          <motion.div 
+                            initial={{ width: 0 }}
+                            animate={{ width: `${module.progress}%` }}
+                            className="h-full bg-accent"
+                          />
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))
+                ) : (
+                  <div className="col-span-full py-12 bg-white border border-slate-200 rounded-2xl flex flex-col items-center justify-center text-center space-y-3 dark:bg-paper dark:border-white/8">
+                    <BookOpen className="w-8 h-8 text-slate-300 dark:text-ink-muted/50" />
+                    <p className="text-sm font-bold text-slate-950 dark:text-ink">{t('no_modules_yet') || 'No modules yet'}</p>
+                    <button onClick={() => navigate('/modules')} className="text-xs font-bold text-accent hover:underline">
+                      {t('dashboard_explore') || 'Explore Curriculum'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </section>
+
+            {/* Upcoming Assignments (Moved from Sidebar Reminders & Exams) */}
+            <section className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-bold text-slate-950 dark:text-ink">{t('upcoming_assignments') || 'Upcoming Assignments'}</h2>
+                <button onClick={() => setIsReminderModalOpen(true)} className="text-sm font-bold text-accent hover:underline flex items-center gap-1">
+                  <Plus size={14} /> {t('add') || 'Add'}
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {reminders.filter(r => !r.completed).length > 0 ? (
+                  reminders
+                    .filter(r => !r.completed)
+                    .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
+                    .slice(0, 4)
+                    .map((reminder, i) => (
+                      <motion.div 
+                        key={reminder.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.05 }}
+                        className="bg-white border border-slate-200 p-4 rounded-2xl flex items-center justify-between group dark:bg-paper dark:border-white/8"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                            reminder.type === 'exam' || reminder.type === 'controle' 
+                              ? 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400' 
+                              : 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400'
+                          }`}>
+                            {reminder.type === 'exam' || reminder.type === 'controle' ? <AlertCircle size={18} /> : <BookOpen size={18} />}
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-bold text-slate-950 line-clamp-1 dark:text-ink">{reminder.title}</h4>
+                            <p className="text-xs font-medium text-slate-500 mt-0.5 dark:text-ink-muted">
+                              {reminder.dueDate ? format(new Date(reminder.dueDate), 'MMM dd, yyyy') : 'No date'}
+                            </p>
+                          </div>
                         </div>
                         <button 
                           onClick={() => toggleReminder(reminder.id)}
-                          className="w-6 h-6 rounded-full border-accent/20 flex items-center justify-center hover:bg-accent hover:text-white transition-all"
+                          className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 transition-all dark:border-white/10 dark:hover:bg-emerald-500/10"
                         >
-                          <Check size={12} />
+                          <Check size={14} />
                         </button>
-                      </div>
-                    ))}
-                  {reminders.filter(r => (r.type === 'exam' || r.type === 'controle') && !r.completed).length === 0 && (
-                    <p className="text-[10px] text-slate-500 italic px-2 dark:text-ink-muted">{t('no_pending_reminders')}</p>
-                  )}
+                      </motion.div>
+                    ))
+                ) : (
+                  <div className="col-span-full py-8 text-center bg-white border border-slate-200 rounded-2xl dark:bg-paper dark:border-white/8">
+                    <p className="text-sm font-medium text-slate-500 dark:text-ink-muted">{t('no_pending_reminders') || 'No upcoming assignments. You are all caught up!'}</p>
+                  </div>
+                )}
+              </div>
+            </section>
+          </div>
+
+          {/* Right Sidebar Column */}
+          <div className="lg:col-span-4 space-y-8">
+            
+            {/* Focus Timer (Subtle Widget) */}
+            <section className="bg-slate-950 text-white rounded-2xl p-5 relative overflow-hidden group dark:bg-white dark:text-slate-950">
+              <div className="relative z-10 flex items-center justify-between">
+                <div>
+                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider dark:text-slate-500">{t('deep_focus') || 'Deep Focus'}</h3>
+                  <div className="text-3xl font-bold tracking-tight mt-1 mb-3">
+                    {formatTime(timerSeconds)}
+                  </div>
+                </div>
+                <div className={`w-12 h-12 rounded-full border-4 flex items-center justify-center ${isTimerRunning ? 'border-accent text-accent animate-pulse' : 'border-slate-800 text-slate-600 dark:border-slate-200 dark:text-slate-400'}`}>
+                  <Timer size={20} />
                 </div>
               </div>
-
-              {/* General Reminders */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="ls-micro-label">{t('reminders')}</h3>
-                  <button className="text-[9px] font-bold text-accent ">{t('view_all')}</button>
-                </div>
-                <div className="space-y-2">
-                  {reminders
-                    .filter(r => r.type !== 'exam' && r.type !== 'controle' && !r.completed)
-                    .slice(0, 3)
-                    .map((reminder) => (
-                      <div key={reminder.id} onClick={() => toggleReminder(reminder.id)} className="flex items-center gap-3 p-3 ls-card cursor-pointer hover:border-accent/20 transition-all">
-                        <div className={`w-4 h-4 rounded border flex items-center justify-center ${reminder.completed ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-200 dark:border-white/15'}`}>
-                          {reminder.completed && <Check size={10} />}
-                        </div>
-                        <div className="flex-grow min-w-0">
-                          <span className={`text-xs font-medium block truncate ${reminder.completed ? 'text-slate-500 line-through dark:text-ink-muted' : 'text-slate-950 dark:text-ink'}`}>{reminder.title}</span>
-                          {reminder.dueDate && (
-                            <span className="text-[8px] font-bold text-slate-500 dark:text-ink-muted">
-                              {format(new Date(reminder.dueDate), 'MMM dd')}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                </div>
+              <div className="relative z-10 flex gap-2">
+                <button
+                  onClick={() => setIsTimerRunning(!isTimerRunning)}
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                    isTimerRunning
+                      ? 'bg-slate-800 text-white hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-950'
+                      : 'bg-accent text-white hover:bg-accent/90'
+                  }`}
+                >
+                  {isTimerRunning ? (t('pause') || 'Pause') : (t('dashboard_start') || 'Start Timer')}
+                </button>
+                <button
+                  onClick={() => { setIsTimerRunning(false); setTimerSeconds(defaultDuration * 60); }}
+                  className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-700 transition-all dark:bg-slate-100 dark:text-slate-600"
+                >
+                  <RefreshCw size={14} />
+                </button>
               </div>
             </section>
 
-            {/* Schedule */}
-            <section className="space-y-6">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold text-slate-950 dark:text-ink">{t('agenda')}</h3>
-                <CalendarIcon className="w-4 h-4 text-slate-500 dark:text-ink-muted" />
+            {/* Upcoming Events / Agenda */}
+            <section className="bg-white border border-slate-200 rounded-2xl p-5 dark:bg-paper dark:border-white/8">
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="text-base font-bold text-slate-950 dark:text-ink">{t('upcoming_events') || 'Upcoming Events'}</h3>
+                <CalendarIcon size={16} className="text-slate-400" />
               </div>
               <div className="space-y-4">
                 {schedule.filter(e => e.date?.includes('-')).length > 0 ? (
                   schedule
                     .filter(e => e.date?.includes('-'))
                     .sort((a, b) => a.date.localeCompare(b.date))
-                    .slice(0, 3)
+                    .slice(0, 4)
                     .map((event) => {
                       const d = new Date(event.date);
                       return (
-                        <div key={event.id} className="flex gap-4">
-                          <div className="flex flex-col items-center justify-center w-12 h-12 bg-slate-50 rounded-xl shrink-0 dark:bg-surface-low">
-                            <span className="text-[9px] font-medium text-slate-500 uppercase dark:text-ink-muted">{format(d, 'MMM')}</span>
-                            <span className="text-lg font-bold text-slate-950 leading-none dark:text-ink">{format(d, 'd')}</span>
+                        <div key={event.id} className="flex gap-4 items-start">
+                          <div className="flex flex-col items-center justify-center w-11 h-11 bg-slate-50 text-slate-500 rounded-xl shrink-0 dark:bg-surface-low dark:text-ink-muted">
+                            <span className="text-[10px] font-bold uppercase">{format(d, 'MMM')}</span>
+                            <span className="text-sm font-bold leading-none text-slate-950 dark:text-ink">{format(d, 'd')}</span>
                           </div>
-                          <div className="space-y-1">
+                          <div className="space-y-0.5 pt-0.5">
                             <h4 className="text-sm font-bold text-slate-950 leading-tight dark:text-ink">{event.title}</h4>
                             {event.time && (
-                              <div className="flex items-center gap-2 text-[10px] text-slate-500 font-medium uppercase tracking-wider dark:text-ink-muted">
-                                <Clock className="w-3 h-3" />
-                                {event.time}
-                              </div>
+                              <p className="text-xs font-medium text-slate-500 flex items-center gap-1 dark:text-ink-muted">
+                                <Clock size={12} /> {event.time}
+                              </p>
                             )}
                           </div>
                         </div>
                       );
                     })
                 ) : (
-                  <p className="ls-micro-label italic">{t('no_upcoming_events')}</p>
+                  <p className="text-sm text-slate-500 italic dark:text-ink-muted">{t('no_upcoming_events') || 'No upcoming events scheduled.'}</p>
                 )}
               </div>
             </section>
 
-            {/* Preferences - Subtle */}
-            <div className="pt-10 border-t border-slate-200 dark:border-white/8">
-              <button
-                onClick={() => navigate('/settings')}
-                className="flex items-center gap-2 ls-micro-label hover:text-slate-950 transition-colors dark:hover:text-ink"
-              >
-                <Settings className="w-3.5 h-3.5" />
-                {t('preferences')}
-              </button>
-            </div>
+            {/* Learning Stats (Clean list) */}
+            <section className="bg-white border border-slate-200 rounded-2xl p-5 dark:bg-paper dark:border-white/8">
+               <h3 className="text-base font-bold text-slate-950 mb-4 dark:text-ink">{t('learning_stats') || 'Stats'}</h3>
+               <div className="space-y-3">
+                 <div className="flex items-center justify-between text-sm">
+                   <span className="font-medium text-slate-500 dark:text-ink-muted">{t('active_modules') || 'Active Modules'}</span>
+                   <span className="font-bold text-slate-950 dark:text-ink">{activeModules.length}</span>
+                 </div>
+                 <div className="flex items-center justify-between text-sm">
+                   <span className="font-medium text-slate-500 dark:text-ink-muted">{t('avg_completion') || 'Avg Completion'}</span>
+                   <span className="font-bold text-slate-950 dark:text-ink">
+                     {Math.round(activeModules.reduce((acc, m) => acc + m.progress, 0) / (activeModules.length || 1))}%
+                   </span>
+                 </div>
+               </div>
+            </section>
+
           </div>
         </div>
 

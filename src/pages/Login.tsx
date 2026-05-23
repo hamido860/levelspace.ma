@@ -37,7 +37,7 @@ export const Login: React.FC = () => {
       if (mode === 'login') {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        navigate('/dashboard');
+        navigate(from || '/dashboard');
       } else {
         const { error } = await supabase.auth.signUp({
           email,
@@ -89,15 +89,23 @@ export const Login: React.FC = () => {
     <Layout hideSidebar>
       <SEO title={mode === 'login' ? "Login" : "Sign Up"} />
       <div className="min-h-[100dvh] w-full flex items-center justify-center bg-background p-4 md:p-8 font-sans relative overflow-hidden">
-        {/* Background Accents */}
-        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_0%_0%,_var(--tw-gradient-stops))] from-accent/5 via-transparent to-transparent pointer-events-none" />
-        <div className="absolute bottom-0 right-0 w-full h-full bg-[radial-gradient(circle_at_100%_100%,_var(--tw-gradient-stops))] from-accent/5 via-transparent to-transparent pointer-events-none" />
+        {/* Background Accents with Animation */}
+        <motion.div 
+          animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
+          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-accent/20 via-accent/5 to-transparent blur-3xl pointer-events-none" 
+        />
+        <motion.div 
+          animate={{ scale: [1, 1.2, 1], opacity: [0.2, 0.4, 0.2] }}
+          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+          className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-accent/15 via-transparent to-transparent blur-3xl pointer-events-none" 
+        />
 
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="w-full max-w-md bg-paper rounded-[2rem] shadow-md shadow-ink/5 border border-ink/5 overflow-hidden lg:scale-[0.70] lg:origin-center"
+          transition={{ duration: 0.6, ease: "easeOut" }}
+          className="w-full max-w-md bg-paper/80 backdrop-blur-xl rounded-[2rem] shadow-2xl shadow-ink/5 border border-white/20 overflow-hidden relative z-10 group"
         >
           {/* Top Branding Bar */}
           <div className="bg-accent p-6 flex items-center justify-between">
@@ -132,8 +140,8 @@ export const Login: React.FC = () => {
             <form className="space-y-6" onSubmit={handleAuth}>
               <div className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-mono font-bold text-muted uppercase tracking-normal px-1 flex items-center gap-2">
-                    <Mail className="w-3 h-3" />
+                  <label className="text-xs font-mono font-bold text-muted uppercase tracking-normal px-1 flex items-center gap-2">
+                    <Mail className="w-4 h-4" />
                     Email Address
                   </label>
                   <input 
@@ -142,15 +150,33 @@ export const Login: React.FC = () => {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="name@example.com"
-                    className="w-full h-11 bg-background border border-ink/5 rounded-xl px-4 focus:ring-1 focus:ring-accent/30 outline-none transition-all text-sm font-medium"
+                    className="w-full h-12 bg-background/50 backdrop-blur-sm border border-ink/5 rounded-xl px-4 focus:ring-2 focus:ring-accent/40 focus:border-accent/40 outline-none transition-all text-base font-medium hover:border-ink/10"
                   />
                 </div>
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between px-1">
-                    <label className="text-[10px] font-mono font-bold text-muted uppercase tracking-normal flex items-center gap-2">
-                      <Lock className="w-3 h-3" />
+                    <label className="text-xs font-mono font-bold text-muted uppercase tracking-normal flex items-center gap-2">
+                      <Lock className="w-4 h-4" />
                       Password
                     </label>
+                    {mode === 'login' && (
+                      <button 
+                        type="button" 
+                        onClick={() => {
+                          if (!email) {
+                            setError('Please enter your email address first to reset your password.');
+                            return;
+                          }
+                          supabase.auth.resetPasswordForEmail(email, {
+                            redirectTo: `${window.location.origin}/reset-password`,
+                          });
+                          alert("If an account exists, a password reset email has been sent.");
+                        }}
+                        className="text-xs font-medium text-accent hover:underline"
+                      >
+                        Forgot password?
+                      </button>
+                    )}
                   </div>
                   <input 
                     type="password" 
@@ -158,7 +184,7 @@ export const Login: React.FC = () => {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full h-11 bg-background border border-ink/5 rounded-xl px-4 focus:ring-1 focus:ring-accent/30 outline-none transition-all text-sm font-medium"
+                    className="w-full h-12 bg-background/50 backdrop-blur-sm border border-ink/5 rounded-xl px-4 focus:ring-2 focus:ring-accent/40 focus:border-accent/40 outline-none transition-all text-base font-medium hover:border-ink/10"
                   />
                 </div>
               </div>
@@ -166,42 +192,29 @@ export const Login: React.FC = () => {
               <button 
                 type="submit"
                 disabled={loading}
-                className="group w-full h-12 bg-ink text-paper rounded-full font-medium text-base shadow-sm shadow-ink/10 hover:bg-accent active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                className="group w-full h-12 bg-ink text-paper rounded-xl font-semibold text-base shadow-lg shadow-ink/20 hover:shadow-xl hover:shadow-ink/30 hover:-translate-y-0.5 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:hover:translate-y-0"
               >
                 {loading ? 'Processing...' : mode === 'login' ? 'Sign In' : 'Sign Up'}
                 {!loading && <LogIn className="w-4 h-4 group-hover:translate-x-1 transition-transform" />}
               </button>
             </form>
 
-            <div className="rounded-2xl border border-accent/15 bg-accent/5 p-4 space-y-3">
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-xl bg-accent text-paper flex items-center justify-center shrink-0">
-                  <Sparkles className="w-4 h-4" />
-                </div>
-                <div className="space-y-1">
-                  <h3 className="text-sm font-bold text-ink">Admin demo mode</h3>
-                  <p className="text-xs text-muted leading-relaxed">
-                    Open the platform with a local admin identity for demos and UI testing, without a real Supabase login.
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                disabled={loading}
-                onClick={handleDemoAdminLogin}
-                className="w-full h-11 bg-accent text-paper rounded-full flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-normal hover:bg-accent-hover transition-all disabled:opacity-50"
-              >
-                Enter Admin Demo
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
+            <button
+              type="button"
+              disabled={loading}
+              onClick={handleDemoAdminLogin}
+              className="w-full h-12 border border-accent/20 bg-accent/5 text-accent rounded-xl flex items-center justify-center gap-2 text-sm font-medium hover:bg-accent/10 transition-all disabled:opacity-50"
+            >
+              <Sparkles className="w-4 h-4" />
+              Continue as Demo Admin
+              <ArrowRight className="w-4 h-4" />
+            </button>
 
             <div className="relative py-2">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-ink/5"></div>
               </div>
-              <div className="relative flex justify-center text-[9px] uppercase tracking-[0.2em] font-mono font-bold">
+              <div className="relative flex justify-center text-[10px] uppercase tracking-[0.2em] font-mono font-bold">
                 <span className="bg-paper px-4 text-muted/60">Or continue with</span>
               </div>
             </div>
@@ -209,17 +222,17 @@ export const Login: React.FC = () => {
             <div className="grid grid-cols-2 gap-3">
               <button 
                 onClick={() => handleSocialLogin('google')}
-                className="h-11 bg-background border border-ink/5 rounded-full flex items-center justify-center gap-2 hover:bg-ink/5 transition-all group"
+                className="h-12 bg-background/50 backdrop-blur-sm border border-ink/5 rounded-xl flex items-center justify-center gap-2 hover:bg-ink/5 hover:-translate-y-0.5 shadow-sm hover:shadow-md transition-all group"
               >
-                <img src="https://www.google.com/favicon.ico" alt="Google" className="w-3.5 h-3.5 grayscale group-hover:grayscale-0 transition-all" />
-                <span className="text-[10px] font-bold text-ink uppercase tracking-normal">Google</span>
+                <img src="https://www.google.com/favicon.ico" alt="Google" className="w-4 h-4 grayscale group-hover:grayscale-0 transition-all" />
+                <span className="text-xs font-bold text-ink uppercase tracking-normal">Google</span>
               </button>
               <button 
                 onClick={() => handleSocialLogin('facebook')}
-                className="h-11 bg-background border border-ink/5 rounded-full flex items-center justify-center gap-2 hover:bg-ink/5 transition-all group"
+                className="h-12 bg-background/50 backdrop-blur-sm border border-ink/5 rounded-xl flex items-center justify-center gap-2 hover:bg-ink/5 hover:-translate-y-0.5 shadow-sm hover:shadow-md transition-all group"
               >
-                <Facebook className="w-3.5 h-3.5 text-[#1877F2]" />
-                <span className="text-[10px] font-bold text-ink uppercase tracking-normal">Facebook</span>
+                <Facebook className="w-4 h-4 text-[#1877F2]" />
+                <span className="text-xs font-bold text-ink uppercase tracking-normal">Facebook</span>
               </button>
             </div>
 
