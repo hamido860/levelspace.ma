@@ -36,7 +36,59 @@ interface NavItem {
   matchPrefix?: boolean;
 }
 
+
+const isItemActive = (pathname: string, item: NavItem) => {
+  return item.matchPrefix
+    ? pathname === item.path || pathname.startsWith(`${item.path}/`)
+    : pathname === item.path;
+};
+
+const SidebarNavItem: React.FC<{
+  item: NavItem;
+  isActive: boolean;
+  isCollapsed: boolean;
+  onClick: () => void;
+}> = ({ item, isActive, isCollapsed, onClick }) => (
+  <button
+    aria-label={item.label}
+    onClick={onClick}
+    title={isCollapsed ? item.label : undefined}
+    className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3 px-3'} py-2.5 rounded-lg font-medium text-sm transition-all duration-200 ease-in-out ${
+      isActive
+        ? 'bg-accent text-white shadow-sm shadow-accent/20'
+        : 'text-muted hover:bg-ink/5'
+    }`}
+  >
+    <span className={isActive ? 'text-white' : 'text-muted'}>
+      {item.icon}
+    </span>
+    {!isCollapsed && <span>{item.label}</span>}
+  </button>
+);
+
+const MobileNavItem: React.FC<{
+  item: NavItem;
+  isActive: boolean;
+  onClick: () => void;
+}> = ({ item, isActive, onClick }) => (
+  <button
+    aria-label={item.label}
+    onClick={onClick}
+    className={`flex flex-col items-center justify-center gap-1 h-full px-3 min-w-[72px] shrink-0 transition-all duration-300 ${
+      isActive ? 'text-accent' : 'text-muted'
+    }`}
+  >
+    <div className={`p-1.5 rounded-xl transition-all duration-300 ${isActive ? 'bg-accent/10 scale-110' : ''}`}>
+      {React.cloneElement(item.icon as React.ReactElement<any>, { size: 20 })}
+    </div>
+    <span className={`text-[9px] font-bold uppercase tracking-tighter whitespace-nowrap transition-all duration-300 ${isActive ? 'opacity-100' : 'opacity-60'}`}>
+      {item.label}
+    </span>
+  </button>
+);
+
 export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsCollapsed }) => {
+
   const navigate = useNavigate();
   const location = useLocation();
   const { language, t } = useLanguage();
@@ -88,54 +140,28 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
         
         <nav className="flex flex-col gap-1">
           {!isCollapsed && <p className="text-[10px] font-bold text-muted uppercase tracking-normal px-3 mb-2 opacity-50">{t('content')}</p>}
-          {mainNavItems.map((item) => {
-            const isActive = location.pathname === item.path;
-            return (
-              <button
-                key={item.path}
-                aria-label={item.label}
-                onClick={() => navigate(item.path)}
-                title={isCollapsed ? item.label : undefined}
-                className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3 px-3'} py-2.5 rounded-lg font-medium text-sm transition-all duration-200 ease-in-out ${
-                  isActive 
-                    ? 'bg-accent text-white shadow-sm shadow-accent/20' 
-                    : 'text-muted hover:bg-ink/5'
-                }`}
-              >
-                <span className={isActive ? 'text-white' : 'text-muted'}>
-                  {item.icon}
-                </span>
-                {!isCollapsed && <span>{item.label}</span>}
-              </button>
-            );
-          })}
+          {mainNavItems.map((item) => (
+            <SidebarNavItem
+              key={item.path}
+              item={item}
+              isActive={isItemActive(location.pathname, item)}
+              isCollapsed={isCollapsed}
+              onClick={() => navigate(item.path)}
+            />
+          ))}
         </nav>
 
         <div className="mt-auto flex flex-col gap-1 pt-4 border-t border-ink/5">
           {!isCollapsed && <p className="text-[10px] font-bold text-muted uppercase tracking-normal px-3 mb-2 opacity-50">{t('tools')}</p>}
-          {toolNavItems.map((item) => {
-            const isActive = item.matchPrefix
-              ? location.pathname === item.path || location.pathname.startsWith(`${item.path}/`)
-              : location.pathname === item.path;
-            return (
-              <button
-                key={item.path}
-                aria-label={item.label}
-                onClick={() => navigate(item.path)}
-                title={isCollapsed ? item.label : undefined}
-                className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3 px-3'} py-2.5 rounded-lg font-medium text-sm transition-all duration-200 ease-in-out ${
-                  isActive 
-                    ? 'bg-accent text-white shadow-sm shadow-accent/20' 
-                    : 'text-muted hover:bg-ink/5'
-                }`}
-              >
-                <span className={isActive ? 'text-white' : 'text-muted'}>
-                  {item.icon}
-                </span>
-                {!isCollapsed && <span>{item.label}</span>}
-              </button>
-            );
-          })}
+          {toolNavItems.map((item) => (
+            <SidebarNavItem
+              key={item.path}
+              item={item}
+              isActive={isItemActive(location.pathname, item)}
+              isCollapsed={isCollapsed}
+              onClick={() => navigate(item.path)}
+            />
+          ))}
           
           <button
             onClick={() => signOut()}
@@ -151,30 +177,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
 
       {/* Mobile Bottom Navigation */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-surface-low border-t border-ink/5 z-50 px-4 flex items-center gap-2 overflow-x-auto no-scrollbar shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
-        {[...mainNavItems, ...toolNavItems].map((item) => {
-          const isActive = item.matchPrefix
-            ? location.pathname === item.path || location.pathname.startsWith(`${item.path}/`)
-            : location.pathname === item.path;
-          return (
-            <button
-              key={`mobile-${item.path}`}
-              aria-label={item.label}
-              onClick={() => navigate(item.path)}
-              className={`flex flex-col items-center justify-center gap-1 h-full px-3 min-w-[72px] shrink-0 transition-all duration-300 ${
-                isActive 
-                  ? 'text-accent' 
-                  : 'text-muted'
-              }`}
-            >
-              <div className={`p-1.5 rounded-xl transition-all duration-300 ${isActive ? 'bg-accent/10 scale-110' : ''}`}>
-                {React.cloneElement(item.icon as React.ReactElement<any>, { size: 20 })}
-              </div>
-              <span className={`text-[9px] font-bold uppercase tracking-tighter whitespace-nowrap transition-all duration-300 ${isActive ? 'opacity-100' : 'opacity-60'}`}>
-                {item.label}
-              </span>
-            </button>
-          );
-        })}
+        {[...mainNavItems, ...toolNavItems].map((item) => (
+          <MobileNavItem
+            key={`mobile-${item.path}`}
+            item={item}
+            isActive={isItemActive(location.pathname, item)}
+            onClick={() => navigate(item.path)}
+          />
+        ))}
       </nav>
     </>
   );
