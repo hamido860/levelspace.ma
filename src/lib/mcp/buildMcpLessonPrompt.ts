@@ -207,6 +207,8 @@ const getQualityChecklist = () =>
     .map((item) => `- ${item}`)
     .join("\n");
 
+
+
 export const buildMcpLessonPrompt = (input: BuildMcpLessonPromptInput) => {
   const { pipelineType, topic, topicOutlines, trustedSources, materialRequirements, learnerContext } = input;
   const adminHeavy = pipelineType === "admin_heavy";
@@ -250,29 +252,26 @@ export const buildMcpLessonPrompt = (input: BuildMcpLessonPromptInput) => {
   "based_on": "verified_lesson|topic_outline|rag_chunk"
 }`;
 
-export const buildMcpLessonPrompt = (input: BuildMcpLessonPromptInput) => {
-  const { pipelineType, topic, topicOutlines, trustedSources, materialRequirements, learnerContext } = input;
-
   return [
     `You are the LevelSpace MCP lesson orchestrator for pipeline: ${pipelineType}.`,
     "",
     "CURRICULUM CONTEXT",
-    buildCurriculumContext(topic),
+    curriculumContext,
     "",
     "LEARNER CONTEXT",
-    buildLearnerBlock(learnerContext),
+    learnerBlock,
     "",
     "SOURCE POLICY",
     `- ${getSourcePolicy(pipelineType)}`,
     "",
     "TOPIC OUTLINES",
-    buildOutlines(topicOutlines),
+    outlines,
     "",
     "TRUSTED SOURCES / EVIDENCE",
-    buildSources(trustedSources),
+    sources,
     "",
     "REQUIRED MATERIALS",
-    buildMaterials(materialRequirements),
+    materials,
     "",
     "PEDAGOGICAL TECHNIQUES",
     getPedagogyRules(pipelineType),
@@ -285,6 +284,6 @@ export const buildMcpLessonPrompt = (input: BuildMcpLessonPromptInput) => {
     "",
     "STRICT OUTPUT",
     "Return ONLY valid JSON. No markdown fence. No commentary outside JSON.",
-    getSchema(pipelineType),
+    schema,
   ].join("\n");
 };
