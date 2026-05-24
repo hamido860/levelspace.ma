@@ -44,6 +44,7 @@ import {
   validateTaskExecution,
   approveAiRecoveryTaskExecution,
   rejectAiRecoveryTaskSql,
+  requireAuthenticatedUser,
 } from "../src/server/api/aiCommandCenter";
 import {
   applyCurriculumReviewAction,
@@ -140,7 +141,7 @@ async function handleNvidiaProxy(req: VercelRequest, res: VercelResponse) {
   if (req.method === "OPTIONS") {
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Nvidia-Api-Key");
     return res.status(200).end();
   }
 
@@ -150,7 +151,13 @@ async function handleNvidiaProxy(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const apiKey = process.env.NVIDIA_API_KEY;
+  try {
+    await requireAuthenticatedUser(req);
+  } catch (error: any) {
+    return res.status(error?.status || 401).json({ error: error.message || "Authentication required." });
+  }
+
+  const apiKey = process.env.NVIDIA_API_KEY || String(req.headers["x-nvidia-api-key"] || "");
 
   if (!apiKey || apiKey === "MY_NVIDIA_API_KEY") {
     return res.status(503).json({ error: "NVIDIA API key not configured." });
