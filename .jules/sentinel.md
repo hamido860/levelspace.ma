@@ -1,0 +1,4 @@
+## 2024-05-24 - [SSRF] Authenticate NVIDIA API Proxy Endpoint
+**Vulnerability:** The serverless proxy endpoint (`/api/nvidia-proxy` in `api/[...slug].ts`) allows unauthenticated access, meaning anyone could exploit the server's NVIDIA API key and potentially use the proxy for Server-Side Request Forgery (SSRF) and quota exhaustion without being a legitimate authenticated user.
+**Learning:** External API proxies in Vercel functions must explicitly enforce authentication checks, even if the primary usage is expected to be internal to the frontend application, because the endpoint is public to the internet.
+**Prevention:** Always use `requireAuthenticatedUser` (or equivalent auth gating) on proxy or integration API endpoints, and consider extracting this pattern into reusable middleware to ensure proxy routes are secure by default.
