@@ -65,7 +65,7 @@ export const DictionaryTool: React.FC<DictionaryToolProps> = ({ state, onChange 
         <button
           type="submit"
           disabled={isLoading || !word.trim()}
-          className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-accent text-white rounded-lg text-[10px] font-bold uppercase tracking-normal hover:bg-ink transition-all disabled:opacity-50"
+          className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-accent text-white rounded-lg text-[10px] font-bold uppercase tracking-normal hover:bg-ink transition-all disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
         >
           {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Define'}
         </button>
@@ -96,7 +96,7 @@ export const DictionaryTool: React.FC<DictionaryToolProps> = ({ state, onChange 
               {definition.phonetics?.find((p: any) => p.audio) && (
                 <button
                   onClick={() => playAudio(definition.phonetics.find((p: any) => p.audio).audio)}
-                  className="w-12 h-12 bg-accent/10 text-accent rounded-full flex items-center justify-center hover:bg-accent hover:text-white transition-all shadow-sm shadow-accent/20"
+                  className="w-12 h-12 bg-accent/10 text-accent rounded-full flex items-center justify-center hover:bg-accent hover:text-white transition-all shadow-sm shadow-accent/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
                   aria-label="Play pronunciation audio"
                 >
                   <Volume2 size={20} />

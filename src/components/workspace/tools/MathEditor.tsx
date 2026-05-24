@@ -90,8 +90,9 @@ export const MathEditorToolbar: React.FC<{
         <button
           onClick={onSendToAI}
           disabled={!latex}
-          className="flex items-center gap-2 px-3 py-1.5 bg-accent/10 text-accent rounded-lg hover:bg-accent/20 transition-colors disabled:opacity-50 disabled:hover:bg-accent/10 text-xs font-medium"
+          className="flex items-center gap-2 px-3 py-1.5 bg-accent/10 text-accent rounded-lg hover:bg-accent/20 transition-colors disabled:opacity-50 disabled:hover:bg-accent/10 text-xs font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
           title="Ask AI about this formula"
+          aria-label="Ask AI about this formula"
         >
           <Send size={14} />
           Ask AI
@@ -100,15 +101,17 @@ export const MathEditorToolbar: React.FC<{
       {canAskAi && <div className="w-px h-4 bg-ink/10 mx-1"></div>}
       <button
         onClick={onCopy}
-        className="p-2 bg-paper border border-ink/5 rounded-lg text-muted hover:text-accent transition-colors"
+        className="p-2 bg-paper border border-ink/5 rounded-lg text-muted hover:text-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
         title="Copy LaTeX"
+        aria-label="Copy LaTeX"
       >
         {copied ? <Check size={16} /> : <Copy size={16} />}
       </button>
       <button
         onClick={onClear}
-        className="p-2 bg-paper border border-ink/5 rounded-lg text-muted hover:text-error transition-colors"
+        className="p-2 bg-paper border border-ink/5 rounded-lg text-muted hover:text-error transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
         title="Clear"
+        aria-label="Clear"
       >
         <Trash2 size={16} />
       </button>
