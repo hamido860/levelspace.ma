@@ -79,7 +79,33 @@ export const Dashboard: React.FC = () => {
 
   const activeModules = useMemo(() => allModules.filter(m => m.selected), [allModules]);
   const reminders = useLiveQuery(() => db.tasks.toArray()) || [];
+
+  const urgentReminders = useMemo(() =>
+    reminders
+      .filter(r => (r.type === 'exam' || r.type === 'controle') && !r.completed)
+      .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
+      .slice(0, 3)
+  , [reminders]);
+
+  const generalReminders = useMemo(() =>
+    reminders
+      .filter(r => r.type !== 'exam' && r.type !== 'controle' && !r.completed)
+      .slice(0, 3)
+  , [reminders]);
+
+  const hasUrgentReminders = useMemo(() =>
+    reminders.some(r => (r.type === 'exam' || r.type === 'controle') && !r.completed)
+  , [reminders]);
+
   const schedule = useLiveQuery(() => db.schedule.toArray()) || [];
+
+  const upcomingSchedule = useMemo(() =>
+    schedule
+      .filter(e => e.date?.includes('-'))
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(0, 3)
+  , [schedule]);
+
   const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
   const settingsMap = useMemo(() => Object.fromEntries(dbSettings.map(s => [s.key, s.value])), [dbSettings]);
 
@@ -541,30 +567,26 @@ export const Dashboard: React.FC = () => {
                   </button>
                 </div>
                 <div className="space-y-2">
-                  {reminders
-                    .filter(r => (r.type === 'exam' || r.type === 'controle') && !r.completed)
-                    .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
-                    .slice(0, 3)
-                    .map((reminder) => (
-                      <div key={reminder.id} className="flex items-center gap-3 p-3 bg-accent/5 border border-accent/10 rounded-xl">
-                        <div className="w-8 h-8 bg-accent/10 rounded-lg flex items-center justify-center shrink-0">
-                          <Brain className="w-4 h-4 text-accent" />
-                        </div>
-                        <div className="flex-grow min-w-0">
-                          <h4 className="text-xs font-bold text-slate-950 truncate dark:text-ink">{reminder.title}</h4>
-                          <p className="text-[9px] font-bold text-accent ">
-                            {reminder.type === 'exam' ? t('exam') : t('controle')} • {reminder.dueDate ? format(new Date(reminder.dueDate), 'MMM dd') : 'No date'}
-                          </p>
-                        </div>
-                        <button 
-                          onClick={() => toggleReminder(reminder.id)}
-                          className="w-6 h-6 rounded-full border-accent/20 flex items-center justify-center hover:bg-accent hover:text-white transition-all"
-                        >
-                          <Check size={12} />
-                        </button>
+                  {urgentReminders.map((reminder) => (
+                    <div key={reminder.id} className="flex items-center gap-3 p-3 bg-accent/5 border border-accent/10 rounded-xl">
+                      <div className="w-8 h-8 bg-accent/10 rounded-lg flex items-center justify-center shrink-0">
+                        <Brain className="w-4 h-4 text-accent" />
                       </div>
-                    ))}
-                  {reminders.filter(r => (r.type === 'exam' || r.type === 'controle') && !r.completed).length === 0 && (
+                      <div className="flex-grow min-w-0">
+                        <h4 className="text-xs font-bold text-slate-950 truncate dark:text-ink">{reminder.title}</h4>
+                        <p className="text-[9px] font-bold text-accent ">
+                          {reminder.type === 'exam' ? t('exam') : t('controle')} • {reminder.dueDate ? format(new Date(reminder.dueDate), 'MMM dd') : 'No date'}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => toggleReminder(reminder.id)}
+                        className="w-6 h-6 rounded-full border-accent/20 flex items-center justify-center hover:bg-accent hover:text-white transition-all"
+                      >
+                        <Check size={12} />
+                      </button>
+                    </div>
+                  ))}
+                  {!hasUrgentReminders && (
                     <p className="text-[10px] text-slate-500 italic px-2 dark:text-ink-muted">{t('no_pending_reminders')}</p>
                   )}
                 </div>
@@ -577,24 +599,21 @@ export const Dashboard: React.FC = () => {
                   <button className="text-[9px] font-bold text-accent ">{t('view_all')}</button>
                 </div>
                 <div className="space-y-2">
-                  {reminders
-                    .filter(r => r.type !== 'exam' && r.type !== 'controle' && !r.completed)
-                    .slice(0, 3)
-                    .map((reminder) => (
-                      <div key={reminder.id} onClick={() => toggleReminder(reminder.id)} className="flex items-center gap-3 p-3 ls-card cursor-pointer hover:border-accent/20 transition-all">
-                        <div className={`w-4 h-4 rounded border flex items-center justify-center ${reminder.completed ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-200 dark:border-white/15'}`}>
-                          {reminder.completed && <Check size={10} />}
-                        </div>
-                        <div className="flex-grow min-w-0">
-                          <span className={`text-xs font-medium block truncate ${reminder.completed ? 'text-slate-500 line-through dark:text-ink-muted' : 'text-slate-950 dark:text-ink'}`}>{reminder.title}</span>
-                          {reminder.dueDate && (
-                            <span className="text-[8px] font-bold text-slate-500 dark:text-ink-muted">
-                              {format(new Date(reminder.dueDate), 'MMM dd')}
-                            </span>
-                          )}
-                        </div>
+                  {generalReminders.map((reminder) => (
+                    <div key={reminder.id} onClick={() => toggleReminder(reminder.id)} className="flex items-center gap-3 p-3 ls-card cursor-pointer hover:border-accent/20 transition-all">
+                      <div className={`w-4 h-4 rounded border flex items-center justify-center ${reminder.completed ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-200 dark:border-white/15'}`}>
+                        {reminder.completed && <Check size={10} />}
                       </div>
-                    ))}
+                      <div className="flex-grow min-w-0">
+                        <span className={`text-xs font-medium block truncate ${reminder.completed ? 'text-slate-500 line-through dark:text-ink-muted' : 'text-slate-950 dark:text-ink'}`}>{reminder.title}</span>
+                        {reminder.dueDate && (
+                          <span className="text-[8px] font-bold text-slate-500 dark:text-ink-muted">
+                            {format(new Date(reminder.dueDate), 'MMM dd')}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </section>
@@ -606,31 +625,27 @@ export const Dashboard: React.FC = () => {
                 <CalendarIcon className="w-4 h-4 text-slate-500 dark:text-ink-muted" />
               </div>
               <div className="space-y-4">
-                {schedule.filter(e => e.date?.includes('-')).length > 0 ? (
-                  schedule
-                    .filter(e => e.date?.includes('-'))
-                    .sort((a, b) => a.date.localeCompare(b.date))
-                    .slice(0, 3)
-                    .map((event) => {
-                      const d = new Date(event.date);
-                      return (
-                        <div key={event.id} className="flex gap-4">
-                          <div className="flex flex-col items-center justify-center w-12 h-12 bg-slate-50 rounded-xl shrink-0 dark:bg-surface-low">
-                            <span className="text-[9px] font-medium text-slate-500 uppercase dark:text-ink-muted">{format(d, 'MMM')}</span>
-                            <span className="text-lg font-bold text-slate-950 leading-none dark:text-ink">{format(d, 'd')}</span>
-                          </div>
-                          <div className="space-y-1">
-                            <h4 className="text-sm font-bold text-slate-950 leading-tight dark:text-ink">{event.title}</h4>
-                            {event.time && (
-                              <div className="flex items-center gap-2 text-[10px] text-slate-500 font-medium uppercase tracking-wider dark:text-ink-muted">
-                                <Clock className="w-3 h-3" />
-                                {event.time}
-                              </div>
-                            )}
-                          </div>
+                {upcomingSchedule.length > 0 ? (
+                  upcomingSchedule.map((event) => {
+                    const d = new Date(event.date);
+                    return (
+                      <div key={event.id} className="flex gap-4">
+                        <div className="flex flex-col items-center justify-center w-12 h-12 bg-slate-50 rounded-xl shrink-0 dark:bg-surface-low">
+                          <span className="text-[9px] font-medium text-slate-500 uppercase dark:text-ink-muted">{format(d, 'MMM')}</span>
+                          <span className="text-lg font-bold text-slate-950 leading-none dark:text-ink">{format(d, 'd')}</span>
                         </div>
-                      );
-                    })
+                        <div className="space-y-1">
+                          <h4 className="text-sm font-bold text-slate-950 leading-tight dark:text-ink">{event.title}</h4>
+                          {event.time && (
+                            <div className="flex items-center gap-2 text-[10px] text-slate-500 font-medium uppercase tracking-wider dark:text-ink-muted">
+                              <Clock className="w-3 h-3" />
+                              {event.time}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
                 ) : (
                   <p className="ls-micro-label italic">{t('no_upcoming_events')}</p>
                 )}
