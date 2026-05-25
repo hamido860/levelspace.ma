@@ -51,6 +51,75 @@ const getBlockReadText = (item: DisplayedLessonBlock) =>
     ...(Array.isArray(item.block?.rules) ? item.block.rules : []),
   ].filter(Boolean).join('\n');
 
+const getLessonIllustration = (title: string | null | undefined, subject?: string | null | undefined) => {
+  const t = String(title || '').toLowerCase();
+  const s = String(subject || '').toLowerCase();
+  
+  if (
+    t.includes('math') || 
+    t.includes('geom') || 
+    t.includes('arith') || 
+    t.includes('calcul') || 
+    t.includes('algebra') || 
+    t.includes('suite') || 
+    t.includes('série') || 
+    t.includes('analyse') || 
+    s.includes('math')
+  ) {
+    return '/illustrations/math_geometry.png';
+  }
+  if (
+    t.includes('physic') || 
+    t.includes('physiq') || 
+    t.includes('chem') || 
+    t.includes('chim') || 
+    t.includes('electr') || 
+    t.includes('circuit') || 
+    t.includes('combust') || 
+    s.includes('phys') || 
+    s.includes('chim')
+  ) {
+    return '/illustrations/physics_chemistry.png';
+  }
+  if (
+    t.includes('svt') || 
+    t.includes('earth') || 
+    t.includes('life') || 
+    t.includes('tecton') || 
+    t.includes('plaqu') || 
+    t.includes('séisme') || 
+    t.includes('volcan') || 
+    t.includes('roche') || 
+    t.includes('géolog') || 
+    t.includes('biolog') || 
+    s.includes('svt') || 
+    s.includes('vie')
+  ) {
+    return '/illustrations/earth_sciences.png';
+  }
+  if (
+    t.includes('lang') || 
+    t.includes('arab') || 
+    t.includes('french') || 
+    t.includes('franç') || 
+    t.includes('read') || 
+    t.includes('book') || 
+    t.includes('littér') || 
+    t.includes('philoso') || 
+    t.includes('lexiq') || 
+    t.includes('gramm') || 
+    t.includes('ortho') || 
+    t.includes('conju') || 
+    s.includes('lang') || 
+    s.includes('fr') || 
+    s.includes('ar') || 
+    s.includes('phil')
+  ) {
+    return '/illustrations/humanities_languages.png';
+  }
+  return '/illustrations/default_edu.png';
+};
+
 export const LessonReader: React.FC<LessonReaderProps> = ({
   title,
   subtitle,
@@ -168,6 +237,16 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
       </div>
 
       <header className="lesson-reader-hero">
+        {/* Premium Subject Illustration Banner */}
+        <div className="h-48 md:h-64 w-full rounded-2xl overflow-hidden mb-6 relative bg-slate-50 border border-slate-100 dark:border-white/5 dark:bg-surface-low shadow-sm">
+          <img 
+            src={getLessonIllustration(title, subject)}
+            alt={title}
+            className="w-full h-full object-cover transition-transform duration-700 hover:scale-[1.02]"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent pointer-events-none" />
+        </div>
+
         <div className="lesson-reader-hero__meta">
           {grade && <span>{grade}</span>}
           {subject && <span>{subject}</span>}

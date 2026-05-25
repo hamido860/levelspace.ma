@@ -42,6 +42,76 @@ import {
 
 type FileFormat = 'pdf' | 'epub' | 'txt' | 'manual' | 'link';
 
+const getLessonIllustration = (title: string | null | undefined, subject?: string | null | undefined) => {
+  const t = String(title || '').toLowerCase();
+  const s = String(subject || '').toLowerCase();
+  
+  if (
+    t.includes('math') || 
+    t.includes('geom') || 
+    t.includes('arith') || 
+    t.includes('calcul') || 
+    t.includes('algebra') || 
+    t.includes('suite') || 
+    t.includes('série') || 
+    t.includes('analyse') || 
+    s.includes('math')
+  ) {
+    return '/illustrations/math_geometry.png';
+  }
+  if (
+    t.includes('physic') || 
+    t.includes('physiq') || 
+    t.includes('chem') || 
+    t.includes('chim') || 
+    t.includes('electr') || 
+    t.includes('circuit') || 
+    t.includes('combust') || 
+    s.includes('phys') || 
+    s.includes('chim')
+  ) {
+    return '/illustrations/physics_chemistry.png';
+  }
+  if (
+    t.includes('svt') || 
+    t.includes('earth') || 
+    t.includes('life') || 
+    t.includes('tecton') || 
+    t.includes('plaqu') || 
+    t.includes('séisme') || 
+    t.includes('volcan') || 
+    t.includes('roche') || 
+    t.includes('géolog') || 
+    t.includes('biolog') || 
+    s.includes('svt') || 
+    s.includes('vie')
+  ) {
+    return '/illustrations/earth_sciences.png';
+  }
+  if (
+    t.includes('lang') || 
+    t.includes('arab') || 
+    t.includes('french') || 
+    t.includes('franç') || 
+    t.includes('read') || 
+    t.includes('book') || 
+    t.includes('littér') || 
+    t.includes('philoso') || 
+    t.includes('lexiq') || 
+    t.includes('gramm') || 
+    t.includes('ortho') || 
+    t.includes('conju') || 
+    s.includes('lang') || 
+    s.includes('fr') || 
+    s.includes('ar') || 
+    s.includes('phil')
+  ) {
+    return '/illustrations/humanities_languages.png';
+  }
+  return '/illustrations/default_edu.png';
+};
+
+
 interface LibraryItem {
   id: string;
   title: string;
@@ -428,11 +498,20 @@ export const Library: React.FC = () => {
                       initial={{ opacity: 0, scale: 0.9 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.9 }}
-                      className="bg-white p-5 rounded-2xl border border-slate-200 group transition-all dark:border-white/8 dark:bg-paper"
+                      className="bg-white p-5 rounded-3xl border border-slate-200 group transition-all dark:border-white/8 dark:bg-paper"
                       style={{ boxShadow: 'var(--ls-shadow)' }}
                     >
+                      {/* Premium Dynamic Illustration */}
+                      <div className="h-28 w-full rounded-2xl overflow-hidden mb-4 relative bg-slate-50 border border-slate-100 dark:border-white/5 dark:bg-surface-low shadow-sm">
+                        <img 
+                          src={getLessonIllustration(item.title, item.category)}
+                          alt={item.title}
+                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                        />
+                      </div>
+
                       <div className="flex justify-between items-start mb-4">
-                        <div className="p-2 bg-white rounded-lg dark:bg-surface-low">
+                        <div className="p-2 bg-white rounded-lg dark:bg-surface-low border border-slate-100 dark:border-white/5 shadow-sm">
                           {getFormatIcon(item.format)}
                         </div>
                         <button

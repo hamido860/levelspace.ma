@@ -18,7 +18,8 @@ import {
   Loader2,
   AlertCircle,
   Cloud,
-  Activity
+  Activity,
+  Play
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
@@ -39,6 +40,75 @@ import { OnboardingModal } from '../components/OnboardingModal';
 import { CalendarWidget } from '../components/CalendarWidget';
 import { PlanSessionModal } from '../components/PlanSessionModal';
 import { SupportZoneModal } from '../components/SupportZoneModal';
+
+const getLessonIllustration = (title: string | null | undefined, category?: string | null | undefined) => {
+  const t = String(title || '').toLowerCase();
+  const c = String(category || '').toLowerCase();
+  
+  if (
+    t.includes('math') || 
+    t.includes('geom') || 
+    t.includes('arith') || 
+    t.includes('calcul') || 
+    t.includes('algebra') || 
+    t.includes('suite') || 
+    t.includes('série') || 
+    t.includes('analyse') || 
+    c.includes('math')
+  ) {
+    return '/illustrations/math_geometry.png';
+  }
+  if (
+    t.includes('physic') || 
+    t.includes('physiq') || 
+    t.includes('chem') || 
+    t.includes('chim') || 
+    t.includes('electr') || 
+    t.includes('circuit') || 
+    t.includes('combust') || 
+    c.includes('phys') || 
+    c.includes('chim')
+  ) {
+    return '/illustrations/physics_chemistry.png';
+  }
+  if (
+    t.includes('svt') || 
+    t.includes('earth') || 
+    t.includes('life') || 
+    t.includes('tecton') || 
+    t.includes('plaqu') || 
+    t.includes('séisme') || 
+    t.includes('volcan') || 
+    t.includes('roche') || 
+    t.includes('géolog') || 
+    t.includes('biolog') || 
+    c.includes('svt') || 
+    c.includes('vie')
+  ) {
+    return '/illustrations/earth_sciences.png';
+  }
+  if (
+    t.includes('lang') || 
+    t.includes('arab') || 
+    t.includes('french') || 
+    t.includes('franç') || 
+    t.includes('read') || 
+    t.includes('book') || 
+    t.includes('littér') || 
+    t.includes('philoso') || 
+    t.includes('lexiq') || 
+    t.includes('gramm') || 
+    t.includes('ortho') || 
+    t.includes('conju') || 
+    c.includes('lang') || 
+    c.includes('fr') || 
+    c.includes('ar') || 
+    c.includes('phil')
+  ) {
+    return '/illustrations/humanities_languages.png';
+  }
+  return '/illustrations/default_edu.png';
+};
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -73,6 +143,33 @@ export const Dashboard: React.FC = () => {
   }, []);
 
   const allModules = useLiveQuery(() => db.modules.toArray()) || [];
+  const allLessons = useLiveQuery(() => db.lessons.toArray()) || [];
+
+  const lessonCountByModuleId = useMemo(
+    () => allLessons.reduce<Record<string, number>>((acc, l) => {
+      acc[l.moduleId] = (acc[l.moduleId] || 0) + 1;
+      return acc;
+    }, {}),
+    [allLessons],
+  );
+
+  const lastActivityByModuleId = useMemo(
+    () => allLessons.reduce<Record<string, number>>((acc, l) => {
+      if (!acc[l.moduleId] || l.createdAt > acc[l.moduleId]) acc[l.moduleId] = l.createdAt;
+      return acc;
+    }, {}),
+    [allLessons],
+  );
+
+  const relativeTime = (ts: number) => {
+    const diff = Date.now() - ts;
+    const minutes = Math.floor(diff / 60000);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  };
   const lastViewedLessonId = useLiveQuery(async () => {
     const setting = await db.settings.get('last_viewed_lesson_id');
     return setting?.value;
@@ -358,31 +455,85 @@ export const Dashboard: React.FC = () => {
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: i * 0.05 }}
-                      onClick={() => handleModuleClick(module.id, module.name)}
-                      className="bg-white border border-slate-200 p-5 rounded-2xl flex flex-col group cursor-pointer hover:border-accent/30 hover:shadow-sm transition-all dark:bg-paper dark:border-white/8"
+                      onClick={() => navigate(`/classroom/${module.id}`)}
+                      className="bg-white border border-slate-200 rounded-3xl overflow-hidden flex flex-col group cursor-pointer hover:border-accent/30 hover:shadow-lg transition-all dark:bg-paper dark:border-white/8 shadow-sm"
                     >
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-accent/10 group-hover:text-accent transition-colors dark:bg-surface-low">
-                          <BookOpen size={18} />
+                      {/* Top Redesigned Teal Header Bar */}
+                      <div className="bg-[#007A87] px-5 py-3.5 flex items-center justify-between text-white dark:bg-accent shrink-0">
+                        <div className="flex items-center gap-2">
+                          <BookOpen className="w-5 h-5 shrink-0 text-white" />
+                          <h3 className="text-sm font-bold leading-tight truncate text-white max-w-[160px]">{module.name}</h3>
                         </div>
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{module.code}</span>
+                        <div className="flex items-center gap-1 shrink-0">
+                          {module.category && module.category !== module.name && (
+                            <span className="bg-white/15 text-white text-[9px] font-bold px-2 py-0.5 rounded-md backdrop-blur-sm truncate max-w-[90px]">{module.category}</span>
+                          )}
+                          {module.code && module.code !== module.name && (
+                            <span className="bg-white/15 text-white text-[9px] font-bold px-2 py-0.5 rounded-md backdrop-blur-sm truncate max-w-[60px]">{module.code}</span>
+                          )}
+                        </div>
                       </div>
-                      
-                      <h3 className="text-base font-bold text-slate-950 mb-1 line-clamp-1 group-hover:text-accent transition-colors dark:text-ink">
-                        {module.name}
-                      </h3>
-                      
-                      <div className="mt-auto pt-6">
-                        <div className="flex items-center justify-between text-xs mb-2">
-                          <span className="font-medium text-slate-500 dark:text-ink-muted">{t('progress') || 'Progress'}</span>
-                          <span className="font-bold text-slate-950 dark:text-ink">{module.progress}%</span>
+
+                      {/* Horizontal Dynamic Illustration Banner */}
+                      <div className="h-24 w-full overflow-hidden relative border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-surface-low shrink-0">
+                        <img 
+                          src={getLessonIllustration(module.name, module.category)}
+                          alt={module.name}
+                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                        />
+                      </div>
+
+                      {/* Card Body */}
+                      <div className="p-5 flex-1 flex flex-col space-y-4">
+                        {/* Metrics grid */}
+                        <div className="grid grid-cols-2 gap-4 text-sm border-b border-slate-100 pb-4 dark:border-white/6 items-center">
+                          <div className="flex items-center gap-2">
+                            <BookOpen className="w-4 h-4 text-slate-400 dark:text-ink-muted" />
+                            <span className="font-bold text-slate-800 dark:text-ink">{lessonCountByModuleId[module.id] ?? 0} Lessons</span>
+                          </div>
+                          <div className="space-y-1">
+                            <div className="flex justify-between text-[11px] font-bold">
+                              <span className="text-slate-400 dark:text-ink-muted">Progress</span>
+                              <span className="text-slate-800 dark:text-ink">{module.progress}%</span>
+                            </div>
+                            <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden dark:bg-surface-mid">
+                              <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${module.progress}%` }} />
+                            </div>
+                          </div>
                         </div>
-                        <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden dark:bg-surface-mid">
-                          <motion.div 
-                            initial={{ width: 0 }}
-                            animate={{ width: `${module.progress}%` }}
-                            className="h-full bg-accent"
-                          />
+
+                        {/* Last activity */}
+                        <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-ink-muted">
+                          <Clock className="w-4 h-4 text-slate-400 shrink-0" />
+                          <span>
+                            Last Active: {lastActivityByModuleId[module.id] ? relativeTime(lastActivityByModuleId[module.id]) : 'No activity yet'}
+                          </span>
+                        </div>
+
+                        {/* Footer: actions */}
+                        <div className="pt-2 flex items-center justify-between border-t border-slate-100 dark:border-white/6">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); navigate(`/classroom/${module.id}`); }}
+                              className="flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 text-xs font-bold text-white transition-colors shadow-sm"
+                            >
+                              <Play className="w-3 h-3 fill-current text-white" />
+                              Start Lesson
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleModuleClick(module.id, module.name); }}
+                              className="rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-700 transition-colors dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:bg-surface-low"
+                            >
+                              View Plan
+                            </button>
+                          </div>
+
+                          <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
+                            module.selected ? 'text-accent' : 'text-emerald-700 dark:text-emerald-400'
+                          }`}>
+                            <span className={`h-1.5 w-1.5 rounded-full ${module.selected ? 'bg-accent' : 'bg-emerald-500 animate-pulse'}`} />
+                            {module.selected ? 'Active' : 'Available'}
+                          </span>
                         </div>
                       </div>
                     </motion.div>
