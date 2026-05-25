@@ -181,6 +181,18 @@ export const Dashboard: React.FC = () => {
   const reminders = useLiveQuery(() => db.tasks.toArray()) || [];
   const schedule = useLiveQuery(() => db.schedule.toArray()) || [];
   const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
+
+  const activeReminders = useMemo(() => {
+    return reminders
+      .filter(r => !r.completed)
+      .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''));
+  }, [reminders]);
+
+  const upcomingEvents = useMemo(() => {
+    return schedule
+      .filter(e => e.date?.includes('-'))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }, [schedule]);
   const settingsMap = useMemo(() => Object.fromEntries(dbSettings.map(s => [s.key, s.value])), [dbSettings]);
 
   const selectedGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
@@ -560,10 +572,8 @@ export const Dashboard: React.FC = () => {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {reminders.filter(r => !r.completed).length > 0 ? (
-                  reminders
-                    .filter(r => !r.completed)
-                    .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
+                {activeReminders.length > 0 ? (
+                  activeReminders
                     .slice(0, 4)
                     .map((reminder, i) => (
                       <motion.div 
@@ -670,10 +680,8 @@ export const Dashboard: React.FC = () => {
                 <CalendarIcon size={16} className="text-slate-400" />
               </div>
               <div className="space-y-4">
-                {schedule.filter(e => e.date?.includes('-')).length > 0 ? (
-                  schedule
-                    .filter(e => e.date?.includes('-'))
-                    .sort((a, b) => a.date.localeCompare(b.date))
+                {upcomingEvents.length > 0 ? (
+                  upcomingEvents
                     .slice(0, 4)
                     .map((event) => {
                       const d = new Date(event.date);
