@@ -100,7 +100,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
     { label: t('classrooms'), icon: <GraduationCap size={20} />, path: '/modules' },
     { label: t('library'), icon: <BookMarked size={20} />, path: '/library' },
     { label: t('blueprints'), icon: <Layers3 size={20} />, path: '/blueprints' },
-    { label: t('schedule'), icon: <Calendar size={20} />, path: '/schedule' },
     { label: t('progress'), icon: <BarChart3 size={20} />, path: '/progress' },
     { label: 'AI Keys', icon: <KeyRound size={20} />, path: '/settings/ai-keys', matchPrefix: true },
   ];

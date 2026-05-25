@@ -195,13 +195,6 @@ export const Progress: React.FC = () => {
               <p className="text-xs text-white/60 leading-relaxed">
                 Data suggests that scheduling your most complex subjects during this window results in a 24% increase in retention. 
               </p>
-              
-              <button 
-                onClick={() => navigate('/schedule')}
-                className="w-full py-3 bg-accent text-white rounded-xl text-[10px] font-bold uppercase tracking-normal hover:bg-paper hover:text-ink transition-all"
-              >
-                Optimize Schedule
-              </button>
             </motion.div>
           </section>
         </div>

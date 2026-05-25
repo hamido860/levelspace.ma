@@ -253,7 +253,6 @@ export const Profile: React.FC = () => {
               <div className="space-y-2">
                 {[
                   { label: 'My Progress', path: '/progress' },
-                  { label: 'Study Planner', path: '/schedule' },
                   { label: 'Library', path: '/library' },
                   { label: 'Settings', path: '/settings' },
                 ].map((link, i) => (

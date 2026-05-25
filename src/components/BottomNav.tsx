@@ -15,15 +15,13 @@ export const BottomNav: React.FC = () => {
   const navItems = [
     { icon: <Timer size={24} strokeWidth={1.2}/>, label: 'Focus', path: '/dashboard' },
     { icon: <BookOpen size={24} strokeWidth={1.2}/>, label: 'Learn', path: '/modules' },
-    { icon: <BarChart3 size={24} strokeWidth={1.2}/>, label: 'Stats', path: '/progress' },
-    { icon: <Calendar size={24} strokeWidth={1.2}/>, label: 'Plan', path: '/schedule' }
+    { icon: <BarChart3 size={24} strokeWidth={1.2}/>, label: 'Stats', path: '/progress' }
   ];
 
   const getActiveItem = () => {
     if (location.pathname === '/dashboard') return 'Focus';
     if (location.pathname === '/modules') return 'Learn';
     if (location.pathname === '/progress') return 'Stats';
-    if (location.pathname === '/schedule') return 'Plan';
     return '';
   };
 
