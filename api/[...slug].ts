@@ -29,6 +29,7 @@ import {
   loadAiRecoveryTaskDetail,
   loadRagChunkHealth,
   MAX_AUTOMATIC_RETRIES,
+  requireAuthenticatedUser,
   requireAdminUser,
   requireAiAdmin,
   repairRagTopicLinks,
@@ -157,6 +158,8 @@ async function handleNvidiaProxy(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    await requireAuthenticatedUser(req);
+
     const response = await axios.post(
       "https://integrate.api.nvidia.com/v1/chat/completions",
       req.body,
