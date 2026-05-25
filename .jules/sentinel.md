@@ -1,0 +1,4 @@
+## 2025-05-25 - Fix unauthenticated NVIDIA proxy SSRF
+**Vulnerability:** The `/api/nvidia-proxy` serverless endpoint proxied requests to the NVIDIA API using the server's configured `NVIDIA_API_KEY` without checking if the user making the request was authenticated. This allowed any unauthenticated user to directly hit the endpoint and consume the application's NVIDIA API quota.
+**Learning:** Proxying API requests purely to bypass CORS issues on the frontend can introduce Server-Side Request Forgery (SSRF) and abuse vulnerabilities if authentication checks are not enforced on the backend endpoint as well.
+**Prevention:** Always use utility functions like `requireAuthenticatedUser()` on all backend serverless endpoints, even if the frontend only exposes those features to authenticated users.
