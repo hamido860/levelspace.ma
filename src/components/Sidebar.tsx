@@ -101,7 +101,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
     { label: t('blueprints'), icon: <Layers3 size={20} />, path: '/blueprints' },
     { label: t('schedule'), icon: <Calendar size={20} />, path: '/schedule' },
     { label: t('progress'), icon: <BarChart3 size={20} />, path: '/progress' },
-    { label: 'AI Keys', icon: <KeyRound size={20} />, path: '/settings/ai-keys', matchPrefix: true },
   ];
 
   const toolNavItems: NavItem[] = isAdmin ? [
