@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Sidebar } from './Sidebar';
-import { Topbar } from './Topbar';
-import { SelectionActions } from './SelectionActions';
+import { Topbar } from './topbar';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -21,7 +20,6 @@ export const Layout: React.FC<LayoutProps> = ({
 
   return (
     <div className="min-h-screen bg-background flex font-sans text-ink">
-      <SelectionActions />
       {!hideSidebar && <Sidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />}
       
       <main 

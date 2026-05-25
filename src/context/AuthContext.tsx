@@ -84,60 +84,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [dbConnected, user?.id]);
 
   useEffect(() => {
-    let subscription: any = null;
+    refreshDbConnection();
 
-    const initialize = async () => {
-      await refreshDbConnection();
-
-      // 1. Listen for Supabase Auth changes
-      const { data } = supabase.auth.onAuthStateChange(async (_event: any, session: any) => {
-        setSession(session);
-        
-        if (session?.user) {
-          setUser(session.user);
-
-          // Try to load from cache first
-          const cachedProfile = await db.settings.get(`profile_${session.user.id}`);
-          if (cachedProfile) {
-            setProfile(cachedProfile.value);
-          }
-
-          const userProfile = await getProfile(session.user.id);
-          if (userProfile) {
-            setProfile(userProfile);
-            await db.settings.put({ key: `profile_${session.user.id}`, value: userProfile });
-          }
-        } else if (localStorage.getItem(DEMO_ADMIN_STORAGE_KEY) === 'true') {
-          await applyDemoAdminAuth();
-        } else {
-          localStorage.removeItem(DEMO_ADMIN_STORAGE_KEY);
-          setUser(null);
-          setProfile(null);
-        }
-        setLoading(false);
-      });
-
-      if (data?.subscription) {
-        subscription = data.subscription;
-      }
-
-      // 2. Initial session check
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
+    const handleSession = async (currentSession: Session | null) => {
+      setSession(currentSession);
       
-      if (session?.user) {
-        setUser(session.user);
+      if (currentSession?.user) {
+        setUser(currentSession.user);
 
         // Try to load from cache first
-        const cachedProfile = await db.settings.get(`profile_${session.user.id}`);
+        const cachedProfile = await db.settings.get(`profile_${currentSession.user.id}`);
         if (cachedProfile) {
           setProfile(cachedProfile.value);
         }
 
-        const userProfile = await getProfile(session.user.id);
+        const userProfile = await getProfile(currentSession.user.id);
         if (userProfile) {
           setProfile(userProfile);
-          await db.settings.put({ key: `profile_${session.user.id}`, value: userProfile });
+          await db.settings.put({ key: `profile_${currentSession.user.id}`, value: userProfile });
         }
       } else if (localStorage.getItem(DEMO_ADMIN_STORAGE_KEY) === 'true') {
         await applyDemoAdminAuth();
@@ -149,12 +113,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
     };
 
-    initialize();
+    // 1. Listen for Supabase Auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      await handleSession(session);
+    });
+
+    // 2. Initial session check
+    const initAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      await handleSession(session);
+    };
+
+    initAuth();
 
     return () => {
-      if (subscription) {
-        subscription.unsubscribe();
-      }
+      subscription.unsubscribe();
     };
   }, []);
 

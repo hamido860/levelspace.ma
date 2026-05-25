@@ -110,7 +110,7 @@ export const ExecuteTaskModal = ({
             <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
                 <RiskBadge level={issue?.severity} />
-                <span className="inline-flex items-center rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white/80">
+                <span className="inline-flex items-center rounded-full bg-paper/10 px-2.5 py-1 text-[11px] font-semibold text-white/80">
                   {issue?.issue_type}
                 </span>
               </div>
@@ -120,7 +120,7 @@ export const ExecuteTaskModal = ({
                 <p className="mt-2 max-w-2xl text-sm text-white/70">{issue?.impact}</p>
               </div>
             </div>
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+            <div className="rounded-3xl border border-white/10 bg-paper/5 p-4">
               <p className="text-xs font-medium text-white/70">Assigned Agent</p>
               <div className="mt-3">
                 <AgentBadge agent={form.assigned_agent} />
@@ -231,7 +231,7 @@ export const ExecuteTaskModal = ({
           </div>
 
           <div className="space-y-4">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+            <div className="rounded-2xl border border-surface-mid bg-surface-low p-5">
               <div className="flex items-start gap-3">
                 <Sparkles className="mt-0.5 h-5 w-5 text-accent" />
                 <div>
@@ -246,7 +246,7 @@ export const ExecuteTaskModal = ({
               </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-5">
+            <div className="rounded-2xl border border-surface-mid bg-paper p-5">
               <div className="flex items-start gap-3">
                 {destructiveBlocked ? (
                   <AlertTriangle className="mt-0.5 h-5 w-5 text-red-600" />
@@ -263,7 +263,7 @@ export const ExecuteTaskModal = ({
                       checked={forceApproval}
                       onChange={(event) => updateField("requires_approval", event.target.checked)}
                       disabled={form.safety_level === "read_only" ? false : true}
-                      className="h-4 w-4 rounded border-slate-300 text-slate-950"
+                      className="h-4 w-4 rounded border-ink/15 text-ink"
                     />
                     Require approval before writes
                   </label>
@@ -276,7 +276,7 @@ export const ExecuteTaskModal = ({
           </div>
         </div>
 
-        <div className="flex flex-wrap justify-end gap-3 border-t border-slate-200 pt-5">
+        <div className="flex flex-wrap justify-end gap-3 border-t border-surface-mid pt-5">
           <button
             onClick={onClose}
             disabled={busy}

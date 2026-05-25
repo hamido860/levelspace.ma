@@ -166,6 +166,20 @@ export const validateMetrics = (metrics: any): ValidationError[] => {
     });
   }
 
+
+  // Lessons cannot exceed topics globally (unless we don't have visibility into topics)
+  const topicsHealth = metrics.tableHealth?.find((t: any) => t.table === "topics");
+  const topicsVisible = topicsHealth && topicsHealth.rows !== null && topicsHealth.rows > 0;
+
+  if (topicsVisible && metrics.lessonsGenerated > metrics.totalTopics) {
+    errors.push({
+      field: "lessonsGenerated",
+      error: `Cannot exceed totalTopics (${metrics.totalTopics})`,
+      value: metrics.lessonsGenerated,
+      expected: `<= ${metrics.totalTopics}`,
+    });
+  }
+
   if (typeof metrics.totalUsers !== "number" || metrics.totalUsers < 0) {
     errors.push({
       field: "totalUsers",
@@ -218,6 +232,25 @@ export const validateMetrics = (metrics: any): ValidationError[] => {
           error: `Cannot exceed grade topics (${g.topics})`,
           value: g.lessons,
           expected: `<= ${g.topics}`,
+        });
+      }
+
+      // Lessons cannot exceed topics per grade
+      if (g.lessons > g.topics) {
+        errors.push({
+          field: `${prefix}.lessons`,
+          error: `Cannot exceed grade topics (${g.topics})`,
+          value: g.lessons,
+          expected: `<= ${g.topics}`,
+        });
+      }
+
+      if (false) {
+        errors.push({
+          field: `${prefix}.lessons`,
+          error: "Must be a non-negative number",
+          value: g.lessons,
+          expected: "number >= 0",
         });
       }
 
