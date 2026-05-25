@@ -20,7 +20,7 @@ import {
   inferLegacyLessonValidationStatus,
   isMissingLessonValidationColumnError,
 } from '../services/lessonSupabase';
-import { isStudentVisibleLesson } from '../services/lessonRecovery';
+import { isStudentVisibleLesson, getLessonAvailabilityState } from '../services/lessonRecovery';
 import { isDraftValidationStatus } from '../services/curriculumValidation';
 
 type SupabaseLessonRecord = {
@@ -189,25 +189,45 @@ export const LessonView: React.FC = () => {
       setIsLoading(true);
       const fetchAttempt = async (includeValidation: boolean) => {
         const selectColumns = getLessonSelectColumns({ includeTags: true, includeValidation });
-        return supabase
+        const query = supabase
           .from('lessons')
           .select(selectColumns)
-          .or(`id.eq.${id},topic_id.eq.${id}`)
-          .maybeSingle()
-          .throwOnError();
+          .or(`id.eq.${id},topic_id.eq.${id}`);
+        const { data, error } = await query;
+        if (error) throw error;
+        return data;
       };
 
       try {
-        let response;
+        let data;
         try {
-          response = await fetchAttempt(true);
+          data = await fetchAttempt(true);
         } catch (error) {
           if (!isMissingLessonValidationColumnError(error)) throw error;
-          response = await fetchAttempt(false);
+          data = await fetchAttempt(false);
         }
 
         if (isCancelled) return;
-        const foundLesson = response.data as SupabaseLessonRecord | null;
+        const lessonsList = (data as SupabaseLessonRecord[]) || [];
+        
+        const getAvailabilityRank = (l: any) => {
+          const state = getLessonAvailabilityState(l);
+          switch (state) {
+            case 'published': return 5;
+            case 'needs_review': return 4;
+            case 'draft_with_content': return 3;
+            case 'locked': return 2;
+            case 'rejected': return 1;
+            default: return 0;
+          }
+        };
+
+        let foundLesson: SupabaseLessonRecord | null = null;
+        if (lessonsList.length > 0) {
+          const sortedLessons = [...lessonsList].sort((a, b) => getAvailabilityRank(b) - getAvailabilityRank(a));
+          foundLesson = sortedLessons[0];
+        }
+
         setSupabaseLesson(foundLesson);
 
         if (foundLesson?.id) {

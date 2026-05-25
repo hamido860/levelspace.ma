@@ -11,7 +11,7 @@ import { generateSeedLesson, generateLessonSuggestions, LessonSuggestion, checkA
 import { aiCrew } from '../services/aiCrewService';
 import { getQuizzesByLesson } from '../services/quizService';
 import { getExercisesByLesson } from '../services/exerciseService';
-import { filterStudentVisibleLessons } from '../services/lessonRecovery';
+import { filterStudentVisibleLessons, isStudentVisibleLesson, getLessonAvailabilityState } from '../services/lessonRecovery';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -288,6 +288,7 @@ export const ClassroomView: React.FC = () => {
   const [quizzes, setQuizzes] = useState<any[]>([]);
   const [exercises, setExercises] = useState<any[]>([]);
   const [isLoadingExtra, setIsLoadingExtra] = useState(false);
+  const [cloudLessonsCount, setCloudLessonsCount] = useState<number | null>(null);
   const aiAvailable = checkAIProvider();
   const [activeDomainKey, setActiveDomainKey] = useState<string>('all');
 
@@ -340,17 +341,47 @@ export const ClassroomView: React.FC = () => {
     () => selectStudentFacingValidatedContent(studentVisibleLessons),
     [studentVisibleLessons],
   );
-  const lessons = useMemo(
-    () => (
-      isAdmin
-        ? storedLessons
-        : (studentLessonSelection.hasPreferred
-          ? studentLessonSelection.preferredOnly
-          : studentLessonSelection.fallback)
-    ),
-    [isAdmin, storedLessons, studentLessonSelection],
-  );
+  const lessons = useMemo(() => {
+    if (isAdmin) {
+      return storedLessons;
+    }
+    if (studentVisibleLessons.length > 0) {
+      return studentLessonSelection.hasPreferred
+        ? studentLessonSelection.preferredOnly
+        : studentLessonSelection.fallback;
+    }
+    return storedLessons;
+  }, [isAdmin, storedLessons, studentVisibleLessons.length, studentLessonSelection]);
   const hasLessons = lessons.length > 0;
+  const adminStats = useMemo(() => {
+    if (!isAdmin) return null;
+    let published = 0;
+    let needsReview = 0;
+    let draft = 0;
+    let hidden = 0;
+    
+    for (const lesson of storedLessons) {
+      const state = getLessonAvailabilityState(lesson);
+      if (state === 'published') {
+        published++;
+      } else {
+        hidden++;
+        if (state === 'needs_review') {
+          needsReview++;
+        } else if (state === 'draft_with_content') {
+          draft++;
+        }
+      }
+    }
+    
+    return {
+      total: storedLessons.length,
+      published,
+      needsReview,
+      draft,
+      hidden,
+    };
+  }, [isAdmin, storedLessons]);
   const hasTopicFallback = !hasLessons && topicFallbackRows.length > 0;
   const topicDomainRows = curriculumTopicRows.length > 0 ? curriculumTopicRows : topicFallbackRows;
   const topicDomainById = useMemo(() => {
@@ -712,9 +743,11 @@ export const ClassroomView: React.FC = () => {
         reviewed_by: lesson.reviewed_by ?? existing?.reviewed_by,
         reviewed_at: lesson.reviewed_at ?? existing?.reviewed_at,
         is_ai_generated: Boolean(lesson.is_ai_generated ?? existing?.is_ai_generated),
-        status: isStarterNeedsReview
+        status: hasStoredContent
+          ? 'done' as const
+          : isStarterNeedsReview
           ? 'pending' as const
-          : (hasStoredContent || normalizedStatus === 'published' || normalizedStatus === 'done' || normalizedStatus === 'draft')
+          : (normalizedStatus === 'published' || normalizedStatus === 'done' || normalizedStatus === 'draft')
           ? 'done' as const
           : (existing?.status || 'pending') as 'suggested' | 'pending' | 'active' | 'done',
         tags,
@@ -742,6 +775,33 @@ export const ClassroomView: React.FC = () => {
           fetchSupabaseTopics(),
         ]);
         setCurriculumTopicRows(topics);
+        setCloudLessonsCount(cloudLessons.length);
+
+        // Sync lesson_generation_jobs for topics that already have lessons
+        try {
+          const topicsWithLessons = cloudLessons
+            .filter((lesson) => 
+              lesson.topic_id && 
+              (Boolean(lesson.content?.trim()) || (Array.isArray(lesson.blocks) && lesson.blocks.length > 0))
+            )
+            .map((lesson) => lesson.topic_id);
+
+          if (topicsWithLessons.length > 0) {
+            await supabase
+              .from('lesson_generation_jobs')
+              .update({
+                status: 'needs_review',
+                completed_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                error_message: null
+              })
+              .eq('status', 'pending')
+              .in('topic_id', topicsWithLessons);
+          }
+        } catch (jobErr) {
+          console.warn('[ClassroomView] Job status sync warning:', jobErr);
+        }
+
         if (cloudLessons.length === 0) {
           setTopicFallbackRows(topics);
           return;
@@ -756,6 +816,27 @@ export const ClassroomView: React.FC = () => {
       }
     })();
   }, [classroomScopeKey, currentCountry, currentGrade, id, module, selectedBacTrack]);
+
+  // Dev mode console diagnostics
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      const hiddenNeedsReview = storedLessons.filter(l => {
+        const isStudVis = isStudentVisibleLesson(l);
+        const state = getLessonAvailabilityState(l);
+        return !isStudVis && state === 'needs_review';
+      }).length;
+
+      console.log('[ClassroomView Diagnostics]', {
+        cloudLessonsCount,
+        hydratedLessonsCount: storedLessons.length,
+        studentVisibleLessonsCount: studentVisibleLessons.length,
+        hiddenNeedsReviewCount: hiddenNeedsReview,
+        currentGrade,
+        moduleName: module?.name,
+        topicIdsCount: curriculumTopicRows.length,
+      });
+    }
+  }, [cloudLessonsCount, storedLessons, studentVisibleLessons, currentGrade, module?.name, curriculumTopicRows]);
 
   useEffect(() => {
     if (!showDomainTabs) {
@@ -1396,6 +1477,29 @@ export const ClassroomView: React.FC = () => {
                     </div>
                   </div>
                 )}
+
+                {!isAdmin && hasLessons && studentVisibleLessons.length === 0 && (
+                  <div className="rounded-3xl border border-blue-200 bg-blue-50 px-5 py-4 text-blue-900 shadow-sm">
+                    <div className="flex items-start gap-3">
+                      <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" />
+                      <div>
+                        <p className="text-sm font-semibold">Lessons are prepared but waiting for validation.</p>
+                        <p className="mt-1 text-sm text-blue-800">Your teacher or administrator can review and publish them for classroom access.</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {isAdmin && adminStats && (
+                  <div className="flex flex-wrap gap-2 items-center bg-slate-50 dark:bg-surface-low border border-slate-200 dark:border-white/5 rounded-2xl p-3 text-xs shrink-0 select-none">
+                    <span className="font-bold text-slate-700 dark:text-ink-secondary mr-1">Admin Diagnostic:</span>
+                    <span className="bg-slate-200/80 text-slate-800 dark:bg-white/8 dark:text-ink px-2.5 py-1 rounded-lg font-semibold">Total: {adminStats.total}</span>
+                    <span className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400 px-2.5 py-1 rounded-lg font-semibold">Published: {adminStats.published}</span>
+                    <span className="bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-400 px-2.5 py-1 rounded-lg font-semibold">Needs Review: {adminStats.needsReview}</span>
+                    <span className="bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-400 px-2.5 py-1 rounded-lg font-semibold">Draft: {adminStats.draft}</span>
+                    <span className="bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-400 px-2.5 py-1 rounded-lg font-semibold">Hidden from Student: {adminStats.hidden}</span>
+                  </div>
+                )}
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-bold text-slate-950 flex items-center gap-2">
                     <BookOpen size={20} className="text-accent" />
@@ -1447,100 +1551,126 @@ export const ClassroomView: React.FC = () => {
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {Array.isArray(lessons) && lessons.length > 0 ? (
-                    visibleLessons.length > 0 ? visibleLessons.map((lesson, i) => (
-                      <motion.div 
-                        key={lesson.id}
-                        layout
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: i * 0.05 }}
-                        onClick={() => navigate(`/lesson/${lesson.id}`)}
-                        className="bg-white border border-slate-200 rounded-3xl overflow-hidden flex flex-col group hover:border-accent/30 hover:shadow-lg transition-all dark:bg-paper dark:border-white/8 shadow-sm cursor-pointer"
-                        style={{ boxShadow: 'var(--ls-shadow)' }}
-                      >
-                        {/* Top Redesigned Teal Header Bar */}
-                        <div className="bg-[#007A87] px-5 py-3.5 flex items-center justify-between text-white dark:bg-accent shrink-0">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <BookOpen className="w-4 h-4 shrink-0 text-white" />
-                            <h3 className="text-sm font-bold leading-tight truncate text-white dark:text-white" title={lesson.title}>{lesson.title}</h3>
-                          </div>
-                          <div className="flex items-center gap-1 shrink-0 ml-2">
-                            {module?.category && (
-                              <span className="bg-white/15 text-white text-[9px] font-bold px-2 py-0.5 rounded-md backdrop-blur-sm truncate max-w-[90px]">{module.category}</span>
-                            )}
-                            {(lesson.grade || currentGrade) && (
-                              <span className="bg-white/15 text-white text-[9px] font-bold px-2 py-0.5 rounded-md backdrop-blur-sm truncate max-w-[80px]">{lesson.grade || currentGrade}</span>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Horizontal Dynamic Illustration Banner */}
-                        <div className="h-24 w-full overflow-hidden relative border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-surface-low shrink-0">
-                          <img 
-                            src={getLessonIllustration(lesson.title, lesson.subject || module?.name)}
-                            alt={lesson.title}
-                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                          />
-                        </div>
-
-                        {/* Card Body */}
-                        <div className="p-5 flex-1 flex flex-col space-y-4">
-                          {/* Metrics columns */}
-                          <div className="grid grid-cols-2 gap-4 text-sm border-b border-slate-100 pb-4 dark:border-white/6 items-center">
-                            <div className="flex items-center gap-2">
-                              <BookOpen className="w-4 h-4 text-slate-400 dark:text-ink-muted shrink-0" />
-                              <span className="font-bold text-slate-800 dark:text-ink">Unit {i + 1}</span>
+                    visibleLessons.length > 0 ? visibleLessons.map((lesson, i) => {
+                      const isClickable = isAdmin || isStudentVisibleLesson(lesson);
+                      const availabilityState = getLessonAvailabilityState(lesson);
+                      
+                      return (
+                        <motion.div 
+                          key={lesson.id}
+                          layout
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: i * 0.05 }}
+                          onClick={() => { if (isClickable) navigate(`/lesson/${lesson.id}`); }}
+                          className={`bg-white border border-slate-200 rounded-3xl overflow-hidden flex flex-col group transition-all dark:bg-paper dark:border-white/8 shadow-sm ${
+                            isClickable 
+                              ? 'cursor-pointer hover:border-accent/30 hover:shadow-lg' 
+                              : 'opacity-85 bg-slate-50/50 dark:bg-surface-low/50 cursor-not-allowed'
+                          }`}
+                          style={{ boxShadow: 'var(--ls-shadow)' }}
+                        >
+                          {/* Top Redesigned Teal Header Bar */}
+                          <div className={`px-5 py-3.5 flex items-center justify-between text-white shrink-0 ${
+                            isClickable ? 'bg-[#007A87] dark:bg-accent' : 'bg-slate-500 dark:bg-slate-700'
+                          }`}>
+                            <div className="flex items-center gap-2 min-w-0">
+                              <BookOpen className="w-4 h-4 shrink-0 text-white" />
+                              <h3 className="text-sm font-bold leading-tight truncate text-white dark:text-white" title={lesson.title}>{lesson.title}</h3>
                             </div>
-                            <div className="space-y-1">
-                              <div className="flex justify-between text-[11px] font-bold">
-                                <span className="text-slate-400 dark:text-ink-muted">Progress</span>
-                                <span className="text-slate-800 dark:text-ink">{lesson.status === 'done' ? '100%' : '0%'}</span>
+                            <div className="flex items-center gap-1 shrink-0 ml-2">
+                              {module?.category && (
+                                <span className="bg-white/15 text-white text-[9px] font-bold px-2 py-0.5 rounded-md backdrop-blur-sm truncate max-w-[90px]">{module.category}</span>
+                              )}
+                              {(lesson.grade || currentGrade) && (
+                                <span className="bg-white/15 text-white text-[9px] font-bold px-2 py-0.5 rounded-md backdrop-blur-sm truncate max-w-[80px]">{lesson.grade || currentGrade}</span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Horizontal Dynamic Illustration Banner */}
+                          <div className="h-24 w-full overflow-hidden relative border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-surface-low shrink-0">
+                            <img 
+                              src={getLessonIllustration(lesson.title, lesson.subject || module?.name)}
+                              alt={lesson.title}
+                              className={`w-full h-full object-cover transition-transform duration-700 ${isClickable ? 'group-hover:scale-105' : ''}`}
+                            />
+                          </div>
+
+                          {/* Card Body */}
+                          <div className="p-5 flex-1 flex flex-col space-y-4">
+                            {/* Metrics columns */}
+                            <div className="grid grid-cols-2 gap-4 text-sm border-b border-slate-100 pb-4 dark:border-white/6 items-center">
+                              <div className="flex items-center gap-2">
+                                <BookOpen className="w-4 h-4 text-slate-400 dark:text-ink-muted shrink-0" />
+                                <span className="font-bold text-slate-800 dark:text-ink">Unit {i + 1}</span>
                               </div>
-                              <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden dark:bg-surface-mid">
-                                <div 
-                                  className={`h-full rounded-full ${lesson.status === 'done' ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-surface-high'}`} 
-                                  style={{ width: lesson.status === 'done' ? '100%' : '0%' }} 
-                                />
+                              <div className="space-y-1">
+                                <div className="flex justify-between text-[11px] font-bold">
+                                  <span className="text-slate-400 dark:text-ink-muted">Progress</span>
+                                  <span className="text-slate-800 dark:text-ink">{lesson.status === 'done' ? '100%' : '0%'}</span>
+                                </div>
+                                <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden dark:bg-surface-mid">
+                                  <div 
+                                    className={`h-full rounded-full ${lesson.status === 'done' ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-surface-high'}`} 
+                                    style={{ width: lesson.status === 'done' ? '100%' : '0%' }} 
+                                  />
+                                </div>
                               </div>
                             </div>
-                          </div>
 
-                          {/* Last activity / status */}
-                          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-ink-muted">
-                            <Clock className="w-4 h-4 text-slate-400 shrink-0" />
-                            <span>
-                              Last Active: {lesson.createdAt ? relativeTime(lesson.createdAt) : 'No activity yet'}
-                            </span>
-                          </div>
-
-                          {/* Footer: actions + status dot */}
-                          <div className="pt-2 flex items-center justify-between border-t border-slate-100 dark:border-white/6">
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={(e) => { e.stopPropagation(); navigate(`/lesson/${lesson.id}`); }}
-                                className="flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 text-xs font-bold text-white transition-colors shadow-sm"
-                              >
-                                <Play className="w-3 h-3 fill-current text-white" />
-                                {lesson.status === 'done' ? 'Review' : 'Start Lesson'}
-                              </button>
-                              <button
-                                onClick={(e) => { e.stopPropagation(); navigate(`/lesson/${lesson.id}`); }}
-                                className="rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-700 transition-colors dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:bg-surface-low"
-                              >
-                                View Plan
-                              </button>
+                            {/* Last activity / status */}
+                            <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-ink-muted">
+                              <Clock className="w-4 h-4 text-slate-400 shrink-0" />
+                              <span>
+                                Last Active: {lesson.createdAt ? relativeTime(lesson.createdAt) : 'No activity yet'}
+                              </span>
                             </div>
 
-                            <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
-                              lesson.status === 'done' ? 'text-emerald-700 dark:text-emerald-400' : 'text-accent'
-                            }`}>
-                              <span className={`h-1.5 w-1.5 rounded-full ${lesson.status === 'done' ? 'bg-emerald-500 animate-pulse' : 'bg-accent'}`} />
-                              {lesson.status === 'done' ? 'Completed' : 'Available'}
-                            </span>
+                            {/* Footer: actions + status dot */}
+                            <div className="pt-2 flex items-center justify-between border-t border-slate-100 dark:border-white/6">
+                              {isClickable ? (
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); navigate(`/lesson/${lesson.id}`); }}
+                                    className="flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 text-xs font-bold text-white transition-colors shadow-sm"
+                                  >
+                                    <Play className="w-3 h-3 fill-current text-white" />
+                                    {lesson.status === 'done' ? 'Review' : 'Start Lesson'}
+                                  </button>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); navigate(`/lesson/${lesson.id}`); }}
+                                    className="rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-700 transition-colors dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:bg-surface-low"
+                                  >
+                                    View Plan
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="flex-1 text-[11px] text-slate-500 dark:text-ink-muted font-medium pr-2 leading-relaxed">
+                                  {availabilityState === 'needs_review' 
+                                    ? 'Lesson exists but is waiting for review' 
+                                    : 'Starter lesson available for admin review'}
+                                </div>
+                              )}
+
+                              {isClickable ? (
+                                <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
+                                  lesson.status === 'done' ? 'text-emerald-700 dark:text-emerald-400' : 'text-accent'
+                                }`}>
+                                  <span className={`h-1.5 w-1.5 rounded-full ${lesson.status === 'done' ? 'bg-emerald-500 animate-pulse' : 'bg-accent'}`} />
+                                  {lesson.status === 'done' ? 'Completed' : 'Available'}
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+                                  {availabilityState === 'needs_review' ? 'Under Review' : 'Draft'}
+                                </span>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      </motion.div>
-                    )) : (
+                        </motion.div>
+                      );
+                    }) : (
                       <div className="col-span-full rounded-2xl border border-solid border-slate-200 bg-white p-5 dark:border-white/8 dark:bg-paper">
                         <p className="text-sm font-semibold text-slate-950 dark:text-ink">No lessons in this domain yet.</p>
                         <p className="mt-1 ls-micro-label">Switch back to {t('all')} to see every available lesson for this classroom.</p>
