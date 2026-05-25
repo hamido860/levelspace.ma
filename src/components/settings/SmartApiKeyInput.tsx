@@ -121,7 +121,8 @@ export const SmartApiKeyInput: React.FC = () => {
           <button 
             type="button"
             onClick={() => setShowKey(!showKey)}
-            className="px-3 text-muted hover:text-ink transition-colors"
+            aria-label={showKey ? 'Hide API key' : 'Show API key'}
+            className="px-3 text-muted hover:text-ink transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 rounded-lg"
           >
             {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>
