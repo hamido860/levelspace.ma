@@ -148,13 +148,13 @@ const fetchExistingLessonRows = async (supabase: SupabaseLike, topicIds: string[
 
     const byTopic = await supabase
       .from("lessons")
-      .select("topic_id, lesson_title, title")
+      .select("topic_id, lesson_title")
       .in("topic_id", batch);
 
     if (!byTopic.error) {
       for (const lesson of (byTopic.data || []) as ExistingLessonRow[]) {
         if (lesson.topic_id) existingTopicIds.add(lesson.topic_id);
-        const titleKey = normalizeKey(lesson.lesson_title || lesson.title);
+        const titleKey = normalizeKey(lesson.lesson_title);
         if (titleKey) existingTitleKeys.add(titleKey);
       }
       continue;
@@ -166,24 +166,14 @@ const fetchExistingLessonRows = async (supabase: SupabaseLike, topicIds: string[
 
     const byTitle = await supabase
       .from("lessons")
-      .select("lesson_title, title");
+      .select("lesson_title");
 
     if (byTitle.error) {
-      if (isMissingColumnError(byTitle.error, "title")) {
-        const legacyByTitle = await supabase.from("lessons").select("lesson_title");
-        if (legacyByTitle.error) throw legacyByTitle.error;
-        for (const lesson of (legacyByTitle.data || []) as ExistingLessonRow[]) {
-          const titleKey = normalizeKey(lesson.lesson_title);
-          if (titleKey) existingTitleKeys.add(titleKey);
-        }
-        continue;
-      }
-
       throw byTitle.error;
     }
 
     for (const lesson of (byTitle.data || []) as ExistingLessonRow[]) {
-      const titleKey = normalizeKey(lesson.lesson_title || lesson.title);
+      const titleKey = normalizeKey(lesson.lesson_title);
       if (titleKey) existingTitleKeys.add(titleKey);
     }
   }
