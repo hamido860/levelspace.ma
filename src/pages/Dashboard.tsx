@@ -343,7 +343,7 @@ export const Dashboard: React.FC = () => {
 
             <div className="flex flex-wrap gap-3">
               <button 
-                onClick={() => navigate('/modules')}
+                onClick={() => navigate('/classrooms')}
                 className="ls-button-primary"
               >
                 {t('dashboard_explore')}
@@ -391,7 +391,7 @@ export const Dashboard: React.FC = () => {
                 <p className="ls-body-text">{t('active_paths_desc')}</p>
               </div>
               <button 
-                onClick={() => navigate('/modules')}
+                onClick={() => navigate('/classrooms')}
                 className="ls-button-secondary"
               >
                 {t('manage')} <ArrowRight className="w-3 h-3" />
@@ -654,7 +654,7 @@ export const Dashboard: React.FC = () => {
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
-          onClick={() => navigate('/modules')}
+          onClick={() => navigate('/classrooms')}
           className="fixed bottom-8 right-8 inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-slate-800 z-50 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100" style={{ boxShadow: 'var(--ls-shadow-hover)' }}
         >
           <Plus className="w-4 h-4" />
@@ -814,7 +814,7 @@ export const Dashboard: React.FC = () => {
             )}
           </div>
           <div 
-            onClick={() => navigate('/modules')}
+            onClick={() => navigate('/classrooms')}
             className="group relative bg-slate-50 border border-solid border-ink/20 rounded-2xl hover:border-accent/50 transition-all cursor-pointer p-6 flex flex-col items-center justify-center space-y-4 dark:bg-surface-low dark:border-white/8"
           >
             <div className="w-12 h-12 rounded-full bg-accent/5 flex items-center justify-center text-accent group-hover:bg-accent group-hover:text-white transition-all">

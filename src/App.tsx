@@ -5,7 +5,7 @@ import { Toaster } from 'sonner';
 import { Landing } from './pages/Landing';
 import { Login } from './pages/Login';
 import { Onboarding } from './pages/Onboarding';
-import { Modules } from './pages/Modules';
+import { Classrooms } from './pages/Classrooms';
 import { LessonView } from './pages/LessonView';
 import { QuizInterface } from './pages/QuizInterface';
 import { Dashboard } from './pages/Dashboard';
@@ -48,7 +48,7 @@ export default function App() {
                 <Route path="/privacy-policy" element={<PrivacyPolicy />} />
                 <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
                 <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-                <Route path="/modules" element={<ProtectedRoute><Modules /></ProtectedRoute>} />
+                <Route path="/classrooms" element={<ProtectedRoute><Classrooms /></ProtectedRoute>} />
                 <Route path="/lesson/:id" element={<ProtectedRoute><LessonView /></ProtectedRoute>} />
                 <Route path="/classroom/:id" element={<ProtectedRoute><ClassroomView /></ProtectedRoute>} />
                 <Route path="/quiz/:id" element={<ProtectedRoute><QuizInterface /></ProtectedRoute>} />

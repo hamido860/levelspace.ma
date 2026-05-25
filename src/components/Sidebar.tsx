@@ -97,7 +97,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
   const mainNavItems: NavItem[] = [
     { label: t('dashboard'), icon: <LayoutDashboard size={20} />, path: '/dashboard' },
     { label: t('profile'), icon: <User size={20} />, path: '/profile' },
-    { label: t('classrooms'), icon: <GraduationCap size={20} />, path: '/modules' },
+    { label: t('classrooms'), icon: <GraduationCap size={20} />, path: '/classrooms' },
     { label: t('library'), icon: <BookMarked size={20} />, path: '/library' },
     { label: t('blueprints'), icon: <Layers3 size={20} />, path: '/blueprints' },
     { label: t('schedule'), icon: <Calendar size={20} />, path: '/schedule' },

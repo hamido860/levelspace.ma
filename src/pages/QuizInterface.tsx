@@ -104,7 +104,7 @@ export const QuizInterface: React.FC = () => {
 
             <div className="flex flex-col gap-4">
               <button 
-                onClick={() => navigate('/modules')}
+                onClick={() => navigate('/classrooms')}
                 className="group w-full py-6 bg-ink text-paper rounded-full font-medium text-sm uppercase tracking-[0.2em] hover:bg-accent transition-all duration-300 flex items-center justify-center gap-3"
               >
                 Return to Repository

@@ -220,7 +220,7 @@ const fetchSubjectsForCurrentGrade = async (country: string, grade: string) => {
     .filter(Boolean);
 };
 
-export const Modules: React.FC = () => {
+export const Classrooms: React.FC = () => {
   const { t } = useLanguage();
   const { isPro } = useAuth();
   const [isLoading, setIsLoading] = useState(false);

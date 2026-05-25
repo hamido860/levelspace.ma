@@ -1204,7 +1204,7 @@ export const Settings: React.FC = () => {
                 <motion.button
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
-                  onClick={() => navigate('/modules')}
+                  onClick={() => navigate('/classrooms')}
                   className="flex items-center gap-2 text-accent text-[10px] font-bold uppercase tracking-normal hover:underline"
                 >
                   {t('continue_to_classrooms')} <ArrowRight className="w-3 h-3" />

@@ -38,7 +38,7 @@ export const Onboarding: React.FC = () => {
     if (selectedGrade) {
       localStorage.setItem('selected_grade', selectedGrade);
       await db.settings.put({ key: 'selected_grade', value: selectedGrade });
-      navigate('/modules');
+      navigate('/classrooms');
     }
   };
 
