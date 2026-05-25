@@ -219,7 +219,14 @@ const CLASSROOM_TAB_CONFIG = {
   },
 } as const;
 
+const resolvedCurriculumCache = new Map<string, { gradeId: string | null; subjectId: string | null; subjectIds: string[] }>();
+
 const resolveCurriculumIds = async (grade: string, subject: string, category?: string | null) => {
+  const cacheKey = `${grade}:${subject}:${category || ''}`;
+  if (resolvedCurriculumCache.has(cacheKey)) {
+    return resolvedCurriculumCache.get(cacheKey)!;
+  }
+
   const gradeCandidates = getGradeCandidates(grade);
   const subjectCandidates = getSubjectCandidates(subject, category);
 
@@ -235,11 +242,14 @@ const resolveCurriculumIds = async (grade: string, subject: string, category?: s
     .filter((row) => normalizedSubjectCandidates.has(normalizeCurriculumValue(String(row.name || ''))))
     .map((row) => row.id);
 
-  return {
+  const result = {
     gradeId: matchedGrade?.id ?? null,
     subjectId: matchedSubject?.id ?? null,
     subjectIds: Array.from(new Set([matchedSubject?.id, ...subjectIds].filter(Boolean) as string[])),
   };
+
+  resolvedCurriculumCache.set(cacheKey, result);
+  return result;
 };
 
 type ClassroomSupabaseLesson = {
@@ -633,8 +643,9 @@ export const ClassroomView: React.FC = () => {
   const hydrateLessonCache = async (cloudLessons: SupabaseLessonRow[]) => {
     if (!module) return;
 
-    const existingById = new Map((allLessons || []).map((lesson) => [lesson.id, lesson]));
-    const existingByTitle = new Map((allLessons || []).map((lesson) => [normalizeLessonTitle(lesson.title), lesson]));
+    const currentStoredLessons = await db.lessons.where('moduleId').equals(module.id).sortBy('createdAt');
+    const existingById = new Map(currentStoredLessons.map((lesson) => [lesson.id, lesson]));
+    const existingByTitle = new Map(currentStoredLessons.map((lesson) => [normalizeLessonTitle(lesson.title), lesson]));
 
     const toPut = cloudLessons.map((lesson) => {
       const existing =
@@ -699,7 +710,7 @@ export const ClassroomView: React.FC = () => {
 
   // Hydrate the local classroom cache from Supabase so cloud stays the source of truth.
   useEffect(() => {
-    if (!module || !id || allLessons === undefined) return;
+    if (!module || !id) return;
     if (cloudHydrationKeyRef.current === classroomScopeKey) return;
 
     cloudHydrationKeyRef.current = classroomScopeKey;
@@ -725,7 +736,7 @@ export const ClassroomView: React.FC = () => {
         setIsHydratingSupabase(false);
       }
     })();
-  }, [allLessons, classroomScopeKey, currentCountry, currentGrade, id, module, selectedBacTrack]);
+  }, [classroomScopeKey, currentCountry, currentGrade, id, module, selectedBacTrack]);
 
   useEffect(() => {
     if (!showDomainTabs) {
