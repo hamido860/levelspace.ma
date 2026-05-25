@@ -1185,7 +1185,7 @@ export const ClassroomView: React.FC = () => {
 
   return (
     <Layout>
-      <div className="max-w-5xl mx-auto space-y-8 pb-20">
+      <div className="max-w-5xl mx-auto space-y-4 pb-20">
         {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div className="space-y-4">
@@ -1197,12 +1197,38 @@ export const ClassroomView: React.FC = () => {
               {t('back_to_dashboard')}
             </button>
             <div className="space-y-2">
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <span className="bg-accent/10 text-accent text-xs font-medium px-2 py-0.5 rounded ">{module.code}</span>
                 <span className="text-slate-500 text-xs font-medium">{module.category}</span>
+                {isAdmin && (
+                  <div className="flex items-center gap-2 border-l border-slate-200 pl-3 dark:border-white/10">
+                    <span className="text-[11px] text-slate-500 dark:text-ink-muted font-medium">Strict RAG</span>
+                    <button
+                      onClick={async () => {
+                        await db.modules.update(module.id, { strictRAG: !module.strictRAG });
+                      }}
+                      className={`w-8 h-4 rounded-full transition-colors relative ${module.strictRAG ? 'bg-accent' : 'bg-slate-950/20 dark:bg-white/20'}`}
+                      title="Keep this classroom grounded in certified content before using AI."
+                    >
+                      <div className={`absolute top-0.5 left-0.5 bg-white w-3 h-3 rounded-full transition-transform ${module.strictRAG ? 'translate-x-4' : 'translate-x-0'}`} />
+                    </button>
+                  </div>
+                )}
               </div>
               <h1 className="text-5xl md:text-6xl font-bold font-display leading-[0.88] tracking-tight text-slate-950 editorial-title">{module.name}</h1>
               <p className="ls-body-text max-w-2xl leading-relaxed">{module.description}</p>
+              {showStats && (
+                <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-ink-muted pt-1">
+                  <span className="font-semibold">{hasLessons ? `${lessons.length} Units` : `${topicFallbackRows.length} Topics`}</span>
+                  <span className="h-1 w-1 rounded-full bg-slate-300 dark:bg-white/10" />
+                  <div className="flex items-center gap-2">
+                    <span>{module.progress}% Complete</span>
+                    <div className="w-24 h-1.5 bg-slate-100 dark:bg-surface-mid rounded-full overflow-hidden inline-block align-middle border border-slate-200/50 dark:border-white/5">
+                      <div className="h-full bg-accent" style={{ width: `${module.progress}%` }} />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1212,10 +1238,20 @@ export const ClassroomView: React.FC = () => {
                 <button
                   onClick={handleSeedFromSupabase}
                   disabled={isSeeding}
-                  className="flex items-center gap-2 bg-slate-50 text-slate-950 px-4 py-3 rounded-xl text-xs font-medium transition-all border border-slate-200 hover:border-accent/30 hover:text-accent disabled:opacity-50"
+                  className="flex items-center gap-2 bg-slate-50 text-slate-950 px-4 py-3 rounded-xl text-xs font-medium transition-all border border-slate-200 hover:border-accent/30 hover:text-accent disabled:opacity-50 dark:bg-paper dark:border-white/8 dark:text-ink"
                 >
                   {isSeeding ? <Loader2 size={14} className="animate-spin" /> : <Database size={14} />}
                   {isSeeding ? 'Loading Units' : 'Load from Supabase'}
+                </button>
+              )}
+              {isAdmin && hasTopicFallback && (
+                <button
+                  onClick={handleGenerateStarterLessons}
+                  disabled={isGeneratingStarterLessons}
+                  className="flex items-center gap-2 bg-slate-50 text-slate-950 px-4 py-3 rounded-xl text-xs font-medium transition-all border border-slate-200 hover:border-accent/30 hover:text-accent disabled:opacity-50 dark:bg-paper dark:border-white/8 dark:text-ink"
+                >
+                  {isGeneratingStarterLessons ? <Loader2 size={14} className="animate-spin" /> : <Database size={14} />}
+                  {isGeneratingStarterLessons ? 'Generating...' : 'Generate All Lessons'}
                 </button>
               )}
               {aiAvailable ? (
@@ -1223,7 +1259,7 @@ export const ClassroomView: React.FC = () => {
                   {isAdmin && hasLessons && (
                     <button
                       onClick={handleAuditClassroom}
-                      className="flex items-center gap-2 bg-slate-50 text-slate-500 hover:text-accent px-4 py-3 rounded-xl text-xs font-medium transition-all border border-slate-200"
+                      className="flex items-center gap-2 bg-slate-50 text-slate-500 hover:text-accent px-4 py-3 rounded-xl text-xs font-medium transition-all border border-slate-200 dark:bg-paper dark:border-white/8 dark:text-ink-secondary"
                     >
                       <ShieldCheck size={14} />
                       Audit
@@ -1247,84 +1283,10 @@ export const ClassroomView: React.FC = () => {
           )}
         </div>
 
-        {/* Admin Controls */}
-        {isAdmin && (
-          <div className="bg-slate-50/70 rounded-2xl p-4 border border-slate-200">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div className="space-y-1">
-                <p className="text-xs font-medium text-accent">Admin Controls</p>
-                <p className="text-sm text-slate-950 font-medium">Keep this classroom grounded in certified content before using AI.</p>
-              </div>
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-white border border-slate-200">
-                  <div>
-                    <p className="ls-micro-label">Strict RAG</p>
-                    <p className="text-[11px] text-slate-500">Use lesson context only</p>
-                  </div>
-                  <button
-                    onClick={async () => {
-                      await db.modules.update(module.id, { strictRAG: !module.strictRAG });
-                    }}
-                    className={`w-12 h-6 rounded-full transition-colors relative ${module.strictRAG ? 'bg-accent' : 'bg-slate-950/20'}`}
-                  >
-                    <div className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${module.strictRAG ? 'translate-x-6' : 'translate-x-0'}`} />
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Stats Grid */}
         {isHydratingSupabase && !hasLessons && !hasTopicFallback && (
           <div className="bg-slate-50/50 border border-slate-200 rounded-3xl p-6 flex items-center gap-3 ls-body-text">
             <Loader2 className="h-4 w-4 animate-spin text-accent" />
             Checking Supabase for existing lessons, topics, and outlines...
-          </div>
-        )}
-
-        {hasTopicFallback && (
-          <div className="rounded-2xl border border-slate-200 bg-white px-6 py-5 shadow-sm">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div>
-                <p className="text-lg font-bold text-slate-950">{t('curriculum_topics') || 'Curriculum Topics'}</p>
-                <p className="mt-1 text-sm text-slate-500">
-                  {topicFallbackRows.length} {t('topics_available') || 'topics found. Generate lessons to start learning.'}
-                </p>
-              </div>
-              {isAdmin && (
-                <button
-                  onClick={handleGenerateStarterLessons}
-                  disabled={isGeneratingStarterLessons}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-slate-800 disabled:opacity-60"
-                >
-                  {isGeneratingStarterLessons ? <Loader2 size={16} className="animate-spin" /> : <Database size={16} />}
-                  {isGeneratingStarterLessons ? t('generating') || 'Generating...' : t('generate_starter_lessons') || 'Generate All Lessons'}
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-
-        {showStats && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="ls-card p-6 space-y-2">
-              <p className="ls-micro-label">Progress</p>
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-bold text-slate-950">{module.progress}%</span>
-                <span className="ls-micro-label">Complete</span>
-              </div>
-              <div className="w-full h-1.5 bg-slate-50 rounded-full overflow-hidden">
-                <div className="h-full bg-accent" style={{ width: `${module.progress}%` }} />
-              </div>
-            </div>
-            <div className="ls-card p-6 space-y-2">
-              <p className="ls-micro-label">Lessons</p>
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-bold text-slate-950">{hasLessons ? lessons.length : topicFallbackRows.length}</span>
-                <span className="ls-micro-label">{hasLessons ? 'Units Curated' : 'Topics need starter lessons'}</span>
-              </div>
-            </div>
           </div>
         )}
 

@@ -510,10 +510,10 @@ export const Modules: React.FC = () => {
   return (
     <Layout>
       <SEO title="Modules" />
-      <div className="space-y-6">
+      <div className="space-y-3">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-3 flex-1">
-            <div className="inline-flex items-center gap-2 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700 dark:border-accent-soft dark:bg-accent-soft dark:text-accent">
+          <div className="space-y-2 flex-1">
+            <div className="inline-flex items-center gap-2 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-2.5 text-sm font-medium text-blue-700 dark:border-accent-soft dark:bg-accent-soft dark:text-accent">
               <Sparkles className="h-4 w-4 shrink-0" />
               Draft AI-assisted content · Pending curriculum validation
             </div>
@@ -547,7 +547,7 @@ export const Modules: React.FC = () => {
         </div>
 
         {/* Filter Bar */}
-        <div className="sticky top-20 z-30 -mx-12 border-b border-slate-200 bg-white px-12 py-3 dark:border-white/8 dark:bg-paper">
+        <div className="sticky top-16 z-30 -mx-12 border-b border-slate-200 bg-white/95 backdrop-blur-md px-12 py-2 dark:border-white/8 dark:bg-paper/95 transition-all">
           <div className="flex items-center justify-between">
             <p className="text-sm text-slate-500 dark:text-ink-muted">Choose a subject to manage curriculum content.</p>
             <div className="flex items-center gap-2">
