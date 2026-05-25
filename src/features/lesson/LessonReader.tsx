@@ -336,6 +336,8 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
           activeBlockId={activeBlockId}
           viewedBlockIds={viewedBlockIds}
           onSelectBlock={scrollToBlock}
+          lessonTitle={title}
+          subject={subject}
         />
       </div>
 
@@ -346,6 +348,8 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
         isOpen={outlineOpen}
         onClose={() => setOutlineOpen(false)}
         onSelectBlock={scrollToBlock}
+        lessonTitle={title}
+        subject={subject}
       />
     </div>
   );
