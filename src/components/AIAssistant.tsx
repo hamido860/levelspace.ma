@@ -52,6 +52,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const [pendingInitialInput, setPendingInitialInput] = useState<string | null>(null);
   const mathFieldRef = useRef<any>(null);
   const [mounted, setMounted] = useState(false);
 
@@ -61,11 +62,9 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
     const handleOpenAIAssistant = (e: CustomEvent<{ initialInput?: string }>) => {
       setIsOpen(true);
       if (e.detail?.initialInput) {
-        setIsMathMode(true);
-        setInput(e.detail.initialInput);
-        if (mathFieldRef.current) {
-          mathFieldRef.current.value = e.detail.initialInput;
-        }
+        // Skip proactive greeting since user has an immediate query
+        setGreetingFetched(true);
+        setPendingInitialInput(e.detail.initialInput);
       }
     };
 
@@ -88,7 +87,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
       })
       .finally(() => { if (isMounted) setIsLoading(false); });
     return () => { isMounted = false; };
-  }, [isOpen]);
+  }, [isOpen, greetingFetched]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -97,6 +96,13 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
   useEffect(() => {
     scrollToBottom();
   }, [messages, isLoading]);
+
+  useEffect(() => {
+    if (pendingInitialInput && !isLoading) {
+      handleSend(pendingInitialInput);
+      setPendingInitialInput(null);
+    }
+  }, [pendingInitialInput, isLoading]);
 
   const handleSend = async (text: string) => {
     if (!text.trim() || isLoading) return;

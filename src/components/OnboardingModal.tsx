@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   GraduationCap, ArrowRight, CheckCircle2, Sparkles, BookOpen, Layers,
-  BookA, BrainCircuit, LibraryBig, Globe
+  BookA, BrainCircuit, LibraryBig, Globe, BookMarked
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { updateProfile, supabase } from '../db/supabase';
@@ -13,96 +13,168 @@ interface OnboardingModalProps {
   onComplete: () => void;
 }
 
-const CYCLES = [
-  { id: 'primary', name: 'Primary Education', desc: 'Enseignement Primaire', icon: BookA },
-  { id: 'college', name: 'Middle School', desc: 'Collège', icon: LibraryBig },
-  { id: 'lycee', name: 'High School', desc: 'Lycée', icon: GraduationCap },
-  { id: 'higher', name: 'Higher Education', desc: 'Classes Préparatoires / Univ', icon: BrainCircuit },
-];
-
-const GRADES_MAP: Record<string, string[]> = {
-  primary: [
-    '1ère année primaire', '2ème année primaire', '3ème année primaire', 
-    '4ème année primaire', '5ème année primaire', '6ème année primaire'
-  ],
-  college: [
-    '1ère année collège', '2ème année collège', '3ème année collège'
-  ],
-  lycee: [
-    'Tronc Commun', '1ère année Bac', '2ème année Bac'
-  ],
-  higher: [
-    'CPGE (1ère année)', 'CPGE (2ème année)'
-  ]
+const CYCLE_ICONS: Record<string, any> = {
+  'التعليم الإبتدائي (Enseignement Primaire)': BookA,
+  'التعليم الثانوي الإعدادي (Collège)': LibraryBig,
+  'التعليم الثانوي التأهيلي (Lycée)': GraduationCap,
 };
 
-const TRACKS_MAP: Record<string, string[]> = {
-  'Tronc Commun': ['Tronc Commun Scientifique', 'Tronc Commun Littéraire', 'Tronc Commun Technologique'],
-  '1ère année Bac': ['Sciences Mathématiques', 'Sciences Expérimentales', 'Sciences et Technologies', 'Lettres et Sciences Humaines', 'Sciences Économiques et Gestion'],
-  '2ème année Bac': ['Sciences Mathématiques A', 'Sciences Mathématiques B', 'Sciences Physiques', 'SVT', 'Sciences Agronomiques', 'Lettres', 'Sciences Humaines', 'Sciences Économiques', 'Techniques de Gestion Comptable']
-};
+function getCycleIcon(cycleName: string) {
+  for (const [key, icon] of Object.entries(CYCLE_ICONS)) {
+    if (cycleName.includes(key) || key.includes(cycleName)) return icon;
+  }
+  return BrainCircuit;
+}
+
+function shouldShowTrackSelector(cycleName: string, gradeName: string) {
+  return cycleName.toLowerCase().includes('lycée') || gradeName.toLowerCase().includes('bac') || gradeName.toLowerCase().includes('tronc commun');
+}
 
 export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComplete }) => {
   const { profile, user } = useAuth();
   
   const [step, setStep] = useState(0);
-  const [selectedCycle, setSelectedCycle] = useState('');
-  const [selectedGrade, setSelectedGrade] = useState('');
-  const [selectedTrack, setSelectedTrack] = useState('');
-  const [selectedOption, setSelectedOption] = useState('');
+  
+  // Data from Supabase
+  const [cycles, setCycles] = useState<any[]>([]);
+  const [grades, setGrades] = useState<any[]>([]);
+  const [subjects, setSubjects] = useState<any[]>([]);
+  const [tracks, setTracks] = useState<any[]>([]);
+  const [options, setOptions] = useState<any[]>([]);
+
+  // Selected State (IDs)
+  const [selectedCycleId, setSelectedCycleId] = useState('');
+  const [selectedGradeId, setSelectedGradeId] = useState('');
+  const [selectedSubjectId, setSelectedSubjectId] = useState('');
+  const [selectedTrackId, setSelectedTrackId] = useState('');
+  const [selectedOptionId, setSelectedOptionId] = useState('');
+
+  // Selected Entities for display
+  const selectedCycle = cycles.find(c => c.id === selectedCycleId);
+  const selectedGrade = grades.find(g => g.id === selectedGradeId);
+  const selectedSubject = subjects.find(s => s.id === selectedSubjectId);
+  const selectedTrack = tracks.find(t => t.id === selectedTrackId);
+  const selectedOption = options.find(o => o.id === selectedOptionId);
+
+  const [loading, setLoading] = useState(false);
 
   const userName = profile?.full_name || (user?.email ? user.email.split('@')[0] : 'Explorer');
 
-  const requiresTrack = selectedCycle === 'lycee';
-  const totalSteps = requiresTrack ? 5 : 3; // 0=Welcome, 1=Cycle, 2=Grade, 3=Track(if lycee)/Done(others), 4=Option(if lycee), 5=Done(if lycee)
+  const requiresTrack = selectedCycle && selectedGrade && shouldShowTrackSelector(selectedCycle.name, selectedGrade.name);
+  // 0=Welcome, 1=Cycle, 2=Grade, 3=Subject, 4=Track(if lycee), 5=Option(if lycee), 6=Done
+  let totalSteps = 4; // Welcome, Cycle, Grade, Subject, Done
+  if (requiresTrack) {
+    totalSteps = 6;
+  }
+
+  // Fetch initial cycles and options
+  useEffect(() => {
+    if (isOpen) {
+      supabase.from('cycles').select('*').order('cycle_order').then(({ data }) => setCycles(data || []));
+      supabase.from('bac_tracks').select('*').order('track_order').then(({ data }) => setTracks(data || []));
+      supabase.from('bac_international_options').select('*').then(({ data }) => setOptions(data || []));
+    }
+  }, [isOpen]);
+
+  // Fetch grades when cycle changes
+  useEffect(() => {
+    if (selectedCycleId) {
+      supabase.from('grades').select('*').eq('cycle_id', selectedCycleId).order('grade_order')
+        .then(({ data }) => setGrades(data || []));
+    } else {
+      setGrades([]);
+    }
+  }, [selectedCycleId]);
+
+  // Fetch subjects when grade changes
+  useEffect(() => {
+    if (selectedGradeId) {
+      const getSubjectsForGrade = async (gradeId: string) => {
+        setLoading(true);
+        const { data } = await supabase
+          .from('grade_subjects')
+          .select('subjects(id, name, code)')
+          .eq('grade_id', gradeId);
+        
+        const mappedSubjects = data?.map((d: any) => d.subjects).filter(Boolean) || [];
+        setSubjects(mappedSubjects);
+        setLoading(false);
+      };
+      getSubjectsForGrade(selectedGradeId);
+    } else {
+      setSubjects([]);
+    }
+  }, [selectedGradeId]);
 
   const handleNext = () => setStep(s => Math.min(s + 1, totalSteps));
   const handleBack = () => setStep(s => Math.max(s - 1, 0));
 
-  const handleComplete = async () => {
-    let finalTrackValue = selectedTrack || '';
+  const handleCycleChange = (id: string) => {
+    setSelectedCycleId(id);
+    setSelectedGradeId("");
+    setSelectedSubjectId("");
+    setSelectedTrackId("");
+    setSelectedOptionId("");
+  };
 
-    // If a track is selected, try to map it to its Supabase UUID
-    if (selectedTrack) {
-      try {
-        const { data: tracksData } = await supabase
-          .from('bac_tracks')
-          .select('id, name');
-        
-        if (tracksData && Array.isArray(tracksData)) {
-          const matchedTrack = tracksData.find(
-            (t: any) => t.name.trim().toLowerCase() === selectedTrack.trim().toLowerCase()
-          );
-          if (matchedTrack) {
-            finalTrackValue = matchedTrack.id;
-          }
-        }
-      } catch (err: any) {
-        console.error('Failed to map track name to UUID:', err.message);
+  const handleGradeChange = (id: string) => {
+    setSelectedGradeId(id);
+    setSelectedSubjectId("");
+    setSelectedTrackId("");
+    setSelectedOptionId("");
+    
+    // Debug logging as requested
+    const grade = grades.find(g => g.id === id);
+    console.debug("[onboarding] selected grade", grade);
+    if (grade && selectedCycle) {
+      console.debug("[onboarding] track selector visible", shouldShowTrackSelector(selectedCycle.name, grade.name));
+    }
+    console.debug("[onboarding] cleared invalid track fields", { track_id: null, option_id: null, subject_id: null });
+  };
+
+  useEffect(() => {
+    if (subjects.length > 0) {
+      console.debug("[onboarding] grade subjects", subjects);
+    }
+  }, [subjects]);
+
+  const handleComplete = async () => {
+    // Save validation
+    if (!selectedGradeId) {
+      console.error("Save rejected: grade_id missing");
+      return;
+    }
+    if (selectedSubjectId && !subjects.find(s => s.id === selectedSubjectId)) {
+      console.error("Save rejected: subject_id doesn't belong to grade_id");
+      return;
+    }
+    if (selectedTrackId || selectedOptionId) {
+      if (!requiresTrack) {
+        console.error("Save rejected: track/option selected for primary/college");
+        return;
       }
     }
 
     localStorage.setItem('selected_country', 'Morocco');
-    localStorage.setItem('selected_cycle', selectedCycle);
-    localStorage.setItem('selected_grade', selectedGrade);
-    if (finalTrackValue) localStorage.setItem('selected_bac_track', finalTrackValue);
-    if (selectedOption) localStorage.setItem('selected_option', selectedOption);
+    localStorage.setItem('selected_cycle', selectedCycle?.name || '');
+    localStorage.setItem('selected_grade', selectedGrade?.name || '');
+    if (selectedTrack) localStorage.setItem('selected_bac_track', selectedTrack.id);
+    if (selectedOption) localStorage.setItem('selected_option', selectedOption.id);
     localStorage.setItem('has_completed_onboarding', 'true');
 
     await db.settings.put({ key: 'selected_country', value: 'Morocco' });
-    await db.settings.put({ key: 'selected_cycle', value: selectedCycle });
-    await db.settings.put({ key: 'selected_grade', value: selectedGrade });
-    if (finalTrackValue) await db.settings.put({ key: 'selected_bac_track', value: finalTrackValue });
-    if (selectedOption) await db.settings.put({ key: 'selected_option', value: selectedOption });
+    await db.settings.put({ key: 'selected_cycle', value: selectedCycle?.name || '' });
+    await db.settings.put({ key: 'selected_grade', value: selectedGrade?.name || '' });
+    if (selectedTrack) await db.settings.put({ key: 'selected_bac_track', value: selectedTrack.id });
+    if (selectedOption) await db.settings.put({ key: 'selected_option', value: selectedOption.id });
     await db.settings.put({ key: 'has_completed_onboarding', value: 'true' });
 
-    // Persist academic profile to Supabase for backend enforcement
     if (user) {
       try {
         await updateProfile(user.id, {
           onboarding_completed: true,
-          selected_grade: selectedGrade,
-          selected_bac_track: finalTrackValue || null,
+          selected_grade: selectedGrade?.name || '',
+          selected_bac_track: selectedTrackId || null,
         });
       } catch (err: any) {
         console.error('Failed to persist onboarding to database:', err.message);
@@ -152,11 +224,11 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
                 </div>
                 <div className="space-y-4">
                   <h1 className="text-xl sm:text-3xl font-display font-bold text-ink leading-[1.1] tracking-tight">
-                    Welcome, <span className="text-accent capitalize">{userName}</span><br />
-                    Let's personalize your space
+                    Welcome to Levelspace.<br />
+                    <span className="text-accent capitalize">{userName}</span>
                   </h1>
                   <p className="text-muted text-sm max-w-sm mx-auto font-medium leading-relaxed">
-                    We'll tailor your academic curriculum to match your exact level and track.
+                    Before we start, let's find your level.
                   </p>
                 </div>
               </motion.div>
@@ -176,36 +248,38 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
                     <Layers className="w-5 h-5" />
                   </div>
                   <div>
-                    <h2 className="text-lg font-display font-semibold text-ink tracking-tight">Academic Phase</h2>
-                    <p className="text-muted">Select your current educational cycle.</p>
+                    <h2 className="text-lg font-display font-semibold text-ink tracking-tight">FirstStep</h2>
+                    <p className="text-muted text-sm">Answer a few simple questions. This helps us choose the best path for you.</p>
                   </div>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {CYCLES.map(cycle => (
-                    <button
-                      key={cycle.id}
-                      onClick={() => { setSelectedCycle(cycle.id); setSelectedGrade(""); setSelectedTrack(""); }}
-                      className={`p-5 rounded-[1.5rem] border-2 transition-all text-left flex items-start gap-4 group ${
-                        selectedCycle === cycle.id 
-                          ? 'bg-accent/5 border-accent shadow-sm shadow-accent/10 scale-[1.02]' 
-                          : 'bg-surface-low border-transparent hover:border-accent/30 hover:bg-paper hover:shadow-md'
-                      }`}
-                    >
-                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 transition-colors ${
-                        selectedCycle === cycle.id ? 'bg-accent text-paper' : 'bg-surface-mid text-ink-secondary group-hover:bg-accent/10 group-hover:text-accent'
-                      }`}>
-                        <cycle.icon className="w-5 h-5" />
-                      </div>
-                      <div className="flex-1">
-                        <h3 className={`font-bold text-base leading-tight mb-1 ${selectedCycle === cycle.id ? 'text-accent' : 'text-ink'}`}>
-                          {cycle.name}
-                        </h3>
-                        <p className="text-xs text-muted font-medium">{cycle.desc}</p>
-                      </div>
-                      {selectedCycle === cycle.id && <CheckCircle2 className="w-5 h-5 text-accent shrink-0" />}
-                    </button>
-                  ))}
+                <div className="grid grid-cols-1 gap-4 overflow-y-auto max-h-[300px] pr-2 custom-scrollbar">
+                  {cycles.map(cycle => {
+                    const Icon = getCycleIcon(cycle.name);
+                    return (
+                      <button
+                        key={cycle.id}
+                        onClick={() => handleCycleChange(cycle.id)}
+                        className={`p-5 rounded-[1.5rem] border-2 transition-all text-left flex items-start gap-4 group ${
+                          selectedCycleId === cycle.id 
+                            ? 'bg-accent/5 border-accent shadow-sm shadow-accent/10 scale-[1.02]' 
+                            : 'bg-surface-low border-transparent hover:border-accent/30 hover:bg-paper hover:shadow-md'
+                        }`}
+                      >
+                        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 transition-colors ${
+                          selectedCycleId === cycle.id ? 'bg-accent text-paper' : 'bg-surface-mid text-ink-secondary group-hover:bg-accent/10 group-hover:text-accent'
+                        }`}>
+                          <Icon className="w-5 h-5" />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className={`font-bold text-base leading-tight mb-1 ${selectedCycleId === cycle.id ? 'text-accent' : 'text-ink'}`}>
+                            {cycle.name}
+                          </h3>
+                        </div>
+                        {selectedCycleId === cycle.id && <CheckCircle2 className="w-5 h-5 text-accent shrink-0" />}
+                      </button>
+                    )
+                  })}
                 </div>
               </motion.div>
             )}
@@ -230,28 +304,76 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
                 </div>
                 
                 <div className="grid grid-cols-2 gap-3 overflow-y-auto max-h-[300px] pr-2 custom-scrollbar">
-                  {GRADES_MAP[selectedCycle]?.map(grade => (
+                  {grades.map(grade => (
                     <button
-                      key={grade}
-                      onClick={() => { setSelectedGrade(grade); setSelectedTrack(""); }}
+                      key={grade.id}
+                      onClick={() => handleGradeChange(grade.id)}
                       className={`p-3 rounded-xl border-2 text-sm font-bold transition-all text-center flex items-center justify-center gap-2 ${
-                        selectedGrade === grade 
+                        selectedGradeId === grade.id 
                           ? 'bg-accent border-accent text-paper shadow-sm shadow-accent/20' 
                           : 'bg-surface-low border-transparent text-ink hover:border-accent/30 hover:bg-paper'
                       }`}
                     >
-                      {grade}
-                      {selectedGrade === grade && <CheckCircle2 className="w-4 h-4" />}
+                      {grade.name}
+                      {selectedGradeId === grade.id && <CheckCircle2 className="w-4 h-4" />}
                     </button>
                   ))}
                 </div>
               </motion.div>
             )}
 
-            {/* STEP 3: TRACK (For Lycée) */}
-            {step === 3 && requiresTrack && (
+            {/* STEP 3: SUBJECT */}
+            {step === 3 && (
               <motion.div
                 key="step-3"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="flex-1 flex flex-col"
+              >
+                <div className="flex items-center gap-4 mb-8">
+                  <div className="w-10 h-10 bg-gradient-to-b from-accent/10 to-transparent border border-accent/10 rounded-xl flex items-center justify-center text-accent shadow-sm">
+                    <BookMarked className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-display font-semibold text-ink tracking-tight">Select Primary Subject</h2>
+                    <p className="text-muted">Optional: focus on a specific subject.</p>
+                  </div>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto max-h-[300px] pr-2 custom-scrollbar">
+                  {loading ? (
+                    <p className="text-sm text-muted">Loading subjects...</p>
+                  ) : subjects.length === 0 ? (
+                    <div className="p-4 bg-surface-low rounded-xl border border-ink/5 text-center text-muted text-sm">
+                      No subjects configured for this grade yet.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {subjects.map(subject => (
+                        <button
+                          key={subject.id}
+                          onClick={() => setSelectedSubjectId(subject.id)}
+                          className={`p-3 rounded-xl border-2 text-sm font-bold transition-all text-left flex items-center justify-between group ${
+                            selectedSubjectId === subject.id 
+                              ? 'bg-accent/10 border-accent text-accent shadow-md' 
+                              : 'bg-surface-low border-transparent text-ink hover:border-accent/30 hover:bg-paper'
+                          }`}
+                        >
+                          <span className="truncate">{subject.name}</span>
+                          {selectedSubjectId === subject.id && <CheckCircle2 className="w-5 h-5 shrink-0 ml-2" />}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+
+            {/* STEP 4: TRACK (For Lycée) */}
+            {step === 4 && requiresTrack && (
+              <motion.div
+                key="step-4"
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
@@ -268,26 +390,32 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
                 </div>
                 
                 <div className="grid grid-cols-1 gap-3 overflow-y-auto max-h-[300px] pr-2 custom-scrollbar">
-                  {TRACKS_MAP[selectedGrade]?.map(track => (
-                    <button
-                      key={track}
-                      onClick={() => setSelectedTrack(track)}
-                      className={`p-3 rounded-xl border-2 text-sm font-bold transition-all text-left flex items-center justify-between group ${
-                        selectedTrack === track 
-                          ? 'bg-accent/10 border-accent text-accent shadow-md' 
-                          : 'bg-surface-low border-transparent text-ink hover:border-accent/30 hover:bg-paper'
-                      }`}
-                    >
-                      {track}
-                      {selectedTrack === track && <CheckCircle2 className="w-5 h-5" />}
-                    </button>
-                  ))}
+                  {tracks.length === 0 ? (
+                    <div className="p-4 bg-surface-low rounded-xl border border-ink/5 text-center text-muted text-sm">
+                      No tracks configured.
+                    </div>
+                  ) : (
+                    tracks.map(track => (
+                      <button
+                        key={track.id}
+                        onClick={() => setSelectedTrackId(track.id)}
+                        className={`p-3 rounded-xl border-2 text-sm font-bold transition-all text-left flex items-center justify-between group ${
+                          selectedTrackId === track.id 
+                            ? 'bg-accent/10 border-accent text-accent shadow-md' 
+                            : 'bg-surface-low border-transparent text-ink hover:border-accent/30 hover:bg-paper'
+                        }`}
+                      >
+                        {track.name}
+                        {selectedTrackId === track.id && <CheckCircle2 className="w-5 h-5" />}
+                      </button>
+                    ))
+                  )}
                 </div>
               </motion.div>
             )}
 
-            {/* STEP 4: INTERNATIONAL OPTION (If applicable) */}
-            {step === 4 && requiresTrack && (
+            {/* STEP 5: INTERNATIONAL OPTION (If applicable) */}
+            {step === 5 && requiresTrack && (
               <motion.div
                  key="step-option"
                  initial={{ opacity: 0, x: 20 }}
@@ -306,27 +434,28 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
                 </div>
 
                 <div className="grid grid-cols-1 gap-4">
-                  {[
-                    { id: 'biof_fr', name: 'Option Français (BIOF)', desc: 'Math, Physics, and SVT are taught in French' },
-                    { id: 'general_ar', name: 'Option Arabe (Général)', desc: 'Scientific subjects taught in Arabic' },
-                    { id: 'biof_en', name: 'Option Anglais (BIOF)', desc: 'Starting slowly in some regions' }
-                  ].map(opt => (
-                    <button
-                      key={opt.id}
-                      onClick={() => setSelectedOption(opt.id)}
-                      className={`p-4 rounded-xl border-2 text-sm transition-all text-left flex items-start justify-between group ${
-                        selectedOption === opt.id 
-                          ? 'bg-accent/5 border-accent shadow-md' 
-                          : 'bg-surface-low border-transparent hover:border-accent/30 hover:bg-paper'
-                      }`}
-                    >
-                      <div>
-                        <h3 className={`font-bold text-base mb-1 ${selectedOption === opt.id ? 'text-accent' : 'text-ink'}`}>{opt.name}</h3>
-                        <p className="text-xs text-muted">{opt.desc}</p>
-                      </div>
-                      {selectedOption === opt.id && <CheckCircle2 className="w-5 h-5 text-accent mt-2" />}
-                    </button>
-                  ))}
+                  {options.length === 0 ? (
+                    <div className="p-4 bg-surface-low rounded-xl border border-ink/5 text-center text-muted text-sm">
+                      No language options configured.
+                    </div>
+                  ) : (
+                    options.map(opt => (
+                      <button
+                        key={opt.id}
+                        onClick={() => setSelectedOptionId(opt.id)}
+                        className={`p-4 rounded-xl border-2 text-sm transition-all text-left flex items-start justify-between group ${
+                          selectedOptionId === opt.id 
+                            ? 'bg-accent/5 border-accent shadow-md' 
+                            : 'bg-surface-low border-transparent hover:border-accent/30 hover:bg-paper'
+                        }`}
+                      >
+                        <div>
+                          <h3 className={`font-bold text-base mb-1 ${selectedOptionId === opt.id ? 'text-accent' : 'text-ink'}`}>{opt.name}</h3>
+                        </div>
+                        {selectedOptionId === opt.id && <CheckCircle2 className="w-5 h-5 text-accent mt-2" />}
+                      </button>
+                    ))
+                  )}
                 </div>
               </motion.div>
             )}
@@ -348,31 +477,37 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
                  </div>
 
                  <div className="space-y-2">
-                   <h2 className="text-xl sm:text-3xl font-display font-bold text-ink tracking-tight">
-                     Workspace Ready
-                   </h2>
-                   <p className="text-muted font-medium text-base">Your academic profile is perfectly configured.</p>
-                 </div>
+                    <h2 className="text-xl sm:text-3xl font-display font-bold text-ink tracking-tight">
+                      Your Starting Level is Ready
+                    </h2>
+                    <p className="text-muted font-medium text-base">We will guide you step by step.</p>
+                  </div>
 
                  <div className="w-full bg-surface-low border border-ink/5 rounded-2xl p-5 text-left text-sm space-y-4">
                    <div className="flex justify-between border-b border-ink/5 pb-3">
                      <span className="text-muted font-bold uppercase text-sm tracking-wider">Cycle</span>
-                     <span className="font-bold text-ink">{CYCLES.find(c => c.id === selectedCycle)?.name}</span>
+                     <span className="font-bold text-ink">{selectedCycle?.name}</span>
                    </div>
                    <div className="flex justify-between border-b border-ink/5 pb-3">
                      <span className="text-muted font-bold uppercase text-sm tracking-wider">Grade</span>
-                     <span className="font-bold text-ink">{selectedGrade}</span>
+                     <span className="font-bold text-ink">{selectedGrade?.name}</span>
                    </div>
+                   {selectedSubject && (
+                     <div className="flex justify-between border-b border-ink/5 pb-3">
+                       <span className="text-muted font-bold uppercase text-sm tracking-wider">Subject</span>
+                       <span className="font-bold text-ink truncate max-w-[200px]">{selectedSubject.name}</span>
+                     </div>
+                   )}
                    {requiresTrack && selectedTrack && (
                      <div className="flex justify-between border-b border-ink/5 pb-3">
                        <span className="text-muted font-bold uppercase text-sm tracking-wider">Track</span>
-                       <span className="font-bold text-ink text-right max-w-[200px] truncate">{selectedTrack}</span>
+                       <span className="font-bold text-ink text-right max-w-[200px] truncate">{selectedTrack.name}</span>
                      </div>
                    )}
-                   {selectedOption && (
+                   {requiresTrack && selectedOption && (
                      <div className="flex justify-between">
                        <span className="text-muted font-bold uppercase text-sm tracking-wider">Option</span>
-                       <span className="font-bold text-ink truncate max-w-[200px]">{selectedOption === 'biof_fr' ? 'Français' : (selectedOption === 'general_ar' ? 'Arabe' : 'Anglais')}</span>
+                       <span className="font-bold text-ink truncate max-w-[200px]">{selectedOption.name}</span>
                      </div>
                    )}
                  </div>
@@ -399,10 +534,11 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
               <button
                 onClick={handleNext}
                 disabled={
-                  (step === 1 && !selectedCycle) || 
-                  (step === 2 && !selectedGrade) || 
-                  (step === 3 && requiresTrack && !selectedTrack) ||
-                  (step === 4 && requiresTrack && !selectedOption)
+                  (step === 1 && !selectedCycleId) || 
+                  (step === 2 && !selectedGradeId) ||
+                  // Subject selection is optional, let them continue even if none selected
+                  (step === 4 && requiresTrack && !selectedTrackId) ||
+                  (step === 5 && requiresTrack && !selectedOptionId)
                 }
                 className="px-5 py-2 text-sm bg-ink text-paper rounded-xl font-semibold flex items-center gap-2 hover:bg-ink/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:-translate-y-0.5"
               >

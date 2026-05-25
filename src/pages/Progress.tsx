@@ -57,7 +57,7 @@ export const Progress: React.FC = () => {
             { label: 'Focus Quotient', value: '8.4', unit: '/10', icon: <Brain />, trend: '+12%' },
             { label: 'Deep Work Total', value: '24.5', unit: 'hrs', icon: <Timer />, trend: '+4.2h' },
             { label: 'Mastery Delta', value: '+18', unit: '%', icon: <Zap />, trend: 'Optimal' },
-            { label: 'Lessons Missed', value: '2', unit: '', icon: <AlertCircle />, trend: '-1 this week' }
+            { label: 'Lessons to Review', value: '2', unit: '', icon: <AlertCircle />, trend: '-1 this week' }
           ].map((stat, i) => (
             <motion.div 
               key={i}

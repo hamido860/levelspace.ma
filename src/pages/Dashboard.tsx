@@ -17,7 +17,8 @@ import {
   Zap,
   Loader2,
   AlertCircle,
-  Cloud
+  Cloud,
+  Activity
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
@@ -37,12 +38,14 @@ import { ConnectionStatusModal } from '../components/ConnectionStatusModal';
 import { OnboardingModal } from '../components/OnboardingModal';
 import { CalendarWidget } from '../components/CalendarWidget';
 import { PlanSessionModal } from '../components/PlanSessionModal';
+import { SupportZoneModal } from '../components/SupportZoneModal';
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const { user, profile, isPro, signOut, dbConnected, refreshDbConnection, syncData } = useAuth();
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const [timerActive, setTimerActive] = useState(false);
   const [selectedModule, setSelectedModule] = useState<{ id: string, name: string } | null>(null);
   const [isFetchingGallery, setIsFetchingGallery] = useState(false);
@@ -486,6 +489,28 @@ export const Dashboard: React.FC = () => {
                 </button>
               </div>
             </section>
+            {/* Support Zone / MyLevel */}
+            <section className="bg-slate-950 text-white rounded-2xl p-5 relative overflow-hidden group dark:bg-white dark:text-slate-950 mb-8">
+              <div className="relative z-10 flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider dark:text-slate-500">Support Zone / MyLevel</h3>
+                </div>
+                <div className="w-10 h-10 rounded-full border-2 border-accent/30 text-accent flex items-center justify-center bg-accent/10">
+                  <Activity size={18} />
+                </div>
+              </div>
+              <div className="relative z-10 space-y-4">
+                <p className="text-sm font-medium text-slate-300 dark:text-slate-600 leading-relaxed">
+                  Check your real level, discover your gaps, and get a personal roadmap.
+                </p>
+                <button
+                  onClick={() => setIsSupportModalOpen(true)}
+                  className="w-full py-2.5 rounded-xl text-xs font-bold transition-all bg-accent text-white hover:bg-accent/90"
+                >
+                  Start MyLevel Check
+                </button>
+              </div>
+            </section>
 
             {/* Upcoming Events / Agenda */}
             <section className="bg-white border border-slate-200 rounded-2xl p-5 dark:bg-paper dark:border-white/8">
@@ -776,6 +801,12 @@ export const Dashboard: React.FC = () => {
           setIsOnboardingOpen(false);
           window.location.reload();
         }}
+      />
+
+      <SupportZoneModal
+        isOpen={isSupportModalOpen}
+        onClose={() => setIsSupportModalOpen(false)}
+        grade={profile?.grade || "Grade 9"}
       />
     </Layout>
   );

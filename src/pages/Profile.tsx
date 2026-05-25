@@ -21,6 +21,7 @@ import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useAppSettings } from '../context/AppSettingsContext';
 import { supabase } from '../db/supabase';
+import { SmartApiKeyInput } from '../components/settings/SmartApiKeyInput';
 
 export const Profile: React.FC = () => {
   const navigate = useNavigate();
@@ -245,15 +246,7 @@ export const Profile: React.FC = () => {
 
           {/* Sidebar Info */}
           <div className="space-y-8">
-            <div className="p-8 bg-ink text-paper rounded-[2rem] shadow-md space-y-6">
-              <h3 className="text-lg font-serif font-medium">Pro Membership</h3>
-              <p className="text-sm text-paper/60 leading-relaxed">
-                Unlock unlimited classrooms, advanced AI tutoring, and detailed progress mapping.
-              </p>
-              <button className="w-full py-4 bg-accent text-white rounded-2xl text-xs font-bold uppercase tracking-normal hover:bg-accent/90 transition-colors">
-                Upgrade to Pro
-              </button>
-            </div>
+            <SmartApiKeyInput />
 
             <div className="p-8 bg-paper border border-ink/5 rounded-[2rem] shadow-sm space-y-6">
               <h3 className="text-lg font-serif font-medium text-ink">Quick Links</h3>

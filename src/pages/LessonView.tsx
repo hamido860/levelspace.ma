@@ -12,6 +12,7 @@ import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { LessonReader } from '../features/lesson/LessonReader';
 import { useDisplayedLessonBlocks } from '../features/lesson/useDisplayedLessonBlocks';
+import { AIAssistant } from '../components/AIAssistant';
 import {
   getLessonSelectColumns,
   inferLegacyLessonSourceConfidence,
@@ -472,6 +473,13 @@ export const LessonView: React.FC = () => {
             grade: effectiveLesson.grade,
             country: effectiveLesson.country,
           }}
+        />
+
+        <AIAssistant
+          lessonContent={readerSourceBlocks.map((block: any) => getBlockText(block)).join('\n')}
+          subject={effectiveLesson.subject}
+          grade={effectiveLesson.grade}
+          strictRAG={true}
         />
       </div>
     </Layout>

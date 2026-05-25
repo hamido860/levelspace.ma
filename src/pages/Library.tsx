@@ -344,14 +344,14 @@ export const Library: React.FC = () => {
 
   return (
     <Layout>
-      <SEO title="Library" />
+      <SEO title="Support Classroom" />
       <div className="space-y-6">
 
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="ls-page-title">{t('library')}</h1>
-            <p className="ls-body-text mt-1">Manage your academic resources and reading list.</p>
+            <h1 className="ls-page-title">{t('support_classroom') || 'Support Classroom'}</h1>
+            <p className="ls-body-text mt-1">Resources and guided paths to strengthen your skills.</p>
           </div>
           {mainTab === 'library' && (
             <button

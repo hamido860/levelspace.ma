@@ -3546,3 +3546,667 @@ export function flatLessonToBlocks(lesson: LessonTemplate): AILessonBlock[] {
 
   return blocks;
 }
+
+export const getQuickDefinition = async (
+  word: string,
+  context: string,
+  retries = 2
+): Promise<{ definition: string; languages: { en: string; fr: string; ar: string } } | null> => {
+  if (!checkAIProvider()) return null;
+  
+  try {
+    const cacheKey = getCacheKey("getQuickDefinition", word, context);
+    const cachedResponse = await responseCache.get(cacheKey);
+    if (cachedResponse) {
+      console.log("Pipeline: Cache hit for getQuickDefinition");
+      return safeJsonParse(cachedResponse);
+    }
+
+    const prompt = `You are a quick dictionary tool.
+    The user has highlighted the text: "${word}".
+    The surrounding lesson context is: "${context.slice(0, 500)}..."
+    
+    Task:
+    1. Briefly define the text/word in simple terms based on the context.
+    2. Provide its translation/equivalent in English, French, and Arabic.
+    
+    Output exactly in this JSON format:
+    {
+      "definition": "string",
+      "languages": {
+        "en": "string",
+        "fr": "string",
+        "ar": "string"
+      }
+    }`;
+
+    const response = await generateContentWithFallback(
+      {
+        model: modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]),
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          maxOutputTokens: 250,
+          temperature: 0.2,
+        },
+      },
+      "getQuickDefinition"
+    );
+
+    const parsed = safeJsonParse(response.text || "");
+    if (parsed && parsed.definition) {
+      await responseCache.set(cacheKey, JSON.stringify(parsed));
+      return parsed;
+    }
+    return null;
+  } catch (error) {
+    if (retries > 0) return getQuickDefinition(word, context, retries - 1);
+    console.error("Error in getQuickDefinition:", error);
+    return null;
+  }
+};
+
+// --- SUPPORT ZONE ADAPTIVE ASSESSMENT ---
+
+export interface AssessmentQuestion {
+  questionText: string;
+  type: 'multiple-choice' | 'fill-in' | 'math' | 'logic';
+  options?: string[];
+  correctAnswer: string;
+  explanation: string;
+  skill: string;
+  difficulty: 'low' | 'medium' | 'high';
+}
+
+// Subject → skill domain map. AI picks from these, ensuring breadth.
+export const SKILL_MAPS: Record<string, string[]> = {
+  Mathematics: [
+    "Linear Equations & Inequalities",
+    "Quadratic Functions",
+    "Polynomials & Factoring",
+    "Geometry – Triangles & Proofs",
+    "Geometry – Circles & Angles",
+    "Trigonometry Basics",
+    "Statistics & Probability",
+    "Number Theory & Fractions",
+    "Sequences & Series",
+    "Logic & Set Theory",
+  ],
+  Physics: [
+    "Kinematics & Motion",
+    "Newton's Laws of Motion",
+    "Work, Energy & Power",
+    "Waves & Sound",
+    "Electricity & Circuits",
+    "Magnetism",
+    "Optics & Light",
+    "Thermodynamics Basics",
+    "Atomic & Nuclear Physics",
+    "Fluid Mechanics",
+  ],
+  French: [
+    "Grammar – Verb Conjugation",
+    "Grammar – Pronouns & Agreement",
+    "Vocabulary – Academic Words",
+    "Vocabulary – Daily Life",
+    "Reading Comprehension",
+    "Writing – Sentence Structure",
+    "Writing – Essay Structure",
+    "Listening & Oral Expression",
+    "Literature – Narrative Texts",
+    "Literature – Poetry & Figures of Style",
+  ],
+  Arabic: [
+    "Nahw – Sentence Structure (الجملة الاسمية والفعلية)",
+    "Sarf – Verb Forms & Morphology",
+    "Vocabulary & Meaning",
+    "Reading Comprehension",
+    "Writing – Composition & Style",
+    "Literature – Classical Poetry",
+    "Literature – Prose & Analysis",
+    "Rhetoric (البلاغة)",
+    "Islamic Studies Texts",
+    "Diacritics & Spelling (الإملاء)",
+  ],
+  Science: [
+    "Cell Biology & Organisms",
+    "Genetics & Heredity",
+    "Human Body Systems",
+    "Ecology & Environment",
+    "Chemical Reactions",
+    "Acids, Bases & Salts",
+    "The Periodic Table & Elements",
+    "Forces & Simple Machines",
+    "Earth Sciences",
+    "Scientific Method & Data Analysis",
+  ],
+  History: [
+    "Ancient Civilizations",
+    "Medieval History",
+    "The Age of Empires & Colonialism",
+    "World War I & II",
+    "Moroccan History – Independence",
+    "Modern Political Systems",
+    "Economic Development & Globalization",
+    "Human Rights & International Law",
+    "Geography – Morocco & Africa",
+    "Geography – World Regions",
+  ],
+  English: [
+    "Grammar – Tenses & Auxiliaries",
+    "Grammar – Conditionals & Modals",
+    "Vocabulary – Academic Words",
+    "Vocabulary – Collocations",
+    "Reading Comprehension",
+    "Writing – Paragraph Structure",
+    "Writing – Essays & Reports",
+    "Listening & Speaking",
+    "Literature – Short Stories",
+    "Literature – Poetry",
+  ],
+};
+
+export const SUPPORTED_SUBJECTS = Object.keys(SKILL_MAPS);
+
+// ---------------------------------------------------------------------------
+// Fallback question bank — used when AI generation fails after all retries
+// ---------------------------------------------------------------------------
+const FALLBACK_QUESTIONS: Record<string, AssessmentQuestion[]> = {
+  Mathematics: [
+    {
+      questionText: "Solve for x: 2x + 6 = 14",
+      type: "multiple-choice",
+      options: ["x = 4", "x = 7", "x = 10", "x = 3"],
+      correctAnswer: "x = 4",
+      explanation: "Subtract 6 from both sides: 2x = 8. Divide by 2: x = 4.",
+      skill: "Linear Equations & Inequalities",
+      difficulty: "low",
+    },
+    {
+      questionText: "What is the value of the discriminant for x^2 - 5x + 6 = 0?",
+      type: "multiple-choice",
+      options: ["1", "25", "36", "11"],
+      correctAnswer: "1",
+      explanation: "Discriminant = b^2 - 4ac = 25 - 24 = 1.",
+      skill: "Quadratic Functions",
+      difficulty: "medium",
+    },
+    {
+      questionText: "In a right triangle, the two legs are 3 and 4. What is the hypotenuse?",
+      type: "multiple-choice",
+      options: ["5", "7", "6", "4.5"],
+      correctAnswer: "5",
+      explanation: "By Pythagoras: 3^2 + 4^2 = 9 + 16 = 25, so hypotenuse = 5.",
+      skill: "Geometry – Triangles & Proofs",
+      difficulty: "low",
+    },
+  ],
+  Physics: [
+    {
+      questionText: "A car travels 100 m in 5 seconds. What is its average speed?",
+      type: "multiple-choice",
+      options: ["20 m/s", "500 m/s", "10 m/s", "25 m/s"],
+      correctAnswer: "20 m/s",
+      explanation: "Speed = Distance / Time = 100 / 5 = 20 m/s.",
+      skill: "Kinematics & Motion",
+      difficulty: "low",
+    },
+  ],
+  French: [
+    {
+      questionText: "Complétez : Elle __ (aller) au marché chaque samedi.",
+      type: "multiple-choice",
+      options: ["va", "allait", "est allée", "ira"],
+      correctAnswer: "va",
+      explanation: "Le présent de l'indicatif pour une habitude régulière: elle va.",
+      skill: "Grammar – Verb Conjugation",
+      difficulty: "low",
+    },
+  ],
+};
+
+// ---------------------------------------------------------------------------
+// Validators & repairers
+// ---------------------------------------------------------------------------
+
+const VALID_TYPES = new Set(["multiple-choice", "fill-in", "math", "logic"]);
+const VALID_DIFFICULTIES = new Set(["low", "medium", "high"]);
+
+/**
+ * Validate and auto-repair a raw question returned by the AI.
+ * Returns a clean AssessmentQuestion or null if unrecoverable.
+ */
+function validateAndRepairQuestion(
+  raw: unknown,
+  targetSkill: string,
+  difficulty: "low" | "medium" | "high"
+): AssessmentQuestion | null {
+  if (!raw || typeof raw !== "object") return null;
+  const q = raw as Record<string, unknown>;
+
+  // Required fields
+  if (typeof q.questionText !== "string" || !q.questionText.trim()) return null;
+  if (typeof q.correctAnswer !== "string" || !q.correctAnswer.trim()) return null;
+
+  // Normalise type
+  let type = String(q.type || "").toLowerCase().trim();
+  if (!VALID_TYPES.has(type)) type = "multiple-choice"; // safe fallback
+
+  // Normalise difficulty
+  let diff = String(q.difficulty || difficulty).toLowerCase().trim();
+  if (!VALID_DIFFICULTIES.has(diff)) diff = difficulty;
+
+  // Normalise skill
+  const skill = typeof q.skill === "string" && q.skill.trim() ? q.skill.trim() : targetSkill;
+
+  // Normalise explanation
+  const explanation =
+    typeof q.explanation === "string" && q.explanation.trim()
+      ? q.explanation.trim()
+      : "See your teacher for a detailed explanation.";
+
+  // --- MCQ-specific repair ---
+  if (type === "multiple-choice") {
+    let options: string[] = [];
+
+    // Accept arrays; strip any "A) " / "1. " prefixes AI might add
+    if (Array.isArray(q.options)) {
+      options = (q.options as unknown[])
+        .map((o) => String(o).replace(/^[A-Da-d1-4][.)]\s*/, "").trim())
+        .filter(Boolean);
+    }
+
+    // Must have 2–6 options to be useful
+    if (options.length < 2) return null;
+
+    // Normalise correctAnswer: strip the same label prefix
+    let correctAnswer = String(q.correctAnswer)
+      .replace(/^[A-Da-d1-4][.)]\s*/, "")
+      .trim();
+
+    // Ensure correctAnswer is one of the options (case-insensitive match → normalise to exact option text)
+    const match = options.find(
+      (o) => o.toLowerCase() === correctAnswer.toLowerCase()
+    );
+    if (match) {
+      correctAnswer = match; // use exact casing from options array
+    } else {
+      // correctAnswer not in options — make it the first option as a safe fallback
+      // (Question is still usable; scoring won't break)
+      options = [correctAnswer, ...options.slice(0, 3)];
+    }
+
+    // Shuffle so the correct answer isn't always first
+    options = shuffleArray(options);
+
+    return {
+      questionText: q.questionText as string,
+      type: "multiple-choice",
+      options,
+      correctAnswer,
+      explanation,
+      skill,
+      difficulty: diff as "low" | "medium" | "high",
+    };
+  }
+
+  // --- Open-ended (fill-in / math / logic) ---
+  return {
+    questionText: q.questionText as string,
+    type: type as "fill-in" | "math" | "logic",
+    correctAnswer: String(q.correctAnswer).trim(),
+    explanation,
+    skill,
+    difficulty: diff as "low" | "medium" | "high",
+  };
+}
+
+function shuffleArray<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function getFallback(
+  subject: string,
+  difficulty: "low" | "medium" | "high",
+  usedTexts: Set<string>
+): AssessmentQuestion | null {
+  const bank = FALLBACK_QUESTIONS[subject] || FALLBACK_QUESTIONS["Mathematics"];
+  const unused = bank.filter((q) => !usedTexts.has(q.questionText));
+  if (unused.length > 0) {
+    return unused[Math.floor(Math.random() * unused.length)];
+  }
+  if (bank.length > 0) {
+    return bank[Math.floor(Math.random() * bank.length)]; // randomise if all used
+  }
+  return null;
+}
+
+async function fetchBankQuestion(
+  grade: string,
+  subject: string,
+  targetSkill: string,
+  difficulty: "low" | "medium" | "high",
+  usedQuestionTexts: Set<string>
+): Promise<AssessmentQuestion | null> {
+  // 1. Try mylevel_question_bank first
+  try {
+    const { data: bankData, error: bankError } = await supabase
+      .from("mylevel_question_bank")
+      .select("*")
+      .eq("grade", grade)
+      .eq("subject", subject)
+      .eq("skill", targetSkill)
+      .eq("difficulty", difficulty)
+      .limit(50);
+      
+    if (!bankError && bankData && bankData.length > 0) {
+      const unused = bankData.filter(q => !usedQuestionTexts.has(q.question_text));
+      if (unused.length > 0) {
+        const selected = unused[Math.floor(Math.random() * unused.length)];
+        return {
+          questionText: selected.question_text,
+          type: selected.type as any,
+          options: selected.options || [],
+          correctAnswer: selected.correct_answer,
+          explanation: selected.explanation || "",
+          skill: selected.skill,
+          difficulty: selected.difficulty as any
+        };
+      }
+    }
+  } catch (err) {
+    // silent fail
+  }
+
+  // 2. Try short exercises table as secondary source
+  try {
+    const { data: exData, error: exError } = await supabase
+      .from("exercises")
+      .select("prompt, solution, difficulty")
+      .eq("difficulty", difficulty)
+      .limit(100);
+
+    if (!exError && exData) {
+      // Find one that is short and not used
+      const unusedEx = exData.filter(ex => 
+        ex.prompt && ex.prompt.length > 10 && ex.prompt.length < 150 && 
+        ex.solution && ex.solution.length > 0 && ex.solution.length < 50 &&
+        !usedQuestionTexts.has(ex.prompt)
+      );
+      if (unusedEx.length > 0) {
+        const selected = unusedEx[Math.floor(Math.random() * unusedEx.length)];
+        return {
+          questionText: selected.prompt,
+          type: "fill-in", // short exercises are typically open-ended
+          options: [],
+          correctAnswer: selected.solution,
+          explanation: "Sourced from the existing exercise bank.",
+          skill: targetSkill,
+          difficulty: (selected.difficulty as any) || difficulty
+        };
+      }
+    }
+  } catch(err) {
+    // silent fail
+  }
+
+  return null;
+}
+
+async function saveBankQuestion(grade: string, subject: string, q: AssessmentQuestion) {
+  try {
+    await supabase.from("mylevel_question_bank").insert({
+      grade,
+      subject,
+      skill: q.skill,
+      difficulty: q.difficulty,
+      question_text: q.questionText,
+      type: q.type,
+      options: q.options && q.options.length > 0 ? q.options : null,
+      correct_answer: q.correctAnswer,
+      explanation: q.explanation,
+      source: 'ai_generated'
+    });
+  } catch (err) {
+    // silent fail if table doesn't exist yet
+  }
+}
+
+/**
+ * Generate a single adaptive assessment question.
+ * Retries up to 3 times, validates & repairs the output, falls back to local bank.
+ */
+export async function generateAssessmentQuestion(
+  subject: string,
+  grade: string,
+  targetSkill: string,
+  difficulty: "low" | "medium" | "high",
+  alreadyTestedTopics: string[],
+  selfRating: string,
+  usedQuestionTexts: Set<string> = new Set()
+): Promise<AssessmentQuestion | null> {
+  // 1. First attempt to fetch from the cached Supabase Bank
+  const bankedQuestion = await fetchBankQuestion(grade, subject, targetSkill, difficulty, usedQuestionTexts);
+  if (bankedQuestion) {
+    return bankedQuestion;
+  }
+  const difficultyGuide: Record<string, string> = {
+    low: "Ask a foundational concept or direct recall question. Must be solvable by a struggling student.",
+    medium: "Ask a standard curriculum question requiring understanding and application.",
+    high: "Ask an advanced problem requiring multi-step reasoning, analysis, or synthesis. Do NOT simplify for A/B learners.",
+  };
+
+  const avoidNote =
+    alreadyTestedTopics.length > 0
+      ? `Already tested skills — DO NOT repeat them: ${alreadyTestedTopics.join(", ")}.`
+      : "";
+
+  const usedNote =
+    usedQuestionTexts.size > 0
+      ? `Do NOT generate a question whose text is identical or very similar to: ${JSON.stringify([...usedQuestionTexts].slice(-5))}.`
+      : "";
+
+  const prompt = `You are an expert adaptive assessment designer for ${grade} ${subject}.
+
+TASK: Generate ONE question targeting the skill domain below.
+Skill Domain: "${targetSkill}"
+Difficulty: ${difficulty} — ${difficultyGuide[difficulty]}
+Student Self-Rating: ${selfRating} (A=very confident, D=struggling)
+${avoidNote}
+${usedNote}
+
+STRICT RULES:
+1. If difficulty is "high" and self-rating is A or B: challenge them — no trivial recall questions.
+2. If difficulty is "low" and self-rating is C or D: be clear, concrete, and encouraging.
+3. For "multiple-choice": provide EXACTLY 4 options as plain strings. Do NOT prefix them with A) B) C) D).
+4. "correctAnswer" MUST be the EXACT text of one of the options — copy-paste it.
+5. For math: write expressions in plain text (e.g. "3x^2 - 2x + 1 = 0"), not LaTeX.
+6. "explanation" must be a complete sentence explaining the reasoning.
+
+Return ONLY valid JSON:
+{
+  "questionText": "the full question text",
+  "type": "multiple-choice" | "fill-in" | "math" | "logic",
+  "options": ["option1", "option2", "option3", "option4"],
+  "correctAnswer": "must exactly match one option",
+  "explanation": "step-by-step explanation",
+  "skill": "${targetSkill}",
+  "difficulty": "${difficulty}"
+}`;
+
+  const MAX_RETRIES = 3;
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const response = await generateContentWithFallback(
+        {
+          model: modelQuotaTracker.getBestModel("gemini-2.5-flash", [
+            "gemini-2.5-flash-lite",
+          ]),
+          contents: prompt,
+          config: {
+            responseMimeType: "application/json",
+            maxOutputTokens: 650,
+            temperature: attempt === 1 ? 0.65 : 0.5, // lower temp on retry
+          },
+        },
+        "generateAssessmentQuestion"
+      );
+
+      const raw = safeJsonParse(response.text || "");
+      const validated = validateAndRepairQuestion(raw, targetSkill, difficulty);
+
+      if (!validated) {
+        console.warn(`[Assessment] Attempt ${attempt}: question failed validation, retrying…`);
+        continue;
+      }
+
+      // Deduplication check
+      if (usedQuestionTexts.has(validated.questionText)) {
+        console.warn(`[Assessment] Attempt ${attempt}: duplicate question detected, retrying…`);
+        continue;
+      }
+
+      // 3. Save the successfully generated question back to Supabase for the next student
+      await saveBankQuestion(grade, subject, validated);
+
+      return validated;
+    } catch (err) {
+      console.warn(`[Assessment] Attempt ${attempt} threw:`, err);
+    }
+  }
+
+  // All retries exhausted — use fallback
+  console.warn("[Assessment] All retries failed. Using local fallback question.");
+  return getFallback(subject, difficulty, usedQuestionTexts);
+}
+
+/**
+ * Evaluate an answer. For MCQ, compares locally. For open-ended, uses AI.
+ */
+export async function evaluateAssessmentAnswer(
+  question: AssessmentQuestion,
+  userAnswer: string
+): Promise<{ isCorrect: boolean; feedback: string }> {
+  // Local evaluation for multiple-choice — no AI needed
+  if (question.type === 'multiple-choice') {
+    const isCorrect = userAnswer.trim().toLowerCase() === question.correctAnswer.trim().toLowerCase();
+    return {
+      isCorrect,
+      feedback: isCorrect
+        ? `Correct! ${question.explanation}`
+        : `Not quite. The correct answer is: "${question.correctAnswer}". ${question.explanation}`,
+    };
+  }
+
+  // AI evaluation for open-ended, math, and logic questions
+  try {
+    const prompt = `You are evaluating a student's answer to an assessment question.
+
+Question: ${question.questionText}
+Expected Answer: ${question.correctAnswer}
+Student's Answer: ${userAnswer}
+
+Evaluate if the student's answer is correct. Be lenient with formatting differences, synonyms, and minor calculation notation differences. Focus on whether the core concept is correct.
+
+Return ONLY valid JSON:
+{
+  "isCorrect": true or false,
+  "feedback": "One encouraging sentence. If wrong, briefly mention what the correct answer is."
+}`;
+
+    const response = await generateContentWithFallback(
+      {
+        model: modelQuotaTracker.getBestModel("gemini-2.5-flash-lite", ["gemini-2.5-flash"]),
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          maxOutputTokens: 150,
+          temperature: 0.1,
+        },
+      },
+      "evaluateAssessmentAnswer"
+    );
+
+    return safeJsonParse(response.text || "") || { isCorrect: false, feedback: "Could not evaluate." };
+  } catch (error) {
+    console.error("Error in evaluateAssessmentAnswer:", error);
+    return { isCorrect: false, feedback: "Error evaluating answer." };
+  }
+}
+
+/**
+ * Generate personalized insights and a 2-week LevelUp roadmap.
+ */
+export async function generateAssessmentInsights(
+  subject: string,
+  grade: string,
+  answers: Array<{ question: AssessmentQuestion; userAnswer: string; isCorrect: boolean }>,
+  weightedScore: number,
+  derivedLevel: string
+): Promise<{ insights: string[]; roadmap: { daily_practice: string; focus_skills: string[]; week_1: string[]; week_2: string[]; goal: string } }> {
+  const skillBreakdown = answers.reduce<Record<string, { correct: number; total: number; difficulty: string }>>((acc, a) => {
+    const skill = a.question.skill || "General";
+    if (!acc[skill]) acc[skill] = { correct: 0, total: 0, difficulty: a.question.difficulty };
+    acc[skill].total++;
+    if (a.isCorrect) acc[skill].correct++;
+    return acc;
+  }, {});
+
+  const weakSkills = Object.entries(skillBreakdown)
+    .filter(([, v]) => v.correct / v.total < 0.5)
+    .map(([k]) => k);
+
+  const strongSkills = Object.entries(skillBreakdown)
+    .filter(([, v]) => v.correct / v.total >= 0.8)
+    .map(([k]) => k);
+
+  try {
+    const prompt = `You are a personal learning coach analyzing a student's adaptive assessment in ${grade} ${subject}.
+
+Assessment Summary:
+- Weighted Score: ${weightedScore}/100
+- Derived Level: ${derivedLevel} (A=Excellent, B=Good, C=Needs Work, D=Foundational Support Needed)
+- Weak Skills (< 50% correct): ${weakSkills.join(', ') || 'None identified'}
+- Strong Skills (≥ 80% correct): ${strongSkills.join(', ') || 'None identified'}
+- Skill Breakdown: ${JSON.stringify(skillBreakdown)}
+
+Write 3–4 specific, actionable insights. Do NOT say "you scored X%". Explain WHAT they are missing and WHY it matters.
+Then write a 2-week LevelUp roadmap targeting the weak skills.
+
+Return ONLY valid JSON:
+{
+  "insights": ["insight 1", "insight 2", "insight 3"],
+  "roadmap": {
+    "daily_practice": "e.g., 15 minutes per day",
+    "focus_skills": ["skill 1", "skill 2"],
+    "week_1": ["specific task 1", "specific task 2", "specific task 3"],
+    "week_2": ["specific task 1", "specific task 2", "specific task 3"],
+    "goal": "Concrete achievable goal for this learner"
+  }
+}`;
+
+    const response = await generateContentWithFallback(
+      {
+        model: modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]),
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          maxOutputTokens: 900,
+          temperature: 0.4,
+        },
+      },
+      "generateAssessmentInsights"
+    );
+
+    return safeJsonParse(response.text || "") || { insights: [], roadmap: { daily_practice: "", focus_skills: [], week_1: [], week_2: [], goal: "" } };
+  } catch (error) {
+    console.error("Error in generateAssessmentInsights:", error);
+    return { insights: [], roadmap: { daily_practice: "", focus_skills: [], week_1: [], week_2: [], goal: "" } };
+  }
+}
+

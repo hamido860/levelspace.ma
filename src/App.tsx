@@ -9,11 +9,9 @@ import { Modules } from './pages/Modules';
 import { LessonView } from './pages/LessonView';
 import { QuizInterface } from './pages/QuizInterface';
 import { Dashboard } from './pages/Dashboard';
-import { StudyPlanner } from './pages/StudyPlanner';
 import { Progress } from './pages/Progress';
 import { Settings } from './pages/Settings';
 import { AiKeysSettings } from './pages/AiKeysSettings';
-import { BlueprintHub } from './pages/BlueprintHub';
 import { ClassroomView } from './pages/ClassroomView';
 import { Library } from './pages/Library';
 import { Admin } from './pages/Admin';
@@ -52,10 +50,8 @@ export default function App() {
                 <Route path="/lesson/:id" element={<ProtectedRoute><LessonView /></ProtectedRoute>} />
                 <Route path="/classroom/:id" element={<ProtectedRoute><ClassroomView /></ProtectedRoute>} />
                 <Route path="/quiz/:id" element={<ProtectedRoute><QuizInterface /></ProtectedRoute>} />
-                <Route path="/blueprints" element={<ProtectedRoute><BlueprintHub /></ProtectedRoute>} />
                 <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
                 <Route path="/progress" element={<ProtectedRoute><Progress /></ProtectedRoute>} />
-                <Route path="/schedule" element={<ProtectedRoute><StudyPlanner /></ProtectedRoute>} />
                 <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                 <Route path="/settings/ai-keys" element={<ProtectedRoute><AiKeysSettings /></ProtectedRoute>} />
                 <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />

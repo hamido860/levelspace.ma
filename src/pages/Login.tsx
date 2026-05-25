@@ -123,10 +123,10 @@ export const Login: React.FC = () => {
           <div className="p-8 md:p-10 space-y-8">
             <div className="space-y-2">
               <h2 className="text-3xl font-serif font-medium tracking-tight text-ink">
-                {mode === 'login' ? 'Welcome back' : 'Create account'}
+                {mode === 'login' ? 'Welcome back' : 'Content is everywhere. Guidance is not.'}
               </h2>
               <p className="text-muted text-sm font-light">
-                {mode === 'login' ? 'Please enter your details to sign in.' : 'Join our community of curated learners.'}
+                {mode === 'login' ? 'Please enter your details to sign in.' : 'Find your level. Build your skills. Level up with confidence.'}
               </p>
             </div>
 
