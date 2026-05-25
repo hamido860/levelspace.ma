@@ -304,22 +304,6 @@ export const Modules: React.FC = () => {
   const dbModules = useLiveQuery(() => db.modules.toArray());
   const allLessons = useLiveQuery(() => db.lessons.toArray()) || [];
 
-  const lessonCountByModuleId = useMemo(
-    () => allLessons.reduce<Record<string, number>>((acc, l) => {
-      acc[l.moduleId] = (acc[l.moduleId] || 0) + 1;
-      return acc;
-    }, {}),
-    [allLessons],
-  );
-
-  const lastActivityByModuleId = useMemo(
-    () => allLessons.reduce<Record<string, number>>((acc, l) => {
-      if (!acc[l.moduleId] || l.createdAt > acc[l.moduleId]) acc[l.moduleId] = l.createdAt;
-      return acc;
-    }, {}),
-    [allLessons],
-  );
-
   const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
   const settingsMap = useMemo(() => Object.fromEntries(dbSettings.map(s => [s.key, s.value])), [dbSettings]);
 
@@ -336,6 +320,61 @@ export const Modules: React.FC = () => {
     normalizeCurriculumValue(String(selectedBacIntOptionId || '')),
   ].join(':');
   const storedClassroomScopeKey = settingsMap['modules_scope_key'] || localStorage.getItem('modules_scope_key') || '';
+
+  const gradeCandidates = useMemo(() => getGradeCandidates(grade), [grade]);
+  const normalizedGradeCandidates = useMemo(
+    () => new Set(gradeCandidates.map((g) => String(g || '').trim().toLocaleLowerCase())),
+    [gradeCandidates],
+  );
+  const normalizedCurrentCountry = String(country || '').trim().toLocaleLowerCase();
+
+  const lessonCountByModuleId = useMemo(
+    () => allLessons.reduce<Record<string, number>>((acc, l) => {
+      if (l.status === 'suggested') return acc;
+
+      const lessonGrade = String(l.grade || '').trim().toLocaleLowerCase();
+      if (lessonGrade && !normalizedGradeCandidates.has(lessonGrade)) {
+        return acc;
+      }
+
+      const lessonCountry = String(l.country || '').trim().toLocaleLowerCase();
+      if (normalizedCurrentCountry && lessonCountry) {
+        const isMatch =
+          (normalizedCurrentCountry === 'morocco' || normalizedCurrentCountry === 'maroc')
+            ? (lessonCountry === 'morocco' || lessonCountry === 'maroc')
+            : lessonCountry === normalizedCurrentCountry;
+        if (!isMatch) return acc;
+      }
+
+      acc[l.moduleId] = (acc[l.moduleId] || 0) + 1;
+      return acc;
+    }, {}),
+    [allLessons, normalizedCurrentCountry, normalizedGradeCandidates],
+  );
+
+  const lastActivityByModuleId = useMemo(
+    () => allLessons.reduce<Record<string, number>>((acc, l) => {
+      if (l.status === 'suggested') return acc;
+
+      const lessonGrade = String(l.grade || '').trim().toLocaleLowerCase();
+      if (lessonGrade && !normalizedGradeCandidates.has(lessonGrade)) {
+        return acc;
+      }
+
+      const lessonCountry = String(l.country || '').trim().toLocaleLowerCase();
+      if (normalizedCurrentCountry && lessonCountry) {
+        const isMatch =
+          (normalizedCurrentCountry === 'morocco' || normalizedCurrentCountry === 'maroc')
+            ? (lessonCountry === 'morocco' || lessonCountry === 'maroc')
+            : lessonCountry === normalizedCurrentCountry;
+        if (!isMatch) return acc;
+      }
+
+      if (!acc[l.moduleId] || l.createdAt > acc[l.moduleId]) acc[l.moduleId] = l.createdAt;
+      return acc;
+    }, {}),
+    [allLessons, normalizedCurrentCountry, normalizedGradeCandidates],
+  );
 
   const [bacTrackName, setBacTrackName] = useState<string>('');
   const [bacIntOptionName, setBacIntOptionName] = useState<string>('');

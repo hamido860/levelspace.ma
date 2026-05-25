@@ -316,8 +316,12 @@ export const ClassroomView: React.FC = () => {
         }
 
         const lessonCountry = String(lesson.country || '').trim().toLocaleLowerCase();
-        if (normalizedCurrentCountry && lessonCountry && lessonCountry !== normalizedCurrentCountry) {
-          return false;
+        if (normalizedCurrentCountry && lessonCountry) {
+          const isMatch =
+            (normalizedCurrentCountry === 'morocco' || normalizedCurrentCountry === 'maroc')
+              ? (lessonCountry === 'morocco' || lessonCountry === 'maroc')
+              : lessonCountry === normalizedCurrentCountry;
+          if (!isMatch) return false;
         }
 
         return true;
@@ -501,7 +505,12 @@ export const ClassroomView: React.FC = () => {
             .in('topic_id', topicIds);
 
           if (currentCountry) {
-            topicLessonQuery = topicLessonQuery.eq('country', currentCountry);
+            const countryNormalized = String(currentCountry).trim().toLowerCase();
+            const countryCandidates = 
+              countryNormalized === 'morocco' || countryNormalized === 'maroc'
+                ? ['Morocco', 'Maroc', 'morocco', 'maroc']
+                : [currentCountry];
+            topicLessonQuery = topicLessonQuery.in('country', countryCandidates);
           }
 
           const { data: topicLessons, error: topicLessonsError } = await topicLessonQuery;
@@ -520,7 +529,12 @@ export const ClassroomView: React.FC = () => {
         .eq('grade', currentGrade);
 
       if (currentCountry) {
-        exactGradeQuery = exactGradeQuery.eq('country', currentCountry);
+        const countryNormalized = String(currentCountry).trim().toLowerCase();
+        const countryCandidates = 
+          countryNormalized === 'morocco' || countryNormalized === 'maroc'
+            ? ['Morocco', 'Maroc', 'morocco', 'maroc']
+            : [currentCountry];
+        exactGradeQuery = exactGradeQuery.in('country', countryCandidates);
       }
 
       const { data: exactGradeLessons, error: exactGradeError } = await exactGradeQuery;
@@ -537,7 +551,12 @@ export const ClassroomView: React.FC = () => {
         .in('grade', gradeCandidates);
 
       if (currentCountry) {
-        fallbackQuery = fallbackQuery.eq('country', currentCountry);
+        const countryNormalized = String(currentCountry).trim().toLowerCase();
+        const countryCandidates = 
+          countryNormalized === 'morocco' || countryNormalized === 'maroc'
+            ? ['Morocco', 'Maroc', 'morocco', 'maroc']
+            : [currentCountry];
+        fallbackQuery = fallbackQuery.in('country', countryCandidates);
       }
 
       const { data, error } = await fallbackQuery;
