@@ -1169,127 +1169,6 @@ export const ClassroomView: React.FC = () => {
   return (
     <Layout>
       <div className="max-w-5xl mx-auto space-y-8 pb-20">
-        {/* Header Section */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-          <div className="space-y-4">
-            <button 
-              onClick={() => navigate('/dashboard')}
-              className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-950 transition-colors dark:text-ink-muted dark:hover:text-ink"
-            >
-              <ArrowLeft size={14} />
-              {t('back_to_dashboard')}
-            </button>
-            <div className="space-y-2">
-              <div className="flex items-center gap-3">
-                <span className="bg-accent/10 text-accent text-xs font-medium px-2 py-0.5 rounded ">{module.code}</span>
-                <span className="text-slate-500 text-xs font-medium dark:text-ink-muted">{module.category}</span>
-              </div>
-              <h1 className="text-5xl md:text-6xl font-bold font-display leading-[0.88] tracking-tight text-slate-950 dark:text-ink editorial-title">{module.name}</h1>
-              {module.description && module.description !== 'Supabase curriculum subject' && (
-                <p className="ls-body-text max-w-2xl leading-relaxed">{module.description}</p>
-              )}
-            </div>
-          </div>
-
-          {!showSetupState && (
-            <div className="flex flex-wrap items-center gap-3 md:justify-end">
-              {isAdmin && (
-                <button
-                  onClick={handleSeedFromSupabase}
-                  disabled={isSeeding}
-                  className="flex items-center gap-2 bg-slate-50 text-slate-950 px-4 py-3 rounded-xl text-xs font-medium transition-all border border-slate-200 hover:border-accent/30 hover:text-accent disabled:opacity-50 dark:bg-paper dark:text-ink dark:border-white/10 dark:hover:bg-surface-low"
-                >
-                  {isSeeding ? <Loader2 size={14} className="animate-spin" /> : <Database size={14} />}
-                  {isSeeding ? 'Loading' : 'Load lessons'}
-                </button>
-              )}
-              {aiAvailable ? (
-                <>
-                  {isAdmin && hasLessons && (
-                    <button
-                      onClick={handleAuditClassroom}
-                      className="flex items-center gap-2 bg-slate-50 text-slate-500 hover:text-accent px-4 py-3 rounded-xl text-xs font-medium transition-all border border-slate-200 dark:bg-paper dark:text-ink-muted dark:border-white/10 dark:hover:bg-surface-low"
-                    >
-                      <ShieldCheck size={14} />
-                      Audit
-                    </button>
-                  )}
-                  <button
-                    onClick={() => handleGenerateLesson()}
-                    disabled={!!generatingTitle}
-                    className="flex items-center gap-2 bg-slate-950 text-white px-6 py-3 rounded-xl text-xs font-bold  hover:bg-accent transition-all shadow-sm shadow-ink/10 disabled:opacity-50 dark:bg-surface-low dark:text-ink dark:hover:bg-surface-high"
-                  >
-                    {generatingTitle === module.name ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-                    {hasLessons ? 'Generate Lesson' : 'Generate First Lesson'}
-                  </button>
-                </>
-              ) : null}
-            </div>
-          )}
-        </div>
-
-        {/* Stats Grid */}
-        {isHydratingSupabase && !hasLessons && !hasTopicFallback && (
-          <div className="bg-slate-50/50 border border-slate-200 rounded-3xl p-4 flex items-center gap-3 ls-body-text dark:bg-surface-low/50 dark:border-white/10">
-            <Loader2 className="h-4 w-4 animate-spin text-accent" />
-            Loading lessons...
-          </div>
-        )}
-
-        {hasTopicFallback && isAdmin && (
-          <div className="rounded-3xl border border-blue-200 bg-blue-50 px-5 py-4 text-blue-950">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div className="flex items-start gap-3">
-                <BookOpen className="mt-0.5 h-5 w-5 shrink-0" />
-                <div>
-                  <p className="text-sm font-semibold">{topicFallbackRows.length} lessons ready to prepare.</p>
-                  {topicFallbackDomains.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {topicFallbackDomains.map((domain) => (
-                        <span key={domain.key} className="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-800">
-                          {domain.name}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-              {isAdmin && (
-                <button
-                  onClick={handleGenerateStarterLessons}
-                  disabled={isGeneratingStarterLessons}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 py-3 text-xs font-medium text-white transition-colors hover:bg-blue-800 disabled:opacity-60"
-                >
-                  {isGeneratingStarterLessons ? <Loader2 size={14} className="animate-spin" /> : <Database size={14} />}
-                  {isGeneratingStarterLessons ? 'Generating...' : 'Generate lessons'}
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-
-        {showStats && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="ls-card p-6 space-y-2">
-              <p className="ls-micro-label">Progress</p>
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-bold text-slate-950 dark:text-ink">{module.progress}%</span>
-                <span className="ls-micro-label">Complete</span>
-              </div>
-              <div className="w-full h-1.5 bg-slate-50 rounded-full overflow-hidden dark:bg-surface-mid">
-                <div className="h-full bg-accent" style={{ width: `${module.progress}%` }} />
-              </div>
-            </div>
-            <div className="ls-card p-6 space-y-2">
-              <p className="ls-micro-label">Lessons</p>
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-bold text-slate-950 dark:text-ink">{hasLessons ? lessons.length : topicFallbackRows.length}</span>
-                <span className="ls-micro-label">{hasLessons ? 'Lessons' : 'Ready'}</span>
-              </div>
-            </div>
-          </div>
-        )}
-
         {showSetupState ? (
           <div className="bg-slate-50/50 border border-solid border-slate-200 rounded-3xl p-10 md:p-14 flex flex-col items-center justify-center text-center space-y-6 dark:bg-surface-low/50 dark:border-white/10">
             <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm dark:bg-surface-mid">
@@ -1414,8 +1293,8 @@ export const ClassroomView: React.FC = () => {
                         <div className="flex items-center justify-between gap-3 bg-[#007A87] px-4 py-3 text-white dark:bg-accent">
                           <div className="flex min-w-0 items-center gap-2">
                             <BookOpen className="h-5 w-5 shrink-0 text-white" />
-                            <h4 className="truncate text-sm font-bold leading-tight text-white" title={lesson.title}>
-                              Lesson {i + 1}
+                            <h4 className="truncate text-sm font-bold leading-tight text-white" title={module.name}>
+                              {module.name}
                             </h4>
                           </div>
                           <div className="flex shrink-0 items-center gap-1">
