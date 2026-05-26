@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { Layout } from '../components/Layout';
-import { ShieldCheck, AlertTriangle, ArrowLeft, BookOpen, Plus, ChevronRight, CheckCircle2, Clock, Brain, Sparkles, Loader2, Play, Target, Dumbbell, Database } from 'lucide-react';
+import { Modal } from '../components/Modal';
+import { ShieldCheck, ArrowLeft, BookOpen, Plus, Sparkles, Loader2, Play, Target, Dumbbell, Database } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 import { supabase } from '../db/supabase';
-import { TagsManager } from '../components/TagsManager';
 import { generateSeedLesson, generateLessonSuggestions, LessonSuggestion, checkAIProvider } from '../services/geminiService';
 import { aiCrew } from '../services/aiCrewService';
 import { getQuizzesByLesson } from '../services/quizService';
@@ -26,13 +26,56 @@ import {
 } from '../services/lessonSupabase';
 import {
   compareCurriculumValidationForStudents,
-  getCurriculumValidationBadgeClass,
-  getCurriculumValidationLabel,
   selectStudentFacingValidatedContent,
 } from '../services/curriculumValidation';
 
 const normalizeLessonTitle = (title: string | null | undefined) =>
   String(title || '').trim().toLocaleLowerCase();
+
+const getLessonCardIllustration = (title: string | null | undefined, fallback?: string | null | undefined) => {
+  const value = `${title || ''} ${fallback || ''}`.toLowerCase();
+
+  if (
+    value.includes('math') ||
+    value.includes('geom') ||
+    value.includes('algebra') ||
+    value.includes('calcul') ||
+    value.includes('analyse')
+  ) {
+    return '/illustrations/math_geometry.png';
+  }
+
+  if (
+    value.includes('phys') ||
+    value.includes('chem') ||
+    value.includes('chim') ||
+    value.includes('electr')
+  ) {
+    return '/illustrations/physics_chemistry.png';
+  }
+
+  if (
+    value.includes('svt') ||
+    value.includes('earth') ||
+    value.includes('life') ||
+    value.includes('geolog') ||
+    value.includes('biolog')
+  ) {
+    return '/illustrations/earth_sciences.png';
+  }
+
+  if (
+    value.includes('fran') ||
+    value.includes('arab') ||
+    value.includes('lang') ||
+    value.includes('litt') ||
+    value.includes('gramm')
+  ) {
+    return '/illustrations/humanities_languages.png';
+  }
+
+  return '/illustrations/default_edu.png';
+};
 
 const isDevAdminModeEnabled = () =>
   String(import.meta.env.VITE_ENABLE_DEV_ADMIN_AI_KEYS || '').toLowerCase() === 'true';
@@ -384,7 +427,6 @@ export const ClassroomView: React.FC = () => {
   const showStats = module?.progress > 0 || hasLessons || hasTopicFallback;
   const showTabs = hasLessons || hasTopicFallback || hasSupplementalContent || isLoadingExtra;
   const showSetupState = !hasLessons && !hasTopicFallback && !isHydratingSupabase && suggestions.length === 0;
-  const showValidationWarningBanner = !isAdmin && lessons.length > 0 && !studentLessonSelection.hasPreferred;
   const cloudHydrationKeyRef = useRef<string | null>(null);
   const classroomScopeKey = `${id || ''}:${module?.name || ''}:${module?.category || ''}:${currentGrade}:${currentCountry}:${selectedBacTrack}`;
 
@@ -988,6 +1030,12 @@ export const ClassroomView: React.FC = () => {
     }
   };
 
+  const closeLessonGallery = () => {
+    if (generatingTitle) return;
+    setSuggestions([]);
+    setSelectedSuggestions([]);
+  };
+
   const handleSeedFromSupabase = async () => {
     if (!module) return;
     setIsSeeding(true);
@@ -1006,7 +1054,7 @@ export const ClassroomView: React.FC = () => {
           return;
         }
 
-        toast.info("No existing lessons found in Supabase for this curriculum.");
+        toast.info("No lessons found yet.");
         setIsSeeding(false);
         return;
       }
@@ -1016,13 +1064,12 @@ export const ClassroomView: React.FC = () => {
       setTopicFallbackRows([]);
       cloudHydrationKeyRef.current = classroomScopeKey;
 
-      // Enforce strict RAG mode for this module by default as requested
       await db.modules.update(module.id, { strictRAG: true });
       
-      toast.success(`Seeded ${dbLessons.length} lessons from Supabase. Strict RAG mode enabled.`);
+      toast.success(`Loaded ${dbLessons.length} lessons.`);
     } catch (err: any) {
       console.error(err);
-      toast.error('Failed to seed from Supabase: ' + err.message);
+      toast.error('Failed to load lessons: ' + err.message);
     } finally {
       setIsSeeding(false);
     }
@@ -1036,7 +1083,6 @@ export const ClassroomView: React.FC = () => {
       const topicIds = topicFallbackRows.map((topic) => topic.id).filter(Boolean);
       const headers = await getAdminApiHeaders();
       let inserted = 0;
-      let skipped = 0;
 
       for (let start = 0; start < topicIds.length; start += 25) {
         const batch = topicIds.slice(start, start + 25);
@@ -1057,10 +1103,9 @@ export const ClassroomView: React.FC = () => {
         if (!res.ok) throw new Error(payload.error || responseText || `Request failed with status ${res.status}`);
 
         inserted += Number(payload.summary?.insertedLessons ?? 0);
-        skipped += Number(payload.summary?.skippedLessons ?? 0);
       }
 
-      toast.success(`Generated ${inserted} starter lessons. Skipped ${skipped} existing topics.`);
+      toast.success(`Generated ${inserted} lessons.`);
 
       const cloudLessons = await fetchSupabaseLessons();
       setCurriculumTopicRows(await fetchSupabaseTopics());
@@ -1074,7 +1119,7 @@ export const ClassroomView: React.FC = () => {
         err?.message === 'Failed to fetch'
           ? 'API server is not reachable. Start or restart the dev server and try again.'
           : err?.message || 'Unknown error';
-      toast.error(`Failed to generate starter lessons: ${message}`);
+      toast.error(`Failed to generate lessons: ${message}`);
     } finally {
       setIsGeneratingStarterLessons(false);
     }
@@ -1140,7 +1185,9 @@ export const ClassroomView: React.FC = () => {
                 <span className="text-slate-500 text-xs font-medium dark:text-ink-muted">{module.category}</span>
               </div>
               <h1 className="text-5xl md:text-6xl font-bold font-display leading-[0.88] tracking-tight text-slate-950 dark:text-ink editorial-title">{module.name}</h1>
-              <p className="ls-body-text max-w-2xl leading-relaxed">{module.description}</p>
+              {module.description && module.description !== 'Supabase curriculum subject' && (
+                <p className="ls-body-text max-w-2xl leading-relaxed">{module.description}</p>
+              )}
             </div>
           </div>
 
@@ -1153,7 +1200,7 @@ export const ClassroomView: React.FC = () => {
                   className="flex items-center gap-2 bg-slate-50 text-slate-950 px-4 py-3 rounded-xl text-xs font-medium transition-all border border-slate-200 hover:border-accent/30 hover:text-accent disabled:opacity-50 dark:bg-paper dark:text-ink dark:border-white/10 dark:hover:bg-surface-low"
                 >
                   {isSeeding ? <Loader2 size={14} className="animate-spin" /> : <Database size={14} />}
-                  {isSeeding ? 'Loading Units' : 'Load from Supabase'}
+                  {isSeeding ? 'Loading' : 'Load lessons'}
                 </button>
               )}
               {aiAvailable ? (
@@ -1176,61 +1223,26 @@ export const ClassroomView: React.FC = () => {
                     {hasLessons ? 'Generate Lesson' : 'Generate First Lesson'}
                   </button>
                 </>
-              ) : (
-                <div className="px-4 py-3 rounded-xl border border-amber-200 bg-amber-50 text-amber-800 text-xs font-medium dark:border-amber-500/30 dark:bg-amber-950/20 dark:text-amber-200">
-                  AI features need an API key
-                </div>
-              )}
+              ) : null}
             </div>
           )}
         </div>
 
-        {/* Admin Controls */}
-        {isAdmin && (
-          <div className="bg-slate-50/70 rounded-2xl p-4 border border-slate-200 dark:bg-surface-low/70 dark:border-white/10">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div className="space-y-1">
-                <p className="text-xs font-medium text-accent">Admin Controls</p>
-                <p className="text-sm text-slate-950 font-medium dark:text-ink">Keep this classroom grounded in certified content before using AI.</p>
-              </div>
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-white border border-slate-200 dark:bg-surface-mid dark:border-white/10">
-                  <div>
-                    <p className="ls-micro-label">Strict RAG</p>
-                    <p className="text-[11px] text-slate-500 dark:text-ink-muted">Use lesson context only</p>
-                  </div>
-                  <button
-                    onClick={async () => {
-                      await db.modules.update(module.id, { strictRAG: !module.strictRAG });
-                    }}
-                    className={`w-12 h-6 rounded-full transition-colors relative ${module.strictRAG ? 'bg-accent' : 'bg-slate-950/20 dark:bg-surface-mid/50'}`}
-                  >
-                    <div className={`absolute top-1 left-1 bg-white dark:bg-surface-low w-4 h-4 rounded-full transition-transform ${module.strictRAG ? 'translate-x-6' : 'translate-x-0'}`} />
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Stats Grid */}
         {isHydratingSupabase && !hasLessons && !hasTopicFallback && (
-          <div className="bg-slate-50/50 border border-slate-200 rounded-3xl p-6 flex items-center gap-3 ls-body-text dark:bg-surface-low/50 dark:border-white/10">
+          <div className="bg-slate-50/50 border border-slate-200 rounded-3xl p-4 flex items-center gap-3 ls-body-text dark:bg-surface-low/50 dark:border-white/10">
             <Loader2 className="h-4 w-4 animate-spin text-accent" />
-            Checking Supabase for existing lessons, topics, and outlines...
+            Loading lessons...
           </div>
         )}
 
-        {hasTopicFallback && (
+        {hasTopicFallback && isAdmin && (
           <div className="rounded-3xl border border-blue-200 bg-blue-50 px-5 py-4 text-blue-950">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div className="flex items-start gap-3">
                 <BookOpen className="mt-0.5 h-5 w-5 shrink-0" />
                 <div>
-                  <p className="text-sm font-semibold">Topics found, but lessons are not generated yet.</p>
-                  <p className="mt-1 text-sm text-blue-800">
-                    {topicFallbackRows.length} curriculum topics are available from Supabase. Outlines are shown below when available; starter lessons stay out of RAG until reviewed.
-                  </p>
+                  <p className="text-sm font-semibold">{topicFallbackRows.length} lessons ready to prepare.</p>
                   {topicFallbackDomains.length > 0 && (
                     <div className="mt-3 flex flex-wrap gap-2">
                       {topicFallbackDomains.map((domain) => (
@@ -1249,7 +1261,7 @@ export const ClassroomView: React.FC = () => {
                   className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 py-3 text-xs font-medium text-white transition-colors hover:bg-blue-800 disabled:opacity-60"
                 >
                   {isGeneratingStarterLessons ? <Loader2 size={14} className="animate-spin" /> : <Database size={14} />}
-                  {isGeneratingStarterLessons ? 'Generating...' : 'Generate starter lessons'}
+                  {isGeneratingStarterLessons ? 'Generating...' : 'Generate lessons'}
                 </button>
               )}
             </div>
@@ -1272,7 +1284,7 @@ export const ClassroomView: React.FC = () => {
               <p className="ls-micro-label">Lessons</p>
               <div className="flex items-baseline gap-2">
                 <span className="text-3xl font-bold text-slate-950 dark:text-ink">{hasLessons ? lessons.length : topicFallbackRows.length}</span>
-                <span className="ls-micro-label">{hasLessons ? 'Units Curated' : 'Topics need starter lessons'}</span>
+                <span className="ls-micro-label">{hasLessons ? 'Lessons' : 'Ready'}</span>
               </div>
             </div>
           </div>
@@ -1284,28 +1296,19 @@ export const ClassroomView: React.FC = () => {
               <BookOpen size={24} className="text-accent" />
             </div>
             <div className="space-y-2 max-w-md">
-              <p className="text-xl font-bold text-slate-950 dark:text-ink">Set up this classroom</p>
-              <p className="ls-body-text">Start with teacher-reviewed or officially validated curriculum units, then add draft AI content only when you need it.</p>
+              <p className="text-xl font-bold text-slate-950 dark:text-ink">No lessons yet</p>
             </div>
-            <div className="flex flex-wrap items-center justify-center gap-2 ls-micro-label">
-              <span className="px-3 py-1 rounded-full bg-white border border-slate-200 dark:bg-surface-mid dark:border-white/10 dark:text-ink">Supabase First</span>
-              <span className="px-3 py-1 rounded-full bg-white border border-slate-200 dark:bg-surface-mid dark:border-white/10 dark:text-ink">Local Classroom</span>
-              <span className="px-3 py-1 rounded-full bg-white border border-slate-200 dark:bg-surface-mid dark:border-white/10 dark:text-ink">{module.strictRAG ? 'Strict RAG On' : 'Strict RAG Off'}</span>
-            </div>
-            {!aiAvailable && (
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 w-full max-w-md">
-                <p className="text-xs text-amber-800 font-medium">AI features need an API key, but you can still load certified units right now.</p>
-              </div>
-            )}
             <div className="flex flex-col sm:flex-row gap-3 w-full max-w-md">
-              <button
-                onClick={handleSeedFromSupabase}
-                disabled={isSeeding}
-                className="flex-1 flex items-center justify-center gap-2 bg-slate-950 text-white px-4 py-3 rounded-xl text-xs font-bold  hover:bg-accent transition-all disabled:opacity-50"
-              >
-                {isSeeding ? <Loader2 size={14} className="animate-spin" /> : <Database size={14} />}
-                {isSeeding ? 'Loading...' : 'Load from Supabase'}
-              </button>
+              {isAdmin && (
+                <button
+                  onClick={handleSeedFromSupabase}
+                  disabled={isSeeding}
+                  className="flex-1 flex items-center justify-center gap-2 bg-slate-950 text-white px-4 py-3 rounded-xl text-xs font-bold hover:bg-accent transition-all disabled:opacity-50"
+                >
+                  {isSeeding ? <Loader2 size={14} className="animate-spin" /> : <Database size={14} />}
+                  {isSeeding ? 'Loading...' : 'Load lessons'}
+                </button>
+              )}
               {aiAvailable && (
                 <button
                   onClick={() => handleGenerateLesson()}
@@ -1313,7 +1316,7 @@ export const ClassroomView: React.FC = () => {
                   className="flex-1 flex items-center justify-center gap-2 bg-white text-slate-950 px-4 py-3 rounded-xl text-xs font-bold  border border-slate-200 hover:border-accent/30 hover:text-accent transition-all disabled:opacity-50 dark:bg-paper dark:text-ink dark:border-white/10 dark:hover:bg-surface-low"
                 >
                   {generatingTitle === module.name ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-                  Generate First Lesson
+                  Generate lesson
                 </button>
               )}
             </div>
@@ -1348,17 +1351,6 @@ export const ClassroomView: React.FC = () => {
             {/* Tab Content */}
             {activeTab === 'lessons' && (
               <div className="space-y-4">
-                {showValidationWarningBanner && (
-                  <div className="rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4 text-amber-900">
-                    <div className="flex items-start gap-3">
-                      <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
-                      <div>
-                        <p className="text-sm font-semibold">Draft AI-assisted content is shown because no teacher-reviewed or officially validated lesson is available yet.</p>
-                        <p className="mt-1 text-sm text-amber-800">Use the status badge on each unit before treating it as final Moroccan curriculum truth.</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-bold text-slate-950 dark:text-ink flex items-center gap-2">
                     <BookOpen size={20} className="text-accent" />
@@ -1368,11 +1360,11 @@ export const ClassroomView: React.FC = () => {
                     <button
                       onClick={fetchGallery}
                       disabled={isFetchingGallery || !aiAvailable}
-                      title={!aiAvailable ? "AI features need an API key, but your classroom content is available." : ""}
-                      className="text-xs font-medium text-blue-700 hover:underline flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="More lessons"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:text-accent disabled:opacity-50 disabled:cursor-not-allowed dark:border-white/10 dark:bg-paper dark:text-ink-muted"
+                      aria-label="More lessons"
                     >
-                      {isFetchingGallery ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />}
-                      Fetch Lesson Gallery
+                      {isFetchingGallery ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
                     </button>
                   )}
                 </div>
@@ -1408,62 +1400,103 @@ export const ClassroomView: React.FC = () => {
                   </div>
                 )}
                 
-                <div className="grid grid-cols-1 gap-3">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {Array.isArray(lessons) && lessons.length > 0 ? (
                     visibleLessons.length > 0 ? visibleLessons.map((lesson, i) => (
-                      <motion.div 
+                      <motion.div
                         key={lesson.id}
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: i * 0.05 }}
                         onClick={() => navigate(`/lesson/${lesson.id}`)}
-                        className="bg-white border border-slate-200 p-5 rounded-2xl flex items-center justify-between group cursor-pointer hover:border-accent/30 hover:shadow-sm hover:shadow-ink/5 transition-all dark:bg-paper dark:border-white/10"
+                        className="group flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all hover:border-accent/30 hover:shadow-md dark:border-white/10 dark:bg-paper"
                       >
-                        <div className="flex items-center gap-4">
-                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors ${
-                            lesson.status === 'done' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400' : 'bg-slate-50 text-slate-500 group-hover:bg-accent/10 group-hover:text-accent dark:bg-surface-mid dark:text-ink-secondary'
-                          }`}>
-                            {lesson.status === 'done' ? <CheckCircle2 size={24} /> : <Play size={20} className="ml-1" />}
+                        <div className="flex items-center justify-between gap-3 bg-[#007A87] px-4 py-3 text-white dark:bg-accent">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <BookOpen className="h-5 w-5 shrink-0 text-white" />
+                            <h4 className="truncate text-sm font-bold leading-tight text-white" title={lesson.title}>
+                              Lesson {i + 1}
+                            </h4>
                           </div>
-                          <div>
-                            <h4 className="text-base font-bold text-slate-950 group-hover:text-accent transition-colors dark:text-ink">{lesson.title}</h4>
-                            <div className="mt-2 flex flex-wrap items-center gap-2">
-                              <span className={getCurriculumValidationBadgeClass(lesson.validation_status, !!lesson.is_ai_generated)}>
-                                {getCurriculumValidationLabel(lesson.validation_status, !!lesson.is_ai_generated)}
+                          <div className="flex shrink-0 items-center gap-1">
+                            <span className="max-w-[76px] truncate rounded-md bg-white/15 px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm">
+                              Unit
+                            </span>
+                            {lesson.status === 'done' && (
+                              <span className="rounded-md bg-white/15 px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm">
+                                Done
                               </span>
-                              {lesson.source_confidence ? (
-                                <span className="pill pill--neutral">
-                                  {Math.round(Number(lesson.source_confidence) * 100)}% source confidence
-                                </span>
-                              ) : null}
-                            </div>
-                            <div className="flex items-center gap-3 mt-2">
-                              <span className="text-[10px] font-mono  text-slate-500/60 dark:text-ink-muted/60">Unit {i + 1}</span>
-                              <span className="w-1 h-1 rounded-full bg-slate-950/10 dark:bg-ink/20" />
-                              <span className="text-[10px] font-mono  text-slate-500/60 dark:text-ink-muted/60">~15 min</span>
-                            </div>
-                            <div className="mt-2" onClick={(e) => e.stopPropagation()}>
-                              <TagsManager 
-                                tags={lesson.tags || []} 
-                                onAddTag={async (tag) => {
-                                  const currentTags = lesson.tags || [];
-                                  if (!currentTags.includes(tag)) {
-                                    await db.lessons.update(lesson.id, { tags: [...currentTags, tag] });
-                                  }
-                                }}
-                                onRemoveTag={async (tag) => {
-                                  const currentTags = lesson.tags || [];
-                                  await db.lessons.update(lesson.id, { tags: currentTags.filter(t => t !== tag) });
-                                }}
-                                maxDisplay={7}
-                              />
-                            </div>
+                            )}
                           </div>
                         </div>
-                        <ChevronRight size={20} className="text-slate-500/30 group-hover:text-accent group-hover:translate-x-1 transition-all dark:text-ink-muted/60" />
+
+                        <div className="h-20 w-full overflow-hidden border-b border-slate-100 bg-slate-50 dark:border-white/5 dark:bg-surface-low">
+                          <img
+                            src={getLessonCardIllustration(lesson.title, module?.name || module?.category)}
+                            alt={lesson.title}
+                            className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                          />
+                        </div>
+
+                        <div className="flex flex-1 flex-col gap-3 p-4">
+                          <div className="grid grid-cols-[auto_1fr] items-center gap-3 text-sm">
+                            <div className="flex min-w-0 items-center gap-2">
+                              <BookOpen className="h-4 w-4 shrink-0 text-slate-400 dark:text-ink-muted" />
+                              <span className="font-bold text-slate-800 dark:text-ink">{i + 1}</span>
+                              <span className="truncate text-xs text-slate-500 dark:text-ink-muted" title={lesson.title}>
+                                {lesson.title}
+                              </span>
+                            </div>
+                            <div className="space-y-1">
+                              <div className="flex justify-between text-[11px] font-bold">
+                                <span className="text-slate-400 dark:text-ink-muted">Progress</span>
+                                <span className="text-slate-800 dark:text-ink">{lesson.status === 'done' ? '100%' : '0%'}</span>
+                              </div>
+                              <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-surface-mid">
+                                <div
+                                  className="h-full rounded-full bg-emerald-500"
+                                  style={{ width: lesson.status === 'done' ? '100%' : '0%' }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="mt-auto flex items-center justify-between gap-3 border-t border-slate-100 pt-3 dark:border-white/6">
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate(`/lesson/${lesson.id}`);
+                                }}
+                                className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-emerald-700"
+                              >
+                                <Play className="h-3 w-3 fill-current text-white" />
+                                Start
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate(`/lesson/${lesson.id}`);
+                                }}
+                                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50 dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:bg-surface-low"
+                              >
+                                Plan
+                              </button>
+                            </div>
+
+                            <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold ${
+                              lesson.status === 'done' ? 'text-accent' : 'text-emerald-700 dark:text-emerald-400'
+                            }`}>
+                              <span className={`h-1.5 w-1.5 rounded-full ${lesson.status === 'done' ? 'bg-accent' : 'bg-emerald-500 animate-pulse'}`} />
+                              {lesson.status === 'done' ? 'Done' : 'Available'}
+                            </span>
+                          </div>
+                        </div>
                       </motion.div>
                     )) : (
-                      <div className="rounded-2xl border border-solid border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-paper">
+                      <div className="col-span-full rounded-2xl border border-solid border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-paper">
                         <p className="text-sm font-semibold text-slate-950 dark:text-ink">No lessons in this domain yet.</p>
                         <p className="mt-1 ls-micro-label">Switch back to {t('all')} to see every available lesson for this classroom.</p>
                       </div>
@@ -1475,43 +1508,91 @@ export const ClassroomView: React.FC = () => {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: i * 0.03 }}
-                        className="bg-white border border-solid border-slate-200 p-5 rounded-2xl dark:bg-paper dark:border-white/10"
+                        className="group flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all hover:border-accent/30 hover:shadow-md dark:border-white/10 dark:bg-paper"
+                        onClick={() => handleGenerateLesson(topic.title, true)}
                       >
-                        <div className="flex items-start gap-4">
-                          <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300 flex items-center justify-center">
-                            <Clock size={22} />
+                        <div className="flex items-center justify-between gap-3 bg-[#007A87] px-4 py-3 text-white dark:bg-accent">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <BookOpen className="h-5 w-5 shrink-0 text-white" />
+                            <h4 className="truncate text-sm font-bold leading-tight text-white" title={topic.title}>
+                              Lesson {i + 1}
+                            </h4>
                           </div>
-                          <div className="min-w-0 flex-1">
-                            <h4 className="text-base font-bold text-slate-950 dark:text-ink">{topic.title}</h4>
-                            <div className="mt-2 flex flex-wrap items-center gap-2">
-                              <span className="pill pill--warn">needs lesson generation</span>
-                              <span className="pill pill--neutral">topic from Supabase</span>
-                              {topic.domain_name && <span className="pill pill--neutral">{topic.domain_name}</span>}
-                              <span className="pill pill--neutral">RAG disabled until reviewed</span>
-                            </div>
-                            {topic.outlines.length > 0 ? (
-                              <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/60 p-3 dark:border-white/10 dark:bg-surface-low/60">
-                                <p className="ls-micro-label">Available outline</p>
-                                <div className="mt-2 space-y-2">
-                                  {topic.outlines.slice(0, 3).map((outline) => (
-                                    <div key={outline.id} className="rounded-xl bg-white/70 px-3 py-2 dark:bg-surface-mid/80">
-                                      <p className="text-sm font-semibold text-slate-950 dark:text-ink">{outline.title || 'Untitled outline item'}</p>
-                                      {outline.description && (
-                                        <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-500 dark:text-ink-muted">{outline.description}</p>
-                                      )}
-                                    </div>
-                                  ))}
-                                </div>
-                                {topic.outlines.length > 3 && (
-                                  <p className="mt-2 text-xs font-medium text-slate-500 dark:text-ink-muted">+{topic.outlines.length - 3} more outline items</p>
-                                )}
-                              </div>
-                            ) : (
-                              <p className="mt-3 ls-micro-label">No outline rows available yet for this topic.</p>
+                          <div className="flex shrink-0 items-center gap-1">
+                            <span className="max-w-[76px] truncate rounded-md bg-white/15 px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm">
+                              Topic
+                            </span>
+                            {topic.domain_name && (
+                              <span className="max-w-[76px] truncate rounded-md bg-white/15 px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm" title={topic.domain_name}>
+                                {topic.domain_name}
+                              </span>
                             )}
-                            <div className="flex items-center gap-3 mt-2">
-                              <span className="text-[10px] font-mono  text-slate-500/60 dark:text-ink-muted/60">Topic {i + 1}</span>
+                          </div>
+                        </div>
+
+                        <div className="h-20 w-full overflow-hidden border-b border-slate-100 bg-slate-50 dark:border-white/5 dark:bg-surface-low">
+                          <img
+                            src={getLessonCardIllustration(topic.title, module?.name || module?.category)}
+                            alt={topic.title}
+                            className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                          />
+                        </div>
+
+                        <div className="flex flex-1 flex-col gap-3 p-4">
+                          <div className="grid grid-cols-[auto_1fr] items-center gap-3 text-sm">
+                            <div className="flex min-w-0 items-center gap-2">
+                              <BookOpen className="h-4 w-4 shrink-0 text-slate-400 dark:text-ink-muted" />
+                              <span className="font-bold text-slate-800 dark:text-ink">{i + 1}</span>
+                              <span className="truncate text-xs text-slate-500 dark:text-ink-muted" title={topic.title}>
+                                {topic.title}
+                              </span>
                             </div>
+                            <div className="space-y-1">
+                              <div className="flex justify-between text-[11px] font-bold">
+                                <span className="text-slate-400 dark:text-ink-muted">Progress</span>
+                                <span className="text-slate-800 dark:text-ink">0%</span>
+                              </div>
+                              <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-surface-mid">
+                                <div className="h-full w-0 rounded-full bg-emerald-500" />
+                              </div>
+                            </div>
+                          </div>
+
+                          <p className="line-clamp-2 min-h-[2.5rem] text-xs leading-relaxed text-slate-500 dark:text-ink-muted">
+                            {topic.outlines[0]?.description || topic.outlines[0]?.title || topic.title}
+                          </p>
+
+                          <div className="mt-auto flex items-center justify-between gap-3 border-t border-slate-100 pt-3 dark:border-white/6">
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleGenerateLesson(topic.title, true);
+                                }}
+                                disabled={!!generatingTitle}
+                                className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:opacity-50"
+                              >
+                                {generatingTitle === topic.title ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3 fill-current text-white" />}
+                                Start
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleGenerateLesson(topic.title);
+                                }}
+                                disabled={!!generatingTitle}
+                                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:bg-surface-low"
+                              >
+                                Plan
+                              </button>
+                            </div>
+
+                            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
+                              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+                              Available
+                            </span>
                           </div>
                         </div>
                       </motion.div>
@@ -1584,114 +1665,161 @@ export const ClassroomView: React.FC = () => {
           </div>
         )}
 
-        {/* Gallery Section */}
-        <AnimatePresence>
-          {suggestions.length > 0 && (
-            <motion.div 
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="space-y-4 pt-8 border-t border-slate-200 dark:border-white/10"
-            >
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-bold text-slate-950 dark:text-ink flex items-center gap-2">
-                  <Sparkles size={20} className="text-accent" />
-                  Suggested Units
-                </h3>
-                <div className="flex items-center gap-4">
-                  {selectedSuggestions.length > 0 ? (
-                    <button 
-                      onClick={handleCurateSelected}
-                      disabled={!!generatingTitle}
-                      className="text-xs font-medium text-blue-700 hover:underline disabled:opacity-50 dark:text-accent"
-                    >
-                      {generatingTitle === 'selected' ? <Loader2 size={10} className="animate-spin inline mr-1" /> : null}
-                      Curate Selected ({selectedSuggestions.length})
-                    </button>
-                  ) : (
-                    <button 
-                      onClick={handleCurateAll}
-                      disabled={!!generatingTitle}
-                      className="text-xs font-medium text-blue-700 hover:underline disabled:opacity-50 dark:text-accent"
-                    >
-                      {generatingTitle === 'all' ? <Loader2 size={10} className="animate-spin inline mr-1" /> : null}
-                      Curate All
-                    </button>
-                  )}
-                  <button 
-                    onClick={() => setSuggestions([])}
-                    className="ls-micro-label hover:text-slate-950 dark:hover:text-ink"
+        <Modal
+          isOpen={suggestions.length > 0}
+          onClose={closeLessonGallery}
+          title={
+            <span className="flex items-center gap-2">
+              <Sparkles size={20} className="text-accent" />
+              Suggested Units
+            </span>
+          }
+          maxWidth="4xl"
+        >
+          <div className="space-y-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+              <div className="flex items-center gap-3">
+                {selectedSuggestions.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={handleCurateSelected}
+                    disabled={!!generatingTitle}
+                    className="rounded-xl bg-slate-950 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-accent disabled:opacity-50 dark:bg-white dark:text-slate-950 dark:hover:bg-accent dark:hover:text-white"
                   >
-                    Close Gallery
+                    {generatingTitle === 'selected' ? <Loader2 size={12} className="mr-1 inline animate-spin" /> : null}
+                    Curate Selected ({selectedSuggestions.length})
                   </button>
-                </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleCurateAll}
+                    disabled={!!generatingTitle}
+                    className="rounded-xl bg-slate-950 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-accent disabled:opacity-50 dark:bg-white dark:text-slate-950 dark:hover:bg-accent dark:hover:text-white"
+                  >
+                    {generatingTitle === 'all' ? <Loader2 size={12} className="mr-1 inline animate-spin" /> : null}
+                    Curate All
+                  </button>
+                )}
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {Array.isArray(suggestions) && suggestions.map((suggestion, i) => {
-                  const isSelected = selectedSuggestions.includes(suggestion.title);
-                  const isThisGenerating = generatingTitle === suggestion.title;
-                  const anyGenerating = !!generatingTitle;
+            </div>
 
-                  return (
-                    <motion.div 
-                      key={i}
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: i * 0.05 }}
-                      onClick={() => {
-                        if (anyGenerating) return;
-                        setSelectedSuggestions(prev => 
-                          prev.includes(suggestion.title) 
-                            ? prev.filter(t => t !== suggestion.title) 
-                            : [...prev, suggestion.title]
-                        );
-                      }}
-                      className={`bg-white border p-6 rounded-2xl space-y-4 transition-all group cursor-pointer relative dark:bg-paper dark:border-white/10 ${
-                        isSelected ? 'border-accent ring-1 ring-accent/20 bg-accent/[0.02] dark:bg-accent/[0.04]' : 'border-slate-200 hover:border-accent/30 dark:border-white/10'
-                      } ${anyGenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                      {isSelected && (
-                        <div className="absolute top-4 right-4 text-accent">
-                          <CheckCircle2 size={16} />
-                        </div>
-                      )}
-                      <div className="space-y-1">
-                        <h4 className={`text-base font-bold transition-colors ${isSelected ? 'text-accent' : 'text-slate-950 dark:text-ink group-hover:text-accent'}`}>
-                          {suggestion.title}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {Array.isArray(suggestions) && suggestions.map((suggestion, i) => {
+                const isSelected = selectedSuggestions.includes(suggestion.title);
+                const isThisGenerating = generatingTitle === suggestion.title;
+                const anyGenerating = !!generatingTitle;
+                const lessonNumber = i + 1;
+
+                return (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: i * 0.05 }}
+                    onClick={() => {
+                      if (anyGenerating) return;
+                      setSelectedSuggestions(prev =>
+                        prev.includes(suggestion.title)
+                          ? prev.filter(t => t !== suggestion.title)
+                          : [...prev, suggestion.title]
+                      );
+                    }}
+                    className={`relative cursor-pointer overflow-hidden rounded-2xl border bg-white shadow-sm transition-all group dark:bg-paper dark:border-white/10 ${
+                      isSelected ? 'border-accent ring-1 ring-accent/20' : 'border-slate-200 hover:border-accent/30 hover:shadow-md dark:border-white/10'
+                    } ${anyGenerating ? 'cursor-not-allowed opacity-50' : ''}`}
+                  >
+                    <div className="bg-[#007A87] px-4 py-3 flex items-center justify-between gap-3 text-white dark:bg-accent">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <BookOpen className="h-5 w-5 shrink-0 text-white" />
+                        <h4 className="truncate text-sm font-bold leading-tight text-white" title={suggestion.title}>
+                          Lesson {lessonNumber}
                         </h4>
-                        <p className="ls-micro-label leading-relaxed">{suggestion.description}</p>
                       </div>
-                      <div className="flex items-center gap-4">
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleGenerateLesson(suggestion.title);
-                          }}
-                          disabled={anyGenerating}
-                          className="flex items-center gap-2 text-xs font-medium text-blue-700 hover:underline disabled:opacity-50"
-                        >
-                          {isThisGenerating ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
-                          Curate
-                        </button>
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleGenerateLesson(suggestion.title, true);
-                          }}
-                          disabled={anyGenerating}
-                          className="flex items-center gap-2 text-xs font-medium text-slate-950 dark:text-ink hover:underline disabled:opacity-50 dark:hover:text-white"
-                        >
-                          {isThisGenerating ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
-                          Curate & Launch
-                        </button>
+                      <div className="flex shrink-0 items-center gap-1">
+                        <span className="max-w-[76px] truncate rounded-md bg-white/15 px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm">
+                          AI
+                        </span>
+                        {isSelected && (
+                          <span className="rounded-md bg-white/15 px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm">
+                            Selected
+                          </span>
+                        )}
                       </div>
-                    </motion.div>
-                  );
-                })}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+                    </div>
+
+                    <div className="h-20 w-full overflow-hidden border-b border-slate-100 bg-slate-50 dark:border-white/5 dark:bg-surface-low">
+                      <img
+                        src={getLessonCardIllustration(suggestion.title, module?.name || module?.category)}
+                        alt={suggestion.title}
+                        className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-3 p-4">
+                      <div className="grid grid-cols-[auto_1fr] items-center gap-3 text-sm">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <BookOpen className="h-4 w-4 shrink-0 text-slate-400 dark:text-ink-muted" />
+                          <span className="font-bold text-slate-800 dark:text-ink">{lessonNumber}</span>
+                          <span className="truncate text-xs text-slate-500 dark:text-ink-muted" title={suggestion.title}>
+                            {suggestion.title}
+                          </span>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-[11px] font-bold">
+                            <span className="text-slate-400 dark:text-ink-muted">Progress</span>
+                            <span className="text-slate-800 dark:text-ink">0%</span>
+                          </div>
+                          <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-surface-mid">
+                            <div className="h-full w-0 rounded-full bg-emerald-500" />
+                          </div>
+                        </div>
+                      </div>
+
+                      <p className="line-clamp-2 min-h-[2.5rem] text-xs leading-relaxed text-slate-500 dark:text-ink-muted">
+                        {suggestion.description}
+                      </p>
+
+                      <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-3 dark:border-white/6">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleGenerateLesson(suggestion.title);
+                            }}
+                            disabled={anyGenerating}
+                            className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:opacity-50"
+                          >
+                            {isThisGenerating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+                            Curate
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleGenerateLesson(suggestion.title, true);
+                            }}
+                            disabled={anyGenerating}
+                            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:bg-surface-low"
+                          >
+                            Launch
+                          </button>
+                        </div>
+
+                        <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold ${
+                          isSelected ? 'text-accent' : 'text-emerald-700 dark:text-emerald-400'
+                        }`}>
+                          <span className={`h-1.5 w-1.5 rounded-full ${isSelected ? 'bg-accent' : 'bg-emerald-500 animate-pulse'}`} />
+                          {isSelected ? 'Selected' : 'Available'}
+                        </span>
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+          </div>
+        </Modal>
       </div>
     </Layout>
   );

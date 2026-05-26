@@ -12,10 +12,11 @@ import {
   Library,
   Brain,
   ArrowRight,
-  Info,
   Sparkles,
   Loader2,
-  PlusCircle
+  PlusCircle,
+  Play,
+  RefreshCw
 } from 'lucide-react';
 import { generateCurriculum, checkAIProvider } from '../services/geminiService';
 import { getClassroomLoadPlan, mapSubjectsToModules, mergeModulesWithAiSuggestions, shouldRequestAiCurriculumSuggestions } from '../services/classroomLoader';
@@ -28,16 +29,6 @@ import { db } from '../db/db';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 
-const relativeTime = (ts: number) => {
-  const diff = Date.now() - ts;
-  const minutes = Math.floor(diff / 60000);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
-};
-
 const getIconForCategory = (category: string) => {
   const cat = category.toLowerCase();
   if (cat.includes('math') || cat.includes('science') || cat.includes('physics') || cat.includes('chem')) return <FlaskConical className="w-5 h-5" />;
@@ -45,6 +36,84 @@ const getIconForCategory = (category: string) => {
   if (cat.includes('lit') || cat.includes('lang') || cat.includes('art')) return <BookOpen className="w-5 h-5" />;
   if (cat.includes('psych') || cat.includes('phil') || cat.includes('socio')) return <Brain className="w-5 h-5" />;
   return <Library className="w-5 h-5" />;
+};
+
+const getLessonIllustration = (title: string | null | undefined, category?: string | null | undefined) => {
+  const t = String(title || '').toLowerCase();
+  const c = String(category || '').toLowerCase();
+
+  if (
+    t.includes('math') ||
+    t.includes('geom') ||
+    t.includes('arith') ||
+    t.includes('calcul') ||
+    t.includes('algebra') ||
+    t.includes('suite') ||
+    t.includes('serie') ||
+    t.includes('série') ||
+    t.includes('analyse') ||
+    c.includes('math')
+  ) {
+    return '/illustrations/math_geometry.png';
+  }
+
+  if (
+    t.includes('physic') ||
+    t.includes('physiq') ||
+    t.includes('chem') ||
+    t.includes('chim') ||
+    t.includes('electr') ||
+    t.includes('circuit') ||
+    t.includes('combust') ||
+    c.includes('phys') ||
+    c.includes('chim')
+  ) {
+    return '/illustrations/physics_chemistry.png';
+  }
+
+  if (
+    t.includes('svt') ||
+    t.includes('earth') ||
+    t.includes('life') ||
+    t.includes('tecton') ||
+    t.includes('plaqu') ||
+    t.includes('seisme') ||
+    t.includes('séisme') ||
+    t.includes('volcan') ||
+    t.includes('roche') ||
+    t.includes('geolog') ||
+    t.includes('géolog') ||
+    t.includes('biolog') ||
+    c.includes('svt') ||
+    c.includes('vie')
+  ) {
+    return '/illustrations/earth_sciences.png';
+  }
+
+  if (
+    t.includes('lang') ||
+    t.includes('arab') ||
+    t.includes('french') ||
+    t.includes('franc') ||
+    t.includes('franç') ||
+    t.includes('read') ||
+    t.includes('book') ||
+    t.includes('litter') ||
+    t.includes('littér') ||
+    t.includes('philoso') ||
+    t.includes('lexiq') ||
+    t.includes('gramm') ||
+    t.includes('ortho') ||
+    t.includes('conju') ||
+    c.includes('lang') ||
+    c.includes('fr') ||
+    c.includes('ar') ||
+    c.includes('phil')
+  ) {
+    return '/illustrations/humanities_languages.png';
+  }
+
+  return '/illustrations/default_edu.png';
 };
 
 const MODULES_SCOPE_VERSION = 'v2';
@@ -190,14 +259,6 @@ export const Modules: React.FC = () => {
   const lessonCountByModuleId = useMemo(
     () => allLessons.reduce<Record<string, number>>((acc, l) => {
       acc[l.moduleId] = (acc[l.moduleId] || 0) + 1;
-      return acc;
-    }, {}),
-    [allLessons],
-  );
-
-  const lastActivityByModuleId = useMemo(
-    () => allLessons.reduce<Record<string, number>>((acc, l) => {
-      if (!acc[l.moduleId] || l.createdAt > acc[l.moduleId]) acc[l.moduleId] = l.createdAt;
       return acc;
     }, {}),
     [allLessons],
@@ -401,61 +462,36 @@ export const Modules: React.FC = () => {
   return (
     <Layout>
       <SEO title="Modules" />
-      <div className="space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-3 flex-1">
-            <div className="inline-flex items-center gap-2 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700 dark:border-accent-soft dark:bg-accent-soft dark:text-accent">
-              <Sparkles className="h-4 w-4 shrink-0" />
-              Draft AI-assisted content · Pending curriculum validation
-            </div>
-            <h2 className="text-2xl md:text-3xl font-bold text-slate-950 font-sans dark:text-ink">{t('actions_create_classroom')}</h2>
-          </div>
-          
-          <div className="flex items-center gap-4 shrink-0">
-            <button
-              onClick={() => {
-                const plan = getClassroomLoadPlan({ action: 'refresh_suggestions', isPro });
-                fetchCurriculum(plan.includeAiSuggestions, true);
-              }}
-              disabled={isLoading || !aiAvailable || !isPro}
-              title={!aiAvailable ? aiUnavailableMsg : undefined}
-              className="ls-button-primary disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-              Regenerate
-            </button>
-            <div className="group relative inline-block">
-              <button className="ls-button-secondary h-10 w-10 px-0">
-                <Info className="w-5 h-5" />
-              </button>
-              <div className="absolute right-0 top-full mt-2 w-72 p-4 ls-card shadow-sm opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                <p className="ls-body-text leading-relaxed">
-                  These classrooms are loaded from your Supabase curriculum first. AI can optionally suggest extras for inspiration.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
+      <div className="space-y-4">
         {/* Filter Bar */}
-        <div className="sticky top-20 z-30 -mx-12 border-b border-slate-200 bg-white px-12 py-3 dark:border-white/8 dark:bg-paper">
+        <div className="relative z-10 w-full border-y border-slate-200 bg-white px-4 py-2 dark:border-white/8 dark:bg-paper md:px-6">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-slate-500 dark:text-ink-muted">Choose a subject to manage curriculum content.</p>
+            <p className="text-sm text-slate-500 dark:text-ink-muted">{filteredModules.length} subjects available</p>
             <div className="flex items-center gap-2">
-              <button className="ls-button-ghost">
+              <button className="ls-button-ghost h-9 w-9 px-0" title="Filter" aria-label="Filter">
                 <Filter className="w-4 h-4" />
-                Filter
               </button>
-              <button className="ls-button-ghost">
+              <button className="ls-button-ghost h-9 w-9 px-0" title="Sort" aria-label="Sort">
                 <ArrowUpDown className="w-4 h-4" />
-                Sort
+              </button>
+              <button
+                onClick={() => {
+                  const plan = getClassroomLoadPlan({ action: 'refresh_suggestions', isPro });
+                  fetchCurriculum(plan.includeAiSuggestions, true);
+                }}
+                disabled={isLoading || !aiAvailable || !isPro}
+                title={!aiAvailable ? aiUnavailableMsg : 'Refresh'}
+                aria-label="Refresh"
+                className="ls-button-ghost h-9 w-9 px-0 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
               </button>
             </div>
           </div>
         </div>
 
         {/* Modules Grid - Visible Grid Aesthetic */}
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           <AnimatePresence mode="popLayout">
             {isLoading ? (
               <div className="col-span-full py-32 flex flex-col items-center justify-center space-y-4 bg-white dark:bg-paper">
@@ -472,76 +508,72 @@ export const Modules: React.FC = () => {
                   exit={{ opacity: 0, scale: 0.95 }}
                   transition={{ delay: i * 0.05, duration: 0.6 }}
                   onClick={() => navigate(`/classroom/${module.id}`)}
-                  className="ls-interactive-card cursor-pointer p-5"
+                  className="bg-white border border-slate-200 rounded-2xl overflow-hidden flex flex-col group hover:border-accent/30 hover:shadow-md transition-all dark:bg-paper dark:border-white/8 shadow-sm"
                 >
-                  {/* Header: icon + name + badges */}
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-start gap-3">
-                      <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-colors ${
-                        module.selected ? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950' : 'bg-slate-100 text-slate-700 dark:bg-surface-mid dark:text-ink-secondary'
-                      }`}>
-                        {module.icon}
-                      </div>
-                      <div>
-                        <h3 className="text-base font-semibold text-slate-950 leading-tight dark:text-ink">{module.name}</h3>
-                        <p className="mt-0.5 text-xs text-slate-500 dark:text-ink-muted">Supabase curriculum subject</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {module.code && module.code !== module.name && (
-                        <span className="ls-badge">{module.code}</span>
-                      )}
-                      {module.category && module.category !== module.name && (
-                        <span className="ls-badge">{module.category}</span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Metrics grid */}
-                  <div className="mt-4 grid grid-cols-2 gap-2.5">
-                    <div className="rounded-xl bg-slate-50 p-3 dark:bg-surface-low">
-                      <p className="text-xs font-medium text-slate-500 dark:text-ink-muted">Lessons</p>
-                      <p className="mt-1 text-lg font-semibold text-slate-950 dark:text-ink">
-                        {lessonCountByModuleId[module.id] ?? 0}
-                      </p>
-                    </div>
-                    <div className="rounded-xl bg-slate-50 p-3 dark:bg-surface-low">
-                      <p className="text-xs font-medium text-slate-500 dark:text-ink-muted">Progress</p>
-                      <p className="mt-1 text-lg font-semibold text-slate-950 dark:text-ink">{module.progress}%</p>
-                    </div>
-                    <div className="col-span-2 rounded-xl bg-slate-50 p-3 dark:bg-surface-low">
-                      <p className="text-xs font-medium text-slate-500 dark:text-ink-muted">Last activity</p>
-                      {lastActivityByModuleId[module.id] ? (
-                        <p className="mt-1 text-sm font-semibold text-slate-950 dark:text-ink">
-                          {relativeTime(lastActivityByModuleId[module.id])}
-                        </p>
-                      ) : (
-                        <p className="mt-1 text-sm font-semibold text-slate-400 dark:text-ink-muted">No activity yet</p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Footer: status + actions */}
-                  <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 dark:border-white/6">
-                    <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${
-                      module.selected ? 'text-accent' : 'text-emerald-700 dark:text-emerald-400'
-                    }`}>
-                      <span className={`h-1.5 w-1.5 rounded-full ${module.selected ? 'bg-accent' : 'bg-emerald-500'}`} />
-                      {module.selected ? 'Active' : 'Available'}
-                    </span>
+                  <div className="bg-[#007A87] px-4 py-3 flex items-center justify-between gap-3 text-white dark:bg-accent shrink-0">
                     <div className="flex items-center gap-2">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); toggleModule(module.id); }}
-                        className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:bg-surface-low"
-                      >
-                        {module.selected ? 'Deactivate' : 'Select'}
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); navigate(`/classroom/${module.id}`); }}
-                        className="rounded-xl bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 transition-colors dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
-                      >
-                        Open
-                      </button>
+                      <BookOpen className="w-5 h-5 shrink-0 text-white" />
+                      <h3 className="text-sm font-bold leading-tight truncate text-white" title={module.name}>{module.name}</h3>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {module.category && module.category !== module.name && (
+                        <span className="bg-white/15 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md backdrop-blur-sm truncate max-w-[76px]" title={module.category}>{module.category}</span>
+                      )}
+                      {module.code && module.code !== module.name && (
+                        <span className="bg-white/15 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md backdrop-blur-sm truncate max-w-[52px]" title={module.code}>{module.code}</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="h-20 w-full overflow-hidden relative border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-surface-low shrink-0">
+                    <img
+                      src={getLessonIllustration(module.name, module.category)}
+                      alt={module.name}
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    />
+                  </div>
+
+                  <div className="p-4 flex-1 flex flex-col gap-3">
+                    <div className="grid grid-cols-[auto_1fr] gap-3 text-sm items-center">
+                      <div className="flex items-center gap-2">
+                        <BookOpen className="w-4 h-4 text-slate-400 dark:text-ink-muted" />
+                        <span className="font-bold text-slate-800 dark:text-ink">{lessonCountByModuleId[module.id] ?? 0}</span>
+                        <span className="text-xs text-slate-500 dark:text-ink-muted">lessons</span>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[11px] font-bold">
+                          <span className="text-slate-400 dark:text-ink-muted">Progress</span>
+                          <span className="text-slate-800 dark:text-ink">{module.progress}%</span>
+                        </div>
+                        <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden dark:bg-surface-mid">
+                          <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${module.progress}%` }} />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-3 dark:border-white/6">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); navigate(`/classroom/${module.id}`); }}
+                          className="flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3 py-2 text-xs font-bold text-white transition-colors shadow-sm"
+                        >
+                          <Play className="w-3 h-3 fill-current text-white" />
+                          Start
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); toggleModule(module.id); }}
+                          className="rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 transition-colors dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:bg-surface-low"
+                        >
+                          Plan
+                        </button>
+                      </div>
+
+                      <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold ${
+                        module.selected ? 'text-accent' : 'text-emerald-700 dark:text-emerald-400'
+                      }`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${module.selected ? 'bg-accent' : 'bg-emerald-500 animate-pulse'}`} />
+                        {module.selected ? 'Active' : 'Available'}
+                      </span>
                     </div>
                   </div>
                 </motion.div>
@@ -555,12 +587,7 @@ export const Modules: React.FC = () => {
                 <div className="w-20 h-20 bg-accent/5 rounded-full flex items-center justify-center mx-auto">
                   <Sparkles className="w-8 h-8 text-accent" />
                 </div>
-                <div className="space-y-2">
-                  <h3 className="text-2xl font-serif">Your classroom is ready to be built.</h3>
-                  <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-slate-500/40 dark:text-ink-muted/40 max-w-md mx-auto leading-relaxed">
-                    Click 'Create' to load your curriculum from Supabase based on your {grade}{bacTrackName ? ` - ${bacTrackName}` : ''}{bacIntOptionName ? ` (${bacIntOptionName})` : ''} settings in {country}.
-                  </p>
-                </div>
+                <h3 className="text-2xl font-serif">No classrooms yet</h3>
                 {!aiAvailable && (
                   <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 max-w-sm dark:bg-amber-950/30 dark:border-amber-800/40">
                     <p className="text-xs text-amber-800 font-medium dark:text-amber-400">{aiUnavailableMsg}</p>
@@ -574,7 +601,7 @@ export const Modules: React.FC = () => {
                   className="px-10 py-4 bg-accent text-white rounded-full text-xs font-medium hover:bg-accent-hover transition-all  flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <PlusCircle className="w-4 h-4" />
-                  Create My Classroom
+                  Create classroom
                 </button>
               </motion.div>
             )}
@@ -586,34 +613,28 @@ export const Modules: React.FC = () => {
         <motion.div 
           initial={{ y: 50, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          className="bg-slate-950 text-white py-8 px-12 rounded-3xl shadow-md flex flex-col md:flex-row items-center justify-between gap-8 relative overflow-hidden"
+          className="bg-slate-950 text-white py-3 px-5 rounded-2xl shadow-md flex flex-col md:flex-row items-center justify-between gap-3 relative overflow-hidden"
         >
-          <div className="flex items-center gap-12">
-            <div className="flex flex-col">
-              <span className="text-[9px] font-mono  text-white/40 mb-1">Current Selection</span>
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-serif italic">{selectedCount}</span>
-                <span className="text-[10px] font-mono  text-white/60">Modules Ready</span>
-              </div>
+          <div className="flex items-center gap-5">
+            <div className="flex items-baseline gap-2">
+              <span className="text-lg font-bold">{selectedCount}</span>
+              <span className="text-xs font-medium text-white/60">ready</span>
             </div>
-            <div className="h-12 w-px bg-white/10 hidden md:block"></div>
+            <div className="h-6 w-px bg-white/10 hidden md:block"></div>
             <button 
               onClick={resetSelection}
-              className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/40 hover:text-white transition-colors"
+              className="text-xs font-semibold text-white/45 hover:text-white transition-colors"
             >
-              Reset Selection
+              Reset
             </button>
           </div>
 
-          <div className="flex items-center gap-10">
-            <button className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/40 hover:text-white transition-colors">
-              Skip for now
-            </button>
+          <div className="flex items-center">
             <motion.button 
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.98 }}
               onClick={() => navigate('/dashboard')}
-              className="bg-white text-slate-950 px-12 py-5 rounded-full text-xs font-mono uppercase tracking-[0.2em] font-bold flex items-center gap-4 hover:bg-accent hover:text-white transition-all duration-500 shadow-sm shadow-ink/20 dark:bg-paper dark:text-ink dark:hover:bg-accent dark:hover:text-white"
+              className="bg-white text-slate-950 px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-accent hover:text-white transition-all duration-300 shadow-sm shadow-ink/20 dark:bg-paper dark:text-ink dark:hover:bg-accent dark:hover:text-white"
             >
               {t('dashboard_continue')}
               <ArrowRight className="w-4 h-4" />
