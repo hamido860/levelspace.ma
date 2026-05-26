@@ -14,16 +14,11 @@ import {
   Zap, 
   PenTool, 
   MessageSquare,
-  X,
-  ChevronRight,
   Loader2,
-  Search,
-  Maximize2,
-  History,
-  LayoutGrid
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { WORKSPACE_CONFIG, ToolConfig, SubjectConfig } from './config';
+import { WORKSPACE_CONFIG } from './config';
+import type { ToolConfig } from './config';
 import { Modal } from '../Modal';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
@@ -65,6 +60,19 @@ const ICON_MAP: Record<string, any> = {
   MessageSquare
 };
 
+const SUPPORTED_TOOL_IDS = new Set([
+  'math-editor',
+  'text-input',
+  'image-fetcher',
+  'ai-assistant',
+  'ai-explainer',
+  'notes-generator',
+  'writing-assistant',
+  'argument-builder',
+  'dictionary',
+  'timeline',
+]);
+
 export const EduWorkspace: React.FC<EduWorkspaceProps> = ({ 
   isOpen, 
   onClose, 
@@ -97,13 +105,16 @@ export const EduWorkspace: React.FC<EduWorkspaceProps> = ({
     const baseConfig = WORKSPACE_CONFIG[normalizedSubjectId] || WORKSPACE_CONFIG.math;
     return {
       ...baseConfig,
-      tools: baseConfig.tools.filter(tool => hasAiAccess || tool.type !== 'ai')
+      tools: baseConfig.tools.filter(tool => SUPPORTED_TOOL_IDS.has(tool.id) && (hasAiAccess || tool.type !== 'ai'))
     };
   }, [normalizedSubjectId, hasAiAccess]);
 
   useEffect(() => {
-    if (isOpen && !activeToolId && config.tools.length > 0) {
-      setActiveToolId(config.tools[0].id);
+    if (!isOpen) return;
+
+    const activeToolExists = config.tools.some((tool) => tool.id === activeToolId);
+    if (!activeToolId || !activeToolExists) {
+      setActiveToolId(config.tools[0]?.id || null);
     }
   }, [isOpen, config, activeToolId]);
 
@@ -115,7 +126,15 @@ export const EduWorkspace: React.FC<EduWorkspaceProps> = ({
   };
 
   const renderTool = () => {
-    if (!activeToolId) return null;
+    if (!activeToolId) {
+      return (
+        <div className="flex h-full min-h-[360px] flex-col items-center justify-center gap-3 text-center text-muted">
+          <Book className="h-10 w-10 text-accent/50" />
+          <p className="text-sm font-semibold text-ink">No tools available for this lesson.</p>
+        </div>
+      );
+    }
+
     const tool = config.tools.find(t => t.id === activeToolId);
     if (!tool) return null;
 
@@ -170,16 +189,42 @@ export const EduWorkspace: React.FC<EduWorkspaceProps> = ({
         </div>
       }
     >
-      <div className="flex flex-col md:flex-row gap-8 h-full min-h-[600px]">
-        {/* Tool Icon */}
-        <div className="flex items-center justify-center">
-          <button className="p-4 bg-surface-low rounded-2xl text-accent hover:bg-surface-mid transition-all">
-            <LayoutGrid size={24} />
-          </button>
+      <div className="flex h-full min-h-[600px] flex-col gap-5 md:flex-row">
+        <div className="flex gap-2 overflow-x-auto rounded-2xl border border-ink/5 bg-surface-low p-2 md:w-56 md:shrink-0 md:flex-col md:overflow-visible">
+          {config.tools.map((tool: ToolConfig) => {
+            const Icon = ICON_MAP[tool.icon] || Book;
+            const active = activeToolId === tool.id;
+
+            return (
+              <button
+                key={tool.id}
+                type="button"
+                onClick={() => setActiveToolId(tool.id)}
+                className={`flex min-w-40 items-center gap-3 rounded-xl px-3 py-3 text-left transition-colors md:min-w-0 ${
+                  active
+                    ? 'bg-paper text-ink shadow-sm'
+                    : 'text-muted hover:bg-paper/70 hover:text-ink'
+                }`}
+                aria-pressed={active}
+              >
+                <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+                  active ? 'bg-accent/10 text-accent' : 'bg-paper text-muted'
+                }`}>
+                  <Icon size={18} />
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-bold">{tool.label}</span>
+                  {tool.library && (
+                    <span className="block truncate text-[10px] font-medium text-muted">{tool.library}</span>
+                  )}
+                </span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Tool Content Area */}
-        <div className="flex-grow bg-paper rounded-[2.5rem] p-8 border border-ink/5 shadow-inner overflow-y-auto min-h-[500px]">
+        <div className="min-h-[500px] flex-grow overflow-y-auto rounded-2xl border border-ink/5 bg-surface-low p-5 shadow-inner md:p-6">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeToolId}

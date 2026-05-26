@@ -53,6 +53,7 @@ export const isStudentVisibleLesson = (
   lesson: { teaching_contract?: unknown; validation_status?: unknown; is_ai_generated?: boolean } | null | undefined,
 ) =>
   (() => {
+    if (!lesson) return false;
     if (isRejectedValidationStatus(lesson?.validation_status, !!lesson?.is_ai_generated)) {
       return false;
     }
@@ -69,9 +70,75 @@ export const isStudentVisibleLesson = (
       return isTrue(teachingContract.student_publish_allowed);
     }
 
+    // If human review is required, hide from normal student visibility.
+    if (isTrue(teachingContract.human_review_required)) {
+      return false;
+    }
+
     // Non-empty contracts without an explicit publish flag are hidden conservatively.
     return false;
   })();
+
+export const isAdminVisibleLesson = (
+  lesson: {
+    validation_status?: unknown;
+    is_ai_generated?: boolean;
+    content?: string | null;
+    blocks?: any[] | null;
+  } | null | undefined
+): boolean => {
+  if (!lesson) return false;
+  if (isRejectedValidationStatus(lesson.validation_status, !!lesson.is_ai_generated)) {
+    return false;
+  }
+  const hasContent = Boolean(lesson.content?.trim()) || (Array.isArray(lesson.blocks) && lesson.blocks.length > 0);
+  return hasContent;
+};
+
+export type LessonAvailabilityState =
+  | "published"
+  | "needs_review"
+  | "draft_with_content"
+  | "locked"
+  | "rejected"
+  | "missing_content";
+
+export const getLessonAvailabilityState = (
+  lesson: {
+    teaching_contract?: unknown;
+    validation_status?: unknown;
+    is_ai_generated?: boolean;
+    content?: string | null;
+    blocks?: any[] | null;
+    status?: string | null;
+  } | null | undefined
+): LessonAvailabilityState => {
+  if (!lesson) return "missing_content";
+  if (isRejectedValidationStatus(lesson.validation_status, !!lesson.is_ai_generated)) {
+    return "rejected";
+  }
+
+  const hasContent = Boolean(lesson.content?.trim()) || (Array.isArray(lesson.blocks) && lesson.blocks.length > 0);
+  if (!hasContent) {
+    return "missing_content";
+  }
+
+  if (isStudentVisibleLesson(lesson)) {
+    return "published";
+  }
+
+  const validationStatus = String(lesson.validation_status || "").trim().toLowerCase();
+  if (validationStatus === "needs_review" || validationStatus === "teacher_reviewed" || validationStatus === "official_validated") {
+    return "needs_review";
+  }
+
+  const lessonStatus = String(lesson.status || "").trim().toLowerCase();
+  if (lessonStatus === "draft" || validationStatus === "ai_generated" || validationStatus === "unverified") {
+    return "draft_with_content";
+  }
+
+  return "locked";
+};
 
 export const filterStudentVisibleLessons = <
   T extends { teaching_contract?: unknown; validation_status?: unknown; is_ai_generated?: boolean }

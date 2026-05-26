@@ -1,17 +1,17 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Layout } from '../components/Layout';
-import { Modal } from '../components/Modal';
-import { ShieldCheck, ArrowLeft, BookOpen, Plus, Sparkles, Loader2, Play, Target, Dumbbell, Database } from 'lucide-react';
+import { ShieldCheck, AlertTriangle, ArrowLeft, BookOpen, Plus, ChevronRight, CheckCircle2, Clock, Brain, Sparkles, Loader2, Play, Target, Dumbbell, Database, Pin } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 import { supabase } from '../db/supabase';
+import { TagsManager } from '../components/TagsManager';
 import { generateSeedLesson, generateLessonSuggestions, LessonSuggestion, checkAIProvider } from '../services/geminiService';
 import { aiCrew } from '../services/aiCrewService';
 import { getQuizzesByLesson } from '../services/quizService';
 import { getExercisesByLesson } from '../services/exerciseService';
-import { filterStudentVisibleLessons } from '../services/lessonRecovery';
+import { filterStudentVisibleLessons, isStudentVisibleLesson, getLessonAvailabilityState } from '../services/lessonRecovery';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -26,63 +26,93 @@ import {
 } from '../services/lessonSupabase';
 import {
   compareCurriculumValidationForStudents,
+  getCurriculumValidationBadgeClass,
+  getCurriculumValidationLabel,
   selectStudentFacingValidatedContent,
 } from '../services/curriculumValidation';
 
 const normalizeLessonTitle = (title: string | null | undefined) =>
   String(title || '').trim().toLocaleLowerCase();
 
-const getLessonCardIllustration = (title: string | null | undefined, fallback?: string | null | undefined) => {
-  const value = `${title || ''} ${fallback || ''}`.toLowerCase();
-
+const getLessonIllustration = (title: string | null | undefined, subject?: string | null | undefined) => {
+  const t = String(title || '').toLowerCase();
+  const s = String(subject || '').toLowerCase();
+  
   if (
-    value.includes('math') ||
-    value.includes('geom') ||
-    value.includes('algebra') ||
-    value.includes('calcul') ||
-    value.includes('analyse')
+    t.includes('math') || 
+    t.includes('geom') || 
+    t.includes('arith') || 
+    t.includes('calcul') || 
+    t.includes('algebra') || 
+    t.includes('suite') || 
+    t.includes('série') || 
+    t.includes('analyse') || 
+    s.includes('math')
   ) {
     return '/illustrations/math_geometry.png';
   }
-
   if (
-    value.includes('phys') ||
-    value.includes('chem') ||
-    value.includes('chim') ||
-    value.includes('electr')
+    t.includes('physic') || 
+    t.includes('physiq') || 
+    t.includes('chem') || 
+    t.includes('chim') || 
+    t.includes('electr') || 
+    t.includes('circuit') || 
+    t.includes('combust') || 
+    s.includes('phys') || 
+    s.includes('chim')
   ) {
     return '/illustrations/physics_chemistry.png';
   }
-
   if (
-    value.includes('svt') ||
-    value.includes('earth') ||
-    value.includes('life') ||
-    value.includes('geolog') ||
-    value.includes('biolog')
+    t.includes('svt') || 
+    t.includes('earth') || 
+    t.includes('life') || 
+    t.includes('tecton') || 
+    t.includes('plaqu') || 
+    t.includes('séisme') || 
+    t.includes('volcan') || 
+    t.includes('roche') || 
+    t.includes('géolog') || 
+    t.includes('biolog') || 
+    s.includes('svt') || 
+    s.includes('vie')
   ) {
     return '/illustrations/earth_sciences.png';
   }
-
   if (
-    value.includes('fran') ||
-    value.includes('arab') ||
-    value.includes('lang') ||
-    value.includes('litt') ||
-    value.includes('gramm')
+    t.includes('lang') || 
+    t.includes('arab') || 
+    t.includes('french') || 
+    t.includes('franç') || 
+    t.includes('read') || 
+    t.includes('book') || 
+    t.includes('littér') || 
+    t.includes('philoso') || 
+    t.includes('lexiq') || 
+    t.includes('gramm') || 
+    t.includes('ortho') || 
+    t.includes('conju') || 
+    s.includes('lang') || 
+    s.includes('fr') || 
+    s.includes('ar') || 
+    s.includes('phil')
   ) {
     return '/illustrations/humanities_languages.png';
   }
-
   return '/illustrations/default_edu.png';
 };
 
-const isDevAdminModeEnabled = () =>
-  String(import.meta.env.VITE_ENABLE_DEV_ADMIN_AI_KEYS || '').toLowerCase() === 'true';
+const relativeTime = (ts: number) => {
+  const diff = Date.now() - ts;
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+};
 
-const shouldUseDemoAdminHeader = () =>
-  isDevAdminModeEnabled() ||
-  (typeof localStorage !== 'undefined' && localStorage.getItem('demo_admin_logged_in') === 'true');
 
 type SupabaseLessonRow = {
   id?: string;
@@ -189,30 +219,12 @@ const CLASSROOM_TAB_CONFIG = {
   },
 } as const;
 
-const resolveCurriculumIds = async (
-  grade: string,
-  subject: string,
-  category?: string | null,
-  scopedIds?: { gradeId?: string; subjectId?: string },
-) => {
-  if (scopedIds?.gradeId && scopedIds?.subjectId) {
-    const { data, error } = await supabase
-      .from('grade_subjects')
-      .select('grade_id, subject_id')
-      .eq('grade_id', scopedIds.gradeId)
-      .eq('subject_id', scopedIds.subjectId)
-      .maybeSingle();
+const resolvedCurriculumCache = new Map<string, { gradeId: string | null; subjectId: string | null; subjectIds: string[] }>();
 
-    if (error) throw error;
-    if (data) {
-      return {
-        gradeId: scopedIds.gradeId,
-        subjectId: scopedIds.subjectId,
-        subjectIds: [scopedIds.subjectId],
-      };
-    }
-
-    console.warn('[ClassroomView] Rejected invalid stored grade/subject ids.', scopedIds);
+const resolveCurriculumIds = async (grade: string, subject: string, category?: string | null) => {
+  const cacheKey = `${grade}:${subject}:${category || ''}`;
+  if (resolvedCurriculumCache.has(cacheKey)) {
+    return resolvedCurriculumCache.get(cacheKey)!;
   }
 
   const gradeCandidates = getGradeCandidates(grade);
@@ -230,11 +242,14 @@ const resolveCurriculumIds = async (
     .filter((row) => normalizedSubjectCandidates.has(normalizeCurriculumValue(String(row.name || ''))))
     .map((row) => row.id);
 
-  return {
+  const result = {
     gradeId: matchedGrade?.id ?? null,
     subjectId: matchedSubject?.id ?? null,
     subjectIds: Array.from(new Set([matchedSubject?.id, ...subjectIds].filter(Boolean) as string[])),
   };
+
+  resolvedCurriculumCache.set(cacheKey, result);
+  return result;
 };
 
 type ClassroomSupabaseLesson = {
@@ -273,8 +288,37 @@ export const ClassroomView: React.FC = () => {
   const [quizzes, setQuizzes] = useState<any[]>([]);
   const [exercises, setExercises] = useState<any[]>([]);
   const [isLoadingExtra, setIsLoadingExtra] = useState(false);
+  const [cloudLessonsCount, setCloudLessonsCount] = useState<number | null>(null);
   const aiAvailable = checkAIProvider();
   const [activeDomainKey, setActiveDomainKey] = useState<string>('all');
+
+  // ── Pinned lessons state (module-scoped, shared with LessonReader) ──
+  const pinStorageKey = `levelspace_pinned_lessons_${id || 'global'}`;
+  const [pinnedLessonIds, setPinnedLessonIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem(pinStorageKey);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(pinStorageKey);
+      setPinnedLessonIds(saved ? JSON.parse(saved) : []);
+    } catch {
+      setPinnedLessonIds([]);
+    }
+  }, [pinStorageKey]);
+  const togglePinLesson = (lessonId: string) => {
+    setPinnedLessonIds(prev => {
+      const next = prev.includes(lessonId)
+        ? prev.filter(x => x !== lessonId)
+        : [...prev, lessonId];
+      localStorage.setItem(pinStorageKey, JSON.stringify(next));
+      return next;
+    });
+  };
 
   const module = useLiveQuery(() => id ? db.modules.get(id) : undefined, [id]);
   const allLessons = useLiveQuery(() => id ? db.lessons.where('moduleId').equals(id).sortBy('createdAt') : [], [id]);
@@ -282,8 +326,6 @@ export const ClassroomView: React.FC = () => {
   const settingsMap = useMemo(() => Object.fromEntries(dbSettings.map(s => [s.key, s.value])), [dbSettings]);
 
   const currentGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
-  const currentGradeId = settingsMap['selected_grade_id'] || localStorage.getItem('selected_grade_id') || '';
-  const currentSubjectId = settingsMap['selected_subject_id'] || localStorage.getItem('selected_subject_id') || '';
   const currentCountry = settingsMap['selected_country'] || localStorage.getItem('selected_country') || '';
   const selectedBacTrack = settingsMap['selected_bac_track'] || localStorage.getItem('selected_bac_track') || '';
   const gradeCandidates = useMemo(() => getGradeCandidates(currentGrade), [currentGrade]);
@@ -303,8 +345,12 @@ export const ClassroomView: React.FC = () => {
         }
 
         const lessonCountry = String(lesson.country || '').trim().toLocaleLowerCase();
-        if (normalizedCurrentCountry && lessonCountry && lessonCountry !== normalizedCurrentCountry) {
-          return false;
+        if (normalizedCurrentCountry && lessonCountry) {
+          const isMatch =
+            (normalizedCurrentCountry === 'morocco' || normalizedCurrentCountry === 'maroc')
+              ? (lessonCountry === 'morocco' || lessonCountry === 'maroc')
+              : lessonCountry === normalizedCurrentCountry;
+          if (!isMatch) return false;
         }
 
         return true;
@@ -323,17 +369,47 @@ export const ClassroomView: React.FC = () => {
     () => selectStudentFacingValidatedContent(studentVisibleLessons),
     [studentVisibleLessons],
   );
-  const lessons = useMemo(
-    () => (
-      isAdmin
-        ? storedLessons
-        : (studentLessonSelection.hasPreferred
-          ? studentLessonSelection.preferredOnly
-          : studentLessonSelection.fallback)
-    ),
-    [isAdmin, storedLessons, studentLessonSelection],
-  );
+  const lessons = useMemo(() => {
+    if (isAdmin) {
+      return storedLessons;
+    }
+    if (studentVisibleLessons.length > 0) {
+      return studentLessonSelection.hasPreferred
+        ? studentLessonSelection.preferredOnly
+        : studentLessonSelection.fallback;
+    }
+    return storedLessons;
+  }, [isAdmin, storedLessons, studentVisibleLessons.length, studentLessonSelection]);
   const hasLessons = lessons.length > 0;
+  const adminStats = useMemo(() => {
+    if (!isAdmin) return null;
+    let published = 0;
+    let needsReview = 0;
+    let draft = 0;
+    let hidden = 0;
+    
+    for (const lesson of storedLessons) {
+      const state = getLessonAvailabilityState(lesson);
+      if (state === 'published') {
+        published++;
+      } else {
+        hidden++;
+        if (state === 'needs_review') {
+          needsReview++;
+        } else if (state === 'draft_with_content') {
+          draft++;
+        }
+      }
+    }
+    
+    return {
+      total: storedLessons.length,
+      published,
+      needsReview,
+      draft,
+      hidden,
+    };
+  }, [isAdmin, storedLessons]);
   const hasTopicFallback = !hasLessons && topicFallbackRows.length > 0;
   const topicDomainRows = curriculumTopicRows.length > 0 ? curriculumTopicRows : topicFallbackRows;
   const topicDomainById = useMemo(() => {
@@ -425,8 +501,9 @@ export const ClassroomView: React.FC = () => {
   }, [activeDomainKey, showDomainTabs, topicFallbackRows]);
   const hasSupplementalContent = quizzes.length > 0 || exercises.length > 0;
   const showStats = module?.progress > 0 || hasLessons || hasTopicFallback;
-  const showTabs = hasLessons || hasTopicFallback || hasSupplementalContent || isLoadingExtra;
+  const showTabs = false;
   const showSetupState = !hasLessons && !hasTopicFallback && !isHydratingSupabase && suggestions.length === 0;
+  const showValidationWarningBanner = !isAdmin && lessons.length > 0 && !studentLessonSelection.hasPreferred;
   const cloudHydrationKeyRef = useRef<string | null>(null);
   const classroomScopeKey = `${id || ''}:${module?.name || ''}:${module?.category || ''}:${currentGrade}:${currentCountry}:${selectedBacTrack}`;
 
@@ -466,10 +543,7 @@ export const ClassroomView: React.FC = () => {
     if (!module) return [] as SupabaseLessonRow[];
 
     const subjectCandidates = getSubjectCandidates(module.name, module.category);
-    const { gradeId, subjectId, subjectIds } = await resolveCurriculumIds(currentGrade, module.name, module.category, {
-      gradeId: currentGradeId,
-      subjectId: currentSubjectId || module.id,
-    });
+    const { gradeId, subjectId, subjectIds } = await resolveCurriculumIds(currentGrade, module.name, module.category);
     const fetchAttempt = async (includeValidation: boolean) => {
       const selectColumns = getLessonSelectColumns({ includeValidation, includeTags: true });
 
@@ -490,7 +564,12 @@ export const ClassroomView: React.FC = () => {
             .in('topic_id', topicIds);
 
           if (currentCountry) {
-            topicLessonQuery = topicLessonQuery.eq('country', currentCountry);
+            const countryNormalized = String(currentCountry).trim().toLowerCase();
+            const countryCandidates = 
+              countryNormalized === 'morocco' || countryNormalized === 'maroc'
+                ? ['Morocco', 'Maroc', 'morocco', 'maroc']
+                : [currentCountry];
+            topicLessonQuery = topicLessonQuery.in('country', countryCandidates);
           }
 
           const { data: topicLessons, error: topicLessonsError } = await topicLessonQuery;
@@ -509,7 +588,12 @@ export const ClassroomView: React.FC = () => {
         .eq('grade', currentGrade);
 
       if (currentCountry) {
-        exactGradeQuery = exactGradeQuery.eq('country', currentCountry);
+        const countryNormalized = String(currentCountry).trim().toLowerCase();
+        const countryCandidates = 
+          countryNormalized === 'morocco' || countryNormalized === 'maroc'
+            ? ['Morocco', 'Maroc', 'morocco', 'maroc']
+            : [currentCountry];
+        exactGradeQuery = exactGradeQuery.in('country', countryCandidates);
       }
 
       const { data: exactGradeLessons, error: exactGradeError } = await exactGradeQuery;
@@ -526,7 +610,12 @@ export const ClassroomView: React.FC = () => {
         .in('grade', gradeCandidates);
 
       if (currentCountry) {
-        fallbackQuery = fallbackQuery.eq('country', currentCountry);
+        const countryNormalized = String(currentCountry).trim().toLowerCase();
+        const countryCandidates = 
+          countryNormalized === 'morocco' || countryNormalized === 'maroc'
+            ? ['Morocco', 'Maroc', 'morocco', 'maroc']
+            : [currentCountry];
+        fallbackQuery = fallbackQuery.in('country', countryCandidates);
       }
 
       const { data, error } = await fallbackQuery;
@@ -550,10 +639,7 @@ export const ClassroomView: React.FC = () => {
   const fetchSupabaseTopics = async () => {
     if (!module) return [] as SupabaseTopicRow[];
 
-    const { gradeId, subjectId, subjectIds } = await resolveCurriculumIds(currentGrade, module.name, module.category, {
-      gradeId: currentGradeId,
-      subjectId: currentSubjectId || module.id,
-    });
+    const { gradeId, subjectId, subjectIds } = await resolveCurriculumIds(currentGrade, module.name, module.category);
     if (!gradeId || (!subjectId && subjectIds.length === 0)) return [] as SupabaseTopicRow[];
 
     const fetchTopics = async (includeDomains: boolean) => supabase
@@ -590,14 +676,21 @@ export const ClassroomView: React.FC = () => {
     const outlinesByTopicId = new Map<string, SupabaseTopicOutlineRow[]>();
     const topicIds = topics.map((topic) => topic.id);
 
+    const batchPromises = [];
     for (let start = 0; start < topicIds.length; start += 100) {
       const batch = topicIds.slice(start, start + 100);
-      const { data: outlineRows, error: outlinesError } = await supabase
-        .from('topic_outlines')
-        .select('id, topic_id, title, description, outline_order')
-        .in('topic_id', batch)
-        .order('outline_order', { ascending: true });
+      batchPromises.push(
+        supabase
+          .from('topic_outlines')
+          .select('id, topic_id, title, description, outline_order')
+          .in('topic_id', batch)
+          .order('outline_order', { ascending: true })
+      );
+    }
 
+    const batchResults = await Promise.all(batchPromises);
+
+    for (const { data: outlineRows, error: outlinesError } of batchResults) {
       if (outlinesError) {
         console.warn('[ClassroomView] topic_outlines unavailable for topic fallback:', outlinesError);
         continue;
@@ -628,8 +721,9 @@ export const ClassroomView: React.FC = () => {
   const hydrateLessonCache = async (cloudLessons: SupabaseLessonRow[]) => {
     if (!module) return;
 
-    const existingById = new Map((allLessons || []).map((lesson) => [lesson.id, lesson]));
-    const existingByTitle = new Map((allLessons || []).map((lesson) => [normalizeLessonTitle(lesson.title), lesson]));
+    const currentStoredLessons = await db.lessons.where('moduleId').equals(module.id).sortBy('createdAt');
+    const existingById = new Map(currentStoredLessons.map((lesson) => [lesson.id, lesson]));
+    const existingByTitle = new Map(currentStoredLessons.map((lesson) => [normalizeLessonTitle(lesson.title), lesson]));
 
     const toPut = cloudLessons.map((lesson) => {
       const existing =
@@ -677,9 +771,11 @@ export const ClassroomView: React.FC = () => {
         reviewed_by: lesson.reviewed_by ?? existing?.reviewed_by,
         reviewed_at: lesson.reviewed_at ?? existing?.reviewed_at,
         is_ai_generated: Boolean(lesson.is_ai_generated ?? existing?.is_ai_generated),
-        status: isStarterNeedsReview
+        status: hasStoredContent
+          ? 'done' as const
+          : isStarterNeedsReview
           ? 'pending' as const
-          : (hasStoredContent || normalizedStatus === 'published' || normalizedStatus === 'done' || normalizedStatus === 'draft')
+          : (normalizedStatus === 'published' || normalizedStatus === 'done' || normalizedStatus === 'draft')
           ? 'done' as const
           : (existing?.status || 'pending') as 'suggested' | 'pending' | 'active' | 'done',
         tags,
@@ -694,7 +790,7 @@ export const ClassroomView: React.FC = () => {
 
   // Hydrate the local classroom cache from Supabase so cloud stays the source of truth.
   useEffect(() => {
-    if (!module || !id || allLessons === undefined) return;
+    if (!module || !id) return;
     if (cloudHydrationKeyRef.current === classroomScopeKey) return;
 
     cloudHydrationKeyRef.current = classroomScopeKey;
@@ -707,6 +803,33 @@ export const ClassroomView: React.FC = () => {
           fetchSupabaseTopics(),
         ]);
         setCurriculumTopicRows(topics);
+        setCloudLessonsCount(cloudLessons.length);
+
+        // Sync lesson_generation_jobs for topics that already have lessons
+        try {
+          const topicsWithLessons = cloudLessons
+            .filter((lesson) => 
+              lesson.topic_id && 
+              (Boolean(lesson.content?.trim()) || (Array.isArray(lesson.blocks) && lesson.blocks.length > 0))
+            )
+            .map((lesson) => lesson.topic_id);
+
+          if (topicsWithLessons.length > 0) {
+            await supabase
+              .from('lesson_generation_jobs')
+              .update({
+                status: 'needs_review',
+                completed_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                error_message: null
+              })
+              .eq('status', 'pending')
+              .in('topic_id', topicsWithLessons);
+          }
+        } catch (jobErr) {
+          console.warn('[ClassroomView] Job status sync warning:', jobErr);
+        }
+
         if (cloudLessons.length === 0) {
           setTopicFallbackRows(topics);
           return;
@@ -720,7 +843,28 @@ export const ClassroomView: React.FC = () => {
         setIsHydratingSupabase(false);
       }
     })();
-  }, [allLessons, classroomScopeKey, currentCountry, currentGrade, id, module, selectedBacTrack]);
+  }, [classroomScopeKey, currentCountry, currentGrade, id, module, selectedBacTrack]);
+
+  // Dev mode console diagnostics
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      const hiddenNeedsReview = storedLessons.filter(l => {
+        const isStudVis = isStudentVisibleLesson(l);
+        const state = getLessonAvailabilityState(l);
+        return !isStudVis && state === 'needs_review';
+      }).length;
+
+      console.log('[ClassroomView Diagnostics]', {
+        cloudLessonsCount,
+        hydratedLessonsCount: storedLessons.length,
+        studentVisibleLessonsCount: studentVisibleLessons.length,
+        hiddenNeedsReviewCount: hiddenNeedsReview,
+        currentGrade,
+        moduleName: module?.name,
+        topicIdsCount: curriculumTopicRows.length,
+      });
+    }
+  }, [cloudLessonsCount, storedLessons, studentVisibleLessons, currentGrade, module?.name, curriculumTopicRows]);
 
   useEffect(() => {
     if (!showDomainTabs) {
@@ -773,10 +917,7 @@ export const ClassroomView: React.FC = () => {
       // Fetch existing topics from Supabase if they exist
       let existingTopics: string[] = [];
       try {
-        const { gradeId, subjectId, subjectIds } = await resolveCurriculumIds(currentGrade, module.name, module.category, {
-          gradeId: currentGradeId,
-          subjectId: currentSubjectId || module.id,
-        });
+        const { gradeId, subjectId, subjectIds } = await resolveCurriculumIds(currentGrade, module.name, module.category);
 
         if (gradeId && (subjectIds.length > 0 || subjectId)) {
           const { data: topics } = await supabase
@@ -870,20 +1011,15 @@ export const ClassroomView: React.FC = () => {
     return combined.length > maxChars ? combined.substring(0, maxChars) + '...' : combined;
   };
 
-  const getAdminApiHeaders = async (): Promise<Record<string, string>> => {
+  const getAdminApiHeaders = async () => {
     const { data } = await supabase.auth.getSession();
     const accessToken = data?.session?.access_token;
-    const headers: Record<string, string> = {
+
+    return {
       'Content-Type': 'application/json',
+      'x-levelspace-demo-admin': 'true',
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
     };
-
-    if (accessToken) {
-      headers.Authorization = `Bearer ${accessToken}`;
-    } else if (shouldUseDemoAdminHeader()) {
-      headers['x-levelspace-demo-admin'] = 'true';
-    }
-
-    return headers;
   };
 
   const handleGenerateLesson = async (title?: string, autoNavigate = false) => {
@@ -945,7 +1081,7 @@ export const ClassroomView: React.FC = () => {
     try {
       const existingContext = await buildChainContext();
 
-      for (const title of selectedSuggestions) {
+      const generatePromises = selectedSuggestions.map(async (title) => {
         const seedLesson = await generateSeedLesson(title, currentGrade, currentCountry, 2, module.strictRAG, existingContext);
         if (seedLesson) {
           await db.lessons.add({
@@ -974,7 +1110,8 @@ export const ClassroomView: React.FC = () => {
             await db.lessons.delete(existingSuggestion.id);
           }
         }
-      }
+      });
+      await Promise.all(generatePromises);
       setSuggestions(prev => prev.filter(s => !selectedSuggestions.includes(s.title)));
       setSelectedSuggestions([]);
     } catch (error) {
@@ -991,7 +1128,7 @@ export const ClassroomView: React.FC = () => {
       const existingContext = await buildChainContext();
 
       const titles = suggestions.map(s => s.title);
-      for (const title of titles) {
+      const generatePromises = titles.map(async (title) => {
         const seedLesson = await generateSeedLesson(title, currentGrade, currentCountry, 2, module.strictRAG, existingContext);
         if (seedLesson) {
           await db.lessons.add({
@@ -1020,7 +1157,8 @@ export const ClassroomView: React.FC = () => {
             await db.lessons.delete(existingSuggestion.id);
           }
         }
-      }
+      });
+      await Promise.all(generatePromises);
       setSuggestions([]);
       setSelectedSuggestions([]);
     } catch (error) {
@@ -1028,12 +1166,6 @@ export const ClassroomView: React.FC = () => {
     } finally {
       setGeneratingTitle(null);
     }
-  };
-
-  const closeLessonGallery = () => {
-    if (generatingTitle) return;
-    setSuggestions([]);
-    setSelectedSuggestions([]);
   };
 
   const handleSeedFromSupabase = async () => {
@@ -1054,7 +1186,7 @@ export const ClassroomView: React.FC = () => {
           return;
         }
 
-        toast.info("No lessons found yet.");
+        toast.info("No existing lessons found in Supabase for this curriculum.");
         setIsSeeding(false);
         return;
       }
@@ -1064,12 +1196,13 @@ export const ClassroomView: React.FC = () => {
       setTopicFallbackRows([]);
       cloudHydrationKeyRef.current = classroomScopeKey;
 
+      // Enforce strict RAG mode for this module by default as requested
       await db.modules.update(module.id, { strictRAG: true });
       
-      toast.success(`Loaded ${dbLessons.length} lessons.`);
+      toast.success(`Seeded ${dbLessons.length} lessons from Supabase. Strict RAG mode enabled.`);
     } catch (err: any) {
       console.error(err);
-      toast.error('Failed to load lessons: ' + err.message);
+      toast.error('Failed to seed from Supabase: ' + err.message);
     } finally {
       setIsSeeding(false);
     }
@@ -1083,29 +1216,56 @@ export const ClassroomView: React.FC = () => {
       const topicIds = topicFallbackRows.map((topic) => topic.id).filter(Boolean);
       const headers = await getAdminApiHeaders();
       let inserted = 0;
+      let skipped = 0;
 
+      const batches = [];
       for (let start = 0; start < topicIds.length; start += 25) {
-        const batch = topicIds.slice(start, start + 25);
-        const res = await fetch('/api/admin/lessons/seed-starter', {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ topic_ids: batch }),
-        });
-
-        const responseText = await res.text();
-        const payload = responseText ? (() => {
-          try {
-            return JSON.parse(responseText);
-          } catch {
-            return {};
-          }
-        })() : {};
-        if (!res.ok) throw new Error(payload.error || responseText || `Request failed with status ${res.status}`);
-
-        inserted += Number(payload.summary?.insertedLessons ?? 0);
+        batches.push(topicIds.slice(start, start + 25));
       }
 
-      toast.success(`Generated ${inserted} lessons.`);
+      const concurrencyLimit = 3;
+      for (let i = 0; i < batches.length; i += concurrencyLimit) {
+        const chunk = batches.slice(i, i + concurrencyLimit);
+
+        const results = await Promise.allSettled(chunk.map(async (batch) => {
+          const res = await fetch('/api/admin/lessons/seed-starter', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ topic_ids: batch }),
+          });
+
+          const responseText = await res.text();
+          const payload = responseText ? (() => {
+            try {
+              return JSON.parse(responseText);
+            } catch {
+              return {};
+            }
+          })() : {};
+          if (!res.ok) throw new Error(payload.error || responseText || `Request failed with status ${res.status}`);
+
+          return {
+            inserted: Number(payload.summary?.insertedLessons ?? 0),
+            skipped: Number(payload.summary?.skippedLessons ?? 0)
+          };
+        }));
+
+        const errors = [];
+        for (const result of results) {
+          if (result.status === 'fulfilled') {
+            inserted += result.value.inserted;
+            skipped += result.value.skipped;
+          } else {
+            errors.push(result.reason);
+          }
+        }
+
+        if (errors.length > 0) {
+          throw new Error(`Encountered ${errors.length} errors during batch processing. First error: ${errors[0].message || errors[0]}`);
+        }
+      }
+
+      toast.success(`Generated ${inserted} starter lessons. Skipped ${skipped} existing topics.`);
 
       const cloudLessons = await fetchSupabaseLessons();
       setCurriculumTopicRows(await fetchSupabaseTopics());
@@ -1115,11 +1275,7 @@ export const ClassroomView: React.FC = () => {
       await db.modules.update(module.id, { strictRAG: false });
     } catch (err: any) {
       console.error(err);
-      const message =
-        err?.message === 'Failed to fetch'
-          ? 'API server is not reachable. Start or restart the dev server and try again.'
-          : err?.message || 'Unknown error';
-      toast.error(`Failed to generate lessons: ${message}`);
+      toast.error(`Failed to generate starter lessons: ${err.message}`);
     } finally {
       setIsGeneratingStarterLessons(false);
     }
@@ -1159,7 +1315,7 @@ export const ClassroomView: React.FC = () => {
       <Layout>
         <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
           <BookOpen className="w-12 h-12 text-slate-500/20" />
-          <p className="text-slate-950 dark:text-ink font-medium">{t('classroom_not_found')}</p>
+          <p className="text-slate-950 font-medium">{t('classroom_not_found')}</p>
           <button onClick={() => navigate('/dashboard')} className="text-accent hover:underline">{t('return_to_dashboard')}</button>
         </div>
       </Layout>
@@ -1168,43 +1324,178 @@ export const ClassroomView: React.FC = () => {
 
   return (
     <Layout>
-      <div className="max-w-5xl mx-auto space-y-8 pb-20">
+      <div className="max-w-5xl mx-auto space-y-4 pb-20">
+        {/* Header Section */}
+        {/* Unified Header Card */}
+        <div className="bg-white dark:bg-paper rounded-[1.5rem] border border-slate-200 dark:border-white/8 p-5 shadow-sm space-y-4">
+          {/* Top Row: Back Navigation, Badges, Strict RAG Toggle & Actions */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-white/5 pb-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <button 
+                onClick={() => navigate('/dashboard')}
+                className="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-slate-950 transition-colors mr-2"
+              >
+                <ArrowLeft size={13} />
+                {t('back_to_dashboard')}
+              </button>
+              <span className="bg-accent/10 text-accent text-[10px] font-extrabold px-2 py-0.5 rounded uppercase">{module.code}</span>
+              <span className="text-slate-400 dark:text-ink-muted text-[10px] font-bold uppercase">{module.category}</span>
+              {isAdmin && (
+                <div className="flex items-center gap-2 border-l border-slate-200 pl-3 dark:border-white/10">
+                  <span className="text-[10px] text-slate-400 dark:text-ink-muted font-bold uppercase">Strict RAG</span>
+                  <button
+                    onClick={async () => {
+                      await db.modules.update(module.id, { strictRAG: !module.strictRAG });
+                    }}
+                    className={`w-7 h-3.5 rounded-full transition-colors relative ${module.strictRAG ? 'bg-accent' : 'bg-slate-950/20 dark:bg-white/20'}`}
+                    title="Keep this classroom grounded in certified content before using AI."
+                  >
+                    <div className={`absolute top-0.5 left-0.5 bg-white w-2.5 h-2.5 rounded-full transition-transform ${module.strictRAG ? 'translate-x-3.5' : 'translate-x-0'}`} />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {!showSetupState && (
+              <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                {isAdmin && (
+                  <button
+                    onClick={handleSeedFromSupabase}
+                    disabled={isSeeding}
+                    className="flex items-center gap-1.5 bg-slate-50 text-slate-950 px-3 py-2 rounded-lg text-xs font-bold transition-all border border-slate-200 hover:border-accent/30 hover:text-accent disabled:opacity-50 dark:bg-surface-low dark:border-white/5 dark:text-ink cursor-pointer"
+                  >
+                    {isSeeding ? <Loader2 size={12} className="animate-spin" /> : <Database size={12} />}
+                    <span>{isSeeding ? 'Loading...' : 'Load from Supabase'}</span>
+                  </button>
+                )}
+                {isAdmin && hasTopicFallback && (
+                  <button
+                    onClick={handleGenerateStarterLessons}
+                    disabled={isGeneratingStarterLessons}
+                    className="flex items-center gap-1.5 bg-slate-50 text-slate-950 px-3 py-2 rounded-lg text-xs font-bold transition-all border border-slate-200 hover:border-accent/30 hover:text-accent disabled:opacity-50 dark:bg-surface-low dark:border-white/5 dark:text-ink cursor-pointer"
+                  >
+                    {isGeneratingStarterLessons ? <Loader2 size={12} className="animate-spin" /> : <Database size={12} />}
+                    <span>{isGeneratingStarterLessons ? 'Generating...' : 'Generate All Lessons'}</span>
+                  </button>
+                )}
+                {aiAvailable ? (
+                  <>
+                    {isAdmin && hasLessons && (
+                      <button
+                        onClick={handleAuditClassroom}
+                        className="flex items-center gap-1.5 bg-slate-50 text-slate-500 hover:text-accent px-3 py-2 rounded-lg text-xs font-bold transition-all border border-slate-200 dark:bg-surface-low dark:border-white/5 dark:text-ink-secondary cursor-pointer"
+                      >
+                        <ShieldCheck size={12} />
+                        <span>Audit</span>
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleGenerateLesson()}
+                      disabled={!!generatingTitle}
+                      className="flex items-center gap-1.5 bg-slate-950 text-white px-4 py-2 rounded-lg text-xs font-black hover:bg-accent transition-all shadow-sm disabled:opacity-50 cursor-pointer"
+                    >
+                      {generatingTitle === module.name ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                      <span>{hasLessons ? 'Generate Lesson' : 'Generate First Lesson'}</span>
+                    </button>
+                  </>
+                ) : (
+                  <div className="px-3 py-2 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-[10px] font-bold uppercase">
+                    AI key needed
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Middle Row: Title & Subtitle/Description */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="space-y-1">
+              <h1 className="text-3xl font-black font-display tracking-tight text-slate-950 dark:text-ink leading-none">
+                {module.name}
+              </h1>
+              <p className="text-xs text-slate-500 dark:text-ink-muted max-w-3xl leading-relaxed">
+                {module.description}
+              </p>
+            </div>
+          </div>
+
+          {/* Bottom Row: Stats & Diagnostics Dashboard */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-slate-100 dark:border-white/5">
+            {showStats && (
+              <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-ink-muted select-none">
+                <span className="font-bold text-slate-700 dark:text-ink-secondary">
+                  {hasLessons ? `${lessons.length} Module Titles` : `${topicFallbackRows.length} Topics`}
+                </span>
+                <span className="h-1 w-1 rounded-full bg-slate-300 dark:bg-white/10" />
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">{module.progress}% Complete</span>
+                  <div className="w-20 h-1.5 bg-slate-100 dark:bg-surface-mid rounded-full overflow-hidden inline-block align-middle border border-slate-200/50 dark:border-white/5">
+                    <div className="h-full bg-accent" style={{ width: `${module.progress}%` }} />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {isAdmin && adminStats && (
+              <div className="flex flex-wrap gap-1.5 items-center text-[10px] font-extrabold uppercase tracking-wide select-none">
+                <span className="text-slate-400 dark:text-ink-muted mr-1">Diagnostics:</span>
+                <span className="bg-slate-100 text-slate-700 dark:bg-surface-low dark:text-ink px-2 py-0.5 rounded font-bold">Total: {adminStats.total}</span>
+                <span className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400 px-2 py-0.5 rounded font-bold">Pub: {adminStats.published}</span>
+                <span className="bg-amber-50 text-amber-700 dark:bg-amber-950/20 dark:text-amber-400 px-2 py-0.5 rounded font-bold">Review: {adminStats.needsReview}</span>
+                <span className="bg-blue-50 text-blue-700 dark:bg-blue-950/20 dark:text-blue-400 px-2 py-0.5 rounded font-bold">Draft: {adminStats.draft}</span>
+                <span className="bg-rose-50 text-rose-700 dark:bg-rose-950/20 dark:text-rose-400 px-2 py-0.5 rounded font-bold">Hidden: {adminStats.hidden}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {isHydratingSupabase && !hasLessons && !hasTopicFallback && (
+          <div className="bg-slate-50/50 border border-slate-200 rounded-3xl p-6 flex items-center gap-3 ls-body-text">
+            <Loader2 className="h-4 w-4 animate-spin text-accent" />
+            Checking Supabase for existing lessons, topics, and outlines...
+          </div>
+        )}
+
         {showSetupState ? (
-          <div className="bg-slate-50/50 border border-solid border-slate-200 rounded-3xl p-10 md:p-14 flex flex-col items-center justify-center text-center space-y-6 dark:bg-surface-low/50 dark:border-white/10">
-            <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm dark:bg-surface-mid">
+          <div className="bg-slate-50/50 border border-solid border-slate-200 rounded-3xl p-10 md:p-14 flex flex-col items-center justify-center text-center space-y-6">
+            <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm">
               <BookOpen size={24} className="text-accent" />
             </div>
             <div className="space-y-2 max-w-md">
-              <p className="text-xl font-bold text-slate-950 dark:text-ink">No lessons yet</p>
+              <p className="text-2xl font-bold text-slate-950">{t('start_here') || 'Set up this classroom'}</p>
+              <p className="ls-body-text">{t('start_here_desc') || 'Generate draft AI content, or load officially validated module titles.'}</p>
             </div>
-            <div className="flex flex-col sm:flex-row gap-3 w-full max-w-md">
-              {isAdmin && (
-                <button
-                  onClick={handleSeedFromSupabase}
-                  disabled={isSeeding}
-                  className="flex-1 flex items-center justify-center gap-2 bg-slate-950 text-white px-4 py-3 rounded-xl text-xs font-bold hover:bg-accent transition-all disabled:opacity-50"
-                >
-                  {isSeeding ? <Loader2 size={14} className="animate-spin" /> : <Database size={14} />}
-                  {isSeeding ? 'Loading...' : 'Load lessons'}
-                </button>
-              )}
+            {!aiAvailable && (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 w-full max-w-md">
+                <p className="text-xs text-amber-800 font-medium">{t('ai_key_needed') || 'AI features need an API key, but you can still load certified module titles right now.'}</p>
+              </div>
+            )}
+            <div className="flex flex-col sm:flex-row gap-3 w-full max-w-md mt-4">
               {aiAvailable && (
                 <button
                   onClick={() => handleGenerateLesson()}
                   disabled={!!generatingTitle}
-                  className="flex-1 flex items-center justify-center gap-2 bg-white text-slate-950 px-4 py-3 rounded-xl text-xs font-bold  border border-slate-200 hover:border-accent/30 hover:text-accent transition-all disabled:opacity-50 dark:bg-paper dark:text-ink dark:border-white/10 dark:hover:bg-surface-low"
+                  className="flex-1 flex items-center justify-center gap-2 bg-accent text-white px-4 py-3.5 rounded-xl text-sm font-bold shadow-sm shadow-accent/20 hover:bg-accent/90 transition-all disabled:opacity-50"
                 >
-                  {generatingTitle === module.name ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-                  Generate lesson
+                  {generatingTitle === module.name ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+                  {t('generate_first_lesson') || 'Generate First Lesson'}
                 </button>
               )}
+              <button
+                onClick={handleSeedFromSupabase}
+                disabled={isSeeding}
+                className="flex-1 flex items-center justify-center gap-2 bg-white text-slate-950 px-4 py-3.5 rounded-xl text-sm font-bold border border-slate-200 hover:border-accent/30 hover:text-accent transition-all disabled:opacity-50"
+              >
+                {isSeeding ? <Loader2 size={16} className="animate-spin" /> : <Database size={16} />}
+                {isSeeding ? t('loading') || 'Loading...' : t('load_from_supabase') || 'Load from Supabase'}
+              </button>
             </div>
           </div>
         ) : (
           <>
             {/* Tabs */}
             {showTabs && (
-              <div className="flex gap-2 border-b border-slate-200 dark:border-white/10 overflow-x-auto pb-2">
+              <div className="flex gap-2 border-b border-slate-200 overflow-x-auto pb-2">
                 {(['lessons', 'quizzes', 'exercises'] as const).map((tabKey) => {
                   const tabConfig = CLASSROOM_TAB_CONFIG[tabKey];
                   const TabIcon = tabConfig.icon;
@@ -1213,13 +1504,13 @@ export const ClassroomView: React.FC = () => {
                     <button
                       key={tabKey}
                       onClick={() => setActiveTab(tabKey)}
-                      className={`flex items-center gap-2 rounded-t-2xl px-4 py-3 text-sm font-bold transition-all border-b-2 whitespace-nowrap ${
+                      className={`flex items-center gap-2 rounded-t-2xl px-4 py-3 text-sm font-bold  transition-all border-b-2 whitespace-nowrap ${
                         isActive
                           ? tabConfig.activeClass
-                          : 'border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-950 dark:text-ink-muted dark:hover:bg-surface-low dark:hover:text-ink'
+                          : 'border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-950'
                       }`}
                     >
-                      <TabIcon size={16} className={isActive ? tabConfig.iconClass : 'text-slate-500 dark:text-ink-muted'} />
+                      <TabIcon size={16} className={isActive ? tabConfig.iconClass : 'text-slate-500'} />
                       {t(tabKey)}
                     </button>
                   );
@@ -1230,8 +1521,33 @@ export const ClassroomView: React.FC = () => {
             {/* Tab Content */}
             {activeTab === 'lessons' && (
               <div className="space-y-4">
+                {showValidationWarningBanner && (
+                  <div className="rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4 text-amber-900">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+                      <div>
+                        <p className="text-sm font-semibold">Draft AI-assisted content is shown because no teacher-reviewed or officially validated lesson is available yet.</p>
+                        <p className="mt-1 text-sm text-amber-800">Use the status badge on each module title before treating it as final Moroccan curriculum truth.</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {!isAdmin && hasLessons && studentVisibleLessons.length === 0 && (
+                  <div className="rounded-3xl border border-blue-200 bg-blue-50 px-5 py-4 text-blue-900 shadow-sm">
+                    <div className="flex items-start gap-3">
+                      <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" />
+                      <div>
+                        <p className="text-sm font-semibold">Lessons are prepared but waiting for validation.</p>
+                        <p className="mt-1 text-sm text-blue-800">Your teacher or administrator can review and publish them for classroom access.</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-bold text-slate-950 dark:text-ink flex items-center gap-2">
+                  <h3 className="text-lg font-bold text-slate-950 flex items-center gap-2">
                     <BookOpen size={20} className="text-accent" />
                     {hasTopicFallback ? t('curriculum_topics') : t('curriculum_units')}
                   </h3>
@@ -1239,24 +1555,24 @@ export const ClassroomView: React.FC = () => {
                     <button
                       onClick={fetchGallery}
                       disabled={isFetchingGallery || !aiAvailable}
-                      title="More lessons"
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:text-accent disabled:opacity-50 disabled:cursor-not-allowed dark:border-white/10 dark:bg-paper dark:text-ink-muted"
-                      aria-label="More lessons"
+                      title={!aiAvailable ? "AI features need an API key, but your classroom content is available." : ""}
+                      className="text-xs font-medium text-blue-700 hover:underline flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {isFetchingGallery ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                      {isFetchingGallery ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />}
+                      Fetch Lesson Gallery
                     </button>
                   )}
                 </div>
 
                 {showDomainTabs && (
-                  <div className="rounded-2xl border border-slate-200 bg-white p-2 dark:border-white/10 dark:bg-paper">
+                  <div className="rounded-2xl border border-slate-200 bg-white p-2">
                     <div className="flex gap-2 overflow-x-auto">
                       <button
                         onClick={() => setActiveDomainKey('all')}
                         className={`shrink-0 rounded-xl px-4 py-2 text-xs font-medium transition-all ${
                           activeDomainKey === 'all'
                             ? 'bg-accent text-white shadow-sm'
-                            : 'text-slate-500 dark:text-ink-muted hover:bg-slate-50 dark:hover:bg-surface-low hover:text-slate-950 dark:hover:text-ink'
+                            : 'text-slate-500 hover:bg-slate-50 hover:text-slate-950'
                         }`}
                       >
                         {t('all')}
@@ -1268,7 +1584,7 @@ export const ClassroomView: React.FC = () => {
                           className={`shrink-0 rounded-xl px-4 py-2 text-xs font-medium transition-all ${
                             activeDomainKey === domain.key
                               ? 'bg-accent text-white shadow-sm'
-                              : 'text-slate-500 dark:text-ink-muted hover:bg-slate-50 dark:hover:bg-surface-low hover:text-slate-950 dark:hover:text-ink'
+                              : 'text-slate-500 hover:bg-slate-50 hover:text-slate-950'
                           }`}
                         >
                           {domain.name}
@@ -1279,103 +1595,210 @@ export const ClassroomView: React.FC = () => {
                   </div>
                 )}
                 
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {Array.isArray(lessons) && lessons.length > 0 ? (
-                    visibleLessons.length > 0 ? visibleLessons.map((lesson, i) => (
-                      <motion.div
-                        key={lesson.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: i * 0.05 }}
-                        onClick={() => navigate(`/lesson/${lesson.id}`)}
-                        className="group flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all hover:border-accent/30 hover:shadow-md dark:border-white/10 dark:bg-paper"
-                      >
-                        <div className="flex items-center justify-between gap-3 bg-[#007A87] px-4 py-3 text-white dark:bg-accent">
-                          <div className="flex min-w-0 items-center gap-2">
-                            <BookOpen className="h-5 w-5 shrink-0 text-white" />
-                            <h4 className="truncate text-sm font-bold leading-tight text-white" title={module.name}>
-                              {module.name}
-                            </h4>
-                          </div>
-                          <div className="flex shrink-0 items-center gap-1">
-                            <span className="max-w-[76px] truncate rounded-md bg-white/15 px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm">
-                              Unit
-                            </span>
-                            {lesson.status === 'done' && (
-                              <span className="rounded-md bg-white/15 px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm">
-                                Done
-                              </span>
-                            )}
-                          </div>
-                        </div>
+                    visibleLessons.length > 0 ? visibleLessons.map((lesson, i) => {
+                      const isClickable = isAdmin || isStudentVisibleLesson(lesson);
+                      const availabilityState = getLessonAvailabilityState(lesson);
+                      
+                      return (
+                        <motion.div 
+                          key={lesson.id}
+                          layout
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: i * 0.05 }}
+                          onClick={(e) => {
+                            const target = e.target as HTMLElement;
+                            // Safe check for detached React synthetic DOM nodes
+                            if (!target.isConnected || !document.body.contains(target)) return;
 
-                        <div className="h-20 w-full overflow-hidden border-b border-slate-100 bg-slate-50 dark:border-white/5 dark:bg-surface-low">
-                          <img
-                            src={getLessonCardIllustration(lesson.title, module?.name || module?.category)}
-                            alt={lesson.title}
-                            className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-                          />
-                        </div>
+                            // Handle click on practice test metrics section as direct test trigger
+                            if (target.closest('.practice-test-metrics-trigger')) {
+                              e.stopPropagation();
+                              const quizzes = (lesson.blocks || []).filter((b: any) => b.purpose === 'quiz' || b.type === 'quiz');
+                              const exercises = (lesson.blocks || []).filter((b: any) => b.purpose === 'practice' || b.purpose === 'exam' || b.type === 'practice' || b.type === 'exam');
+                              const hasTests = quizzes.length > 0 || exercises.length > 0;
+                              if (hasTests) {
+                                navigate(`/lesson/${lesson.id}`, { state: { startAtTest: true } });
+                              } else {
+                                navigate(`/lesson/${lesson.id}`);
+                              }
+                              return;
+                            }
 
-                        <div className="flex flex-1 flex-col gap-3 p-4">
-                          <div className="grid grid-cols-[auto_1fr] items-center gap-3 text-sm">
-                            <div className="flex min-w-0 items-center gap-2">
-                              <BookOpen className="h-4 w-4 shrink-0 text-slate-400 dark:text-ink-muted" />
-                              <span className="font-bold text-slate-800 dark:text-ink">{i + 1}</span>
-                              <span className="truncate text-xs text-slate-500 dark:text-ink-muted" title={lesson.title}>
-                                {lesson.title}
-                              </span>
+                            if (target.closest('.card-footer-actions') || target.closest('button')) return;
+                            if (isClickable) navigate(`/lesson/${lesson.id}`);
+                          }}
+                          className={`bg-white border border-slate-200 rounded-3xl overflow-hidden flex flex-col group transition-all dark:bg-paper dark:border-white/8 shadow-sm ${
+                            isClickable 
+                              ? 'cursor-pointer hover:border-accent/30 hover:shadow-lg' 
+                              : 'opacity-85 bg-slate-50/50 dark:bg-surface-low/50 cursor-not-allowed'
+                          }`}
+                          style={{ boxShadow: 'var(--ls-shadow)' }}
+                        >
+                          {/* Top Redesigned Teal Header Bar */}
+                          <div className={`px-5 py-3.5 flex items-center justify-between text-white shrink-0 ${
+                            isClickable ? 'bg-[#007A87] dark:bg-accent' : 'bg-slate-500 dark:bg-slate-700'
+                          }`}>
+                            <div className="flex items-center gap-2 min-w-0">
+                              <BookOpen className="w-4 h-4 shrink-0 text-white" />
+                              <h3 className="text-sm font-bold leading-tight truncate text-white dark:text-white" title={lesson.title}>{lesson.title}</h3>
                             </div>
-                            <div className="space-y-1">
-                              <div className="flex justify-between text-[11px] font-bold">
-                                <span className="text-slate-400 dark:text-ink-muted">Progress</span>
-                                <span className="text-slate-800 dark:text-ink">{lesson.status === 'done' ? '100%' : '0%'}</span>
-                              </div>
-                              <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-surface-mid">
-                                <div
-                                  className="h-full rounded-full bg-emerald-500"
-                                  style={{ width: lesson.status === 'done' ? '100%' : '0%' }}
-                                />
-                              </div>
+                            <div className="flex items-center gap-1 shrink-0 ml-2">
+                              {module?.category && (
+                                <span className="bg-white/15 text-white text-[9px] font-bold px-2 py-0.5 rounded-md backdrop-blur-sm truncate max-w-[90px]">{module.category}</span>
+                              )}
+                              {(lesson.grade || currentGrade) && (
+                                <span className="bg-white/15 text-white text-[9px] font-bold px-2 py-0.5 rounded-md backdrop-blur-sm truncate max-w-[80px]">{lesson.grade || currentGrade}</span>
+                              )}
                             </div>
                           </div>
 
-                          <div className="mt-auto flex items-center justify-between gap-3 border-t border-slate-100 pt-3 dark:border-white/6">
-                            <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  navigate(`/lesson/${lesson.id}`);
-                                }}
-                                className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-emerald-700"
+                          {/* Horizontal Dynamic Illustration Banner */}
+                          <div className="h-24 w-full overflow-hidden relative border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-surface-low shrink-0">
+                            <img 
+                              src={lesson.bannerImage || getLessonIllustration(lesson.title, lesson.subject || module?.name)}
+                              alt={lesson.title}
+                              className={`w-full h-full object-cover transition-transform duration-700 ${isClickable ? 'group-hover:scale-105' : ''}`}
+                            />
+                            {/* Pin / Unpin button on the illustration banner */}
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); togglePinLesson(lesson.id); }}
+                              className={`absolute top-2 right-2 z-10 w-7 h-7 rounded-full flex items-center justify-center border backdrop-blur-md transition-all shadow-sm cursor-pointer ${
+                                pinnedLessonIds.includes(lesson.id)
+                                  ? 'bg-amber-500 border-amber-400 text-white shadow-amber-500/40 shadow-md'
+                                  : 'bg-black/35 border-white/20 text-white/75 hover:text-white hover:bg-black/50'
+                              }`}
+                              title={pinnedLessonIds.includes(lesson.id) ? 'Unpin Lesson' : 'Pin to Study Desk'}
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                viewBox="0 0 24 24"
+                                fill={pinnedLessonIds.includes(lesson.id) ? "currentColor" : "none"}
+                                stroke="currentColor"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className="w-3.5 h-3.5"
                               >
-                                <Play className="h-3 w-3 fill-current text-white" />
-                                Start
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  navigate(`/lesson/${lesson.id}`);
-                                }}
-                                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50 dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:bg-surface-low"
-                              >
-                                Plan
-                              </button>
+                                <line x1="12" y1="17" x2="12" y2="22"></line>
+                                <path d="M5 17h14v-1.76a2 2 0 0 0-.44-1.24l-2.78-3.55A2 2 0 0 1 15 9.24V5a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4.24a2 2 0 0 1-.78 1.21L5.44 14a2 2 0 0 0-.44 1.24Z"></path>
+                              </svg>
+                            </button>
+                          </div>
+
+                          {/* Card Body */}
+                          <div className="p-5 flex-1 flex flex-col space-y-4">
+                            {/* Metrics columns */}
+                            <div className="grid grid-cols-2 gap-4 text-sm border-b border-slate-100 pb-4 dark:border-white/6 items-center">
+                              {(() => {
+                                const quizzes = (lesson.blocks || []).filter((b: any) => b.purpose === 'quiz' || b.type === 'quiz');
+                                const exercises = (lesson.blocks || []).filter((b: any) => b.purpose === 'practice' || b.purpose === 'exam' || b.type === 'practice' || b.type === 'exam');
+                                const hasTests = quizzes.length > 0 || exercises.length > 0;
+                                return (
+                                  <div className="space-y-1 practice-test-metrics-trigger cursor-pointer hover:bg-slate-50 dark:hover:bg-surface-low rounded-xl p-1.5 transition-all" title={hasTests ? "Click to take practice test directly" : ""}>
+                                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 dark:text-ink">
+                                      <Target className="w-3.5 h-3.5 text-accent shrink-0" />
+                                      <span>Practice Test</span>
+                                    </div>
+                                    <p className="text-[10px] text-slate-500 dark:text-ink-muted leading-tight">
+                                      {hasTests 
+                                        ? `${quizzes.length} Quizzes • ${exercises.length} Exercises`
+                                        : 'No tests generated yet'}
+                                    </p>
+                                  </div>
+                                );
+                              })()}
+                              <div className="space-y-1">
+                                <div className="flex justify-between text-[11px] font-bold">
+                                  <span className="text-slate-400 dark:text-ink-muted">Progress</span>
+                                  <span className="text-slate-800 dark:text-ink">{lesson.status === 'done' ? '100%' : '0%'}</span>
+                                </div>
+                                <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden dark:bg-surface-mid">
+                                  <div 
+                                    className={`h-full rounded-full ${lesson.status === 'done' ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-surface-high'}`} 
+                                    style={{ width: lesson.status === 'done' ? '100%' : '0%' }} 
+                                  />
+                                </div>
+                              </div>
                             </div>
 
-                            <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold ${
-                              lesson.status === 'done' ? 'text-accent' : 'text-emerald-700 dark:text-emerald-400'
-                            }`}>
-                              <span className={`h-1.5 w-1.5 rounded-full ${lesson.status === 'done' ? 'bg-accent' : 'bg-emerald-500 animate-pulse'}`} />
-                              {lesson.status === 'done' ? 'Done' : 'Available'}
-                            </span>
+                            {/* Last activity / status */}
+                            <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-ink-muted">
+                              <Clock className="w-4 h-4 text-slate-400 shrink-0" />
+                              <span>
+                                Last Active: {lesson.createdAt ? relativeTime(lesson.createdAt) : 'No activity yet'}
+                              </span>
+                            </div>
+
+                            {/* Footer: actions + status dot */}
+                            <div className="pt-2 flex items-center justify-between border-t border-slate-100 dark:border-white/6">
+                              {isClickable ? (
+                                <div className="flex items-center gap-2 card-footer-actions">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); navigate(`/lesson/${lesson.id}`); }}
+                                    className="flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 text-xs font-bold text-white transition-colors shadow-sm"
+                                  >
+                                    <Play className="w-3 h-3 fill-current text-white" />
+                                    {lesson.status === 'done' ? 'Review' : 'Start Lesson'}
+                                  </button>
+                                  {(() => {
+                                    const quizzes = (lesson.blocks || []).filter((b: any) => b.purpose === 'quiz' || b.type === 'quiz');
+                                    const exercises = (lesson.blocks || []).filter((b: any) => b.purpose === 'practice' || b.purpose === 'exam' || b.type === 'practice' || b.type === 'exam');
+                                    const hasTests = quizzes.length > 0 || exercises.length > 0;
+                                    if (hasTests) {
+                                      return (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => { e.stopPropagation(); navigate(`/lesson/${lesson.id}`, { state: { startAtTest: true } }); }}
+                                          className="rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-700 transition-colors dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:bg-surface-low flex items-center gap-1.5 shadow-sm"
+                                        >
+                                          <Target size={12} className="text-accent shrink-0" />
+                                          Take Test
+                                        </button>
+                                      );
+                                    }
+                                    return (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); navigate(`/lesson/${lesson.id}`); }}
+                                        className="rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-700 transition-colors dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:bg-surface-low"
+                                      >
+                                        View Plan
+                                      </button>
+                                    );
+                                  })()}
+                                </div>
+                              ) : (
+                                <div className="flex-1 text-[11px] text-slate-500 dark:text-ink-muted font-medium pr-2 leading-relaxed">
+                                  {availabilityState === 'needs_review' 
+                                    ? 'Lesson exists but is waiting for review' 
+                                    : 'Starter lesson available for admin review'}
+                                </div>
+                              )}
+
+                              {isClickable ? (
+                                <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
+                                  lesson.status === 'done' ? 'text-emerald-700 dark:text-emerald-400' : 'text-accent'
+                                }`}>
+                                  <span className={`h-1.5 w-1.5 rounded-full ${lesson.status === 'done' ? 'bg-emerald-500 animate-pulse' : 'bg-accent'}`} />
+                                  {lesson.status === 'done' ? 'Completed' : 'Available'}
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+                                  {availabilityState === 'needs_review' ? 'Under Review' : 'Draft'}
+                                </span>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      </motion.div>
-                    )) : (
-                      <div className="col-span-full rounded-2xl border border-solid border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-paper">
+                        </motion.div>
+                      );
+                    }) : (
+                      <div className="col-span-full rounded-2xl border border-solid border-slate-200 bg-white p-5 dark:border-white/8 dark:bg-paper">
                         <p className="text-sm font-semibold text-slate-950 dark:text-ink">No lessons in this domain yet.</p>
                         <p className="mt-1 ls-micro-label">Switch back to {t('all')} to see every available lesson for this classroom.</p>
                       </div>
@@ -1384,93 +1807,107 @@ export const ClassroomView: React.FC = () => {
                     visibleTopicFallbackRows.map((topic, i) => (
                       <motion.div
                         key={topic.id}
+                        layout
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: i * 0.03 }}
-                        className="group flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all hover:border-accent/30 hover:shadow-md dark:border-white/10 dark:bg-paper"
-                        onClick={() => handleGenerateLesson(topic.title, true)}
+                        onClick={(e) => {
+                          const target = e.target as HTMLElement;
+                          if (!target.isConnected || !document.body.contains(target)) return;
+                          if (target.closest('.card-footer-actions') || target.closest('button')) return;
+                          handleGenerateLesson(topic.title, true);
+                        }}
+                        className="bg-white border border-slate-200 rounded-3xl overflow-hidden flex flex-col group hover:border-accent/30 hover:shadow-lg transition-all dark:bg-paper dark:border-white/8 shadow-sm cursor-pointer"
+                        style={{ boxShadow: 'var(--ls-shadow)' }}
                       >
-                        <div className="flex items-center justify-between gap-3 bg-[#007A87] px-4 py-3 text-white dark:bg-accent">
-                          <div className="flex min-w-0 items-center gap-2">
-                            <BookOpen className="h-5 w-5 shrink-0 text-white" />
-                            <h4 className="truncate text-sm font-bold leading-tight text-white" title={topic.title}>
-                              Lesson {i + 1}
-                            </h4>
+                        {/* Top Redesigned Teal Header Bar */}
+                        <div className="bg-[#007A87] px-5 py-3.5 flex items-center justify-between text-white dark:bg-accent shrink-0">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <BookOpen className="w-4 h-4 shrink-0 text-white" />
+                            <h3 className="text-sm font-bold leading-tight truncate text-white dark:text-white" title={topic.title}>{topic.title}</h3>
                           </div>
-                          <div className="flex shrink-0 items-center gap-1">
-                            <span className="max-w-[76px] truncate rounded-md bg-white/15 px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm">
-                              Topic
-                            </span>
-                            {topic.domain_name && (
-                              <span className="max-w-[76px] truncate rounded-md bg-white/15 px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm" title={topic.domain_name}>
-                                {topic.domain_name}
-                              </span>
+                          <div className="flex items-center gap-1 shrink-0 ml-2">
+                            {module?.category && (
+                              <span className="bg-white/15 text-white text-[9px] font-bold px-2 py-0.5 rounded-md backdrop-blur-sm truncate max-w-[90px]">{module.category}</span>
+                            )}
+                            {currentGrade && (
+                              <span className="bg-white/15 text-white text-[9px] font-bold px-2 py-0.5 rounded-md backdrop-blur-sm truncate max-w-[80px]">{currentGrade}</span>
                             )}
                           </div>
                         </div>
 
-                        <div className="h-20 w-full overflow-hidden border-b border-slate-100 bg-slate-50 dark:border-white/5 dark:bg-surface-low">
-                          <img
-                            src={getLessonCardIllustration(topic.title, module?.name || module?.category)}
+                        {/* Horizontal Dynamic Illustration Banner */}
+                        <div className="h-24 w-full overflow-hidden relative border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-surface-low shrink-0">
+                          <img 
+                            src={getLessonIllustration(topic.title, module?.name)}
                             alt={topic.title}
-                            className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                           />
                         </div>
 
-                        <div className="flex flex-1 flex-col gap-3 p-4">
-                          <div className="grid grid-cols-[auto_1fr] items-center gap-3 text-sm">
-                            <div className="flex min-w-0 items-center gap-2">
-                              <BookOpen className="h-4 w-4 shrink-0 text-slate-400 dark:text-ink-muted" />
-                              <span className="font-bold text-slate-800 dark:text-ink">{i + 1}</span>
-                              <span className="truncate text-xs text-slate-500 dark:text-ink-muted" title={topic.title}>
-                                {topic.title}
-                              </span>
+                        {/* Card Body */}
+                        <div className="p-5 flex-1 flex flex-col space-y-4">
+                          {/* Metrics columns */}
+                          <div className="grid grid-cols-2 gap-4 text-sm border-b border-slate-100 pb-4 dark:border-white/6 items-center">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 dark:text-ink">
+                                <Target className="w-3.5 h-3.5 text-slate-400 dark:text-ink-muted shrink-0" />
+                                <span>Practice Test</span>
+                              </div>
+                              <p className="text-[10px] text-slate-500 dark:text-ink-muted leading-tight">
+                                No tests generated yet
+                              </p>
                             </div>
                             <div className="space-y-1">
                               <div className="flex justify-between text-[11px] font-bold">
                                 <span className="text-slate-400 dark:text-ink-muted">Progress</span>
                                 <span className="text-slate-800 dark:text-ink">0%</span>
                               </div>
-                              <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-surface-mid">
-                                <div className="h-full w-0 rounded-full bg-emerald-500" />
+                              <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden dark:bg-surface-mid">
+                                <div 
+                                  className="h-full rounded-full bg-slate-300 dark:bg-surface-high" 
+                                  style={{ width: '0%' }} 
+                                />
                               </div>
                             </div>
                           </div>
 
-                          <p className="line-clamp-2 min-h-[2.5rem] text-xs leading-relaxed text-slate-500 dark:text-ink-muted">
-                            {topic.outlines[0]?.description || topic.outlines[0]?.title || topic.title}
-                          </p>
+                          {/* Last activity / status */}
+                          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-ink-muted">
+                            <Clock className="w-4 h-4 text-slate-400 shrink-0" />
+                            <span>
+                              Last Active: No activity yet
+                            </span>
+                          </div>
 
-                          <div className="mt-auto flex items-center justify-between gap-3 border-t border-slate-100 pt-3 dark:border-white/6">
-                            <div className="flex items-center gap-2">
+                          {/* Footer: actions + status dot */}
+                          <div className="pt-2 flex items-center justify-between border-t border-slate-100 dark:border-white/6">
+                            <div className="flex items-center gap-2 card-footer-actions">
                               <button
                                 type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleGenerateLesson(topic.title, true);
-                                }}
+                                onClick={(e) => { e.stopPropagation(); handleGenerateLesson(topic.title, true); }}
                                 disabled={!!generatingTitle}
-                                className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:opacity-50"
+                                className="flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 text-xs font-bold text-white transition-colors shadow-sm disabled:opacity-60"
                               >
-                                {generatingTitle === topic.title ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3 fill-current text-white" />}
-                                Start
+                                {generatingTitle === topic.title ? (
+                                  <Loader2 size={12} className="animate-spin text-white" />
+                                ) : (
+                                  <Play className="w-3 h-3 fill-current text-white" />
+                                )}
+                                Generate
                               </button>
                               <button
                                 type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleGenerateLesson(topic.title);
-                                }}
-                                disabled={!!generatingTitle}
-                                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:bg-surface-low"
+                                onClick={(e) => { e.stopPropagation(); handleGenerateLesson(topic.title, true); }}
+                                className="rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-700 transition-colors dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:bg-surface-low"
                               >
-                                Plan
+                                View Plan
                               </button>
                             </div>
 
-                            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
-                              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
-                              Available
+                            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-600 dark:text-amber-400">
+                              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                              Not Started
                             </span>
                           </div>
                         </div>
@@ -1486,7 +1923,7 @@ export const ClassroomView: React.FC = () => {
         {activeTab === 'quizzes' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-slate-950 dark:text-ink flex items-center gap-2">
+              <h3 className="text-lg font-bold text-slate-950 flex items-center gap-2">
                 <Target size={20} className="text-accent" />
                 {t('available_quizzes')}
               </h3>
@@ -1496,19 +1933,19 @@ export const ClassroomView: React.FC = () => {
             ) : quizzes.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {quizzes.map((quiz) => (
-                  <div key={quiz.id} className="bg-white border border-slate-200 p-5 rounded-2xl hover:border-accent/30 transition-all cursor-pointer dark:bg-paper dark:border-white/10">
-                    <h4 className="font-bold text-slate-950 dark:text-ink">{quiz.title}</h4>
+                  <div key={quiz.id} className="bg-white border border-slate-200 p-5 rounded-2xl hover:border-accent/30 transition-all cursor-pointer">
+                    <h4 className="font-bold text-slate-950">{quiz.title}</h4>
                     <p className="ls-body-text mt-1">{quiz.description}</p>
                     <div className="flex items-center gap-3 mt-4">
-                      <span className="text-xs font-medium bg-slate-50 px-2 py-1 rounded text-slate-500 dark:bg-surface-mid dark:text-ink-muted">{quiz.difficulty}</span>
-                      <span className="text-xs font-medium bg-slate-50 px-2 py-1 rounded text-slate-500 dark:bg-surface-mid dark:text-ink-muted">{quiz.questions?.length || 0} Questions</span>
+                      <span className="text-xs font-medium bg-slate-50 px-2 py-1 rounded text-slate-500">{quiz.difficulty}</span>
+                      <span className="text-xs font-medium bg-slate-50 px-2 py-1 rounded text-slate-500">{quiz.questions?.length || 0} Questions</span>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="bg-slate-50/50 border border-solid border-slate-200 rounded-3xl p-16 text-center dark:bg-surface-low/50 dark:border-white/10">
-                <p className="text-slate-500 dark:text-ink-muted">{t('no_quizzes_for_lessons')}</p>
+              <div className="bg-slate-50/50 border border-solid border-slate-200 rounded-3xl p-16 text-center">
+                <p className="text-slate-500">{t('no_quizzes_for_lessons')}</p>
               </div>
             )}
           </div>
@@ -1517,7 +1954,7 @@ export const ClassroomView: React.FC = () => {
         {activeTab === 'exercises' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-slate-950 dark:text-ink flex items-center gap-2">
+              <h3 className="text-lg font-bold text-slate-950 flex items-center gap-2">
                 <Dumbbell size={20} className="text-accent" />
                 {t('practice_exercises')}
               </h3>
@@ -1527,179 +1964,133 @@ export const ClassroomView: React.FC = () => {
             ) : exercises.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {exercises.map((exercise) => (
-                  <div key={exercise.id} className="bg-white border border-slate-200 p-5 rounded-2xl hover:border-accent/30 transition-all cursor-pointer dark:bg-paper dark:border-white/10">
-                    <h4 className="font-bold text-slate-950 dark:text-ink">{exercise.title}</h4>
+                  <div key={exercise.id} className="bg-white border border-slate-200 p-5 rounded-2xl hover:border-accent/30 transition-all cursor-pointer">
+                    <h4 className="font-bold text-slate-950">{exercise.title}</h4>
                     <p className="ls-body-text mt-1 line-clamp-2">{exercise.prompt}</p>
                     <div className="flex items-center gap-3 mt-4">
-                      <span className="text-xs font-medium bg-slate-50 px-2 py-1 rounded text-slate-500 dark:bg-surface-mid dark:text-ink-muted">{exercise.difficulty}</span>
+                      <span className="text-xs font-medium bg-slate-50 px-2 py-1 rounded text-slate-500">{exercise.difficulty}</span>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="bg-slate-50/50 border border-solid border-slate-200 rounded-3xl p-16 text-center dark:bg-surface-low/50 dark:border-white/10">
-                <p className="text-slate-500 dark:text-ink-muted">{t('no_exercises_for_lessons')}</p>
+              <div className="bg-slate-50/50 border border-solid border-slate-200 rounded-3xl p-16 text-center">
+                <p className="text-slate-500">{t('no_exercises_for_lessons')}</p>
               </div>
             )}
           </div>
         )}
 
-        <Modal
-          isOpen={suggestions.length > 0}
-          onClose={closeLessonGallery}
-          title={
-            <span className="flex items-center gap-2">
-              <Sparkles size={20} className="text-accent" />
-              Suggested Units
-            </span>
-          }
-          maxWidth="4xl"
-        >
-          <div className="space-y-5">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-              <div className="flex items-center gap-3">
-                {selectedSuggestions.length > 0 ? (
-                  <button
-                    type="button"
-                    onClick={handleCurateSelected}
-                    disabled={!!generatingTitle}
-                    className="rounded-xl bg-slate-950 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-accent disabled:opacity-50 dark:bg-white dark:text-slate-950 dark:hover:bg-accent dark:hover:text-white"
+        {/* Gallery Section */}
+        <AnimatePresence>
+          {suggestions.length > 0 && (
+            <motion.div 
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="space-y-4 pt-8 border-t border-slate-200"
+            >
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold text-slate-950 flex items-center gap-2">
+                  <Sparkles size={20} className="text-accent" />
+                  Suggested Module Titles
+                </h3>
+                <div className="flex items-center gap-4">
+                  {selectedSuggestions.length > 0 ? (
+                    <button 
+                      onClick={handleCurateSelected}
+                      disabled={!!generatingTitle}
+                      className="text-xs font-medium text-blue-700 hover:underline disabled:opacity-50"
+                    >
+                      {generatingTitle === 'selected' ? <Loader2 size={10} className="animate-spin inline mr-1" /> : null}
+                      Curate Selected ({selectedSuggestions.length})
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={handleCurateAll}
+                      disabled={!!generatingTitle}
+                      className="text-xs font-medium text-blue-700 hover:underline disabled:opacity-50"
+                    >
+                      {generatingTitle === 'all' ? <Loader2 size={10} className="animate-spin inline mr-1" /> : null}
+                      Curate All
+                    </button>
+                  )}
+                  <button 
+                    onClick={() => setSuggestions([])}
+                    className="ls-micro-label hover:text-slate-950"
                   >
-                    {generatingTitle === 'selected' ? <Loader2 size={12} className="mr-1 inline animate-spin" /> : null}
-                    Curate Selected ({selectedSuggestions.length})
+                    Close Gallery
                   </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={handleCurateAll}
-                    disabled={!!generatingTitle}
-                    className="rounded-xl bg-slate-950 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-accent disabled:opacity-50 dark:bg-white dark:text-slate-950 dark:hover:bg-accent dark:hover:text-white"
-                  >
-                    {generatingTitle === 'all' ? <Loader2 size={12} className="mr-1 inline animate-spin" /> : null}
-                    Curate All
-                  </button>
-                )}
+                </div>
               </div>
-            </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {Array.isArray(suggestions) && suggestions.map((suggestion, i) => {
+                  const isSelected = selectedSuggestions.includes(suggestion.title);
+                  const isThisGenerating = generatingTitle === suggestion.title;
+                  const anyGenerating = !!generatingTitle;
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {Array.isArray(suggestions) && suggestions.map((suggestion, i) => {
-                const isSelected = selectedSuggestions.includes(suggestion.title);
-                const isThisGenerating = generatingTitle === suggestion.title;
-                const anyGenerating = !!generatingTitle;
-                const lessonNumber = i + 1;
-
-                return (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: i * 0.05 }}
-                    onClick={() => {
-                      if (anyGenerating) return;
-                      setSelectedSuggestions(prev =>
-                        prev.includes(suggestion.title)
-                          ? prev.filter(t => t !== suggestion.title)
-                          : [...prev, suggestion.title]
-                      );
-                    }}
-                    className={`relative cursor-pointer overflow-hidden rounded-2xl border bg-white shadow-sm transition-all group dark:bg-paper dark:border-white/10 ${
-                      isSelected ? 'border-accent ring-1 ring-accent/20' : 'border-slate-200 hover:border-accent/30 hover:shadow-md dark:border-white/10'
-                    } ${anyGenerating ? 'cursor-not-allowed opacity-50' : ''}`}
-                  >
-                    <div className="bg-[#007A87] px-4 py-3 flex items-center justify-between gap-3 text-white dark:bg-accent">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <BookOpen className="h-5 w-5 shrink-0 text-white" />
-                        <h4 className="truncate text-sm font-bold leading-tight text-white" title={suggestion.title}>
-                          Lesson {lessonNumber}
+                  return (
+                    <motion.div 
+                      key={i}
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: i * 0.05 }}
+                      onClick={() => {
+                        if (anyGenerating) return;
+                        setSelectedSuggestions(prev => 
+                          prev.includes(suggestion.title) 
+                            ? prev.filter(t => t !== suggestion.title) 
+                            : [...prev, suggestion.title]
+                        );
+                      }}
+                      className={`bg-white border p-6 rounded-2xl space-y-4 transition-all group cursor-pointer relative ${
+                        isSelected ? 'border-accent ring-1 ring-accent/20 bg-accent/[0.02]' : 'border-slate-200 hover:border-accent/30'
+                      } ${anyGenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      {isSelected && (
+                        <div className="absolute top-4 right-4 text-accent">
+                          <CheckCircle2 size={16} />
+                        </div>
+                      )}
+                      <div className="space-y-1">
+                        <h4 className={`text-base font-bold transition-colors ${isSelected ? 'text-accent' : 'text-slate-950 group-hover:text-accent'}`}>
+                          {suggestion.title}
                         </h4>
+                        <p className="ls-micro-label leading-relaxed">{suggestion.description}</p>
                       </div>
-                      <div className="flex shrink-0 items-center gap-1">
-                        <span className="max-w-[76px] truncate rounded-md bg-white/15 px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm">
-                          AI
-                        </span>
-                        {isSelected && (
-                          <span className="rounded-md bg-white/15 px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm">
-                            Selected
-                          </span>
-                        )}
+                      <div className="flex items-center gap-4">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleGenerateLesson(suggestion.title);
+                          }}
+                          disabled={anyGenerating}
+                          className="flex items-center gap-2 text-xs font-medium text-blue-700 hover:underline disabled:opacity-50"
+                        >
+                          {isThisGenerating ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+                          Curate
+                        </button>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleGenerateLesson(suggestion.title, true);
+                          }}
+                          disabled={anyGenerating}
+                          className="flex items-center gap-2 text-xs font-medium text-slate-950  hover:underline disabled:opacity-50"
+                        >
+                          {isThisGenerating ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
+                          Curate & Launch
+                        </button>
                       </div>
-                    </div>
-
-                    <div className="h-20 w-full overflow-hidden border-b border-slate-100 bg-slate-50 dark:border-white/5 dark:bg-surface-low">
-                      <img
-                        src={getLessonCardIllustration(suggestion.title, module?.name || module?.category)}
-                        alt={suggestion.title}
-                        className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-                      />
-                    </div>
-
-                    <div className="flex flex-col gap-3 p-4">
-                      <div className="grid grid-cols-[auto_1fr] items-center gap-3 text-sm">
-                        <div className="flex min-w-0 items-center gap-2">
-                          <BookOpen className="h-4 w-4 shrink-0 text-slate-400 dark:text-ink-muted" />
-                          <span className="font-bold text-slate-800 dark:text-ink">{lessonNumber}</span>
-                          <span className="truncate text-xs text-slate-500 dark:text-ink-muted" title={suggestion.title}>
-                            {suggestion.title}
-                          </span>
-                        </div>
-                        <div className="space-y-1">
-                          <div className="flex justify-between text-[11px] font-bold">
-                            <span className="text-slate-400 dark:text-ink-muted">Progress</span>
-                            <span className="text-slate-800 dark:text-ink">0%</span>
-                          </div>
-                          <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-surface-mid">
-                            <div className="h-full w-0 rounded-full bg-emerald-500" />
-                          </div>
-                        </div>
-                      </div>
-
-                      <p className="line-clamp-2 min-h-[2.5rem] text-xs leading-relaxed text-slate-500 dark:text-ink-muted">
-                        {suggestion.description}
-                      </p>
-
-                      <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-3 dark:border-white/6">
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleGenerateLesson(suggestion.title);
-                            }}
-                            disabled={anyGenerating}
-                            className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:opacity-50"
-                          >
-                            {isThisGenerating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
-                            Curate
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleGenerateLesson(suggestion.title, true);
-                            }}
-                            disabled={anyGenerating}
-                            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:bg-surface-low"
-                          >
-                            Launch
-                          </button>
-                        </div>
-
-                        <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold ${
-                          isSelected ? 'text-accent' : 'text-emerald-700 dark:text-emerald-400'
-                        }`}>
-                          <span className={`h-1.5 w-1.5 rounded-full ${isSelected ? 'bg-accent' : 'bg-emerald-500 animate-pulse'}`} />
-                          {isSelected ? 'Selected' : 'Available'}
-                        </span>
-                      </div>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
-          </div>
-        </Modal>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
+
     </Layout>
   );
 };

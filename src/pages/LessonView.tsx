@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { Layout } from '../components/Layout';
@@ -12,6 +12,7 @@ import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { LessonReader } from '../features/lesson/LessonReader';
 import { useDisplayedLessonBlocks } from '../features/lesson/useDisplayedLessonBlocks';
+import { AIAssistant } from '../components/AIAssistant';
 import {
   getLessonSelectColumns,
   inferLegacyLessonSourceConfidence,
@@ -19,7 +20,7 @@ import {
   inferLegacyLessonValidationStatus,
   isMissingLessonValidationColumnError,
 } from '../services/lessonSupabase';
-import { isStudentVisibleLesson } from '../services/lessonRecovery';
+import { isStudentVisibleLesson, getLessonAvailabilityState } from '../services/lessonRecovery';
 import { isDraftValidationStatus } from '../services/curriculumValidation';
 
 type SupabaseLessonRecord = {
@@ -43,6 +44,7 @@ type SupabaseLessonRecord = {
   reviewed_at?: string | null;
   is_ai_generated?: boolean | null;
   teaching_contract?: unknown;
+  bannerImage?: string | null;
 };
 
 type CurriculumContext = {
@@ -159,9 +161,12 @@ const PendingLessonView: React.FC<{ title: string; lessonId: string; onReady: ()
 export const LessonView: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { t, language } = useLanguage();
   const { isAdmin } = useAuth();
   const lesson = useLiveQuery(() => (id ? db.lessons.get(id) : undefined), [id]);
+
+  const startAtTest = location.state?.startAtTest || false;
 
   const [supabaseLesson, setSupabaseLesson] = useState<SupabaseLessonRecord | null>(null);
   const [curriculumContext, setCurriculumContext] = useState<CurriculumContext | null>(null);
@@ -181,6 +186,18 @@ export const LessonView: React.FC = () => {
   const blockRefs = useRef<Record<string, HTMLElement | null>>({});
 
   useEffect(() => {
+    setQuizAnswered({});
+    setQuizCorrect({});
+    setQuizSelectedOption({});
+    setExerciseResult({});
+    setExerciseHintShown({});
+    setExamResult({});
+    setExamHintShown({});
+    setReadingBlockIndex(null);
+    setActiveDomain('all');
+  }, [id]);
+
+  useEffect(() => {
     if (!id) return;
     let isCancelled = false;
 
@@ -188,25 +205,45 @@ export const LessonView: React.FC = () => {
       setIsLoading(true);
       const fetchAttempt = async (includeValidation: boolean) => {
         const selectColumns = getLessonSelectColumns({ includeTags: true, includeValidation });
-        return supabase
+        const query = supabase
           .from('lessons')
           .select(selectColumns)
-          .or(`id.eq.${id},topic_id.eq.${id}`)
-          .maybeSingle()
-          .throwOnError();
+          .or(`id.eq.${id},topic_id.eq.${id}`);
+        const { data, error } = await query;
+        if (error) throw error;
+        return data;
       };
 
       try {
-        let response;
+        let data;
         try {
-          response = await fetchAttempt(true);
+          data = await fetchAttempt(true);
         } catch (error) {
           if (!isMissingLessonValidationColumnError(error)) throw error;
-          response = await fetchAttempt(false);
+          data = await fetchAttempt(false);
         }
 
         if (isCancelled) return;
-        const foundLesson = response.data as SupabaseLessonRecord | null;
+        const lessonsList = (data as SupabaseLessonRecord[]) || [];
+        
+        const getAvailabilityRank = (l: any) => {
+          const state = getLessonAvailabilityState(l);
+          switch (state) {
+            case 'published': return 5;
+            case 'needs_review': return 4;
+            case 'draft_with_content': return 3;
+            case 'locked': return 2;
+            case 'rejected': return 1;
+            default: return 0;
+          }
+        };
+
+        let foundLesson: SupabaseLessonRecord | null = null;
+        if (lessonsList.length > 0) {
+          const sortedLessons = [...lessonsList].sort((a, b) => getAvailabilityRank(b) - getAvailabilityRank(a));
+          foundLesson = sortedLessons[0];
+        }
+
         setSupabaseLesson(foundLesson);
 
         if (foundLesson?.id) {
@@ -237,6 +274,7 @@ export const LessonView: React.FC = () => {
     if (supabaseLesson) {
       return {
         id: supabaseLesson.id,
+        moduleId: lesson?.moduleId || undefined,
         title: supabaseLesson.lesson_title,
         content: supabaseLesson.content || '',
         blocks: Array.isArray(supabaseLesson.blocks) ? supabaseLesson.blocks : [],
@@ -251,6 +289,7 @@ export const LessonView: React.FC = () => {
         source_confidence: supabaseLesson.source_confidence ?? inferLegacyLessonSourceConfidence(supabaseLesson) ?? undefined,
         source_name: supabaseLesson.source_name || inferLegacyLessonSourceName(supabaseLesson),
         is_ai_generated: supabaseLesson.is_ai_generated ?? undefined,
+        bannerImage: supabaseLesson.bannerImage || undefined,
       };
     }
 
@@ -263,11 +302,42 @@ export const LessonView: React.FC = () => {
         subtitle: lesson.subtitle || '',
         grade: lesson.grade || '',
         subject: lesson.subject || '',
+        bannerImage: lesson.bannerImage || undefined,
       } as any;
     }
 
     return undefined;
   }, [lesson, supabaseLesson, curriculumContext]);
+
+  // Use moduleId from effective lesson, falling back to subject_id from curriculum or the lesson's own module
+  const targetModuleId = effectiveLesson?.moduleId || curriculumContext?.subject_id || lesson?.moduleId;
+  const lessonsInModule = useLiveQuery(
+    () => (targetModuleId ? db.lessons.where('moduleId').equals(targetModuleId).sortBy('createdAt') : Promise.resolve([])),
+    [targetModuleId]
+  );
+
+  const orderedLessons = useMemo(() => {
+    if (!lessonsInModule) return [];
+    return lessonsInModule.filter((l) => {
+      if (l.status === 'suggested') return false;
+      return isAdmin || isStudentVisibleLesson(l);
+    });
+  }, [lessonsInModule, isAdmin]);
+
+  const currentIndex = useMemo(() => {
+    if (!orderedLessons || !effectiveLesson) return -1;
+    return orderedLessons.findIndex((l) => l.id === effectiveLesson.id);
+  }, [orderedLessons, effectiveLesson]);
+
+  const prevLesson = useMemo(() => {
+    if (currentIndex <= 0) return null;
+    return orderedLessons[currentIndex - 1];
+  }, [orderedLessons, currentIndex]);
+
+  const nextLesson = useMemo(() => {
+    if (currentIndex === -1 || currentIndex >= orderedLessons.length - 1) return null;
+    return orderedLessons[currentIndex + 1];
+  }, [orderedLessons, currentIndex]);
 
   const storedBlocks = Array.isArray(effectiveLesson?.blocks) ? effectiveLesson.blocks : [];
   const readerSourceBlocks = useMemo(() => {
@@ -301,6 +371,16 @@ export const LessonView: React.FC = () => {
     { ...effectiveLesson, blocks: readerSourceBlocks },
     `${effectiveLesson?.subject || 'Curriculum'} lesson for ${effectiveLesson?.grade || 'students'} on LevelSpace.`,
   );
+
+  const quizzesCount = useMemo(() => {
+    return readerSourceBlocks.filter((b: any) => b.purpose === 'quiz' || b.type === 'quiz').length;
+  }, [readerSourceBlocks]);
+
+  const exercisesCount = useMemo(() => {
+    return readerSourceBlocks.filter((b: any) => b.purpose === 'practice' || b.purpose === 'exam' || b.type === 'practice' || b.type === 'exam').length;
+  }, [readerSourceBlocks]);
+
+  const hasTests = quizzesCount > 0 || exercisesCount > 0;
 
   const toggleReadAloud = (sourceIndex: number, text: string) => {
     if (!('speechSynthesis' in window)) return;
@@ -354,7 +434,14 @@ export const LessonView: React.FC = () => {
     setShowNoteModal(false);
   };
 
-  if (isLoading && !effectiveLesson) {
+  const handleUpdateBanner = async (url: string) => {
+    if (effectiveLesson?.id) {
+      await db.lessons.update(effectiveLesson.id, { bannerImage: url });
+    }
+    setSupabaseLesson(prev => prev ? { ...prev, bannerImage: url } : null);
+  };
+
+  if (isLoading || lessonsInModule === undefined) {
     return (
       <Layout fullWidth>
         <div className="flex min-h-[50vh] items-center justify-center">
@@ -439,6 +526,14 @@ export const LessonView: React.FC = () => {
           onExamSubmit={(sourceIndex) => setExamResult((current) => ({ ...current, [sourceIndex]: 'shown' }))}
           onShowExamHint={(sourceIndex) => setExamHintShown((current) => ({ ...current, [sourceIndex]: true }))}
           blockRefs={blockRefs}
+          prevLesson={prevLesson}
+          nextLesson={nextLesson}
+          onNavigateToLesson={(lessonId) => navigate(`/lesson/${lessonId}`)}
+          hasTests={hasTests}
+          bannerImage={effectiveLesson.bannerImage}
+          onUpdateBanner={handleUpdateBanner}
+          startAtTest={startAtTest}
+          allLessonsInModule={orderedLessons}
         />
 
         <Modal isOpen={showNoteModal} onClose={() => setShowNoteModal(false)} title="Add a note">
@@ -472,6 +567,13 @@ export const LessonView: React.FC = () => {
             grade: effectiveLesson.grade,
             country: effectiveLesson.country,
           }}
+        />
+
+        <AIAssistant
+          lessonContent={readerSourceBlocks.map((block: any) => getBlockText(block)).join('\n')}
+          subject={effectiveLesson.subject}
+          grade={effectiveLesson.grade}
+          strictRAG={true}
         />
       </div>
     </Layout>

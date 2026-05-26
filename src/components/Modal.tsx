@@ -34,6 +34,10 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
     '7xl': 'max-w-7xl',
   }[maxWidth];
 
+  const titleNode = typeof title === 'string'
+    ? <h3 className="text-xl font-bold text-ink font-display">{title}</h3>
+    : title;
+
   return createPortal(
     <AnimatePresence>
       {isOpen && (
@@ -53,11 +57,13 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
             className={`relative w-full ${maxWidthClass} bg-paper rounded-3xl shadow-md overflow-hidden flex flex-col max-h-[90vh]`}
             dir={dir}
           >
-            <div className="flex items-center justify-between p-6 border-b border-ink/5">
-              <h3 className="text-xl font-bold text-ink font-display">{title}</h3>
+            <div className="flex items-center justify-between gap-4 p-6 border-b border-ink/5">
+              {title ? <div className="min-w-0 flex-1">{titleNode}</div> : <span />}
               <button 
+                type="button"
                 onClick={onClose}
                 className="w-10 h-10 rounded-full bg-surface-low flex items-center justify-center text-muted hover:text-ink transition-colors"
+                aria-label="Close modal"
               >
                 <X size={20} />
               </button>
