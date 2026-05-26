@@ -179,7 +179,21 @@ export const Dashboard: React.FC = () => {
 
   const activeModules = useMemo(() => allModules.filter(m => m.selected), [allModules]);
   const reminders = useLiveQuery(() => db.tasks.toArray()) || [];
+  const activeReminders = useMemo(() =>
+    reminders
+      .filter(r => !r.completed)
+      .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
+      .slice(0, 4),
+  [reminders]);
+
   const schedule = useLiveQuery(() => db.schedule.toArray()) || [];
+  const upcomingEvents = useMemo(() =>
+    schedule
+      .filter(e => e.date?.includes('-'))
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(0, 4),
+  [schedule]);
+
   const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
   const settingsMap = useMemo(() => Object.fromEntries(dbSettings.map(s => [s.key, s.value])), [dbSettings]);
 
@@ -560,11 +574,8 @@ export const Dashboard: React.FC = () => {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {reminders.filter(r => !r.completed).length > 0 ? (
-                  reminders
-                    .filter(r => !r.completed)
-                    .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
-                    .slice(0, 4)
+                {activeReminders.length > 0 ? (
+                  activeReminders
                     .map((reminder, i) => (
                       <motion.div 
                         key={reminder.id}
@@ -670,11 +681,8 @@ export const Dashboard: React.FC = () => {
                 <CalendarIcon size={16} className="text-slate-400" />
               </div>
               <div className="space-y-4">
-                {schedule.filter(e => e.date?.includes('-')).length > 0 ? (
-                  schedule
-                    .filter(e => e.date?.includes('-'))
-                    .sort((a, b) => a.date.localeCompare(b.date))
-                    .slice(0, 4)
+                {upcomingEvents.length > 0 ? (
+                  upcomingEvents
                     .map((event) => {
                       const d = new Date(event.date);
                       return (
