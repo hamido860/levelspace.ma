@@ -98,8 +98,13 @@ export const CalendarWidget: React.FC = () => {
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ title: '', time: '', type: 'general' as string });
 
-  const scheduleEvents = useLiveQuery(() => db.schedule.toArray()) ?? [];
-  const tasks = useLiveQuery(() => db.tasks.toArray()) ?? [];
+  const scheduleEventsVal = useLiveQuery(() => db.schedule.toArray());
+  const tasksVal = useLiveQuery(() => db.tasks.toArray());
+
+  const isLoading = scheduleEventsVal === undefined || tasksVal === undefined;
+
+  const scheduleEvents = scheduleEventsVal ?? [];
+  const tasks = tasksVal ?? [];
 
   // Build date → events map
   const eventsByDate = useMemo(() => {
@@ -253,9 +258,11 @@ export const CalendarWidget: React.FC = () => {
               {format(selectedDay, 'EEEE, MMM d')}
             </p>
             <p className="text-[10px] text-slate-400 dark:text-ink-muted/60 mt-0.5">
-              {selectedEvents.length === 0
-                ? 'No events'
-                : `${selectedEvents.length} event${selectedEvents.length > 1 ? 's' : ''}`}
+              {isLoading
+                ? 'Loading events...'
+                : selectedEvents.length === 0
+                  ? 'No events'
+                  : `${selectedEvents.length} event${selectedEvents.length > 1 ? 's' : ''}`}
             </p>
           </div>
           <button
@@ -268,7 +275,17 @@ export const CalendarWidget: React.FC = () => {
         </div>
 
         <AnimatePresence mode="popLayout">
-          {selectedEvents.length > 0 ? (
+          {isLoading ? (
+            <motion.div
+              key="loading"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="py-4 flex justify-center items-center"
+            >
+              <div className="w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+            </motion.div>
+          ) : selectedEvents.length > 0 ? (
             <div className="space-y-1.5">
               {selectedEvents.map((ev, i) => (
                 <motion.div
@@ -295,8 +312,10 @@ export const CalendarWidget: React.FC = () => {
             </div>
           ) : (
             <motion.p
+              key="empty"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               className="text-[10px] text-slate-400 dark:text-ink-muted/40 italic"
             >
               Click "Add event" to create something for this day.

@@ -142,8 +142,11 @@ export const Dashboard: React.FC = () => {
     }
   }, []);
 
-  const allModules = useLiveQuery(() => db.modules.toArray()) || [];
-  const allLessons = useLiveQuery(() => db.lessons.toArray()) || [];
+  const allModulesVal = useLiveQuery(() => db.modules.toArray());
+  const allLessonsVal = useLiveQuery(() => db.lessons.toArray());
+  
+  const allModules = allModulesVal || [];
+  const allLessons = allLessonsVal || [];
 
   const lessonCountByModuleId = useMemo(
     () => allLessons.reduce<Record<string, number>>((acc, l) => {
@@ -178,9 +181,15 @@ export const Dashboard: React.FC = () => {
   const visibleLastLesson = lastLesson && isStudentVisibleLesson(lastLesson) ? lastLesson : undefined;
 
   const activeModules = useMemo(() => allModules.filter(m => m.selected), [allModules]);
-  const reminders = useLiveQuery(() => db.tasks.toArray()) || [];
-  const schedule = useLiveQuery(() => db.schedule.toArray()) || [];
-  const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
+  const remindersVal = useLiveQuery(() => db.tasks.toArray());
+  const scheduleVal = useLiveQuery(() => db.schedule.toArray());
+  const dbSettingsVal = useLiveQuery(() => db.settings.toArray());
+
+  const isLoading = allModulesVal === undefined || allLessonsVal === undefined || remindersVal === undefined || scheduleVal === undefined || dbSettingsVal === undefined;
+  
+  const reminders = remindersVal || [];
+  const schedule = scheduleVal || [];
+  const dbSettings = dbSettingsVal || [];
   const settingsMap = useMemo(() => Object.fromEntries(dbSettings.map(s => [s.key, s.value])), [dbSettings]);
 
   const selectedGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
@@ -448,7 +457,11 @@ export const Dashboard: React.FC = () => {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {allModules.length > 0 ? (
+                {isLoading ? (
+                  <div className="col-span-full py-12 flex justify-center items-center">
+                    <Loader2 className="w-6 h-6 text-accent animate-spin" />
+                  </div>
+                ) : allModules.length > 0 ? (
                   allModules.map((module, i) => (
                     <motion.div
                       key={module.id}
@@ -560,7 +573,11 @@ export const Dashboard: React.FC = () => {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {reminders.filter(r => !r.completed).length > 0 ? (
+                {isLoading ? (
+                  <div className="col-span-full py-8 flex justify-center items-center">
+                    <Loader2 className="w-5 h-5 text-accent animate-spin" />
+                  </div>
+                ) : reminders.filter(r => !r.completed).length > 0 ? (
                   reminders
                     .filter(r => !r.completed)
                     .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
@@ -670,7 +687,11 @@ export const Dashboard: React.FC = () => {
                 <CalendarIcon size={16} className="text-slate-400" />
               </div>
               <div className="space-y-4">
-                {schedule.filter(e => e.date?.includes('-')).length > 0 ? (
+                {isLoading ? (
+                  <div className="py-8 flex justify-center items-center">
+                    <Loader2 className="w-5 h-5 text-accent animate-spin" />
+                  </div>
+                ) : schedule.filter(e => e.date?.includes('-')).length > 0 ? (
                   schedule
                     .filter(e => e.date?.includes('-'))
                     .sort((a, b) => a.date.localeCompare(b.date))

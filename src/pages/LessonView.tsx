@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { Layout } from '../components/Layout';
@@ -44,6 +44,7 @@ type SupabaseLessonRecord = {
   reviewed_at?: string | null;
   is_ai_generated?: boolean | null;
   teaching_contract?: unknown;
+  bannerImage?: string | null;
 };
 
 type CurriculumContext = {
@@ -160,9 +161,12 @@ const PendingLessonView: React.FC<{ title: string; lessonId: string; onReady: ()
 export const LessonView: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { t, language } = useLanguage();
   const { isAdmin } = useAuth();
   const lesson = useLiveQuery(() => (id ? db.lessons.get(id) : undefined), [id]);
+
+  const startAtTest = location.state?.startAtTest || false;
 
   const [supabaseLesson, setSupabaseLesson] = useState<SupabaseLessonRecord | null>(null);
   const [curriculumContext, setCurriculumContext] = useState<CurriculumContext | null>(null);
@@ -180,6 +184,18 @@ export const LessonView: React.FC = () => {
   const [examResult, setExamResult] = useState<Record<number, 'correct' | 'wrong' | 'shown' | null>>({});
   const [examHintShown, setExamHintShown] = useState<Record<number, boolean>>({});
   const blockRefs = useRef<Record<string, HTMLElement | null>>({});
+
+  useEffect(() => {
+    setQuizAnswered({});
+    setQuizCorrect({});
+    setQuizSelectedOption({});
+    setExerciseResult({});
+    setExerciseHintShown({});
+    setExamResult({});
+    setExamHintShown({});
+    setReadingBlockIndex(null);
+    setActiveDomain('all');
+  }, [id]);
 
   useEffect(() => {
     if (!id) return;
@@ -272,6 +288,7 @@ export const LessonView: React.FC = () => {
         source_confidence: supabaseLesson.source_confidence ?? inferLegacyLessonSourceConfidence(supabaseLesson) ?? undefined,
         source_name: supabaseLesson.source_name || inferLegacyLessonSourceName(supabaseLesson),
         is_ai_generated: supabaseLesson.is_ai_generated ?? undefined,
+        bannerImage: supabaseLesson.bannerImage || undefined,
       };
     }
 
@@ -284,11 +301,41 @@ export const LessonView: React.FC = () => {
         subtitle: lesson.subtitle || '',
         grade: lesson.grade || '',
         subject: lesson.subject || '',
+        bannerImage: lesson.bannerImage || undefined,
       } as any;
     }
 
     return undefined;
   }, [lesson, supabaseLesson, curriculumContext]);
+
+  const targetModuleId = effectiveLesson?.moduleId;
+  const lessonsInModule = useLiveQuery(
+    () => (targetModuleId ? db.lessons.where('moduleId').equals(targetModuleId).sortBy('createdAt') : Promise.resolve([])),
+    [targetModuleId]
+  );
+
+  const orderedLessons = useMemo(() => {
+    if (!lessonsInModule) return [];
+    return lessonsInModule.filter((l) => {
+      if (l.status === 'suggested') return false;
+      return isAdmin || isStudentVisibleLesson(l);
+    });
+  }, [lessonsInModule, isAdmin]);
+
+  const currentIndex = useMemo(() => {
+    if (!orderedLessons || !effectiveLesson) return -1;
+    return orderedLessons.findIndex((l) => l.id === effectiveLesson.id);
+  }, [orderedLessons, effectiveLesson]);
+
+  const prevLesson = useMemo(() => {
+    if (currentIndex <= 0) return null;
+    return orderedLessons[currentIndex - 1];
+  }, [orderedLessons, currentIndex]);
+
+  const nextLesson = useMemo(() => {
+    if (currentIndex === -1 || currentIndex >= orderedLessons.length - 1) return null;
+    return orderedLessons[currentIndex + 1];
+  }, [orderedLessons, currentIndex]);
 
   const storedBlocks = Array.isArray(effectiveLesson?.blocks) ? effectiveLesson.blocks : [];
   const readerSourceBlocks = useMemo(() => {
@@ -322,6 +369,16 @@ export const LessonView: React.FC = () => {
     { ...effectiveLesson, blocks: readerSourceBlocks },
     `${effectiveLesson?.subject || 'Curriculum'} lesson for ${effectiveLesson?.grade || 'students'} on LevelSpace.`,
   );
+
+  const quizzesCount = useMemo(() => {
+    return readerSourceBlocks.filter((b: any) => b.purpose === 'quiz' || b.type === 'quiz').length;
+  }, [readerSourceBlocks]);
+
+  const exercisesCount = useMemo(() => {
+    return readerSourceBlocks.filter((b: any) => b.purpose === 'practice' || b.purpose === 'exam' || b.type === 'practice' || b.type === 'exam').length;
+  }, [readerSourceBlocks]);
+
+  const hasTests = quizzesCount > 0 || exercisesCount > 0;
 
   const toggleReadAloud = (sourceIndex: number, text: string) => {
     if (!('speechSynthesis' in window)) return;
@@ -375,7 +432,14 @@ export const LessonView: React.FC = () => {
     setShowNoteModal(false);
   };
 
-  if (isLoading && !effectiveLesson) {
+  const handleUpdateBanner = async (url: string) => {
+    if (effectiveLesson?.id) {
+      await db.lessons.update(effectiveLesson.id, { bannerImage: url });
+    }
+    setSupabaseLesson(prev => prev ? { ...prev, bannerImage: url } : null);
+  };
+
+  if (isLoading || lessonsInModule === undefined) {
     return (
       <Layout fullWidth>
         <div className="flex min-h-[50vh] items-center justify-center">
@@ -460,6 +524,14 @@ export const LessonView: React.FC = () => {
           onExamSubmit={(sourceIndex) => setExamResult((current) => ({ ...current, [sourceIndex]: 'shown' }))}
           onShowExamHint={(sourceIndex) => setExamHintShown((current) => ({ ...current, [sourceIndex]: true }))}
           blockRefs={blockRefs}
+          prevLesson={prevLesson}
+          nextLesson={nextLesson}
+          onNavigateToLesson={(lessonId) => navigate(`/lesson/${lessonId}`)}
+          hasTests={hasTests}
+          bannerImage={effectiveLesson.bannerImage}
+          onUpdateBanner={handleUpdateBanner}
+          startAtTest={startAtTest}
+          allLessonsInModule={orderedLessons}
         />
 
         <Modal isOpen={showNoteModal} onClose={() => setShowNoteModal(false)} title="Add a note">

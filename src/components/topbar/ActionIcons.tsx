@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Globe,
@@ -6,6 +6,7 @@ import {
   Bell,
   Sun,
   Moon,
+  WifiOff,
 } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -23,6 +24,21 @@ export const ActionIcons: React.FC = () => {
   const location = useLocation();
   const { language, setLanguage, t } = useLanguage();
   const { theme, toggleTheme } = useTheme();
+  
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   const langs = ['en', 'fr', 'ar', 'es', 'de'] as const;
   const currentLanguageMeta = LANGUAGE_META[language] || LANGUAGE_META.en;
@@ -32,7 +48,17 @@ export const ActionIcons: React.FC = () => {
 
   return (
     <div className="flex items-center gap-2 md:gap-3">
+      {isOffline && (
+        <span 
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-extrabold uppercase tracking-wide bg-error/15 text-error border border-error/15 animate-pulse" 
+          title="Working in local offline mode."
+        >
+          <WifiOff size={11} />
+          <span>Offline Mode</span>
+        </span>
+      )}
       <div className="flex items-center gap-1 bg-surface-low p-1 rounded-full border border-ink/5">
+
         <button
           onClick={toggleTheme}
           title={theme === 'light' ? 'Dark Mode' : 'Light Mode'}

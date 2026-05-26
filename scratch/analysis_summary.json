@@ -1,0 +1,577 @@
+{
+  "total": 88,
+  "gradeCounts": {
+    "1ère année primaire": 22,
+    "Tronc Commun": 6,
+    "1ère année collège": 6,
+    "2ème année primaire": 7,
+    "4ème année primaire": 7,
+    "5ème année primaire": 7,
+    "2ème année collège": 6,
+    "3ème année collège": 6,
+    "1ère année Bac": 7,
+    "3ème année primaire": 7,
+    "6ème année primaire": 7
+  },
+  "statusCounts": {
+    "draft": 88
+  },
+  "validationCounts": {
+    "needs_review": 84,
+    "unchecked": 4
+  },
+  "emptyCount": 20,
+  "richCount": 68,
+  "emptyShells": [
+    {
+      "id": "f2a29e36-f240-42fb-9cf9-88f1bfb47ee1",
+      "grade": "1ère année primaire",
+      "title": "سورة النصر",
+      "status": "draft",
+      "len": 156
+    },
+    {
+      "id": "e206e7a7-a6a3-42a6-b3dd-3f7ccc70a0bf",
+      "grade": "1ère année primaire",
+      "title": "مدخل الاستجابة",
+      "status": "draft",
+      "len": 277
+    },
+    {
+      "id": "aad9f2d2-eab7-42b2-bf2a-d81805ca1a2c",
+      "grade": "1ère année primaire",
+      "title": "مدخل الحكمة",
+      "status": "draft",
+      "len": 274
+    },
+    {
+      "id": "f72539f3-19f0-48a8-8159-d478d82a50dd",
+      "grade": "1ère année primaire",
+      "title": "مدخل العقيدة",
+      "status": "draft",
+      "len": 275
+    },
+    {
+      "id": "00853070-f0ce-47c9-b371-d60b6211d990",
+      "grade": "1ère année primaire",
+      "title": "مدخل القسط",
+      "status": "draft",
+      "len": 273
+    },
+    {
+      "id": "54da5f44-e1fe-4117-abc3-3459ff86e212",
+      "grade": "1ère année primaire",
+      "title": "سورة الفاتحة",
+      "status": "draft",
+      "len": 170
+    },
+    {
+      "id": "893c17c4-bc7b-43d9-aeba-b99527463ecf",
+      "grade": "1ère année primaire",
+      "title": "سورة الناس",
+      "status": "draft",
+      "len": 156
+    },
+    {
+      "id": "99f46702-240e-454c-87c1-e48d7d5b6bbd",
+      "grade": "1ère année primaire",
+      "title": "سورة الفلق",
+      "status": "draft",
+      "len": 156
+    },
+    {
+      "id": "069f11ec-46d7-405d-a704-20a6d388d5a2",
+      "grade": "1ère année primaire",
+      "title": "سورة المسد",
+      "status": "draft",
+      "len": 156
+    },
+    {
+      "id": "66bf26a0-bc7e-4411-9a32-9c3a1dd16c4b",
+      "grade": "1ère année primaire",
+      "title": "سورة الكافرون",
+      "status": "draft",
+      "len": 177
+    },
+    {
+      "id": "17efc442-68da-4589-a048-734d01870c4f",
+      "grade": "1ère année primaire",
+      "title": "سورة الكوثر",
+      "status": "draft",
+      "len": 163
+    },
+    {
+      "id": "ec3288aa-4607-47ba-953c-d2a63dd04c2d",
+      "grade": "1ère année primaire",
+      "title": "سورة قريش",
+      "status": "draft",
+      "len": 149
+    },
+    {
+      "id": "f53a8440-a120-4f4c-ac27-6c857dc15b6d",
+      "grade": "1ère année primaire",
+      "title": "1سورة الفاتحة",
+      "status": "draft",
+      "len": 231
+    },
+    {
+      "id": "fba241b1-5c29-4624-8636-67eac0dc26df",
+      "grade": "1ère année primaire",
+      "title": "2سورة التین",
+      "status": "draft",
+      "len": 217
+    },
+    {
+      "id": "e158976b-c222-4a8f-906b-3431901443af",
+      "grade": "1ère année primaire",
+      "title": "5سورة الفیل",
+      "status": "draft",
+      "len": 217
+    },
+    {
+      "id": "4881f973-8318-4072-af57-87a11bccf645",
+      "grade": "1ère année primaire",
+      "title": "6سورة الكافرون",
+      "status": "draft",
+      "len": 238
+    },
+    {
+      "id": "865a8733-3c68-4506-912a-6c8370c6809a",
+      "grade": "1ère année primaire",
+      "title": "7سورة الفلق",
+      "status": "draft",
+      "len": 217
+    },
+    {
+      "id": "158f4218-3280-4b14-b859-180ccbdd7b19",
+      "grade": "1ère année primaire",
+      "title": "8سورة الناس",
+      "status": "draft",
+      "len": 217
+    },
+    {
+      "id": "fc1a3ac3-8996-40ed-ac81-30a584f65b2a",
+      "grade": "1ère année primaire",
+      "title": "9سورة القدر",
+      "status": "draft",
+      "len": 217
+    },
+    {
+      "id": "0e9688ee-336f-4c91-9ad3-28c47d10e93b",
+      "grade": "1ère année Bac",
+      "title": "سورة يوسف",
+      "status": "draft",
+      "len": 297
+    }
+  ],
+  "richLessons": [
+    {
+      "id": "3a6721ce-d1c4-453e-b186-7843730e654e",
+      "grade": "1ère année primaire",
+      "title": "1مولد الرسول صلى الله علیه وسلم",
+      "len": 306
+    },
+    {
+      "id": "aa19266e-307b-4d45-998c-2e6f862f5d60",
+      "grade": "1ère année primaire",
+      "title": "2مولد الرسول صلى الله علیه وسلم (قصة الفيل)",
+      "len": 319
+    },
+    {
+      "id": "e9ecd50c-b21c-421d-82cb-d672c54b9be6",
+      "grade": "1ère année primaire",
+      "title": "4یتم الرسول صلى الله علیه وسلم وكفالته",
+      "len": 314
+    },
+    {
+      "id": "26743d8f-ea1b-4ed4-9223-9c382106081f",
+      "grade": "Tronc Commun",
+      "title": "العقيدة الصحيحة وأثرها في السلوك",
+      "len": 380
+    },
+    {
+      "id": "c32c88b9-d011-42ff-bbcb-be0355afeb04",
+      "grade": "Tronc Commun",
+      "title": "الاقتداء بالرسول صلى الله عليه وسلم في مرحلة الشباب",
+      "len": 419
+    },
+    {
+      "id": "8356d476-1640-4dfa-a88f-262a5864490d",
+      "grade": "Tronc Commun",
+      "title": "القسط: حق الله وحق النفس",
+      "len": 346
+    },
+    {
+      "id": "46be3f7f-b7ba-405d-bcd3-3dea5585f8c3",
+      "grade": "1ère année collège",
+      "title": "التزكية: توحيد الله سبحانه، أسماء الله الحسنى",
+      "len": 373
+    },
+    {
+      "id": "681f8283-915e-4d6d-b25c-8041e03d6dbc",
+      "grade": "1ère année collège",
+      "title": "الاقتداء: الهجرة النبوية، تأسيس مجتمع المدينة",
+      "len": 373
+    },
+    {
+      "id": "290f3c57-47de-4698-a834-a23dc00bf8d2",
+      "grade": "1ère année collège",
+      "title": "الاستجابة: الصيام (الأحكام والمقاصد)، الزكاة",
+      "len": 371
+    },
+    {
+      "id": "6ccba30a-5a72-4f33-893d-220d9facbe19",
+      "grade": "1ère année collège",
+      "title": "القسط: رعاية حقوق الله وحقوق النفس، حق البيئة",
+      "len": 373
+    },
+    {
+      "id": "66ce303b-7894-4c43-8d36-0af7b37e6a1b",
+      "grade": "1ère année collège",
+      "title": "الحكمة: التسامح والعفو، الحوار والاختلاف",
+      "len": 363
+    },
+    {
+      "id": "b114b0b6-a796-40dd-a181-9f16fb8a8c7e",
+      "grade": "2ème année primaire",
+      "title": "التزكية (القرآن الكريم): سورة الملك، سورة القلم، سورة المرسلات",
+      "len": 408
+    },
+    {
+      "id": "2d009bf9-2b33-487f-a86d-d7318ece438c",
+      "grade": "2ème année primaire",
+      "title": "التزكية (عقيدة): أومن بالله وملائكته ورسله",
+      "len": 368
+    },
+    {
+      "id": "69033c7b-a31e-479c-860a-86fceb71dc69",
+      "grade": "4ème année primaire",
+      "title": "التزكية (القرآن الكريم): سورة الملك، سورة القلم، سورة المرسلات",
+      "len": 408
+    },
+    {
+      "id": "b50a3763-1dd0-44e7-bf2a-01aef6bf4c23",
+      "grade": "4ème année primaire",
+      "title": "التزكية (عقيدة): أومن بالله وملائكته ورسله",
+      "len": 368
+    },
+    {
+      "id": "607ff412-053c-42e0-9a7b-b7911ebf4b42",
+      "grade": "5ème année primaire",
+      "title": "التزكية (عقيدة): أومن بالله وملائكته ورسله",
+      "len": 368
+    },
+    {
+      "id": "d4fa4d4c-4f7a-4b35-8b6e-66b823e3adde",
+      "grade": "2ème année collège",
+      "title": "التزكية: سورة لقمان، سورة الحجرات",
+      "len": 349
+    },
+    {
+      "id": "5c107f4c-b0a8-480f-a478-e9174490072a",
+      "grade": "2ème année collège",
+      "title": "الاقتداء: الهجرة النبوية، تأسيس مجتمع المدينة",
+      "len": 373
+    },
+    {
+      "id": "e6335d0e-ab06-47b8-a949-2b8d7d3bbf91",
+      "grade": "3ème année collège",
+      "title": "التزكية: توحيد الله سبحانه، أسماء الله الحسنى",
+      "len": 373
+    },
+    {
+      "id": "134bc0ab-4651-4695-9677-40dbc41aeaed",
+      "grade": "3ème année collège",
+      "title": "الاقتداء: الهجرة النبوية، تأسيس مجتمع المدينة",
+      "len": 373
+    },
+    {
+      "id": "2075d17b-4d8d-48f9-bb89-74b2e61c1e66",
+      "grade": "3ème année collège",
+      "title": "الاستجابة: الصيام (الأحكام والمقاصد)، الزكاة",
+      "len": 371
+    },
+    {
+      "id": "91150ae9-8b7e-48a8-baf4-6223d79127b7",
+      "grade": "1ère année Bac",
+      "title": "التزكية : الإيمان والغيب، الإيمان والعلم",
+      "len": 359
+    },
+    {
+      "id": "6760ba25-fa83-45d4-8789-95477665a374",
+      "grade": "1ère année Bac",
+      "title": "التزكية : الإيمان والفلسفة، الإيمان وعمارة الأرض",
+      "len": 375
+    },
+    {
+      "id": "a881243a-bfaa-416b-8065-26ad1e83897a",
+      "grade": "2ème année primaire",
+      "title": "القسط: حق الله وحق النفس، الإيمان والإيواء (قصة آسية)",
+      "len": 390
+    },
+    {
+      "id": "c0c2bd02-d60d-4338-a05d-ecf943327b33",
+      "grade": "3ème année primaire",
+      "title": "الاستجابة: شروط الصلاة، فرائضها وسننها",
+      "len": 360
+    },
+    {
+      "id": "83d30874-8410-40c0-beb9-e15f08a591e2",
+      "grade": "4ème année primaire",
+      "title": "الاستجابة: شروط الصلاة، فرائضها وسننها",
+      "len": 360
+    },
+    {
+      "id": "739444e1-3bc3-471a-9cd0-3f72f0e8ff5e",
+      "grade": "5ème année primaire",
+      "title": "الاستجابة: شروط الصلاة، فرائضها وسننها",
+      "len": 360
+    },
+    {
+      "id": "b389317d-b2a0-4fe2-8ba5-9453adb1a7c6",
+      "grade": "6ème année primaire",
+      "title": "الاستجابة: شروط الصلاة، فرائضها وسننها",
+      "len": 360
+    },
+    {
+      "id": "488c57c5-b2d1-48c6-a92b-b1b3d7ebc283",
+      "grade": "2ème année collège",
+      "title": "الاستجابة: الصيام (الأحكام والمقاصد)، الزكاة",
+      "len": 371
+    },
+    {
+      "id": "fb4637c1-dab4-4af0-ac19-869efc98dadc",
+      "grade": "1ère année Bac",
+      "title": "الاستجابة : فقه الأسرة (الزواج والطلاق)",
+      "len": 357
+    },
+    {
+      "id": "b26bc1b6-2988-4fa0-8f49-035044213536",
+      "grade": "2ème année primaire",
+      "title": "الاستجابة: الصيام (معناه، شروطه، فوائده)",
+      "len": 364
+    },
+    {
+      "id": "0c8310a5-3bfb-4a80-ba71-1f75eafe1e9b",
+      "grade": "2ème année primaire",
+      "title": "الحكمة: الرضا والتفاؤل، العفو والتسامح",
+      "len": 360
+    },
+    {
+      "id": "f5893d17-b624-46af-8487-71a2f55ddfde",
+      "grade": "3ème année primaire",
+      "title": "الاستجابة: الصيام (معناه، شروطه، فوائده)",
+      "len": 364
+    },
+    {
+      "id": "43f94c30-71ca-474a-8aff-c41c24555042",
+      "grade": "4ème année primaire",
+      "title": "الاقتداء: بعثة الرسول صلى الله عليه وسلم والدعوة السرية والجهرية",
+      "len": 412
+    },
+    {
+      "id": "4736a010-0cce-400b-8940-8bbf610153e0",
+      "grade": "4ème année primaire",
+      "title": "الحكمة: الرضا والتفاؤل، العفو والتسامح",
+      "len": 360
+    },
+    {
+      "id": "d5d561ac-d79a-40a5-8483-44f3b0c934ff",
+      "grade": "5ème année primaire",
+      "title": "الاستجابة: الصيام (معناه، شروطه، فوائده)",
+      "len": 364
+    },
+    {
+      "id": "b6d1437f-34d1-4887-a0c5-3a3866b2580d",
+      "grade": "6ème année primaire",
+      "title": "الاقتداء: بعثة الرسول صلى الله عليه وسلم والدعوة السرية والجهرية",
+      "len": 412
+    },
+    {
+      "id": "8398a5aa-27ab-4869-8b5a-e172fe66f087",
+      "grade": "6ème année primaire",
+      "title": "الحكمة: الرضا والتفاؤل، العفو والتسامح",
+      "len": 360
+    },
+    {
+      "id": "1fbd6090-2fd8-4175-bbfd-7a688659c67d",
+      "grade": "2ème année collège",
+      "title": "الحكمة: التسامح والعفو، الحوار والاختلاف",
+      "len": 363
+    },
+    {
+      "id": "f1ab7c73-594d-434f-9e6b-f8a2b824d330",
+      "grade": "3ème année collège",
+      "title": "الحكمة: التسامح والعفو، الحوار والاختلاف",
+      "len": 363
+    },
+    {
+      "id": "6b47d2bf-7582-4750-844e-eb7cee465ba0",
+      "grade": "Tronc Commun",
+      "title": "سورة الكهف: الهداية والقيم",
+      "len": 448
+    },
+    {
+      "id": "bd0b9136-8a4d-4f9b-92fd-56fd078d88e7",
+      "grade": "Tronc Commun",
+      "title": "فقه العبادات: الصلاة",
+      "len": 376
+    },
+    {
+      "id": "319a9655-3d22-4095-9921-71c3d1be1188",
+      "grade": "Tronc Commun",
+      "title": "الحكمة: الكفاءة والاستحقاق",
+      "len": 417
+    },
+    {
+      "id": "d992d703-ce07-4148-8b8f-ad13a4488919",
+      "grade": "1ère année collège",
+      "title": "التزكية: سورة لقمان، سورة الحجرات",
+      "len": 349
+    },
+    {
+      "id": "b119f56f-9d84-4866-8e73-e68022e76b66",
+      "grade": "3ème année primaire",
+      "title": "التزكية (القرآن الكريم): سورة الملك، سورة القلم، سورة المرسلات",
+      "len": 408
+    },
+    {
+      "id": "500f6c28-b4e9-4592-897a-4500ca9c8145",
+      "grade": "3ème année primaire",
+      "title": "التزكية (عقيدة): أومن بالله وملائكته ورسله",
+      "len": 368
+    },
+    {
+      "id": "86f5de3e-ec69-4267-80c0-f1034346fb73",
+      "grade": "5ème année primaire",
+      "title": "التزكية (القرآن الكريم): سورة الملك، سورة القلم، سورة المرسلات",
+      "len": 408
+    },
+    {
+      "id": "0ac4c7db-26dc-485d-a2e5-6e76ea60fada",
+      "grade": "6ème année primaire",
+      "title": "التزكية (القرآن الكريم): سورة الملك، سورة القلم، سورة المرسلات",
+      "len": 408
+    },
+    {
+      "id": "ba773b67-9034-4b77-bc0a-afe72f10b058",
+      "grade": "6ème année primaire",
+      "title": "التزكية (عقيدة): أومن بالله وملائكته ورسله",
+      "len": 368
+    },
+    {
+      "id": "555ba912-2c7f-471d-88e4-c15bcb103113",
+      "grade": "2ème année collège",
+      "title": "التزكية: توحيد الله سبحانه، أسماء الله الحسنى",
+      "len": 373
+    },
+    {
+      "id": "305e31f5-8a77-463b-aa18-5d1a7c2a27bf",
+      "grade": "3ème année collège",
+      "title": "التزكية: سورة لقمان، سورة الحجرات",
+      "len": 349
+    },
+    {
+      "id": "785e1552-3c78-4a6b-9c5b-504bbb012862",
+      "grade": "2ème année primaire",
+      "title": "الاستجابة: شروط الصلاة، فرائضها وسننها",
+      "len": 360
+    },
+    {
+      "id": "f3466527-6ee7-4161-b962-c2bb48e67040",
+      "grade": "3ème année primaire",
+      "title": "القسط: حق الله وحق النفس، الإيمان والإيواء (قصة آسية)",
+      "len": 390
+    },
+    {
+      "id": "1b85d9e1-004e-49e9-a15e-87cd479db178",
+      "grade": "4ème année primaire",
+      "title": "القسط: حق الله وحق النفس، الإيمان والإيواء (قصة آسية)",
+      "len": 390
+    },
+    {
+      "id": "35b86e98-a7b7-406f-b9b2-3b31a21dbbac",
+      "grade": "5ème année primaire",
+      "title": "القسط: حق الله وحق النفس، الإيمان والإيواء (قصة آسية)",
+      "len": 390
+    },
+    {
+      "id": "aa9be260-26d5-46cd-88ec-1f0db96c38ae",
+      "grade": "6ème année primaire",
+      "title": "القسط: حق الله وحق النفس، الإيمان والإيواء (قصة آسية)",
+      "len": 390
+    },
+    {
+      "id": "00e248b7-ac6d-4251-b983-798eb8e41556",
+      "grade": "2ème année primaire",
+      "title": "الاقتداء: بعثة الرسول صلى الله عليه وسلم والدعوة السرية والجهرية",
+      "len": 412
+    },
+    {
+      "id": "3d84bfe9-5baa-477f-8721-648b99cd3f7b",
+      "grade": "3ème année primaire",
+      "title": "الاقتداء: بعثة الرسول صلى الله عليه وسلم والدعوة السرية والجهرية",
+      "len": 412
+    },
+    {
+      "id": "3a03c220-7449-4010-8621-369b3659bbe8",
+      "grade": "3ème année primaire",
+      "title": "الحكمة: الرضا والتفاؤل، العفو والتسامح",
+      "len": 360
+    },
+    {
+      "id": "8815fc7f-2f34-4d3e-a27f-64792b032dbe",
+      "grade": "4ème année primaire",
+      "title": "الاستجابة: الصيام (معناه، شروطه، فوائده)",
+      "len": 364
+    },
+    {
+      "id": "9a3b57c0-035d-4598-b8d3-db2e1a726bce",
+      "grade": "5ème année primaire",
+      "title": "الاقتداء: بعثة الرسول صلى الله عليه وسلم والدعوة السرية والجهرية",
+      "len": 412
+    },
+    {
+      "id": "ca5744d1-3660-45de-a569-5b87d936c248",
+      "grade": "5ème année primaire",
+      "title": "الحكمة: الرضا والتفاؤل، العفو والتسامح",
+      "len": 360
+    },
+    {
+      "id": "8eddbcb3-7ccf-404a-8048-0d3b3050ceb1",
+      "grade": "6ème année primaire",
+      "title": "الاستجابة: الصيام (معناه، شروطه، فوائده)",
+      "len": 364
+    },
+    {
+      "id": "4ccaa770-5686-4c8a-bef5-6dab84194ba7",
+      "grade": "2ème année collège",
+      "title": "القسط: رعاية حقوق الله وحقوق النفس، حق البيئة",
+      "len": 373
+    },
+    {
+      "id": "18ab514e-4a69-475b-b794-61692dd18169",
+      "grade": "3ème année collège",
+      "title": "القسط: رعاية حقوق الله وحقوق النفس، حق البيئة",
+      "len": 373
+    },
+    {
+      "id": "0e79a1d7-ee52-444a-aeac-003968ae4d33",
+      "grade": "1ère année Bac",
+      "title": "الاقتداء : صلح الحديبية وفتح مكة",
+      "len": 343
+    },
+    {
+      "id": "eefddb4d-c924-42c2-934a-59711408df7d",
+      "grade": "1ère année Bac",
+      "title": "القسط : حق الله (الوفاء بالأمانة)، حق النفس (الصبر اليقين)",
+      "len": 395
+    },
+    {
+      "id": "ddb59035-914a-4536-8b87-e069a4858952",
+      "grade": "1ère année Bac",
+      "title": "الحكمة : العفو والتسامح، وقاية المجتمع من الفواحش",
+      "len": 377
+    }
+  ]
+}

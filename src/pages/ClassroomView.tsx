@@ -473,7 +473,7 @@ export const ClassroomView: React.FC = () => {
   }, [activeDomainKey, showDomainTabs, topicFallbackRows]);
   const hasSupplementalContent = quizzes.length > 0 || exercises.length > 0;
   const showStats = module?.progress > 0 || hasLessons || hasTopicFallback;
-  const showTabs = hasLessons || hasTopicFallback || hasSupplementalContent || isLoadingExtra;
+  const showTabs = false;
   const showSetupState = !hasLessons && !hasTopicFallback && !isHydratingSupabase && suggestions.length === 0;
   const showValidationWarningBanner = !isAdmin && lessons.length > 0 && !studentLessonSelection.hasPreferred;
   const cloudHydrationKeyRef = useRef<string | null>(null);
@@ -1298,100 +1298,127 @@ export const ClassroomView: React.FC = () => {
     <Layout>
       <div className="max-w-5xl mx-auto space-y-4 pb-20">
         {/* Header Section */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-          <div className="space-y-4">
-            <button 
-              onClick={() => navigate('/dashboard')}
-              className="flex items-center gap-2 text-xs font-bold  text-slate-500 hover:text-slate-950 transition-colors"
-            >
-              <ArrowLeft size={14} />
-              {t('back_to_dashboard')}
-            </button>
-            <div className="space-y-2">
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="bg-accent/10 text-accent text-xs font-medium px-2 py-0.5 rounded ">{module.code}</span>
-                <span className="text-slate-500 text-xs font-medium">{module.category}</span>
+        {/* Unified Header Card */}
+        <div className="bg-white dark:bg-paper rounded-[1.5rem] border border-slate-200 dark:border-white/8 p-5 shadow-sm space-y-4">
+          {/* Top Row: Back Navigation, Badges, Strict RAG Toggle & Actions */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-white/5 pb-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <button 
+                onClick={() => navigate('/dashboard')}
+                className="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-slate-950 transition-colors mr-2"
+              >
+                <ArrowLeft size={13} />
+                {t('back_to_dashboard')}
+              </button>
+              <span className="bg-accent/10 text-accent text-[10px] font-extrabold px-2 py-0.5 rounded uppercase">{module.code}</span>
+              <span className="text-slate-400 dark:text-ink-muted text-[10px] font-bold uppercase">{module.category}</span>
+              {isAdmin && (
+                <div className="flex items-center gap-2 border-l border-slate-200 pl-3 dark:border-white/10">
+                  <span className="text-[10px] text-slate-400 dark:text-ink-muted font-bold uppercase">Strict RAG</span>
+                  <button
+                    onClick={async () => {
+                      await db.modules.update(module.id, { strictRAG: !module.strictRAG });
+                    }}
+                    className={`w-7 h-3.5 rounded-full transition-colors relative ${module.strictRAG ? 'bg-accent' : 'bg-slate-950/20 dark:bg-white/20'}`}
+                    title="Keep this classroom grounded in certified content before using AI."
+                  >
+                    <div className={`absolute top-0.5 left-0.5 bg-white w-2.5 h-2.5 rounded-full transition-transform ${module.strictRAG ? 'translate-x-3.5' : 'translate-x-0'}`} />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {!showSetupState && (
+              <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                 {isAdmin && (
-                  <div className="flex items-center gap-2 border-l border-slate-200 pl-3 dark:border-white/10">
-                    <span className="text-[11px] text-slate-500 dark:text-ink-muted font-medium">Strict RAG</span>
+                  <button
+                    onClick={handleSeedFromSupabase}
+                    disabled={isSeeding}
+                    className="flex items-center gap-1.5 bg-slate-50 text-slate-950 px-3 py-2 rounded-lg text-xs font-bold transition-all border border-slate-200 hover:border-accent/30 hover:text-accent disabled:opacity-50 dark:bg-surface-low dark:border-white/5 dark:text-ink cursor-pointer"
+                  >
+                    {isSeeding ? <Loader2 size={12} className="animate-spin" /> : <Database size={12} />}
+                    <span>{isSeeding ? 'Loading...' : 'Load from Supabase'}</span>
+                  </button>
+                )}
+                {isAdmin && hasTopicFallback && (
+                  <button
+                    onClick={handleGenerateStarterLessons}
+                    disabled={isGeneratingStarterLessons}
+                    className="flex items-center gap-1.5 bg-slate-50 text-slate-950 px-3 py-2 rounded-lg text-xs font-bold transition-all border border-slate-200 hover:border-accent/30 hover:text-accent disabled:opacity-50 dark:bg-surface-low dark:border-white/5 dark:text-ink cursor-pointer"
+                  >
+                    {isGeneratingStarterLessons ? <Loader2 size={12} className="animate-spin" /> : <Database size={12} />}
+                    <span>{isGeneratingStarterLessons ? 'Generating...' : 'Generate All Lessons'}</span>
+                  </button>
+                )}
+                {aiAvailable ? (
+                  <>
+                    {isAdmin && hasLessons && (
+                      <button
+                        onClick={handleAuditClassroom}
+                        className="flex items-center gap-1.5 bg-slate-50 text-slate-500 hover:text-accent px-3 py-2 rounded-lg text-xs font-bold transition-all border border-slate-200 dark:bg-surface-low dark:border-white/5 dark:text-ink-secondary cursor-pointer"
+                      >
+                        <ShieldCheck size={12} />
+                        <span>Audit</span>
+                      </button>
+                    )}
                     <button
-                      onClick={async () => {
-                        await db.modules.update(module.id, { strictRAG: !module.strictRAG });
-                      }}
-                      className={`w-8 h-4 rounded-full transition-colors relative ${module.strictRAG ? 'bg-accent' : 'bg-slate-950/20 dark:bg-white/20'}`}
-                      title="Keep this classroom grounded in certified content before using AI."
+                      onClick={() => handleGenerateLesson()}
+                      disabled={!!generatingTitle}
+                      className="flex items-center gap-1.5 bg-slate-950 text-white px-4 py-2 rounded-lg text-xs font-black hover:bg-accent transition-all shadow-sm disabled:opacity-50 cursor-pointer"
                     >
-                      <div className={`absolute top-0.5 left-0.5 bg-white w-3 h-3 rounded-full transition-transform ${module.strictRAG ? 'translate-x-4' : 'translate-x-0'}`} />
+                      {generatingTitle === module.name ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                      <span>{hasLessons ? 'Generate Lesson' : 'Generate First Lesson'}</span>
                     </button>
+                  </>
+                ) : (
+                  <div className="px-3 py-2 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-[10px] font-bold uppercase">
+                    AI key needed
                   </div>
                 )}
               </div>
-              <h1 className="text-5xl md:text-6xl font-bold font-display leading-[0.88] tracking-tight text-slate-950 editorial-title">{module.name}</h1>
-              <p className="ls-body-text max-w-2xl leading-relaxed">{module.description}</p>
-              {showStats && (
-                <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-ink-muted pt-1">
-                  <span className="font-semibold">{hasLessons ? `${lessons.length} Units` : `${topicFallbackRows.length} Topics`}</span>
-                  <span className="h-1 w-1 rounded-full bg-slate-300 dark:bg-white/10" />
-                  <div className="flex items-center gap-2">
-                    <span>{module.progress}% Complete</span>
-                    <div className="w-24 h-1.5 bg-slate-100 dark:bg-surface-mid rounded-full overflow-hidden inline-block align-middle border border-slate-200/50 dark:border-white/5">
-                      <div className="h-full bg-accent" style={{ width: `${module.progress}%` }} />
-                    </div>
-                  </div>
-                </div>
-              )}
+            )}
+          </div>
+
+          {/* Middle Row: Title & Subtitle/Description */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="space-y-1">
+              <h1 className="text-3xl font-black font-display tracking-tight text-slate-950 dark:text-ink leading-none">
+                {module.name}
+              </h1>
+              <p className="text-xs text-slate-500 dark:text-ink-muted max-w-3xl leading-relaxed">
+                {module.description}
+              </p>
             </div>
           </div>
 
-          {!showSetupState && (
-            <div className="flex flex-wrap items-center gap-3 md:justify-end">
-              {isAdmin && (
-                <button
-                  onClick={handleSeedFromSupabase}
-                  disabled={isSeeding}
-                  className="flex items-center gap-2 bg-slate-50 text-slate-950 px-4 py-3 rounded-xl text-xs font-medium transition-all border border-slate-200 hover:border-accent/30 hover:text-accent disabled:opacity-50 dark:bg-paper dark:border-white/8 dark:text-ink"
-                >
-                  {isSeeding ? <Loader2 size={14} className="animate-spin" /> : <Database size={14} />}
-                  {isSeeding ? 'Loading Units' : 'Load from Supabase'}
-                </button>
-              )}
-              {isAdmin && hasTopicFallback && (
-                <button
-                  onClick={handleGenerateStarterLessons}
-                  disabled={isGeneratingStarterLessons}
-                  className="flex items-center gap-2 bg-slate-50 text-slate-950 px-4 py-3 rounded-xl text-xs font-medium transition-all border border-slate-200 hover:border-accent/30 hover:text-accent disabled:opacity-50 dark:bg-paper dark:border-white/8 dark:text-ink"
-                >
-                  {isGeneratingStarterLessons ? <Loader2 size={14} className="animate-spin" /> : <Database size={14} />}
-                  {isGeneratingStarterLessons ? 'Generating...' : 'Generate All Lessons'}
-                </button>
-              )}
-              {aiAvailable ? (
-                <>
-                  {isAdmin && hasLessons && (
-                    <button
-                      onClick={handleAuditClassroom}
-                      className="flex items-center gap-2 bg-slate-50 text-slate-500 hover:text-accent px-4 py-3 rounded-xl text-xs font-medium transition-all border border-slate-200 dark:bg-paper dark:border-white/8 dark:text-ink-secondary"
-                    >
-                      <ShieldCheck size={14} />
-                      Audit
-                    </button>
-                  )}
-                  <button
-                    onClick={() => handleGenerateLesson()}
-                    disabled={!!generatingTitle}
-                    className="flex items-center gap-2 bg-slate-950 text-white px-6 py-3 rounded-xl text-xs font-bold  hover:bg-accent transition-all shadow-sm shadow-ink/10 disabled:opacity-50"
-                  >
-                    {generatingTitle === module.name ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-                    {hasLessons ? 'Generate Lesson' : 'Generate First Lesson'}
-                  </button>
-                </>
-              ) : (
-                <div className="px-4 py-3 rounded-xl border border-amber-200 bg-amber-50 text-amber-800 text-xs font-medium">
-                  AI features need an API key
+          {/* Bottom Row: Stats & Diagnostics Dashboard */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-slate-100 dark:border-white/5">
+            {showStats && (
+              <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-ink-muted select-none">
+                <span className="font-bold text-slate-700 dark:text-ink-secondary">
+                  {hasLessons ? `${lessons.length} Module Titles` : `${topicFallbackRows.length} Topics`}
+                </span>
+                <span className="h-1 w-1 rounded-full bg-slate-300 dark:bg-white/10" />
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">{module.progress}% Complete</span>
+                  <div className="w-20 h-1.5 bg-slate-100 dark:bg-surface-mid rounded-full overflow-hidden inline-block align-middle border border-slate-200/50 dark:border-white/5">
+                    <div className="h-full bg-accent" style={{ width: `${module.progress}%` }} />
+                  </div>
                 </div>
-              )}
-            </div>
-          )}
+              </div>
+            )}
+
+            {isAdmin && adminStats && (
+              <div className="flex flex-wrap gap-1.5 items-center text-[10px] font-extrabold uppercase tracking-wide select-none">
+                <span className="text-slate-400 dark:text-ink-muted mr-1">Diagnostics:</span>
+                <span className="bg-slate-100 text-slate-700 dark:bg-surface-low dark:text-ink px-2 py-0.5 rounded font-bold">Total: {adminStats.total}</span>
+                <span className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400 px-2 py-0.5 rounded font-bold">Pub: {adminStats.published}</span>
+                <span className="bg-amber-50 text-amber-700 dark:bg-amber-950/20 dark:text-amber-400 px-2 py-0.5 rounded font-bold">Review: {adminStats.needsReview}</span>
+                <span className="bg-blue-50 text-blue-700 dark:bg-blue-950/20 dark:text-blue-400 px-2 py-0.5 rounded font-bold">Draft: {adminStats.draft}</span>
+                <span className="bg-rose-50 text-rose-700 dark:bg-rose-950/20 dark:text-rose-400 px-2 py-0.5 rounded font-bold">Hidden: {adminStats.hidden}</span>
+              </div>
+            )}
+          </div>
         </div>
 
         {isHydratingSupabase && !hasLessons && !hasTopicFallback && (
@@ -1408,11 +1435,11 @@ export const ClassroomView: React.FC = () => {
             </div>
             <div className="space-y-2 max-w-md">
               <p className="text-2xl font-bold text-slate-950">{t('start_here') || 'Set up this classroom'}</p>
-              <p className="ls-body-text">{t('start_here_desc') || 'Generate draft AI content, or load officially validated units.'}</p>
+              <p className="ls-body-text">{t('start_here_desc') || 'Generate draft AI content, or load officially validated module titles.'}</p>
             </div>
             {!aiAvailable && (
               <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 w-full max-w-md">
-                <p className="text-xs text-amber-800 font-medium">{t('ai_key_needed') || 'AI features need an API key, but you can still load certified units right now.'}</p>
+                <p className="text-xs text-amber-800 font-medium">{t('ai_key_needed') || 'AI features need an API key, but you can still load certified module titles right now.'}</p>
               </div>
             )}
             <div className="flex flex-col sm:flex-row gap-3 w-full max-w-md mt-4">
@@ -1472,7 +1499,7 @@ export const ClassroomView: React.FC = () => {
                       <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
                       <div>
                         <p className="text-sm font-semibold">Draft AI-assisted content is shown because no teacher-reviewed or officially validated lesson is available yet.</p>
-                        <p className="mt-1 text-sm text-amber-800">Use the status badge on each unit before treating it as final Moroccan curriculum truth.</p>
+                        <p className="mt-1 text-sm text-amber-800">Use the status badge on each module title before treating it as final Moroccan curriculum truth.</p>
                       </div>
                     </div>
                   </div>
@@ -1490,16 +1517,7 @@ export const ClassroomView: React.FC = () => {
                   </div>
                 )}
 
-                {isAdmin && adminStats && (
-                  <div className="flex flex-wrap gap-2 items-center bg-slate-50 dark:bg-surface-low border border-slate-200 dark:border-white/5 rounded-2xl p-3 text-xs shrink-0 select-none">
-                    <span className="font-bold text-slate-700 dark:text-ink-secondary mr-1">Admin Diagnostic:</span>
-                    <span className="bg-slate-200/80 text-slate-800 dark:bg-white/8 dark:text-ink px-2.5 py-1 rounded-lg font-semibold">Total: {adminStats.total}</span>
-                    <span className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400 px-2.5 py-1 rounded-lg font-semibold">Published: {adminStats.published}</span>
-                    <span className="bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-400 px-2.5 py-1 rounded-lg font-semibold">Needs Review: {adminStats.needsReview}</span>
-                    <span className="bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-400 px-2.5 py-1 rounded-lg font-semibold">Draft: {adminStats.draft}</span>
-                    <span className="bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-400 px-2.5 py-1 rounded-lg font-semibold">Hidden from Student: {adminStats.hidden}</span>
-                  </div>
-                )}
+
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-bold text-slate-950 flex items-center gap-2">
                     <BookOpen size={20} className="text-accent" />
@@ -1562,7 +1580,28 @@ export const ClassroomView: React.FC = () => {
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: i * 0.05 }}
-                          onClick={() => { if (isClickable) navigate(`/lesson/${lesson.id}`); }}
+                          onClick={(e) => {
+                            const target = e.target as HTMLElement;
+                            // Safe check for detached React synthetic DOM nodes
+                            if (!target.isConnected || !document.body.contains(target)) return;
+
+                            // Handle click on practice test metrics section as direct test trigger
+                            if (target.closest('.practice-test-metrics-trigger')) {
+                              e.stopPropagation();
+                              const quizzes = (lesson.blocks || []).filter((b: any) => b.purpose === 'quiz' || b.type === 'quiz');
+                              const exercises = (lesson.blocks || []).filter((b: any) => b.purpose === 'practice' || b.purpose === 'exam' || b.type === 'practice' || b.type === 'exam');
+                              const hasTests = quizzes.length > 0 || exercises.length > 0;
+                              if (hasTests) {
+                                navigate(`/lesson/${lesson.id}`, { state: { startAtTest: true } });
+                              } else {
+                                navigate(`/lesson/${lesson.id}`);
+                              }
+                              return;
+                            }
+
+                            if (target.closest('.card-footer-actions') || target.closest('button')) return;
+                            if (isClickable) navigate(`/lesson/${lesson.id}`);
+                          }}
                           className={`bg-white border border-slate-200 rounded-3xl overflow-hidden flex flex-col group transition-all dark:bg-paper dark:border-white/8 shadow-sm ${
                             isClickable 
                               ? 'cursor-pointer hover:border-accent/30 hover:shadow-lg' 
@@ -1591,7 +1630,7 @@ export const ClassroomView: React.FC = () => {
                           {/* Horizontal Dynamic Illustration Banner */}
                           <div className="h-24 w-full overflow-hidden relative border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-surface-low shrink-0">
                             <img 
-                              src={getLessonIllustration(lesson.title, lesson.subject || module?.name)}
+                              src={lesson.bannerImage || getLessonIllustration(lesson.title, lesson.subject || module?.name)}
                               alt={lesson.title}
                               className={`w-full h-full object-cover transition-transform duration-700 ${isClickable ? 'group-hover:scale-105' : ''}`}
                             />
@@ -1601,10 +1640,24 @@ export const ClassroomView: React.FC = () => {
                           <div className="p-5 flex-1 flex flex-col space-y-4">
                             {/* Metrics columns */}
                             <div className="grid grid-cols-2 gap-4 text-sm border-b border-slate-100 pb-4 dark:border-white/6 items-center">
-                              <div className="flex items-center gap-2">
-                                <BookOpen className="w-4 h-4 text-slate-400 dark:text-ink-muted shrink-0" />
-                                <span className="font-bold text-slate-800 dark:text-ink">Unit {i + 1}</span>
-                              </div>
+                              {(() => {
+                                const quizzes = (lesson.blocks || []).filter((b: any) => b.purpose === 'quiz' || b.type === 'quiz');
+                                const exercises = (lesson.blocks || []).filter((b: any) => b.purpose === 'practice' || b.purpose === 'exam' || b.type === 'practice' || b.type === 'exam');
+                                const hasTests = quizzes.length > 0 || exercises.length > 0;
+                                return (
+                                  <div className="space-y-1 practice-test-metrics-trigger cursor-pointer hover:bg-slate-50 dark:hover:bg-surface-low rounded-xl p-1.5 transition-all" title={hasTests ? "Click to take practice test directly" : ""}>
+                                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 dark:text-ink">
+                                      <Target className="w-3.5 h-3.5 text-accent shrink-0" />
+                                      <span>Practice Test</span>
+                                    </div>
+                                    <p className="text-[10px] text-slate-500 dark:text-ink-muted leading-tight">
+                                      {hasTests 
+                                        ? `${quizzes.length} Quizzes • ${exercises.length} Exercises`
+                                        : 'No tests generated yet'}
+                                    </p>
+                                  </div>
+                                );
+                              })()}
                               <div className="space-y-1">
                                 <div className="flex justify-between text-[11px] font-bold">
                                   <span className="text-slate-400 dark:text-ink-muted">Progress</span>
@@ -1630,20 +1683,41 @@ export const ClassroomView: React.FC = () => {
                             {/* Footer: actions + status dot */}
                             <div className="pt-2 flex items-center justify-between border-t border-slate-100 dark:border-white/6">
                               {isClickable ? (
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 card-footer-actions">
                                   <button
+                                    type="button"
                                     onClick={(e) => { e.stopPropagation(); navigate(`/lesson/${lesson.id}`); }}
                                     className="flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 text-xs font-bold text-white transition-colors shadow-sm"
                                   >
                                     <Play className="w-3 h-3 fill-current text-white" />
                                     {lesson.status === 'done' ? 'Review' : 'Start Lesson'}
                                   </button>
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); navigate(`/lesson/${lesson.id}`); }}
-                                    className="rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-700 transition-colors dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:bg-surface-low"
-                                  >
-                                    View Plan
-                                  </button>
+                                  {(() => {
+                                    const quizzes = (lesson.blocks || []).filter((b: any) => b.purpose === 'quiz' || b.type === 'quiz');
+                                    const exercises = (lesson.blocks || []).filter((b: any) => b.purpose === 'practice' || b.purpose === 'exam' || b.type === 'practice' || b.type === 'exam');
+                                    const hasTests = quizzes.length > 0 || exercises.length > 0;
+                                    if (hasTests) {
+                                      return (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => { e.stopPropagation(); navigate(`/lesson/${lesson.id}`, { state: { startAtTest: true } }); }}
+                                          className="rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-700 transition-colors dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:bg-surface-low flex items-center gap-1.5 shadow-sm"
+                                        >
+                                          <Target size={12} className="text-accent shrink-0" />
+                                          Take Test
+                                        </button>
+                                      );
+                                    }
+                                    return (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); navigate(`/lesson/${lesson.id}`); }}
+                                        className="rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-700 transition-colors dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:bg-surface-low"
+                                      >
+                                        View Plan
+                                      </button>
+                                    );
+                                  })()}
                                 </div>
                               ) : (
                                 <div className="flex-1 text-[11px] text-slate-500 dark:text-ink-muted font-medium pr-2 leading-relaxed">
@@ -1684,7 +1758,12 @@ export const ClassroomView: React.FC = () => {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: i * 0.03 }}
-                        onClick={() => handleGenerateLesson(topic.title, true)}
+                        onClick={(e) => {
+                          const target = e.target as HTMLElement;
+                          if (!target.isConnected || !document.body.contains(target)) return;
+                          if (target.closest('.card-footer-actions') || target.closest('button')) return;
+                          handleGenerateLesson(topic.title, true);
+                        }}
                         className="bg-white border border-slate-200 rounded-3xl overflow-hidden flex flex-col group hover:border-accent/30 hover:shadow-lg transition-all dark:bg-paper dark:border-white/8 shadow-sm cursor-pointer"
                         style={{ boxShadow: 'var(--ls-shadow)' }}
                       >
@@ -1717,9 +1796,14 @@ export const ClassroomView: React.FC = () => {
                         <div className="p-5 flex-1 flex flex-col space-y-4">
                           {/* Metrics columns */}
                           <div className="grid grid-cols-2 gap-4 text-sm border-b border-slate-100 pb-4 dark:border-white/6 items-center">
-                            <div className="flex items-center gap-2">
-                              <BookOpen className="w-4 h-4 text-slate-400 dark:text-ink-muted shrink-0" />
-                              <span className="font-bold text-slate-800 dark:text-ink">Topic {i + 1}</span>
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 dark:text-ink">
+                                <Target className="w-3.5 h-3.5 text-slate-400 dark:text-ink-muted shrink-0" />
+                                <span>Practice Test</span>
+                              </div>
+                              <p className="text-[10px] text-slate-500 dark:text-ink-muted leading-tight">
+                                No tests generated yet
+                              </p>
                             </div>
                             <div className="space-y-1">
                               <div className="flex justify-between text-[11px] font-bold">
@@ -1745,8 +1829,9 @@ export const ClassroomView: React.FC = () => {
 
                           {/* Footer: actions + status dot */}
                           <div className="pt-2 flex items-center justify-between border-t border-slate-100 dark:border-white/6">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 card-footer-actions">
                               <button
+                                type="button"
                                 onClick={(e) => { e.stopPropagation(); handleGenerateLesson(topic.title, true); }}
                                 disabled={!!generatingTitle}
                                 className="flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 text-xs font-bold text-white transition-colors shadow-sm disabled:opacity-60"
@@ -1759,6 +1844,7 @@ export const ClassroomView: React.FC = () => {
                                 Generate
                               </button>
                               <button
+                                type="button"
                                 onClick={(e) => { e.stopPropagation(); handleGenerateLesson(topic.title, true); }}
                                 className="rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-700 transition-colors dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:bg-surface-low"
                               >
@@ -1854,7 +1940,7 @@ export const ClassroomView: React.FC = () => {
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-bold text-slate-950 flex items-center gap-2">
                   <Sparkles size={20} className="text-accent" />
-                  Suggested Units
+                  Suggested Module Titles
                 </h3>
                 <div className="flex items-center gap-4">
                   {selectedSuggestions.length > 0 ? (
@@ -1951,6 +2037,7 @@ export const ClassroomView: React.FC = () => {
           )}
         </AnimatePresence>
       </div>
+
     </Layout>
   );
 };

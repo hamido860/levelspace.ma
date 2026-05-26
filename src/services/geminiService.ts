@@ -4210,3 +4210,88 @@ Return ONLY valid JSON:
   }
 }
 
+export interface DetailedWordExplanation {
+  word: string;
+  phonetic?: string;
+  partOfSpeech: string;
+  definition: string;
+  languages: {
+    en: string;
+    fr: string;
+    ar: string;
+  };
+  pedagogicalExplanation: string;
+  examples: {
+    sentence: string;
+    translation: string;
+  }[];
+}
+
+export const getDetailedWordExplanation = async (
+  word: string,
+  context: string,
+  retries = 2
+): Promise<DetailedWordExplanation | null> => {
+  if (!checkAIProvider()) return null;
+
+  try {
+    const cacheKey = getCacheKey("getDetailedWordExplanation", word, context);
+    const cachedResponse = await responseCache.get(cacheKey);
+    if (cachedResponse) {
+      return safeJsonParse(cachedResponse);
+    }
+
+    const prompt = `You are a premium educational dictionary and vocabulary tutor tool.
+    The user has highlighted the text/word: "${word}".
+    The surrounding context is: "${context.slice(0, 500)}..."
+    
+    Task:
+    Provide a detailed, rich, multi-lingual pedagogical breakdown of this word.
+    
+    Return EXACTLY in this JSON format:
+    {
+      "word": "original word",
+      "phonetic": "IPA pronunciation or phonetic spelling (optional)",
+      "partOfSpeech": "Noun | Verb | Adjective | Adverb | etc.",
+      "definition": "Clear concise translation-focused definition",
+      "languages": {
+        "en": "English definition / equivalent",
+        "fr": "French definition / equivalent",
+        "ar": "Arabic definition / equivalent"
+      },
+      "pedagogicalExplanation": "A student-friendly detailed explanation of what this word means in this specific educational context and curriculum.",
+      "examples": [
+        {
+          "sentence": "Example sentence using the word in context",
+          "translation": "Translation of the example sentence in the active language of the context"
+        }
+      ]
+    }`;
+
+    const response = await generateContentWithFallback(
+      {
+        model: modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]),
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          maxOutputTokens: 800,
+          temperature: 0.3,
+        },
+      },
+      "getDetailedWordExplanation"
+    );
+
+    const parsed = safeJsonParse(response.text || "");
+    if (parsed && parsed.definition) {
+      await responseCache.set(cacheKey, JSON.stringify(parsed));
+      return parsed as DetailedWordExplanation;
+    }
+    return null;
+  } catch (error) {
+    if (retries > 0) return getDetailedWordExplanation(word, context, retries - 1);
+    console.error("Error in getDetailedWordExplanation:", error);
+    return null;
+  }
+};
+
+
