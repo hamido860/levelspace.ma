@@ -1,11 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import {
-  GraduationCap, ArrowRight, CheckCircle2, Sparkles, BookOpen, Layers,
-  BookA, BrainCircuit, LibraryBig, Globe, BookMarked
-} from 'lucide-react';
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowRight, CheckCircle2, GraduationCap, BookOpen, Globe, Search } from 'lucide-react';
+import { supabase } from '../db/supabase';
 import { useAuth } from '../context/AuthContext';
-import { updateProfile, supabase } from '../db/supabase';
 import { db } from '../db/db';
 
 interface OnboardingModalProps {
@@ -13,548 +10,352 @@ interface OnboardingModalProps {
   onComplete: () => void;
 }
 
-const CYCLE_ICONS: Record<string, any> = {
-  'التعليم الإبتدائي (Enseignement Primaire)': BookA,
-  'التعليم الثانوي الإعدادي (Collège)': LibraryBig,
-  'التعليم الثانوي التأهيلي (Lycée)': GraduationCap,
-};
-
-function getCycleIcon(cycleName: string) {
-  for (const [key, icon] of Object.entries(CYCLE_ICONS)) {
-    if (cycleName.includes(key) || key.includes(cycleName)) return icon;
-  }
-  return BrainCircuit;
-}
-
-function shouldShowTrackSelector(cycleName: string, gradeName: string) {
-  return cycleName.toLowerCase().includes('lycée') || gradeName.toLowerCase().includes('bac') || gradeName.toLowerCase().includes('tronc commun');
-}
-
 export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComplete }) => {
-  const { profile, user } = useAuth();
-  
-  const [step, setStep] = useState(0);
-  
-  // Data from Supabase
-  const [cycles, setCycles] = useState<any[]>([]);
-  const [grades, setGrades] = useState<any[]>([]);
-  const [subjects, setSubjects] = useState<any[]>([]);
-  const [tracks, setTracks] = useState<any[]>([]);
-  const [options, setOptions] = useState<any[]>([]);
+  const { user } = useAuth();
+  const [step, setStep] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Selected State (IDs)
-  const [selectedCycleId, setSelectedCycleId] = useState('');
-  const [selectedGradeId, setSelectedGradeId] = useState('');
-  const [selectedSubjectId, setSelectedSubjectId] = useState('');
-  const [selectedTrackId, setSelectedTrackId] = useState('');
-  const [selectedOptionId, setSelectedOptionId] = useState('');
-
-  // Selected Entities for display
-  const selectedCycle = cycles.find(c => c.id === selectedCycleId);
-  const selectedGrade = grades.find(g => g.id === selectedGradeId);
-  const selectedSubject = subjects.find(s => s.id === selectedSubjectId);
-  const selectedTrack = tracks.find(t => t.id === selectedTrackId);
-  const selectedOption = options.find(o => o.id === selectedOptionId);
-
-  const [loading, setLoading] = useState(false);
-
-  const userName = profile?.full_name || (user?.email ? user.email.split('@')[0] : 'Explorer');
-
-  const requiresTrack = selectedCycle && selectedGrade && shouldShowTrackSelector(selectedCycle.name, selectedGrade.name);
-  // 0=Welcome, 1=Cycle, 2=Grade, 3=Subject, 4=Track(if lycee), 5=Option(if lycee), 6=Done
-  let totalSteps = 4; // Welcome, Cycle, Grade, Subject, Done
-  if (requiresTrack) {
-    totalSteps = 6;
-  }
-
-  // Fetch initial cycles and options
-  useEffect(() => {
-    if (isOpen) {
-      supabase.from('cycles').select('*').order('cycle_order').then(({ data }) => setCycles(data || []));
-      supabase.from('bac_tracks').select('*').order('track_order').then(({ data }) => setTracks(data || []));
-      supabase.from('bac_international_options').select('*').then(({ data }) => setOptions(data || []));
-    }
-  }, [isOpen]);
-
-  // Fetch grades when cycle changes
-  useEffect(() => {
-    if (selectedCycleId) {
-      supabase.from('grades').select('*').eq('cycle_id', selectedCycleId).order('grade_order')
-        .then(({ data }) => setGrades(data || []));
-    } else {
-      setGrades([]);
-    }
-  }, [selectedCycleId]);
-
-  // Fetch subjects when grade changes
-  useEffect(() => {
-    if (selectedGradeId) {
-      const getSubjectsForGrade = async (gradeId: string) => {
-        setLoading(true);
-        const { data } = await supabase
-          .from('grade_subjects')
-          .select('subjects(id, name, code)')
-          .eq('grade_id', gradeId);
-        
-        const mappedSubjects = data?.map((d: any) => d.subjects).filter(Boolean) || [];
-        setSubjects(mappedSubjects);
-        setLoading(false);
-      };
-      getSubjectsForGrade(selectedGradeId);
-    } else {
-      setSubjects([]);
-    }
-  }, [selectedGradeId]);
-
-  const handleNext = () => setStep(s => Math.min(s + 1, totalSteps));
-  const handleBack = () => setStep(s => Math.max(s - 1, 0));
-
-  const handleCycleChange = (id: string) => {
-    setSelectedCycleId(id);
-    setSelectedGradeId("");
-    setSelectedSubjectId("");
-    setSelectedTrackId("");
-    setSelectedOptionId("");
-  };
-
-  const handleGradeChange = (id: string) => {
-    setSelectedGradeId(id);
-    setSelectedSubjectId("");
-    setSelectedTrackId("");
-    setSelectedOptionId("");
-    
-    // Debug logging as requested
-    const grade = grades.find(g => g.id === id);
-    console.debug("[onboarding] selected grade", grade);
-    if (grade && selectedCycle) {
-      console.debug("[onboarding] track selector visible", shouldShowTrackSelector(selectedCycle.name, grade.name));
-    }
-    console.debug("[onboarding] cleared invalid track fields", { track_id: null, option_id: null, subject_id: null });
-  };
-
-  useEffect(() => {
-    if (subjects.length > 0) {
-      console.debug("[onboarding] grade subjects", subjects);
-    }
-  }, [subjects]);
-
-  const handleComplete = async () => {
-    // Save validation
-    if (!selectedGradeId) {
-      console.error("Save rejected: grade_id missing");
-      return;
-    }
-    if (selectedSubjectId && !subjects.find(s => s.id === selectedSubjectId)) {
-      console.error("Save rejected: subject_id doesn't belong to grade_id");
-      return;
-    }
-    if (selectedTrackId || selectedOptionId) {
-      if (!requiresTrack) {
-        console.error("Save rejected: track/option selected for primary/college");
-        return;
-      }
-    }
-
-    localStorage.setItem('selected_country', 'Morocco');
-    localStorage.setItem('selected_cycle', selectedCycle?.name || '');
-    localStorage.setItem('selected_grade', selectedGrade?.name || '');
-    if (selectedTrack) localStorage.setItem('selected_bac_track', selectedTrack.id);
-    if (selectedOption) localStorage.setItem('selected_option', selectedOption.id);
-    localStorage.setItem('has_completed_onboarding', 'true');
-
-    await db.settings.put({ key: 'selected_country', value: 'Morocco' });
-    await db.settings.put({ key: 'selected_cycle', value: selectedCycle?.name || '' });
-    await db.settings.put({ key: 'selected_grade', value: selectedGrade?.name || '' });
-    if (selectedTrack) await db.settings.put({ key: 'selected_bac_track', value: selectedTrack.id });
-    if (selectedOption) await db.settings.put({ key: 'selected_option', value: selectedOption.id });
-    await db.settings.put({ key: 'has_completed_onboarding', value: 'true' });
-
-    if (user) {
-      try {
-        await updateProfile(user.id, {
-          onboarding_completed: true,
-          selected_grade: selectedGrade?.name || '',
-          selected_bac_track: selectedTrackId || null,
-        });
-      } catch (err: any) {
-        console.error('Failed to persist onboarding to database:', err.message);
-      }
-    }
-
-    onComplete();
-  };
+  // Form State
+  const [selectedCycle, setSelectedCycle] = useState<string | null>(null);
+  const [selectedGrade, setSelectedGrade] = useState<string | null>(null);
+  const [selectedTrack, setSelectedTrack] = useState<string | null>(null);
+  const [selectedLanguageOption, setSelectedLanguageOption] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
+  // Constants
+  const CYCLES = [
+    { id: 'primary', name: 'Primary Education', desc: 'Enseignement Primaire' },
+    { id: 'college', name: 'Middle School', desc: 'Collège' },
+    { id: 'lycee', name: 'High School', desc: 'Lycée' },
+  ];
+
+  const GRADES_MAP: Record<string, string[]> = {
+    primary: [
+      '1ère année primaire', '2ème année primaire', '3ème année primaire',
+      '4ème année primaire', '5ème année primaire', '6ème année primaire'
+    ],
+    college: [
+      '1ère année collège', '2ème année collège', '3ème année collège'
+    ],
+    lycee: [
+      'Tronc Commun', '1ère année Bac', '2ème année Bac'
+    ]
+  };
+
+  const TRACKS_MAP: Record<string, string[]> = {
+    'Tronc Commun': ['Tronc Commun Scientifique', 'Tronc Commun Littéraire', 'Tronc Commun Technologique'],
+    '1ère année Bac': ['Sciences Mathématiques', 'Sciences Expérimentales', 'Sciences et Technologies', 'Lettres et Sciences Humaines', 'Sciences Économiques et Gestion'],
+    '2ème année Bac': ['Sciences Mathématiques A', 'Sciences Mathématiques B', 'Sciences Physiques', 'SVT', 'Sciences Agronomiques', 'Lettres', 'Sciences Humaines', 'Sciences Économiques', 'Techniques de Gestion Comptable']
+  };
+
+  const LANGUAGE_OPTIONS = [
+    { id: 'general_ar', name: 'Général (Arabe)', desc: 'Subjects taught in Arabic' },
+    { id: 'biof_fr', name: 'Option Français (BIOF)', desc: 'Math, Physics, and SVT taught in French' },
+    { id: 'biof_en', name: 'Option Anglais (BIOF)', desc: 'Starting slowly in some regions' }
+  ];
+
+  const isLycee = selectedCycle === 'lycee';
+  const totalSteps = isLycee ? 5 : 3;
+
+  const handleNext = () => setStep(prev => prev + 1);
+  const handleBack = () => setStep(prev => prev - 1);
+
+  const handleSubmit = async () => {
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      if (user) {
+        // Build update object based on what was selected
+        const updates = {
+          onboarding_completed: true,
+          selected_cycle: selectedCycle,
+          selected_grade: selectedGrade,
+          selected_bac_track: isLycee ? selectedTrack : null,
+          selected_language_option: isLycee ? selectedLanguageOption : null,
+        };
+
+        const { error: dbError } = await supabase
+          .from('profiles')
+          .update(updates)
+          .eq('id', user.id);
+
+        if (dbError) throw dbError;
+      }
+
+      // Update Local State for fast access
+      localStorage.setItem('has_completed_onboarding', 'true');
+      if (selectedGrade) localStorage.setItem('selected_grade', selectedGrade);
+      if (selectedTrack) localStorage.setItem('selected_bac_track', selectedTrack);
+
+      await db.settings.put({ key: 'has_completed_onboarding', value: 'true' });
+
+      onComplete();
+    } catch (err: any) {
+      console.error('Failed to save onboarding state:', err);
+      setError(err.message || 'Failed to complete onboarding. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-ink/40 ">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-ink/80 backdrop-blur-sm">
       <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        className="bg-paper w-full max-w-xl rounded-[2rem] shadow-md overflow-hidden border border-ink/10 relative"
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="bg-paper w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col relative max-h-[90vh]"
       >
-        <div className="absolute inset-0 bg-gradient-to-br from-accent/5 via-transparent to-transparent pointer-events-none" />
-        
-        <div className="absolute top-0 left-0 w-full h-1 bg-ink/5">
-          <motion.div 
-            className="h-full bg-accent"
-            initial={{ width: '0%' }}
-            animate={{ width: `${(step / totalSteps) * 100}%` }}
-            transition={{ duration: 0.3 }}
-          />
-        </div>
+        <div className="p-8 flex-1 overflow-y-auto">
+          {/* Progress Indicator */}
+          <div className="flex gap-2 mb-8">
+            {Array.from({ length: totalSteps }).map((_, i) => (
+              <div
+                key={i}
+                className={`h-2 flex-1 rounded-full transition-all ${
+                  i < step ? 'bg-accent' : 'bg-surface-mid'
+                }`}
+              />
+            ))}
+          </div>
 
-        <div className="p-6 md:p-10 min-h-[425px] flex flex-col">
+          {error && (
+            <div className="mb-4 p-4 bg-red-500/10 text-red-500 rounded-xl text-sm font-medium">
+              {error}
+            </div>
+          )}
+
           <AnimatePresence mode="wait">
-            
-            {/* STEP 0: WELCOME */}
-            {step === 0 && (
-              <motion.div
-                key="step-0"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="flex-1 flex flex-col items-center justify-center text-center space-y-8"
-              >
-                <div className="relative">
-                  <div className="absolute -inset-4 bg-accent/20 blur-2xl rounded-full animate-pulse" />
-                  <div className="relative w-20 h-20 bg-accent rounded-3xl flex items-center justify-center text-paper shadow-md rotate-3">
-                    <Sparkles className="w-8 h-8" />
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  <h1 className="text-xl sm:text-3xl font-display font-bold text-ink leading-[1.1] tracking-tight">
-                    Welcome to Levelspace.<br />
-                    <span className="text-accent capitalize">{userName}</span>
-                  </h1>
-                  <p className="text-muted text-sm max-w-sm mx-auto font-medium leading-relaxed">
-                    Before we start, let's find your level.
-                  </p>
-                </div>
-              </motion.div>
-            )}
-
-            {/* STEP 1: CYCLE */}
+            {/* Step 1: Cycle */}
             {step === 1 && (
               <motion.div
-                key="step-1"
+                key="step1"
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
-                className="flex-1 flex flex-col"
+                className="space-y-6"
               >
-                <div className="flex items-center gap-4 mb-8">
-                  <div className="w-10 h-10 bg-gradient-to-b from-accent/10 to-transparent border border-accent/10 rounded-xl flex items-center justify-center text-accent shadow-sm">
-                    <Layers className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-display font-semibold text-ink tracking-tight">FirstStep</h2>
-                    <p className="text-muted text-sm">Answer a few simple questions. This helps us choose the best path for you.</p>
-                  </div>
+                <div className="mb-8">
+                  <h2 className="text-2xl font-bold text-ink mb-2">Welcome to LevelSpace</h2>
+                  <p className="text-muted">Let's set up your profile. What is your current educational cycle?</p>
                 </div>
-                
-                <div className="grid grid-cols-1 gap-4 overflow-y-auto max-h-[300px] pr-2 custom-scrollbar">
-                  {cycles.map(cycle => {
-                    const Icon = getCycleIcon(cycle.name);
-                    return (
-                      <button
-                        key={cycle.id}
-                        onClick={() => handleCycleChange(cycle.id)}
-                        className={`p-5 rounded-[1.5rem] border-2 transition-all text-left flex items-start gap-4 group ${
-                          selectedCycleId === cycle.id 
-                            ? 'bg-accent/5 border-accent shadow-sm shadow-accent/10 scale-[1.02]' 
-                            : 'bg-surface-low border-transparent hover:border-accent/30 hover:bg-paper hover:shadow-md'
-                        }`}
-                      >
-                        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 transition-colors ${
-                          selectedCycleId === cycle.id ? 'bg-accent text-paper' : 'bg-surface-mid text-ink-secondary group-hover:bg-accent/10 group-hover:text-accent'
-                        }`}>
-                          <Icon className="w-5 h-5" />
-                        </div>
-                        <div className="flex-1">
-                          <h3 className={`font-bold text-base leading-tight mb-1 ${selectedCycleId === cycle.id ? 'text-accent' : 'text-ink'}`}>
-                            {cycle.name}
-                          </h3>
-                        </div>
-                        {selectedCycleId === cycle.id && <CheckCircle2 className="w-5 h-5 text-accent shrink-0" />}
-                      </button>
-                    )
-                  })}
-                </div>
-              </motion.div>
-            )}
-
-            {/* STEP 2: GRADE */}
-            {step === 2 && (
-              <motion.div
-                key="step-2"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="flex-1 flex flex-col"
-              >
-                <div className="flex items-center gap-4 mb-8">
-                  <div className="w-10 h-10 bg-gradient-to-b from-accent/10 to-transparent border border-accent/10 rounded-xl flex items-center justify-center text-accent shadow-sm">
-                    <GraduationCap className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-display font-semibold text-ink tracking-tight">Select Grade</h2>
-                    <p className="text-muted">Which specific year are you currently in?</p>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-3 overflow-y-auto max-h-[300px] pr-2 custom-scrollbar">
-                  {grades.map(grade => (
+                <div className="grid gap-4">
+                  {CYCLES.map(cycle => (
                     <button
-                      key={grade.id}
-                      onClick={() => handleGradeChange(grade.id)}
-                      className={`p-3 rounded-xl border-2 text-sm font-bold transition-all text-center flex items-center justify-center gap-2 ${
-                        selectedGradeId === grade.id 
-                          ? 'bg-accent border-accent text-paper shadow-sm shadow-accent/20' 
-                          : 'bg-surface-low border-transparent text-ink hover:border-accent/30 hover:bg-paper'
+                      key={cycle.id}
+                      onClick={() => {
+                        setSelectedCycle(cycle.id);
+                        setSelectedGrade(null);
+                        setSelectedTrack(null);
+                        setSelectedLanguageOption(null);
+                      }}
+                      className={`p-4 rounded-2xl border-2 text-left flex items-center justify-between transition-all ${
+                        selectedCycle === cycle.id
+                          ? 'border-accent bg-accent/5'
+                          : 'border-surface-mid hover:border-accent/50 bg-background'
                       }`}
                     >
-                      {grade.name}
-                      {selectedGradeId === grade.id && <CheckCircle2 className="w-4 h-4" />}
+                      <div>
+                        <div className={`font-bold text-lg ${selectedCycle === cycle.id ? 'text-accent' : 'text-ink'}`}>
+                          {cycle.name}
+                        </div>
+                        <div className="text-sm text-muted">{cycle.desc}</div>
+                      </div>
+                      {selectedCycle === cycle.id && <CheckCircle2 className="text-accent" />}
                     </button>
                   ))}
                 </div>
               </motion.div>
             )}
 
-            {/* STEP 3: SUBJECT */}
-            {step === 3 && (
+            {/* Step 2: Grade */}
+            {step === 2 && selectedCycle && (
               <motion.div
-                key="step-3"
+                key="step2"
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
-                className="flex-1 flex flex-col"
+                className="space-y-6"
               >
-                <div className="flex items-center gap-4 mb-8">
-                  <div className="w-10 h-10 bg-gradient-to-b from-accent/10 to-transparent border border-accent/10 rounded-xl flex items-center justify-center text-accent shadow-sm">
-                    <BookMarked className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-display font-semibold text-ink tracking-tight">Select Primary Subject</h2>
-                    <p className="text-muted">Optional: focus on a specific subject.</p>
-                  </div>
+                <div className="mb-8">
+                  <h2 className="text-2xl font-bold text-ink mb-2">Select your Grade</h2>
+                  <p className="text-muted">Which year are you currently in?</p>
                 </div>
-                
-                <div className="flex-1 overflow-y-auto max-h-[300px] pr-2 custom-scrollbar">
-                  {loading ? (
-                    <p className="text-sm text-muted">Loading subjects...</p>
-                  ) : subjects.length === 0 ? (
-                    <div className="p-4 bg-surface-low rounded-xl border border-ink/5 text-center text-muted text-sm">
-                      No subjects configured for this grade yet.
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {subjects.map(subject => (
-                        <button
-                          key={subject.id}
-                          onClick={() => setSelectedSubjectId(subject.id)}
-                          className={`p-3 rounded-xl border-2 text-sm font-bold transition-all text-left flex items-center justify-between group ${
-                            selectedSubjectId === subject.id 
-                              ? 'bg-accent/10 border-accent text-accent shadow-md' 
-                              : 'bg-surface-low border-transparent text-ink hover:border-accent/30 hover:bg-paper'
-                          }`}
-                        >
-                          <span className="truncate">{subject.name}</span>
-                          {selectedSubjectId === subject.id && <CheckCircle2 className="w-5 h-5 shrink-0 ml-2" />}
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {GRADES_MAP[selectedCycle].map(grade => (
+                    <button
+                      key={grade}
+                      onClick={() => {
+                        setSelectedGrade(grade);
+                        setSelectedTrack(null);
+                      }}
+                      className={`p-4 rounded-2xl border-2 text-left flex items-center justify-between transition-all ${
+                        selectedGrade === grade
+                          ? 'border-accent bg-accent/5 text-accent font-bold'
+                          : 'border-surface-mid hover:border-accent/50 bg-background text-ink'
+                      }`}
+                    >
+                      <span>{grade}</span>
+                      {selectedGrade === grade && <CheckCircle2 className="w-5 h-5 text-accent" />}
+                    </button>
+                  ))}
                 </div>
               </motion.div>
             )}
 
-            {/* STEP 4: TRACK (For Lycée) */}
-            {step === 4 && requiresTrack && (
+            {/* Step 3: Track (Lycée Only) */}
+            {step === 3 && isLycee && selectedGrade && (
               <motion.div
-                key="step-4"
+                key="step3"
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
-                className="flex-1 flex flex-col"
+                className="space-y-6"
               >
-                <div className="flex items-center gap-4 mb-8">
-                  <div className="w-10 h-10 bg-gradient-to-b from-accent/10 to-transparent border border-accent/10 rounded-xl flex items-center justify-center text-accent shadow-sm">
-                    <BookOpen className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-display font-semibold text-ink tracking-tight">Specialty / Track</h2>
-                    <p className="text-muted">Choose your specific focus area.</p>
-                  </div>
+                <div className="mb-8">
+                  <h2 className="text-2xl font-bold text-ink mb-2">Select your Track</h2>
+                  <p className="text-muted">What is your specialty or branch?</p>
                 </div>
-                
-                <div className="grid grid-cols-1 gap-3 overflow-y-auto max-h-[300px] pr-2 custom-scrollbar">
-                  {tracks.length === 0 ? (
-                    <div className="p-4 bg-surface-low rounded-xl border border-ink/5 text-center text-muted text-sm">
-                      No tracks configured.
-                    </div>
-                  ) : (
-                    tracks.map(track => (
-                      <button
-                        key={track.id}
-                        onClick={() => setSelectedTrackId(track.id)}
-                        className={`p-3 rounded-xl border-2 text-sm font-bold transition-all text-left flex items-center justify-between group ${
-                          selectedTrackId === track.id 
-                            ? 'bg-accent/10 border-accent text-accent shadow-md' 
-                            : 'bg-surface-low border-transparent text-ink hover:border-accent/30 hover:bg-paper'
-                        }`}
-                      >
-                        {track.name}
-                        {selectedTrackId === track.id && <CheckCircle2 className="w-5 h-5" />}
-                      </button>
-                    ))
-                  )}
+                <div className="grid gap-3">
+                  {TRACKS_MAP[selectedGrade]?.map(track => (
+                    <button
+                      key={track}
+                      onClick={() => setSelectedTrack(track)}
+                      className={`p-4 rounded-2xl border-2 text-left flex items-center justify-between transition-all ${
+                        selectedTrack === track
+                          ? 'border-accent bg-accent/5 text-accent font-bold'
+                          : 'border-surface-mid hover:border-accent/50 bg-background text-ink'
+                      }`}
+                    >
+                      <span>{track}</span>
+                      {selectedTrack === track && <CheckCircle2 className="w-5 h-5 text-accent" />}
+                    </button>
+                  ))}
                 </div>
               </motion.div>
             )}
 
-            {/* STEP 5: INTERNATIONAL OPTION (If applicable) */}
-            {step === 5 && requiresTrack && (
+            {/* Step 4: Language Option (Lycée Only) */}
+            {step === 4 && isLycee && (
               <motion.div
-                 key="step-option"
-                 initial={{ opacity: 0, x: 20 }}
-                 animate={{ opacity: 1, x: 0 }}
-                 exit={{ opacity: 0, x: -20 }}
-                 className="flex-1 flex flex-col"
+                key="step4"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="space-y-6"
               >
-                <div className="flex items-center gap-4 mb-8">
-                  <div className="w-10 h-10 bg-gradient-to-b from-accent/10 to-transparent border border-accent/10 rounded-xl flex items-center justify-center text-accent shadow-sm">
-                    <Globe className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-display font-semibold text-ink tracking-tight">Language Option</h2>
-                    <p className="text-muted">In which language do you study scientific subjects?</p>
-                  </div>
+                <div className="mb-8">
+                  <h2 className="text-2xl font-bold text-ink mb-2">Language Option</h2>
+                  <p className="text-muted">In which language do you study scientific subjects?</p>
                 </div>
-
-                <div className="grid grid-cols-1 gap-4">
-                  {options.length === 0 ? (
-                    <div className="p-4 bg-surface-low rounded-xl border border-ink/5 text-center text-muted text-sm">
-                      No language options configured.
-                    </div>
-                  ) : (
-                    options.map(opt => (
-                      <button
-                        key={opt.id}
-                        onClick={() => setSelectedOptionId(opt.id)}
-                        className={`p-4 rounded-xl border-2 text-sm transition-all text-left flex items-start justify-between group ${
-                          selectedOptionId === opt.id 
-                            ? 'bg-accent/5 border-accent shadow-md' 
-                            : 'bg-surface-low border-transparent hover:border-accent/30 hover:bg-paper'
-                        }`}
-                      >
-                        <div>
-                          <h3 className={`font-bold text-base mb-1 ${selectedOptionId === opt.id ? 'text-accent' : 'text-ink'}`}>{opt.name}</h3>
-                        </div>
-                        {selectedOptionId === opt.id && <CheckCircle2 className="w-5 h-5 text-accent mt-2" />}
-                      </button>
-                    ))
-                  )}
+                <div className="grid gap-4">
+                  {LANGUAGE_OPTIONS.map(opt => (
+                    <button
+                      key={opt.id}
+                      onClick={() => setSelectedLanguageOption(opt.id)}
+                      className={`p-4 rounded-2xl border-2 text-left flex flex-col gap-1 transition-all ${
+                        selectedLanguageOption === opt.id
+                          ? 'border-accent bg-accent/5'
+                          : 'border-surface-mid hover:border-accent/50 bg-background'
+                      }`}
+                    >
+                      <div className="flex w-full items-center justify-between">
+                        <span className={`font-bold ${selectedLanguageOption === opt.id ? 'text-accent' : 'text-ink'}`}>
+                          {opt.name}
+                        </span>
+                        {selectedLanguageOption === opt.id && <CheckCircle2 className="w-5 h-5 text-accent" />}
+                      </div>
+                      <span className="text-sm text-muted">{opt.desc}</span>
+                    </button>
+                  ))}
                 </div>
               </motion.div>
             )}
 
-            {/* STEP: DONE SUMMARY */}
+            {/* Summary Step */}
             {step === totalSteps && (
-               <motion.div
-                 key="step-final"
-                 initial={{ opacity: 0, scale: 0.95 }}
-                 animate={{ opacity: 1, scale: 1 }}
-                 exit={{ opacity: 0, scale: 0.95 }}
-                 className="flex-1 flex flex-col items-center justify-center text-center space-y-10"
-               >
-                 <div className="relative">
-                   <div className="absolute -inset-6 bg-emerald-500/20 blur-3xl rounded-full" />
-                   <div className="relative w-16 h-16 bg-gradient-to-br from-emerald-500/20 to-emerald-500/5 border border-emerald-500/20 rounded-full flex items-center justify-center text-paper shadow-md">
-                     <CheckCircle2 className="w-10 h-10" />
-                   </div>
-                 </div>
+              <motion.div
+                key="summary"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="space-y-8 flex flex-col items-center py-8"
+              >
+                <div className="w-20 h-20 bg-accent/10 rounded-full flex items-center justify-center mb-4">
+                  <CheckCircle2 className="w-10 h-10 text-accent" />
+                </div>
+                <h2 className="text-3xl font-bold text-ink text-center">You're all set!</h2>
 
-                 <div className="space-y-2">
-                    <h2 className="text-xl sm:text-3xl font-display font-bold text-ink tracking-tight">
-                      Your Starting Level is Ready
-                    </h2>
-                    <p className="text-muted font-medium text-base">We will guide you step by step.</p>
+                <div className="w-full bg-background border border-surface-mid rounded-2xl p-6 space-y-4">
+                  <div className="flex justify-between border-b border-surface-mid pb-3">
+                    <span className="text-muted">Cycle</span>
+                    <span className="font-bold text-ink">{CYCLES.find(c => c.id === selectedCycle)?.name}</span>
                   </div>
-
-                 <div className="w-full bg-surface-low border border-ink/5 rounded-2xl p-5 text-left text-sm space-y-4">
-                   <div className="flex justify-between border-b border-ink/5 pb-3">
-                     <span className="text-muted font-bold uppercase text-sm tracking-wider">Cycle</span>
-                     <span className="font-bold text-ink">{selectedCycle?.name}</span>
-                   </div>
-                   <div className="flex justify-between border-b border-ink/5 pb-3">
-                     <span className="text-muted font-bold uppercase text-sm tracking-wider">Grade</span>
-                     <span className="font-bold text-ink">{selectedGrade?.name}</span>
-                   </div>
-                   {selectedSubject && (
-                     <div className="flex justify-between border-b border-ink/5 pb-3">
-                       <span className="text-muted font-bold uppercase text-sm tracking-wider">Subject</span>
-                       <span className="font-bold text-ink truncate max-w-[200px]">{selectedSubject.name}</span>
-                     </div>
-                   )}
-                   {requiresTrack && selectedTrack && (
-                     <div className="flex justify-between border-b border-ink/5 pb-3">
-                       <span className="text-muted font-bold uppercase text-sm tracking-wider">Track</span>
-                       <span className="font-bold text-ink text-right max-w-[200px] truncate">{selectedTrack.name}</span>
-                     </div>
-                   )}
-                   {requiresTrack && selectedOption && (
-                     <div className="flex justify-between">
-                       <span className="text-muted font-bold uppercase text-sm tracking-wider">Option</span>
-                       <span className="font-bold text-ink truncate max-w-[200px]">{selectedOption.name}</span>
-                     </div>
-                   )}
-                 </div>
-               </motion.div>
+                  <div className="flex justify-between border-b border-surface-mid pb-3">
+                    <span className="text-muted">Grade</span>
+                    <span className="font-bold text-ink">{selectedGrade}</span>
+                  </div>
+                  {isLycee && (
+                    <>
+                      <div className="flex justify-between border-b border-surface-mid pb-3">
+                        <span className="text-muted">Track</span>
+                        <span className="font-bold text-ink">{selectedTrack}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted">Language</span>
+                        <span className="font-bold text-ink">
+                          {LANGUAGE_OPTIONS.find(l => l.id === selectedLanguageOption)?.name}
+                        </span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </motion.div>
             )}
-
           </AnimatePresence>
+        </div>
 
-          {/* Navigation Controls */}
-          <div className="mt-8 flex items-center justify-between pt-6 border-t border-ink/10 relative z-10 w-full">
-            {step > 0 ? (
-              <button
-                onClick={handleBack}
-                className="px-5 py-2.5 text-sm rounded-2xl font-bold text-muted hover:text-ink hover:bg-ink/5 transition-all flex items-center gap-2 group"
-              >
-                <ArrowRight className="w-4 h-4 rotate-180 group-hover:-translate-x-1 transition-transform" />
-                Back
-              </button>
-            ) : (
-              <div />
-            )}
+        {/* Footer Navigation */}
+        <div className="p-6 bg-background border-t border-surface-mid flex justify-between items-center">
+          {step > 1 ? (
+            <button
+              onClick={handleBack}
+              disabled={isSubmitting}
+              className="px-6 py-3 font-semibold text-muted hover:text-ink transition-colors disabled:opacity-50"
+            >
+              Back
+            </button>
+          ) : (
+            <div />
+          )}
 
-            {step < totalSteps ? (
-              <button
-                onClick={handleNext}
-                disabled={
-                  (step === 1 && !selectedCycleId) || 
-                  (step === 2 && !selectedGradeId) ||
-                  // Subject selection is optional, let them continue even if none selected
-                  (step === 4 && requiresTrack && !selectedTrackId) ||
-                  (step === 5 && requiresTrack && !selectedOptionId)
-                }
-                className="px-5 py-2 text-sm bg-ink text-paper rounded-xl font-semibold flex items-center gap-2 hover:bg-ink/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:-translate-y-0.5"
-              >
-                Continue
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            ) : (
-              <button
-                onClick={handleComplete}
-                className="px-6 py-2.5 text-sm bg-accent text-paper rounded-2xl font-bold flex items-center gap-2 hover:bg-[var(--accent-hover)] transition-all shadow-md shadow-accent/20 hover:-translate-y-1 group"
-              >
-                Enter Platform
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </button>
-            )}
-          </div>
+          {step < totalSteps ? (
+            <button
+              onClick={handleNext}
+              disabled={
+                (step === 1 && !selectedCycle) ||
+                (step === 2 && !selectedGrade) ||
+                (step === 3 && !selectedTrack) ||
+                (step === 4 && !selectedLanguageOption)
+              }
+              className="flex items-center gap-2 px-8 py-3 bg-accent text-paper font-bold rounded-xl hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Continue
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          ) : (
+            <button
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              className="flex items-center gap-2 px-8 py-3 bg-accent text-paper font-bold rounded-xl hover:opacity-90 transition-all disabled:opacity-50"
+            >
+              {isSubmitting ? 'Saving...' : 'Enter Platform'}
+              {!isSubmitting && <ArrowRight className="w-4 h-4" />}
+            </button>
+          )}
         </div>
       </motion.div>
     </div>
