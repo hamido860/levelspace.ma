@@ -36,7 +36,8 @@ export const BottomNav: React.FC = () => {
             key={i}
             aria-label={item.label}
             onClick={() => navigate(item.path)}
-            className={`flex flex-col items-center gap-2 transition-all duration-500 group ${
+            aria-label={item.label}
+            className={`flex flex-col items-center gap-2 transition-all duration-500 group focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 rounded-lg ${
               isActive ? 'text-accent scale-110' : 'text-muted hover:text-ink'
             }`}
           >
