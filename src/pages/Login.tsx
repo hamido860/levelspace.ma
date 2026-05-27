@@ -204,16 +204,18 @@ export const Login: React.FC = () => {
               </button>
             </form>
 
-            <button
-              type="button"
-              disabled={loading}
-              onClick={handleDemoAdminLogin}
-              className="w-full h-12 border border-accent/20 bg-accent/5 text-accent rounded-xl flex items-center justify-center gap-2 text-sm font-medium hover:bg-accent/10 transition-all disabled:opacity-50"
-            >
-              <Sparkles className="w-4 h-4" />
-              Continue as Demo Admin
-              <ArrowRight className="w-4 h-4" />
-            </button>
+            {import.meta.env.DEV && (
+              <button
+                type="button"
+                disabled={loading}
+                onClick={handleDemoAdminLogin}
+                className="w-full h-12 border border-accent/20 bg-accent/5 text-accent rounded-xl flex items-center justify-center gap-2 text-sm font-medium hover:bg-accent/10 transition-all disabled:opacity-50"
+              >
+                <Sparkles className="w-4 h-4" />
+                Continue as Demo Admin
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            )}
 
             <div className="relative py-2">
               <div className="absolute inset-0 flex items-center">
