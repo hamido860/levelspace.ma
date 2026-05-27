@@ -437,7 +437,7 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
       <div 
         key={lesson.id} 
         onClick={() => onNavigateToLesson?.(lesson.id)}
-        className="bg-white dark:bg-paper rounded-[2rem] border border-slate-200 dark:border-white/8 shadow-md overflow-hidden flex flex-col group/preview transition-all hover:shadow-lg relative cursor-pointer hover:border-slate-300 dark:hover:border-white/15 hover:scale-[1.005] active:scale-[0.99]"
+        className="bg-white dark:bg-paper rounded-2xl border border-slate-200 dark:border-white/8 shadow-md overflow-hidden flex flex-col group/preview transition-all hover:shadow-lg relative cursor-pointer hover:border-slate-300 dark:hover:border-white/15 hover:scale-[1.005] active:scale-[0.99]"
       >
         {/* Pin Icon button in top-right */}
         <button
@@ -534,18 +534,18 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
 
       {/* Responsive Grid/Single Column Layout Container */}
       <main className={hasSidebar
-        ? "max-w-7xl mx-auto mt-8 px-6 grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500"
+        ? "max-w-7xl mx-auto mt-6 px-6 grid grid-cols-1 lg:grid-cols-3 gap-5 lg:h-[calc(100vh-7rem)] lg:max-h-[calc(100vh-7rem)] overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500"
         : "max-w-2xl mx-auto mt-8 px-4 flex flex-col items-center justify-center animate-in fade-in slide-in-from-bottom-4 duration-500"
       }>
         
         {/* Main Content Column */}
         <div className={hasSidebar
-          ? "lg:col-span-2 flex flex-col justify-start w-full"
+          ? "lg:col-span-2 flex flex-col h-full w-full overflow-hidden"
           : "w-full flex flex-col justify-start"
         }>
         
         {/* Redesigned Card Container */}
-        <div className="w-full bg-white dark:bg-paper rounded-[2rem] shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex flex-col">
+        <div className="w-full h-full bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex flex-col">
           
           {/* Top Full-bleed Image Banner */}
           <div className="h-28 w-full relative bg-slate-100 dark:bg-surface-low shrink-0 overflow-hidden border-b border-slate-100 dark:border-white/5 group">
@@ -659,35 +659,33 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
           </div>
 
           {/* Single Horizontal Content Block Player */}
-          <div className="flex-grow min-h-[400px] flex flex-row relative">
+          <div className="flex-grow min-h-[400px] flex flex-row relative overflow-hidden h-full">
             
             {/* Left Nav */}
-            <div className="w-12 sm:w-16 shrink-0 flex flex-col items-center pt-24 sm:pt-32 relative z-10">
-               <div className="sticky top-1/3">
-                 {prevLesson ? (
-                    <button
-                      type="button"
-                      onClick={() => onNavigateToLesson?.(prevLesson.id)}
-                      className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 shadow-sm transition-all dark:bg-paper dark:border-white/10 dark:text-ink-secondary dark:hover:bg-surface-low cursor-pointer hover:scale-110 group"
-                      title="Previous Lesson"
-                    >
-                      <ArrowLeft size={16} />
-                    </button>
-                  ) : currentBlockIndex > 0 ? (
-                    <button
-                      type="button"
-                      onClick={handleBackSection}
-                      className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 shadow-sm transition-all dark:bg-paper dark:border-white/10 dark:text-ink-secondary dark:hover:bg-surface-low cursor-pointer hover:scale-110 group"
-                      title="Previous Section"
-                    >
-                      <ChevronLeft size={20} />
-                    </button>
-                  ) : null}
-               </div>
+            <div className="w-12 sm:w-16 shrink-0 flex flex-col items-center justify-center relative z-10">
+               {prevLesson ? (
+                  <button
+                    type="button"
+                    onClick={() => onNavigateToLesson?.(prevLesson.id)}
+                    className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 shadow-sm transition-all dark:bg-paper dark:border-white/10 dark:text-ink-secondary dark:hover:bg-surface-low cursor-pointer hover:scale-110 group"
+                    title="Previous Lesson"
+                  >
+                    <ArrowLeft size={16} />
+                  </button>
+                ) : currentBlockIndex > 0 ? (
+                  <button
+                    type="button"
+                    onClick={handleBackSection}
+                    className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 shadow-sm transition-all dark:bg-paper dark:border-white/10 dark:text-ink-secondary dark:hover:bg-surface-low cursor-pointer hover:scale-110 group"
+                    title="Previous Section"
+                  >
+                    <ChevronLeft size={20} />
+                  </button>
+                ) : null}
             </div>
 
             {/* Main Content Area */}
-            <div className="flex-grow flex flex-col justify-start space-y-4 pt-4 pb-12 min-w-0">
+            <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col justify-start space-y-4 pt-4 pb-12 min-w-0 px-2 h-full">
               
               {/* Speech Boundary Karaoke visualizer panel */}
               {isSpeaking && speakingState && speakingState.activeSentence && (
@@ -777,7 +775,7 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
                     </div>
                   );
                 })() : (
-                  <div className="text-center py-12 text-slate-400 dark:text-ink-muted bg-slate-50/50 dark:bg-surface-low rounded-[2rem] border border-solid border-slate-200/60 dark:border-white/5">
+                  <div className="text-center py-12 text-slate-400 dark:text-ink-muted bg-slate-50/50 dark:bg-surface-low rounded-2xl border border-solid border-slate-200/60 dark:border-white/5">
                     No sections found in this lesson view.
                   </div>
                 )}
@@ -786,17 +784,15 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
             </div>
 
             {/* Right Nav */}
-            <div className="w-12 sm:w-16 shrink-0 flex flex-col items-center pt-24 sm:pt-32 relative z-10">
-               <div className="sticky top-1/3">
-                 <button 
-                    type="button"
-                    onClick={handleContinue}
-                    className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-600/20 transition-all cursor-pointer hover:scale-110 group"
-                    title={currentBlockIndex === displayedBlocks.length - 1 ? t('complete') : t('continue')}
-                  >
-                    <ChevronRight size={20} className="stroke-[3]" />
-                  </button>
-               </div>
+            <div className="w-12 sm:w-16 shrink-0 flex flex-col items-center justify-center relative z-10">
+               <button 
+                  type="button"
+                  onClick={handleContinue}
+                  className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-600/20 transition-all cursor-pointer hover:scale-110 group"
+                  title={currentBlockIndex === displayedBlocks.length - 1 ? t('complete') : t('continue')}
+                >
+                  <ChevronRight size={20} className="stroke-[3]" />
+                </button>
             </div>
 
           </div>
@@ -811,7 +807,7 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
 
       {/* Column 3: Suggestions & Next Lesson Preview Sidebar (1/3 width) - Rendered only if there are other lessons */}
       {hasSidebar && (
-        <div className="lg:col-span-1 flex flex-col gap-6 w-full shrink-0 max-h-[85vh] overflow-y-auto no-scrollbar pr-1 pb-10">
+        <div className="lg:col-span-1 h-full w-full overflow-y-auto no-scrollbar pr-1 pb-4 flex flex-col gap-4">
           {(() => {
             const pinnedLessons = otherLessons.filter((l: any) => validPinnedIds.includes(l.id));
             const unpinnedLessons = otherLessons.filter((l: any) => !validPinnedIds.includes(l.id));
@@ -866,7 +862,7 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
                     </AnimatePresence>
                     
                     {unpinnedLessons.length === 0 && (
-                      <div className="p-6 text-center bg-slate-50 dark:bg-surface-low rounded-[2rem] border border-solid border-slate-200/50 dark:border-white/5 opacity-60">
+                      <div className="p-6 text-center bg-slate-50 dark:bg-surface-low rounded-2xl border border-solid border-slate-200/50 dark:border-white/5 opacity-60">
                         <p className="text-[10px] font-black text-slate-500 dark:text-ink-muted uppercase tracking-wider">All lessons pinned above</p>
                       </div>
                     )}
