@@ -50,6 +50,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const isDemoAdmin = user?.id === DEMO_ADMIN_USER_ID;
 
   const applyDemoAdminAuth = async () => {
+    if (!import.meta.env.DEV) return;
     const demoUser = createDemoAdminUser();
     const demoProfile = createDemoAdminProfile();
     localStorage.setItem(DEMO_ADMIN_STORAGE_KEY, 'true');
@@ -103,7 +104,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setProfile(userProfile);
           await db.settings.put({ key: `profile_${currentSession.user.id}`, value: userProfile });
         }
-      } else if (localStorage.getItem(DEMO_ADMIN_STORAGE_KEY) === 'true') {
+      } else if (import.meta.env.DEV && localStorage.getItem(DEMO_ADMIN_STORAGE_KEY) === 'true') {
         await applyDemoAdminAuth();
       } else {
         localStorage.removeItem(DEMO_ADMIN_STORAGE_KEY);
@@ -142,6 +143,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signInDemoAdmin = async () => {
+    if (!import.meta.env.DEV) return;
     setLoading(true);
     await applyDemoAdminAuth();
     setLoading(false);
