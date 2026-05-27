@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { AlertTriangle, Database, RefreshCw } from "lucide-react";
-import { Layout } from "../components/Layout";
-import { SEO } from "../components/SEO";
+
 import { CurriculumDebugReport, CurriculumDebugRow, loadCurriculumDebugReport } from "../services/curriculumDebugService";
 
 const EMPTY_REPORT: CurriculumDebugReport = {
@@ -69,9 +68,7 @@ export const AdminCurriculumDebug: React.FC = () => {
   }, []);
 
   return (
-    <Layout>
-      <SEO title="Curriculum Debug" />
-      <div className="mx-auto max-w-6xl space-y-6">
+      <div className="space-y-6">
         <div className="flex flex-col gap-4 rounded-3xl bg-ink p-6 text-paper md:flex-row md:items-center md:justify-between">
           <div className="flex items-start gap-4">
             <div className="rounded-2xl bg-paper/10 p-3">
@@ -131,6 +128,5 @@ export const AdminCurriculumDebug: React.FC = () => {
           </div>
         )}
       </div>
-    </Layout>
   );
 };

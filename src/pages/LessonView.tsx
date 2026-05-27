@@ -274,6 +274,7 @@ export const LessonView: React.FC = () => {
     if (supabaseLesson) {
       return {
         id: supabaseLesson.id,
+        moduleId: lesson?.moduleId || undefined,
         title: supabaseLesson.lesson_title,
         content: supabaseLesson.content || '',
         blocks: Array.isArray(supabaseLesson.blocks) ? supabaseLesson.blocks : [],
@@ -308,7 +309,8 @@ export const LessonView: React.FC = () => {
     return undefined;
   }, [lesson, supabaseLesson, curriculumContext]);
 
-  const targetModuleId = effectiveLesson?.moduleId;
+  // Use moduleId from effective lesson, falling back to subject_id from curriculum or the lesson's own module
+  const targetModuleId = effectiveLesson?.moduleId || curriculumContext?.subject_id || lesson?.moduleId;
   const lessonsInModule = useLiveQuery(
     () => (targetModuleId ? db.lessons.where('moduleId').equals(targetModuleId).sortBy('createdAt') : Promise.resolve([])),
     [targetModuleId]

@@ -548,59 +548,28 @@ export const Modules: React.FC = () => {
 
   return (
     <Layout>
-      <SEO title="Modules" />
-      <div className="space-y-3">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-2 flex-1">
-            <div className="inline-flex items-center gap-2 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-2.5 text-sm font-medium text-blue-700 dark:border-accent-soft dark:bg-accent-soft dark:text-accent">
-              <Sparkles className="h-4 w-4 shrink-0" />
-              Draft AI-assisted content · Pending curriculum validation
-            </div>
-            <h2 className="text-2xl md:text-3xl font-bold text-slate-950 font-sans dark:text-ink">{t('actions_create_classroom')}</h2>
-          </div>
-          
-          <div className="flex items-center gap-4 shrink-0">
-            <button
-              onClick={() => {
-                const plan = getClassroomLoadPlan({ action: 'refresh_suggestions', isPro });
-                fetchCurriculum(plan.includeAiSuggestions, true);
-              }}
-              disabled={isLoading || !aiAvailable || !isPro}
-              title={!aiAvailable ? aiUnavailableMsg : undefined}
-              className="ls-button-primary disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-              Regenerate
+      <SEO title={t('curriculum_classrooms_title') || 'Syllabus & Academic Classrooms'} />
+      <div className="space-y-4">
+        
+        {/* Page Header */}
+        <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/5 pb-5 mb-6">
+          <h1 className="ls-page-title text-slate-950 dark:text-ink">Classrooms</h1>
+          <div className="flex items-center gap-2">
+            <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:text-ink-muted dark:hover:bg-white/5 dark:hover:text-ink transition-all">
+              <Filter className="w-3 h-3" />
+              Filter
             </button>
-            <div className="group relative inline-block">
-              <button className="ls-button-secondary h-10 w-10 px-0">
-                <Info className="w-5 h-5" />
-              </button>
-              <div className="absolute right-0 top-full mt-2 w-72 p-4 ls-card shadow-sm opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                <p className="ls-body-text leading-relaxed">
-                  These classrooms are loaded from your Supabase curriculum first. AI can optionally suggest extras for inspiration.
-                </p>
-              </div>
-            </div>
+            <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:text-ink-muted dark:hover:bg-white/5 dark:hover:text-ink transition-all">
+              <ArrowUpDown className="w-3 h-3" />
+              Sort
+            </button>
           </div>
         </div>
 
-        {/* Filter Bar */}
-        <div className="sticky top-16 z-30 -mx-12 border-b border-slate-200 bg-white/95 backdrop-blur-md px-12 py-2 dark:border-white/8 dark:bg-paper/95 transition-all">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-slate-500 dark:text-ink-muted">Choose a subject to manage curriculum content.</p>
-            <div className="flex items-center gap-2">
-              <button className="ls-button-ghost">
-                <Filter className="w-4 h-4" />
-                Filter
-              </button>
-              <button className="ls-button-ghost">
-                <ArrowUpDown className="w-4 h-4" />
-                Sort
-              </button>
-            </div>
-          </div>
-        </div>
+
+
+
+
 
         {/* Modules Grid - Visible Grid Aesthetic */}
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">

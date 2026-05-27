@@ -13,7 +13,8 @@ import {
   Award,
   Zap,
   Clock,
-  BookOpen
+  BookOpen,
+  KeyRound
 } from 'lucide-react';
 import { Layout } from '../components/Layout';
 import { SEO } from '../components/SEO';
@@ -21,13 +22,14 @@ import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useAppSettings } from '../context/AppSettingsContext';
 import { supabase } from '../db/supabase';
-import { SmartApiKeyInput } from '../components/settings/SmartApiKeyInput';
+import { AiKeysModal } from '../components/settings/AiKeysModal';
 
 export const Profile: React.FC = () => {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
   const { t } = useLanguage();
   const { settings } = useAppSettings();
+  const [isAiKeysOpen, setIsAiKeysOpen] = React.useState(false);
 
   const selectedGrade = settings['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
   const selectedCountry = settings['selected_country'] || localStorage.getItem('selected_country') || '';
@@ -246,20 +248,37 @@ export const Profile: React.FC = () => {
 
           {/* Sidebar Info */}
           <div className="space-y-8">
-            <SmartApiKeyInput />
+            <div className="p-8 bg-paper border border-ink/5 rounded-[2rem] shadow-sm space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent">
+                  <KeyRound className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-ink">Bring Your Own Key</h3>
+                  <p className="text-xs text-muted">Configure private AI credentials.</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsAiKeysOpen(true)}
+                className="w-full py-3 bg-ink hover:bg-accent text-paper hover:text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 border border-ink/5 cursor-pointer"
+              >
+                <KeyRound size={14} />
+                Manage API Keys
+              </button>
+            </div>
 
             <div className="p-8 bg-paper border border-ink/5 rounded-[2rem] shadow-sm space-y-6">
               <h3 className="text-lg font-serif font-medium text-ink">Quick Links</h3>
               <div className="space-y-2">
                 {[
                   { label: 'My Progress', path: '/progress' },
-                  { label: 'Library', path: '/library' },
+                  { label: 'LevelUp', path: '/levelup' },
                   { label: 'Settings', path: '/settings' },
                 ].map((link, i) => (
                   <button
                     key={i}
                     onClick={() => navigate(link.path)}
-                    className="w-full flex items-center justify-between p-4 bg-background rounded-2xl border border-ink/5 hover:border-accent/30 transition-all text-sm font-medium text-ink"
+                    className="w-full flex items-center justify-between p-4 bg-background rounded-2xl border border-ink/5 hover:border-accent/30 transition-all text-sm font-medium text-ink cursor-pointer"
                   >
                     {link.label}
                     <ChevronRight className="w-4 h-4 text-muted" />
@@ -270,6 +289,11 @@ export const Profile: React.FC = () => {
           </div>
         </div>
       </div>
+      <AiKeysModal 
+        isOpen={isAiKeysOpen} 
+        onClose={() => setIsAiKeysOpen(false)} 
+        mode="user" 
+      />
     </Layout>
   );
 };

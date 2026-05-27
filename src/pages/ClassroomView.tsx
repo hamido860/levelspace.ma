@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Layout } from '../components/Layout';
-import { ShieldCheck, AlertTriangle, ArrowLeft, BookOpen, Plus, ChevronRight, CheckCircle2, Clock, Brain, Sparkles, Loader2, Play, Target, Dumbbell, Database } from 'lucide-react';
+import { ShieldCheck, AlertTriangle, ArrowLeft, BookOpen, Plus, ChevronRight, CheckCircle2, Clock, Brain, Sparkles, Loader2, Play, Target, Dumbbell, Database, Pin } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 import { supabase } from '../db/supabase';
@@ -292,8 +292,45 @@ export const ClassroomView: React.FC = () => {
   const aiAvailable = checkAIProvider();
   const [activeDomainKey, setActiveDomainKey] = useState<string>('all');
 
+  // ── Pinned lessons state (module-scoped, shared with LessonReader) ──
+  const pinStorageKey = `levelspace_pinned_lessons_${id || 'global'}`;
+  const [pinnedLessonIds, setPinnedLessonIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem(pinStorageKey);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const togglePinLesson = (lessonId: string) => {
+    setPinnedLessonIds(prev => {
+      const next = prev.includes(lessonId)
+        ? prev.filter(x => x !== lessonId)
+        : [...prev, lessonId];
+      localStorage.setItem(pinStorageKey, JSON.stringify(next));
+      return next;
+    });
+  };
+
   const module = useLiveQuery(() => id ? db.modules.get(id) : undefined, [id]);
   const allLessons = useLiveQuery(() => id ? db.lessons.where('moduleId').equals(id).sortBy('createdAt') : [], [id]);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(pinStorageKey);
+      if (saved) {
+        setPinnedLessonIds(JSON.parse(saved));
+      } else if (allLessons && allLessons.length > 0) {
+        // Default to first 3 lessons if no pins are saved yet
+        const defaultPins = allLessons.slice(0, 3).map((l: any) => l.id);
+        setPinnedLessonIds(defaultPins);
+        localStorage.setItem(pinStorageKey, JSON.stringify(defaultPins));
+      }
+    } catch {
+      setPinnedLessonIds([]);
+    }
+  }, [pinStorageKey, allLessons?.length]);
   const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
   const settingsMap = useMemo(() => Object.fromEntries(dbSettings.map(s => [s.key, s.value])), [dbSettings]);
 
@@ -473,7 +510,7 @@ export const ClassroomView: React.FC = () => {
   }, [activeDomainKey, showDomainTabs, topicFallbackRows]);
   const hasSupplementalContent = quizzes.length > 0 || exercises.length > 0;
   const showStats = module?.progress > 0 || hasLessons || hasTopicFallback;
-  const showTabs = false;
+  const showTabs = true;
   const showSetupState = !hasLessons && !hasTopicFallback && !isHydratingSupabase && suggestions.length === 0;
   const showValidationWarningBanner = !isAdmin && lessons.length > 0 && !studentLessonSelection.hasPreferred;
   const cloudHydrationKeyRef = useRef<string | null>(null);
@@ -1299,7 +1336,7 @@ export const ClassroomView: React.FC = () => {
       <div className="max-w-5xl mx-auto space-y-4 pb-20">
         {/* Header Section */}
         {/* Unified Header Card */}
-        <div className="bg-white dark:bg-paper rounded-[1.5rem] border border-slate-200 dark:border-white/8 p-5 shadow-sm space-y-4">
+        <div className="bg-white dark:bg-paper rounded-[2rem] border border-slate-200 dark:border-white/8 p-5 shadow-sm space-y-4">
           {/* Top Row: Back Navigation, Badges, Strict RAG Toggle & Actions */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-white/5 pb-3">
             <div className="flex flex-wrap items-center gap-3">
@@ -1467,7 +1504,7 @@ export const ClassroomView: React.FC = () => {
           <>
             {/* Tabs */}
             {showTabs && (
-              <div className="flex gap-2 border-b border-slate-200 overflow-x-auto pb-2">
+              <div className="flex gap-1 border-b border-slate-200 dark:border-white/8 -mb-px">
                 {(['lessons', 'quizzes', 'exercises'] as const).map((tabKey) => {
                   const tabConfig = CLASSROOM_TAB_CONFIG[tabKey];
                   const TabIcon = tabConfig.icon;
@@ -1476,14 +1513,14 @@ export const ClassroomView: React.FC = () => {
                     <button
                       key={tabKey}
                       onClick={() => setActiveTab(tabKey)}
-                      className={`flex items-center gap-2 rounded-t-2xl px-4 py-3 text-sm font-bold  transition-all border-b-2 whitespace-nowrap ${
+                      className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${
                         isActive
-                          ? tabConfig.activeClass
-                          : 'border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-950'
+                          ? 'border-accent text-accent'
+                          : 'border-transparent text-slate-500 dark:text-ink-muted hover:text-slate-950 dark:hover:text-ink'
                       }`}
                     >
-                      <TabIcon size={16} className={isActive ? tabConfig.iconClass : 'text-slate-500'} />
-                      {t(tabKey)}
+                      <TabIcon size={14} />
+                      {tabKey.charAt(0).toUpperCase() + tabKey.slice(1)}
                     </button>
                   );
                 })}
@@ -1634,6 +1671,31 @@ export const ClassroomView: React.FC = () => {
                               alt={lesson.title}
                               className={`w-full h-full object-cover transition-transform duration-700 ${isClickable ? 'group-hover:scale-105' : ''}`}
                             />
+                            {/* Pin / Unpin button on the illustration banner */}
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); togglePinLesson(lesson.id); }}
+                              className={`absolute top-2 right-2 z-10 w-7 h-7 rounded-full flex items-center justify-center border backdrop-blur-md transition-all shadow-sm cursor-pointer ${
+                                pinnedLessonIds.includes(lesson.id)
+                                  ? 'bg-amber-500 border-amber-400 text-white shadow-amber-500/40 shadow-md'
+                                  : 'bg-black/35 border-white/20 text-white/75 hover:text-white hover:bg-black/50'
+                              }`}
+                              title={pinnedLessonIds.includes(lesson.id) ? 'Unpin Lesson' : 'Pin to Study Desk'}
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                viewBox="0 0 24 24"
+                                fill={pinnedLessonIds.includes(lesson.id) ? "currentColor" : "none"}
+                                stroke="currentColor"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className="w-3.5 h-3.5"
+                              >
+                                <line x1="12" y1="17" x2="12" y2="22"></line>
+                                <path d="M5 17h14v-1.76a2 2 0 0 0-.44-1.24l-2.78-3.55A2 2 0 0 1 15 9.24V5a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4.24a2 2 0 0 1-.78 1.21L5.44 14a2 2 0 0 0-.44 1.24Z"></path>
+                              </svg>
+                            </button>
                           </div>
 
                           {/* Card Body */}

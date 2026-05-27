@@ -340,107 +340,49 @@ export const Dashboard: React.FC = () => {
     <Layout>
       <SEO title="Dashboard" />
       <div className="max-w-7xl mx-auto space-y-12 pb-20 relative">
-        {/* Top Bar - Minimal Actions */}
-        <div className="flex items-center justify-between px-4">
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 bg-accent rounded-xl flex items-center justify-center ">
-              <Brain className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-lg font-bold text-slate-950 leading-tight dark:text-ink">{t('dashboard')}</h1>
-              <p className="ls-micro-label">{t('academic_repository')}</p>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={() => navigate('/pricing')}
-              className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-semibold transition-all ${
-                isPro 
-                  ? 'bg-accent/10 border-accent/20 text-accent shadow-sm' 
-                  : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 dark:bg-paper dark:border-white/10 dark:text-ink-muted dark:hover:border-white/20'
-              }`}
-            >
-              {isPro ? <Sparkles className="w-3 h-3" /> : <Zap className="w-3 h-3" />}
-              {isPro ? 'Pro Member' : 'Free Plan'}
-            </button>
-            {dbConnected !== null && (
-              <div className="flex items-center gap-1">
-                <button 
-                  onClick={async () => {
-                    setIsSyncing(true);
-                    try {
-                      const results = await syncData();
-                      if (results.errors.length > 0) {
-                        alert(`Sync completed with errors:\n${results.errors.join('\n')}`);
-                      } else {
-                        alert(`Sync successful!\nModules: ${results.modules}\nLessons: ${results.lessons}\nTasks: ${results.tasks}`);
-                      }
-                    } catch (err) {
-                      alert('Sync failed. Please check your connection.');
-                    } finally {
-                      setIsSyncing(false);
-                    }
-                  }}
-                  disabled={isSyncing || !dbConnected}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${dbConnected ? 'bg-accent/10 border-accent/20 text-accent' : 'bg-error/10 border-error/20 text-error'} text-[11px] font-semibold  transition-all disabled:opacity-50`}
-                >
-                  {isSyncing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Cloud className="w-3 h-3" />}
-                  {isSyncing ? 'Syncing...' : 'Sync to Cloud'}
-                </button>
-                <button 
-                  onClick={() => setIsStatusModalOpen(true)}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${dbConnected ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600' : 'bg-error/10 border-error/20 text-error'} text-[11px] font-semibold  transition-all`}
-                >
-                  <div className={`w-1.5 h-1.5 rounded-full ${dbConnected ? 'bg-emerald-500' : 'bg-error'} animate-pulse`} />
-                  {dbConnected ? 'Cloud Connected' : 'Local Only'}
-                </button>
-                <button 
-                  onClick={async () => {
-                    await refreshDbConnection();
-                  }}
-                  className="p-1.5 hover:bg-slate-950/5 rounded-full text-slate-500 transition-all dark:text-ink-muted dark:hover:bg-surface-low"
-                  title="Refresh Connection"
-                >
-                  <RefreshCw className={`w-3 h-3 ${dbConnected === null ? 'animate-spin' : ''}`} />
-                </button>
-              </div>
-            )}
-            <button 
-              onClick={() => setShowAuditModal(true)}
-              className="flex items-center gap-2 px-4 py-2 ls-card ls-micro-label hover:border-accent/30 hover:text-accent transition-all"
-            >
-              <Search className="w-3.5 h-3.5" />
-              {t('run_audit')}
-            </button>
-            <button 
-              onClick={async () => {
-                if (confirm(t('reset_confirm'))) {
-                  await db.modules.clear();
-                  await db.lessons.clear();
-                  await db.tasks.clear();
-                  await db.schedule.clear();
-                  localStorage.removeItem('curated_modules');
-                  window.location.reload();
-                }
-              }}
-              className="flex items-center gap-2 px-4 py-2 ls-card text-xs font-medium text-error/60  hover:bg-error/5 hover:text-error transition-all"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              {t('reset')}
-            </button>
-          </div>
+        {/* Page Header */}
+        <div className="border-b border-slate-100 dark:border-white/5 pb-5 mb-6 px-4">
+          <h1 className="ls-page-title text-slate-950 dark:text-ink">
+            {t('dashboard') || 'Dashboard'}
+          </h1>
         </div>
 
-        {/* Simple Welcome Header */}
-        <div className="px-4 pt-6 pb-2">
-          <h1 className="text-2xl font-bold text-slate-950 dark:text-ink">
-            {t('welcome_back', { name: profile?.first_name || 'Student' }) || `Welcome back${profile?.first_name ? `, ${profile.first_name}` : ''}`}
-          </h1>
-          <p className="text-sm text-slate-500 mt-1 dark:text-ink-muted">
-            {t('dashboard_continue') || "Here's what's happening in your classes today."}
-          </p>
-        </div>
+        {/* Progress & Stats Overview (Ported from Progress) */}
+
+        <section className="px-4 mt-4 mb-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {[
+              { label: 'Focus Quotient', value: '8.4', unit: '/10', icon: <Brain />, trend: '+12%' },
+              { label: 'Deep Work Total', value: '24.5', unit: 'hrs', icon: <Timer />, trend: '+4.2h' },
+              { label: 'Mastery Delta', value: '+18', unit: '%', icon: <Zap />, trend: 'Optimal' },
+              { label: 'Lessons to Review', value: '2', unit: '', icon: <AlertCircle />, trend: '-1 this week' }
+            ].map((stat, i) => (
+              <motion.div 
+                key={i}
+                initial={{ opacity: 0, y: 10 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.05 }}
+                viewport={{ once: true }}
+                className="bg-white dark:bg-paper p-5 rounded-2xl border border-slate-200 dark:border-white/8 space-y-3 shadow-sm hover:border-accent/30 transition-all cursor-default"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-surface-low flex items-center justify-center text-slate-400 dark:text-ink-muted">
+                    {React.cloneElement(stat.icon as React.ReactElement<any>, { size: 16 })}
+                  </div>
+                  <span className="text-[9px] font-bold text-emerald-500 uppercase tracking-normal">{stat.trend}</span>
+                </div>
+                
+                <div className="space-y-1">
+                  <p className="text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-normal">{stat.label}</p>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-2xl font-bold text-slate-800 dark:text-ink">{stat.value}</span>
+                    <span className="text-[10px] font-medium text-slate-400 dark:text-ink-muted">{stat.unit}</span>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </section>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 px-4">
           

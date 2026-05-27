@@ -96,22 +96,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
 
   const mainNavItems: NavItem[] = [
     { label: t('dashboard'), icon: <LayoutDashboard size={20} />, path: '/dashboard' },
-    { label: t('profile'), icon: <User size={20} />, path: '/profile' },
     { label: t('classrooms'), icon: <GraduationCap size={20} />, path: '/modules' },
-    { label: t('library'), icon: <BookMarked size={20} />, path: '/library' },
-    { label: t('blueprints'), icon: <Layers3 size={20} />, path: '/blueprints' },
-    { label: t('progress'), icon: <BarChart3 size={20} />, path: '/progress' },
-    { label: 'AI Keys', icon: <KeyRound size={20} />, path: '/settings/ai-keys', matchPrefix: true },
+    { label: t('library'), icon: <BookMarked size={20} />, path: '/levelup' },
   ];
 
-  const toolNavItems: NavItem[] = isAdmin ? [
-    { label: 'Admin', icon: <ShieldCheck size={20} />, path: '/admin', matchPrefix: false },
-    { label: 'Curriculum', icon: <Database size={20} />, path: '/admin/curriculum-debug', matchPrefix: true },
-    { label: 'MCP Lessons', icon: <PackageSearch size={20} />, path: '/admin/mcp-lessons', matchPrefix: true },
-    { label: 'AI Ops', icon: <Brain size={20} />, path: '/admin/ai-command-center', matchPrefix: true },
-    { label: 'AI Diagnostics', icon: <Activity size={20} />, path: '/admin/ai-diagnostics', matchPrefix: true },
-    { label: 'AI Recovery', icon: <Wrench size={20} />, path: '/admin/ai-recovery', matchPrefix: true },
-  ] : [];
+
+  const adminNavItems: NavItem[] = [
+    ...(isAdmin ? [
+      { label: 'Admin', icon: <ShieldCheck size={20} />, path: '/admin', matchPrefix: false }
+    ] : [])
+  ];
+
+  const profileNavItems: NavItem[] = [
+    { label: t('profile'), icon: <User size={20} />, path: '/profile' }
+  ];
 
   return (
     <>
@@ -150,9 +148,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
           ))}
         </nav>
 
+        <div className="flex flex-col gap-1 pt-4 border-t border-ink/5 mt-auto">
+          {!isCollapsed && <p className="text-[10px] font-bold text-muted uppercase tracking-normal px-3 mb-2 opacity-50">{t('settings')}</p>}
+          {adminNavItems.map((item) => (
+            <SidebarNavItem
+              key={item.path}
+              item={item}
+              isActive={isItemActive(location.pathname, item)}
+              isCollapsed={isCollapsed}
+              onClick={() => navigate(item.path)}
+            />
+          ))}
+        </div>
+
         <div className="mt-auto flex flex-col gap-1 pt-4 border-t border-ink/5">
-          {!isCollapsed && <p className="text-[10px] font-bold text-muted uppercase tracking-normal px-3 mb-2 opacity-50">{t('tools')}</p>}
-          {toolNavItems.map((item) => (
+          {profileNavItems.map((item) => (
             <SidebarNavItem
               key={item.path}
               item={item}
@@ -176,7 +186,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
 
       {/* Mobile Bottom Navigation */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-surface-low border-t border-ink/5 z-50 px-4 flex items-center gap-2 overflow-x-auto no-scrollbar shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
-        {[...mainNavItems, ...toolNavItems].map((item) => (
+        {[...mainNavItems, ...adminNavItems, ...profileNavItems].map((item) => (
           <MobileNavItem
             key={`mobile-${item.path}`}
             item={item}

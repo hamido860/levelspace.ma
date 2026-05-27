@@ -33,15 +33,18 @@ import {
   RefreshCw, Database, BarChart2, BookOpen, Cpu, Table2,
   AlertTriangle, CheckCircle, Clock, Layers, Sparkles,
   Lightbulb, ListChecks, Map as MapIcon, ChevronRight,
-  TrendingUp, TrendingDown, Info, Zap,
+  TrendingUp, TrendingDown, Info, Zap, KeyRound,
   Trash2, Wrench, Play, Pencil, ChevronDown, Brain, ShieldCheck, GraduationCap,
-  Copy, Check
+  Copy, Check, PackageSearch
 } from "lucide-react";
+import { AdminCurriculumDebug } from "./AdminCurriculumDebug";
+import { AdminMcpLessons } from "./AdminMcpLessons";
+import { AiKeysModal } from "../components/settings/AiKeysModal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface BrowseRow { [key: string]: any; }
 
-type Tab = "overview" | "grades" | "queue" | "rag" | "browser" | "ai";
+type Tab = "overview" | "grades" | "queue" | "rag" | "browser" | "ai" | "curriculum" | "mcp";
 const ADMIN_TAB_CONFIG: Record<Tab, { label: string; icon: React.ElementType; activeClass: string; iconClass: string }> = {
   overview: {
     label: "Overview",
@@ -78,6 +81,18 @@ const ADMIN_TAB_CONFIG: Record<Tab, { label: string; icon: React.ElementType; ac
     icon: Brain,
     activeClass: "border-emerald-500 bg-emerald-50 text-emerald-700",
     iconClass: "text-emerald-500",
+  },
+  curriculum: {
+    label: "Curriculum",
+    icon: Database,
+    activeClass: "border-pink-500 bg-pink-50 text-pink-700",
+    iconClass: "text-pink-500",
+  },
+  mcp: {
+    label: "MCP Lessons",
+    icon: PackageSearch,
+    activeClass: "border-orange-500 bg-orange-50 text-orange-700",
+    iconClass: "text-orange-500",
   },
 };
 
@@ -258,6 +273,7 @@ export const Admin: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [dashboardError, setDashboardError] = useState("");
   const [lastRefresh, setLastRefresh] = useState<string>("");
+  const [isAiKeysOpen, setIsAiKeysOpen] = useState(false);
 
   // Overview state
   const [kpis, setKpis] = useState<AdminOverviewKpis>({
@@ -792,7 +808,7 @@ export const Admin: React.FC = () => {
     setExecLoading(false);
   };
 
-  const tabs: Tab[] = ["overview", "grades", "queue", "rag", "browser", "ai"];
+  const tabs: Tab[] = ["overview", "grades", "queue", "rag", "browser", "ai", "curriculum", "mcp"];
 
   // ── RENDER ────────────────────────────────────────────────────────────────
   return (
@@ -800,23 +816,11 @@ export const Admin: React.FC = () => {
       <SEO title="Admin Panel" />
       <div className="admin-theme-scope">
 
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-extrabold text-ink">Admin Panel</h1>
-          <p className="text-sm text-ink-muted mt-0.5">
-            {lastRefresh ? `Last refreshed: ${lastRefresh}` : "Loading live data…"}
-          </p>
-        </div>
-        <button
-          onClick={refreshAll}
-          disabled={loading}
-          className="flex items-center gap-2 bg-ink text-paper px-4 py-2 rounded-lg text-sm font-semibold hover:bg-red-500 transition-colors disabled:opacity-50"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-          Refresh
-        </button>
+      {/* Page Header */}
+      <div className="border-b border-slate-100 dark:border-white/5 pb-5 mb-6">
+        <h1 className="ls-page-title text-slate-950 dark:text-ink">Admin Panel</h1>
       </div>
+
 
       {dashboardError && (
         <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -826,25 +830,26 @@ export const Admin: React.FC = () => {
       )}
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-surface-mid mb-6 overflow-x-auto pb-2">
+      <div className="flex gap-1 border-b border-slate-200 dark:border-white/8 -mb-px overflow-x-auto pb-2 mb-6">
         {tabs.map((tabKey) => {
           const tabConfig = ADMIN_TAB_CONFIG[tabKey];
           const TabIcon = tabConfig.icon;
           const isActive = tab === tabKey;
           return (
-          <button
-            key={tabKey}
-            onClick={() => setTab(tabKey)}
-            className={`flex items-center gap-2 rounded-t-2xl px-4 py-2.5 text-sm font-semibold border-b-2 transition-all whitespace-nowrap ${
-              isActive
-                ? tabConfig.activeClass
-                : "border-transparent text-ink-muted hover:bg-surface-low hover:text-ink"
-            }`}
-          >
-            <TabIcon className={`w-4 h-4 ${isActive ? tabConfig.iconClass : "text-ink-muted"}`} />
-            {tabConfig.label}
-          </button>
-        )})}
+            <button
+              key={tabKey}
+              onClick={() => setTab(tabKey)}
+              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors whitespace-nowrap ${
+                isActive
+                  ? 'border-accent text-accent'
+                  : 'border-transparent text-slate-500 dark:text-ink-muted hover:text-slate-950 dark:hover:text-ink'
+              }`}
+            >
+              <TabIcon className="w-4 h-4" />
+              {tabConfig.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* ── OVERVIEW ── */}
@@ -1556,12 +1561,22 @@ export const Admin: React.FC = () => {
             <div className="w-10 h-10 rounded-lg bg-red-500 flex items-center justify-center flex-shrink-0">
               <Sparkles className="w-5 h-5" />
             </div>
-            <div className="flex-1">
-              <h2 className="font-bold text-base">AI Analyst Agent</h2>
-              <p className="text-ink-muted text-sm mt-0.5">
-                Powered by <span className="text-paper font-medium">qwen/qwen3-coder-480b-a35b-instruct</span> via NVIDIA NIM.
-                Reads your live database metrics and returns insights, tasks, and strategy.
-              </p>
+            <div className="flex-1 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h2 className="font-bold text-base">AI Analyst Agent</h2>
+                <p className="text-ink-muted text-sm mt-0.5">
+                  Powered by <span className="text-paper font-medium">qwen/qwen3-coder-480b-a35b-instruct</span> via NVIDIA NIM.
+                  Reads your live database metrics and returns insights, tasks, and strategy.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAiKeysOpen(true)}
+                className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-xs font-bold text-paper hover:bg-white/20 cursor-pointer self-start md:self-auto shrink-0 transition-all duration-300"
+              >
+                <KeyRound className="w-3.5 h-3.5" />
+                Manage Admin Keys
+              </button>
             </div>
           </div>
 
@@ -1818,6 +1833,20 @@ export const Admin: React.FC = () => {
         </div>
       )}
 
+      {/* ── Curriculum Debug Tab ── */}
+      {tab === "curriculum" && (
+        <div className="animate-in fade-in duration-300 space-y-6">
+          <AdminCurriculumDebug />
+        </div>
+      )}
+
+      {/* ── MCP Lessons Tab ── */}
+      {tab === "mcp" && (
+        <div className="animate-in fade-in duration-300 space-y-6">
+          <AdminMcpLessons />
+        </div>
+      )}
+
       {/* ── Execute Task Modal ── */}
       {execModal?.open && execModal.task && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -1917,7 +1946,11 @@ export const Admin: React.FC = () => {
         </div>
       )}
       </div>
-
+      <AiKeysModal
+        isOpen={isAiKeysOpen}
+        onClose={() => setIsAiKeysOpen(false)}
+        mode="admin"
+      />
     </Layout>
   );
 };

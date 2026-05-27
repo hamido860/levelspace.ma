@@ -14,8 +14,6 @@ import {
   Sparkles,
   XCircle,
 } from "lucide-react";
-import { Layout } from "../components/Layout";
-import { SEO } from "../components/SEO";
 import { supabase } from "../db/supabase";
 import { db } from "../db/db";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -341,9 +339,6 @@ export const AdminMcpLessons: React.FC = () => {
   }));
 
   return (
-    <Layout>
-      <SEO title="MCP Lesson Review" description="Admin review surface for MCP lesson orchestration." />
-
       <section className="space-y-6">
         <div className="rounded-3xl border border-ink/10 bg-paper p-6 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -549,7 +544,6 @@ export const AdminMcpLessons: React.FC = () => {
           )}
         </div>
       </section>
-    </Layout>
   );
 };
 
