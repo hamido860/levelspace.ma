@@ -765,6 +765,8 @@ export const ClassroomView: React.FC = () => {
         title: lesson.lesson_title,
         content: lesson.content || existing?.content || '',
         blocks: lesson.blocks ?? existing?.blocks,
+        quizzes: lesson.quizzes ?? (existing as any)?.quizzes,
+        exercises: lesson.exercises ?? (existing as any)?.exercises,
         subtitle: lesson.subtitle ?? existing?.subtitle,
         grade: lesson.grade ?? existing?.grade,
         country: lesson.country ?? existing?.country,
@@ -1334,129 +1336,11 @@ export const ClassroomView: React.FC = () => {
   return (
     <Layout>
       <div className="max-w-5xl mx-auto space-y-4 pb-20">
-        {/* Header Section */}
-        {/* Unified Header Card */}
-        <div className="bg-white dark:bg-paper rounded-[2rem] border border-slate-200 dark:border-white/8 p-5 shadow-sm space-y-4">
-          {/* Top Row: Back Navigation, Badges, Strict RAG Toggle & Actions */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-white/5 pb-3">
-            <div className="flex flex-wrap items-center gap-3">
-              <button 
-                onClick={() => navigate('/dashboard')}
-                className="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-slate-950 transition-colors mr-2"
-              >
-                <ArrowLeft size={13} />
-                {t('back_to_dashboard')}
-              </button>
-              <span className="bg-accent/10 text-accent text-[10px] font-extrabold px-2 py-0.5 rounded uppercase">{module.code}</span>
-              <span className="text-slate-400 dark:text-ink-muted text-[10px] font-bold uppercase">{module.category}</span>
-              {isAdmin && (
-                <div className="flex items-center gap-2 border-l border-slate-200 pl-3 dark:border-white/10">
-                  <span className="text-[10px] text-slate-400 dark:text-ink-muted font-bold uppercase">Strict RAG</span>
-                  <button
-                    onClick={async () => {
-                      await db.modules.update(module.id, { strictRAG: !module.strictRAG });
-                    }}
-                    className={`w-7 h-3.5 rounded-full transition-colors relative ${module.strictRAG ? 'bg-accent' : 'bg-slate-950/20 dark:bg-white/20'}`}
-                    title="Keep this classroom grounded in certified content before using AI."
-                  >
-                    <div className={`absolute top-0.5 left-0.5 bg-white w-2.5 h-2.5 rounded-full transition-transform ${module.strictRAG ? 'translate-x-3.5' : 'translate-x-0'}`} />
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {!showSetupState && (
-              <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                {isAdmin && (
-                  <button
-                    onClick={handleSeedFromSupabase}
-                    disabled={isSeeding}
-                    className="flex items-center gap-1.5 bg-slate-50 text-slate-950 px-3 py-2 rounded-lg text-xs font-bold transition-all border border-slate-200 hover:border-accent/30 hover:text-accent disabled:opacity-50 dark:bg-surface-low dark:border-white/5 dark:text-ink cursor-pointer"
-                  >
-                    {isSeeding ? <Loader2 size={12} className="animate-spin" /> : <Database size={12} />}
-                    <span>{isSeeding ? 'Loading...' : 'Load from Supabase'}</span>
-                  </button>
-                )}
-                {isAdmin && hasTopicFallback && (
-                  <button
-                    onClick={handleGenerateStarterLessons}
-                    disabled={isGeneratingStarterLessons}
-                    className="flex items-center gap-1.5 bg-slate-50 text-slate-950 px-3 py-2 rounded-lg text-xs font-bold transition-all border border-slate-200 hover:border-accent/30 hover:text-accent disabled:opacity-50 dark:bg-surface-low dark:border-white/5 dark:text-ink cursor-pointer"
-                  >
-                    {isGeneratingStarterLessons ? <Loader2 size={12} className="animate-spin" /> : <Database size={12} />}
-                    <span>{isGeneratingStarterLessons ? 'Generating...' : 'Generate All Lessons'}</span>
-                  </button>
-                )}
-                {aiAvailable ? (
-                  <>
-                    {isAdmin && hasLessons && (
-                      <button
-                        onClick={handleAuditClassroom}
-                        className="flex items-center gap-1.5 bg-slate-50 text-slate-500 hover:text-accent px-3 py-2 rounded-lg text-xs font-bold transition-all border border-slate-200 dark:bg-surface-low dark:border-white/5 dark:text-ink-secondary cursor-pointer"
-                      >
-                        <ShieldCheck size={12} />
-                        <span>Audit</span>
-                      </button>
-                    )}
-                    <button
-                      onClick={() => handleGenerateLesson()}
-                      disabled={!!generatingTitle}
-                      className="flex items-center gap-1.5 bg-slate-950 text-white px-4 py-2 rounded-lg text-xs font-black hover:bg-accent transition-all shadow-sm disabled:opacity-50 cursor-pointer"
-                    >
-                      {generatingTitle === module.name ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-                      <span>{hasLessons ? 'Generate Lesson' : 'Generate First Lesson'}</span>
-                    </button>
-                  </>
-                ) : (
-                  <div className="px-3 py-2 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-[10px] font-bold uppercase">
-                    AI key needed
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Middle Row: Title & Subtitle/Description */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-            <div className="space-y-1">
-              <h1 className="text-3xl font-black font-display tracking-tight text-slate-950 dark:text-ink leading-none">
-                {module.name}
-              </h1>
-              <p className="text-xs text-slate-500 dark:text-ink-muted max-w-3xl leading-relaxed">
-                {module.description}
-              </p>
-            </div>
-          </div>
-
-          {/* Bottom Row: Stats & Diagnostics Dashboard */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-slate-100 dark:border-white/5">
-            {showStats && (
-              <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-ink-muted select-none">
-                <span className="font-bold text-slate-700 dark:text-ink-secondary">
-                  {hasLessons ? `${lessons.length} Module Titles` : `${topicFallbackRows.length} Topics`}
-                </span>
-                <span className="h-1 w-1 rounded-full bg-slate-300 dark:bg-white/10" />
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">{module.progress}% Complete</span>
-                  <div className="w-20 h-1.5 bg-slate-100 dark:bg-surface-mid rounded-full overflow-hidden inline-block align-middle border border-slate-200/50 dark:border-white/5">
-                    <div className="h-full bg-accent" style={{ width: `${module.progress}%` }} />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {isAdmin && adminStats && (
-              <div className="flex flex-wrap gap-1.5 items-center text-[10px] font-extrabold uppercase tracking-wide select-none">
-                <span className="text-slate-400 dark:text-ink-muted mr-1">Diagnostics:</span>
-                <span className="bg-slate-100 text-slate-700 dark:bg-surface-low dark:text-ink px-2 py-0.5 rounded font-bold">Total: {adminStats.total}</span>
-                <span className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400 px-2 py-0.5 rounded font-bold">Pub: {adminStats.published}</span>
-                <span className="bg-amber-50 text-amber-700 dark:bg-amber-950/20 dark:text-amber-400 px-2 py-0.5 rounded font-bold">Review: {adminStats.needsReview}</span>
-                <span className="bg-blue-50 text-blue-700 dark:bg-blue-950/20 dark:text-blue-400 px-2 py-0.5 rounded font-bold">Draft: {adminStats.draft}</span>
-                <span className="bg-rose-50 text-rose-700 dark:bg-rose-950/20 dark:text-rose-400 px-2 py-0.5 rounded font-bold">Hidden: {adminStats.hidden}</span>
-              </div>
-            )}
-          </div>
+        {/* Page Header */}
+        <div className="border-b border-slate-100 dark:border-white/5 pb-5 mb-6">
+          <h1 className="ls-page-title text-slate-950 dark:text-ink">{module.name}</h1>
         </div>
+
 
         {isHydratingSupabase && !hasLessons && !hasTopicFallback && (
           <div className="bg-slate-50/50 border border-slate-200 rounded-3xl p-6 flex items-center gap-3 ls-body-text">
@@ -1942,7 +1826,11 @@ export const ClassroomView: React.FC = () => {
             ) : quizzes.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {quizzes.map((quiz) => (
-                  <div key={quiz.id} className="bg-white border border-slate-200 p-5 rounded-2xl hover:border-accent/30 transition-all cursor-pointer">
+                  <div 
+                    key={quiz.id} 
+                    onClick={() => navigate(`/lesson/${quiz.lesson_id}`, { state: { startAtTest: true } })}
+                    className="bg-white border border-slate-200 p-5 rounded-2xl hover:border-accent/30 transition-all cursor-pointer hover:shadow-sm"
+                  >
                     <h4 className="font-bold text-slate-950">{quiz.title}</h4>
                     <p className="ls-body-text mt-1">{quiz.description}</p>
                     <div className="flex items-center gap-3 mt-4">
@@ -1973,7 +1861,11 @@ export const ClassroomView: React.FC = () => {
             ) : exercises.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {exercises.map((exercise) => (
-                  <div key={exercise.id} className="bg-white border border-slate-200 p-5 rounded-2xl hover:border-accent/30 transition-all cursor-pointer">
+                  <div 
+                    key={exercise.id} 
+                    onClick={() => navigate(`/lesson/${exercise.lesson_id}`, { state: { startAtTest: true } })}
+                    className="bg-white border border-slate-200 p-5 rounded-2xl hover:border-accent/30 transition-all cursor-pointer hover:shadow-sm"
+                  >
                     <h4 className="font-bold text-slate-950">{exercise.title}</h4>
                     <p className="ls-body-text mt-1 line-clamp-2">{exercise.prompt}</p>
                     <div className="flex items-center gap-3 mt-4">

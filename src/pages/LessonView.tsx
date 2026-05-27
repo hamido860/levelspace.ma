@@ -13,15 +13,11 @@ import { useLanguage } from '../context/LanguageContext';
 import { LessonReader } from '../features/lesson/LessonReader';
 import { useDisplayedLessonBlocks } from '../features/lesson/useDisplayedLessonBlocks';
 import { AIAssistant } from '../components/AIAssistant';
-import {
-  getLessonSelectColumns,
-  inferLegacyLessonSourceConfidence,
-  inferLegacyLessonSourceName,
-  inferLegacyLessonValidationStatus,
-  isMissingLessonValidationColumnError,
-} from '../services/lessonSupabase';
+import { getLessonSelectColumns, inferLegacyLessonSourceConfidence, inferLegacyLessonSourceName, inferLegacyLessonValidationStatus, isMissingLessonValidationColumnError } from '../services/lessonSupabase';
 import { isStudentVisibleLesson, getLessonAvailabilityState } from '../services/lessonRecovery';
 import { isDraftValidationStatus } from '../services/curriculumValidation';
+import { getQuizzesByLesson } from '../services/quizService';
+import { getExercisesByLesson } from '../services/exerciseService';
 
 type SupabaseLessonRecord = {
   id?: string;
@@ -29,6 +25,8 @@ type SupabaseLessonRecord = {
   lesson_title: string;
   content?: string | null;
   blocks?: any[] | null;
+  quizzes?: any[] | null;
+  exercises?: any[] | null;
   subtitle?: string | null;
   tags?: string[] | null;
   status?: string | null;
@@ -169,6 +167,8 @@ export const LessonView: React.FC = () => {
   const startAtTest = location.state?.startAtTest || false;
 
   const [supabaseLesson, setSupabaseLesson] = useState<SupabaseLessonRecord | null>(null);
+  const [supabaseQuizzes, setSupabaseQuizzes] = useState<any[]>([]);
+  const [supabaseExercises, setSupabaseExercises] = useState<any[]>([]);
   const [curriculumContext, setCurriculumContext] = useState<CurriculumContext | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeDomain, setActiveDomain] = useState('all');
@@ -195,6 +195,8 @@ export const LessonView: React.FC = () => {
     setExamHintShown({});
     setReadingBlockIndex(null);
     setActiveDomain('all');
+    setSupabaseQuizzes([]);
+    setSupabaseExercises([]);
   }, [id]);
 
   useEffect(() => {
@@ -244,7 +246,25 @@ export const LessonView: React.FC = () => {
           foundLesson = sortedLessons[0];
         }
 
+        let dbQuizzes: any[] = [];
+        let dbExercises: any[] = [];
+        if (foundLesson?.id) {
+          try {
+            const [fetchedQuizzes, fetchedExercises] = await Promise.all([
+              getQuizzesByLesson(foundLesson.id),
+              getExercisesByLesson(foundLesson.id),
+            ]);
+            dbQuizzes = fetchedQuizzes || [];
+            dbExercises = fetchedExercises || [];
+          } catch (e) {
+            console.warn('[LessonView] Failed to fetch quizzes/exercises from Supabase:', e);
+          }
+        }
+
+        if (isCancelled) return;
         setSupabaseLesson(foundLesson);
+        setSupabaseQuizzes(dbQuizzes);
+        setSupabaseExercises(dbExercises);
 
         if (foundLesson?.id) {
           const { data: context } = await supabase
@@ -278,6 +298,8 @@ export const LessonView: React.FC = () => {
         title: supabaseLesson.lesson_title,
         content: supabaseLesson.content || '',
         blocks: Array.isArray(supabaseLesson.blocks) ? supabaseLesson.blocks : [],
+        quizzes: Array.isArray(supabaseLesson.quizzes) ? supabaseLesson.quizzes : [],
+        exercises: Array.isArray(supabaseLesson.exercises) ? supabaseLesson.exercises : [],
         subtitle: supabaseLesson.subtitle || '',
         tags: supabaseLesson.tags || [],
         status: supabaseLesson.status || 'published',
@@ -299,6 +321,8 @@ export const LessonView: React.FC = () => {
         title: lesson.title,
         content: lesson.content || '',
         blocks: Array.isArray(lesson.blocks) ? lesson.blocks : [],
+        quizzes: Array.isArray((lesson as any).quizzes) ? (lesson as any).quizzes : [],
+        exercises: Array.isArray((lesson as any).exercises) ? (lesson as any).exercises : [],
         subtitle: lesson.subtitle || '',
         grade: lesson.grade || '',
         subject: lesson.subject || '',
@@ -341,10 +365,96 @@ export const LessonView: React.FC = () => {
 
   const storedBlocks = Array.isArray(effectiveLesson?.blocks) ? effectiveLesson.blocks : [];
   const readerSourceBlocks = useMemo(() => {
-    if (storedBlocks.length > 0) return storedBlocks;
-    if (!effectiveLesson?.content?.trim()) return [];
-    return [{ type: 'content', title: effectiveLesson.title, content: effectiveLesson.content }];
-  }, [effectiveLesson?.content, effectiveLesson?.title, storedBlocks]);
+    let baseBlocks = [...storedBlocks];
+    if (baseBlocks.length === 0 && effectiveLesson?.content?.trim()) {
+      baseBlocks = [{ type: 'content', title: effectiveLesson.title, content: effectiveLesson.content }];
+    }
+
+    // 1. Gather all quizzes from Supabase separate table and embedded column/local record
+    const allRawQuizzes = [
+      ...supabaseQuizzes,
+      ...(effectiveLesson?.quizzes || [])
+    ];
+
+    // Deduplicate quizzes by question text
+    const uniqueQuizQuestions: any[] = [];
+    const seenQuizTexts = new Set<string>();
+
+    for (const quiz of allRawQuizzes) {
+      if (!quiz) continue;
+      // Sometimes it's a flat list of questions directly, sometimes it has a .questions array, sometimes a single question object
+      const questionsList = Array.isArray(quiz.questions) 
+        ? quiz.questions 
+        : Array.isArray(quiz)
+        ? quiz
+        : [quiz];
+
+      for (const q of questionsList) {
+        if (!q) continue;
+        const qText = (q.question || q.questionText || q.text || '').trim();
+        if (qText && !seenQuizTexts.has(qText)) {
+          seenQuizTexts.add(qText);
+          uniqueQuizQuestions.push({
+            question: qText,
+            options: q.options || q.choices || [],
+            correctAnswer: q.correctAnswer || q.answer || '',
+            explanation: q.explanation || '',
+          });
+        }
+      }
+    }
+
+    const mappedQuizzes = uniqueQuizQuestions.map((q, qIdx) => ({
+      id: `supabase-quiz-${qIdx}`,
+      type: 'quiz',
+      purpose: 'quiz',
+      title: effectiveLesson?.title || 'Quiz',
+      quiz: q
+    }));
+
+    // 2. Gather all exercises from Supabase separate table and embedded column/local record
+    const allRawExercises = [
+      ...supabaseExercises,
+      ...(effectiveLesson?.exercises || [])
+    ];
+
+    // Deduplicate exercises by prompt
+    const uniqueExercises: any[] = [];
+    const seenExercisePrompts = new Set<string>();
+
+    for (const ex of allRawExercises) {
+      if (!ex) continue;
+      // Could be an array of exercises, or a single exercise
+      const exList = Array.isArray(ex) ? ex : [ex];
+      for (const singleEx of exList) {
+        if (!singleEx) continue;
+        const exPrompt = (singleEx.prompt || singleEx.question || '').trim();
+        if (exPrompt && !seenExercisePrompts.has(exPrompt)) {
+          seenExercisePrompts.add(exPrompt);
+          uniqueExercises.push({
+            title: singleEx.title || 'Practice Exercise',
+            prompt: exPrompt,
+            solution: singleEx.solution || singleEx.answer || '',
+            hint: singleEx.hints?.[0] || singleEx.hint || '',
+          });
+        }
+      }
+    }
+
+    const mappedExercises = uniqueExercises.map((ex, exIdx) => ({
+      id: `supabase-exercise-${exIdx}`,
+      type: 'exercise',
+      purpose: 'practice',
+      title: ex.title,
+      exercise: {
+        prompt: ex.prompt,
+        solution: ex.solution,
+        hint: ex.hint,
+      }
+    }));
+
+    return [...baseBlocks, ...mappedQuizzes, ...mappedExercises];
+  }, [effectiveLesson?.content, effectiveLesson?.title, effectiveLesson?.quizzes, effectiveLesson?.exercises, storedBlocks, supabaseQuizzes, supabaseExercises]);
   const hasStoredContent = Boolean(effectiveLesson?.content?.trim()) || readerSourceBlocks.length > 0;
   const contentDir = isRTL(`${effectiveLesson?.title || ''} ${getBlockText(readerSourceBlocks[0]) || effectiveLesson?.content || ''}`)
     ? 'rtl'
