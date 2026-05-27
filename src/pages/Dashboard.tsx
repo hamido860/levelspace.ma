@@ -192,6 +192,20 @@ export const Dashboard: React.FC = () => {
   const dbSettings = dbSettingsVal || [];
   const settingsMap = useMemo(() => Object.fromEntries(dbSettings.map(s => [s.key, s.value])), [dbSettings]);
 
+  const upcomingReminders = useMemo(() => {
+    return reminders
+      .filter(r => !r.completed)
+      .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''));
+  }, [reminders]);
+
+  const upcomingEvents = useMemo(() => {
+    return schedule
+      .filter(e => e.date?.includes('-'))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }, [schedule]);
+
+  const uniqueStudySubjects = useMemo(() => Array.from(new Set(studySessions.map(s => s.subject))), [studySessions]);
+
   const selectedGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
   const selectedCountry = settingsMap['selected_country'] || localStorage.getItem('selected_country') || '';
   const currentSession = settingsMap['current_session'] || localStorage.getItem('current_session') || 'Fall 2024';
@@ -519,10 +533,8 @@ export const Dashboard: React.FC = () => {
                   <div className="col-span-full py-8 flex justify-center items-center">
                     <Loader2 className="w-5 h-5 text-accent animate-spin" />
                   </div>
-                ) : reminders.filter(r => !r.completed).length > 0 ? (
-                  reminders
-                    .filter(r => !r.completed)
-                    .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
+                ) : upcomingReminders.length > 0 ? (
+                  upcomingReminders
                     .slice(0, 4)
                     .map((reminder, i) => (
                       <motion.div 
@@ -633,10 +645,8 @@ export const Dashboard: React.FC = () => {
                   <div className="py-8 flex justify-center items-center">
                     <Loader2 className="w-5 h-5 text-accent animate-spin" />
                   </div>
-                ) : schedule.filter(e => e.date?.includes('-')).length > 0 ? (
-                  schedule
-                    .filter(e => e.date?.includes('-'))
-                    .sort((a, b) => a.date.localeCompare(b.date))
+                ) : upcomingEvents.length > 0 ? (
+                  upcomingEvents
                     .slice(0, 4)
                     .map((event) => {
                       const d = new Date(event.date);
@@ -761,7 +771,7 @@ export const Dashboard: React.FC = () => {
                 {activeModules.map(m => (
                   <option key={m.id} value={m.name} />
                 ))}
-                {Array.from(new Set(studySessions.map(s => s.subject))).map((subject, idx) => (
+                {uniqueStudySubjects.map((subject, idx) => (
                   <option key={idx} value={subject} />
                 ))}
               </datalist>
