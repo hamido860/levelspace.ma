@@ -529,12 +529,12 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
   };
 
   return (
-    <div className="lesson-reader-shell min-h-screen bg-slate-50/50 dark:bg-background pb-20 select-none">
+    <div className="lesson-reader-shell w-full h-full flex flex-col overflow-hidden bg-slate-50/50 dark:bg-background select-none">
       
 
       {/* Responsive Grid/Single Column Layout Container */}
       <main className={hasSidebar
-        ? "max-w-7xl mx-auto mt-6 px-6 grid grid-cols-1 lg:grid-cols-3 gap-5 lg:h-[calc(100vh-7rem)] lg:max-h-[calc(100vh-7rem)] overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500"
+        ? "w-full h-full grid grid-cols-1 lg:grid-cols-3 gap-5 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500"
         : "max-w-2xl mx-auto mt-8 px-4 flex flex-col items-center justify-center animate-in fade-in slide-in-from-bottom-4 duration-500"
       }>
         

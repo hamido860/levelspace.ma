@@ -605,7 +605,7 @@ export const LessonView: React.FC = () => {
         type="article"
       />
 
-      <div dir={contentDir} className="min-h-screen bg-background">
+      <div dir={contentDir} className="p-5 h-[calc(100vh-4rem)] max-h-[calc(100vh-4rem)] bg-background flex flex-col overflow-hidden">
         <LessonReader
           title={effectiveLesson.title}
           subtitle={effectiveLesson.subtitle || `${displayedBlocks.length} sections`}
