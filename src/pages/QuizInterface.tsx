@@ -146,51 +146,27 @@ export const QuizInterface: React.FC = () => {
       <div className="h-full w-full bg-background flex flex-col overflow-hidden p-4">
         <div className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-4 overflow-hidden">
 
-          {/* Column 1: Left Sidebar — Quiz Info */}
-          <div className="hidden lg:flex lg:w-[220px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-5">
-            <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-5">
-              <div>
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-3">Quiz Info</p>
-                <div className="space-y-2">
-                  <div className="p-3 bg-slate-50 dark:bg-surface-low/30 rounded-xl border border-slate-100 dark:border-white/5">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Module</p>
-                    <p className="text-sm font-bold text-slate-800 dark:text-ink">{mockQuiz.moduleName}</p>
-                  </div>
-                  <div className="p-3 bg-slate-50 dark:bg-surface-low/30 rounded-xl border border-slate-100 dark:border-white/5">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Title</p>
-                    <p className="text-sm font-semibold text-slate-700 dark:text-ink leading-tight">{mockQuiz.title}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-3">Progress</p>
-                <div className="space-y-3">
-                  <div className="flex justify-between text-[11px]">
-                    <span className="text-slate-500">Question</span>
-                    <span className="font-bold text-slate-800 dark:text-ink">{currentQuestionIndex + 1} / {totalQuestions}</span>
-                  </div>
-                  <div className="h-2 w-full bg-slate-100 dark:bg-surface-mid rounded-full overflow-hidden">
-                    <div className="h-full bg-accent rounded-full transition-all" style={{ width: `${progress}%` }} />
-                  </div>
-                  <div className="flex justify-between text-[11px]">
-                    <span className="text-slate-500">Time Limit</span>
-                    <span className="font-bold text-slate-800 dark:text-ink">{mockQuiz.timeLimitMinutes} min</span>
-                  </div>
-                </div>
-              </div>
-
-              <button onClick={() => navigate(-1)}
-                className="flex items-center gap-2 p-3 bg-slate-50 dark:bg-surface-low/30 rounded-xl border border-slate-100 dark:border-white/5 hover:border-accent/30 transition-all w-full">
-                <ArrowLeft size={13} className="text-accent" />
-                <span className="text-[11px] font-semibold text-slate-700 dark:text-ink">Back to Lesson</span>
-              </button>
-            </div>
-          </div>
-
           {/* Column 2: Main Quiz Content */}
           <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 p-8">
-            <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-12">
+            <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-8">
+              {/* Quiz Header Info Bar */}
+              <div className="relative p-6 bg-slate-50 dark:bg-surface-low/30 border border-slate-100 dark:border-white/5 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-[10px] font-bold text-accent uppercase tracking-wider">
+                    <span>{mockQuiz.moduleName}</span>
+                    <span className="h-1 w-1 rounded-full bg-slate-300 dark:bg-white/20" />
+                    <span>{mockQuiz.timeLimitMinutes} min limit</span>
+                  </div>
+                  <h1 className="text-xl font-serif font-bold text-slate-950 dark:text-ink">{mockQuiz.title}</h1>
+                </div>
+                <button
+                  onClick={() => navigate(-1)}
+                  className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 rounded-xl text-xs font-semibold shadow-sm transition-all dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:bg-surface-low self-start md:self-auto"
+                >
+                  <ArrowLeft size={13} className="text-accent" />
+                  Back to Lesson
+                </button>
+              </div>
               {/* Progress Bar Section */}
               <div className="space-y-4">
                 <div className="flex justify-between items-end">

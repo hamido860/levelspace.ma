@@ -90,57 +90,6 @@ export const Profile: React.FC = () => {
         {/* 3-Column Layout */}
         <div className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-4 overflow-hidden">
 
-          {/* Column 1: Left Sidebar — User Identity */}
-          <div className="hidden lg:flex lg:w-[220px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-5">
-            <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-5">
-              {/* Avatar */}
-              <div className="flex flex-col items-center gap-3 pb-4 border-b border-slate-100 dark:border-white/5">
-                <div className="w-20 h-20 rounded-2xl bg-accent/10 flex items-center justify-center border-2 border-accent/20 overflow-hidden shadow-md">
-                  {profile?.avatar_url ? (
-                    <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                  ) : (
-                    <User className="w-10 h-10 text-accent" />
-                  )}
-                </div>
-                <div className="text-center">
-                  <p className="text-sm font-bold text-slate-800 dark:text-ink truncate max-w-[160px]">{profile?.full_name || user?.email?.split('@')[0] || 'Scholar'}</p>
-                  <p className="text-[10px] text-slate-400 dark:text-ink-muted">{selectedGrade}</p>
-                </div>
-              </div>
-
-              {/* Stats */}
-              <div className="space-y-2">
-                <p className="text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-wider">Stats</p>
-                {stats.map((stat, i) => (
-                  <div key={i} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-surface-low/30 rounded-xl border border-slate-100 dark:border-white/5">
-                    <div className={`flex items-center gap-2 ${stat.color}`}>
-                      {stat.icon}
-                      <span className="text-[11px] font-medium text-slate-600 dark:text-ink-secondary">{stat.label}</span>
-                    </div>
-                    <span className="text-sm font-bold text-slate-800 dark:text-ink">{stat.value}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Nav Links */}
-              <div className="space-y-2">
-                <p className="text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-wider">Navigate</p>
-                {[
-                  { label: 'Dashboard', path: '/dashboard', icon: <TrendingUp size={13} /> },
-                  { label: 'Classrooms', path: '/modules', icon: <LayoutGrid size={13} /> },
-                  { label: 'LevelUp', path: '/levelup', icon: <Activity size={13} /> },
-                  { label: 'Settings', path: '/settings', icon: <Settings size={13} /> },
-                ].map((link, i) => (
-                  <button key={i} onClick={() => navigate(link.path)}
-                    className="w-full flex items-center gap-2 p-3 bg-slate-50 dark:bg-surface-low/30 rounded-xl border border-slate-100 dark:border-white/5 hover:border-accent/30 transition-all">
-                    <span className="text-accent">{link.icon}</span>
-                    <span className="text-[11px] font-semibold text-slate-700 dark:text-ink">{link.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
           {/* Column 2: Main Content */}
           <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 p-6">
             <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6">        {/* Profile Header */}

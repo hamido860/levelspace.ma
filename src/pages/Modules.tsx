@@ -575,64 +575,6 @@ export const Modules: React.FC = () => {
         {/* 3-Column Layout */}
         <div className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-4 overflow-hidden">
         
-          {/* Column 1: Left Sidebar — Subject Overview */}
-          <div className="hidden lg:flex lg:w-[220px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-5 gap-4">
-            <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-4">
-              <div>
-                <p className="text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-wider mb-3">Overview</p>
-                <div className="space-y-2">
-                  {[
-                    { label: 'Total Subjects', value: modules.length, icon: <LayoutGrid size={14} /> },
-                    { label: 'Active', value: selectedModules.length, icon: <Zap size={14} /> },
-                    { label: 'With Lessons', value: Object.keys(lessonCountByModuleId).length, icon: <BookOpen size={14} /> },
-                  ].map((s, i) => (
-                    <div key={i} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-surface-low/30 rounded-xl border border-slate-100 dark:border-white/5">
-                      <div className="flex items-center gap-2 text-slate-500 dark:text-ink-muted">
-                        {s.icon}
-                        <span className="text-[11px] font-medium">{s.label}</span>
-                      </div>
-                      <span className="text-sm font-bold text-slate-800 dark:text-ink">{s.value}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {selectedModules.length > 0 && (
-                <div>
-                  <p className="text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-wider mb-3">Active Classrooms</p>
-                  <div className="space-y-2">
-                    {selectedModules.slice(0, 5).map(m => (
-                      <button
-                        key={m.id}
-                        onClick={() => navigate(`/classroom/${m.id}`)}
-                        className="w-full flex items-center gap-2 p-3 bg-slate-50 dark:bg-surface-low/30 rounded-xl border border-slate-100 dark:border-white/5 hover:border-accent/30 transition-all text-left"
-                      >
-                        <div className="w-7 h-7 rounded-lg bg-accent/10 flex items-center justify-center text-accent shrink-0">
-                          <BookOpen size={12} />
-                        </div>
-                        <span className="text-[11px] font-semibold text-slate-700 dark:text-ink truncate">{m.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div>
-                <p className="text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-wider mb-3">Quick Actions</p>
-                <div className="space-y-2">
-                  <button onClick={() => navigate('/dashboard')} className="w-full flex items-center gap-2 p-3 bg-slate-50 dark:bg-surface-low/30 rounded-xl border border-slate-100 dark:border-white/5 hover:border-accent/30 transition-all">
-                    <TrendingUp size={13} className="text-accent" />
-                    <span className="text-[11px] font-semibold text-slate-700 dark:text-ink">Dashboard</span>
-                  </button>
-                  <button onClick={() => navigate('/levelup')} className="w-full flex items-center gap-2 p-3 bg-slate-50 dark:bg-surface-low/30 rounded-xl border border-slate-100 dark:border-white/5 hover:border-accent/30 transition-all">
-                    <Brain size={13} className="text-accent" />
-                    <span className="text-[11px] font-semibold text-slate-700 dark:text-ink">LevelUp Hub</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
           {/* Column 2: Main Content */}
           <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 p-6">
             <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6">
@@ -651,10 +593,28 @@ export const Modules: React.FC = () => {
                 </div>
               </div>
 
-
-
-
-
+              {/* Symmetrical Stats Row */}
+              <section className="mt-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {[
+                    { label: 'Total Subjects', value: modules.length, icon: <LayoutGrid size={16} /> },
+                    { label: 'Active Classrooms', value: selectedModules.length, icon: <Zap size={16} /> },
+                    { label: 'With Lessons', value: Object.keys(lessonCountByModuleId).length, icon: <BookOpen size={16} /> },
+                  ].map((s, i) => (
+                    <div key={i} className="bg-slate-50/50 dark:bg-surface-low/30 p-4 rounded-2xl border border-slate-100 dark:border-white/5 flex items-center justify-between shadow-sm hover:border-accent/30 transition-all cursor-default">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-surface-low flex items-center justify-center text-slate-400 dark:text-ink-muted shrink-0">
+                          {s.icon}
+                        </div>
+                        <div>
+                          <p className="text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-normal">{s.label}</p>
+                          <span className="text-lg font-bold text-slate-800 dark:text-ink">{s.value}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
 
         {/* Modules Grid */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -855,6 +815,27 @@ export const Modules: React.FC = () => {
                   </div>
                 </div>
               </section>
+
+              {/* Active Classrooms */}
+              {selectedModules.length > 0 && (
+                <section className="space-y-3">
+                  <p className="text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-wider">Active Classrooms</p>
+                  <div className="space-y-2">
+                    {selectedModules.slice(0, 5).map(m => (
+                      <button
+                        key={m.id}
+                        onClick={() => navigate(`/classroom/${m.id}`)}
+                        className="w-full flex items-center gap-2.5 p-3 bg-slate-50 dark:bg-surface-low/30 rounded-xl border border-slate-100 dark:border-white/5 hover:border-accent/30 transition-all text-left group"
+                      >
+                        <div className="w-7 h-7 rounded-lg bg-accent/10 flex items-center justify-center text-accent shrink-0 group-hover:bg-accent group-hover:text-white transition-colors">
+                          <BookOpen size={12} />
+                        </div>
+                        <span className="text-[11px] font-semibold text-slate-700 dark:text-ink truncate">{m.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              )}
 
               {/* Study Tips */}
               <section className="space-y-3">

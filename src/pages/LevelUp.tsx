@@ -414,56 +414,6 @@ export const LevelUp: React.FC = () => {
         {/* 3-Column Layout */}
         <div className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-4 overflow-hidden">
 
-          {/* Column 1: Left Sidebar — Tab Navigation */}
-          <div className="hidden lg:flex lg:w-[220px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-5">
-            <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-5">
-              <div>
-                <p className="text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-wider mb-3">LevelUp Sections</p>
-                <div className="space-y-1">
-                  {[
-                    { id: 'support', label: 'AI Explainer', icon: <Brain size={14} />, desc: 'Gap analysis & support' },
-                    { id: 'resources', label: 'Resource Vault', icon: <BookOpen size={14} />, desc: 'eBooks & materials' },
-                    { id: 'discover', label: 'References', icon: <Globe size={14} />, desc: 'Wikipedia & more' },
-                  ].map(tab => (
-                    <button
-                      key={tab.id}
-                      onClick={() => setMainTab(tab.id as any)}
-                      className={`w-full flex items-start gap-3 p-3 rounded-xl border transition-all text-left ${
-                        mainTab === tab.id
-                          ? 'bg-accent/10 border-accent/30 text-accent'
-                          : 'bg-slate-50 dark:bg-surface-low/30 border-slate-100 dark:border-white/5 hover:border-accent/20'
-                      }`}
-                    >
-                      <span className={mainTab === tab.id ? 'text-accent' : 'text-slate-400'}>{tab.icon}</span>
-                      <div>
-                        <p className={`text-[11px] font-bold ${mainTab === tab.id ? 'text-accent' : 'text-slate-700 dark:text-ink'}`}>{tab.label}</p>
-                        <p className="text-[10px] text-slate-400 dark:text-ink-muted">{tab.desc}</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <p className="text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-wider mb-3">My Progress</p>
-                <div className="space-y-2">
-                  {[
-                    { label: 'Resources Saved', value: resources.length, icon: <FileText size={13} /> },
-                    { label: 'Vocab Entries', value: vocab.length, icon: <BookMarked size={13} /> },
-                  ].map((s, i) => (
-                    <div key={i} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-surface-low/30 rounded-xl border border-slate-100 dark:border-white/5">
-                      <div className="flex items-center gap-2 text-slate-500 dark:text-ink-muted">
-                        {s.icon}
-                        <span className="text-[11px] font-medium">{s.label}</span>
-                      </div>
-                      <span className="text-sm font-bold text-slate-800 dark:text-ink">{s.value}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
           {/* Column 2: Main Content */}
           <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 p-6">
             <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6">
