@@ -437,7 +437,7 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
       <div 
         key={lesson.id} 
         onClick={() => onNavigateToLesson?.(lesson.id)}
-        className="bg-white dark:bg-paper rounded-2xl border border-slate-200 dark:border-white/8 shadow-md overflow-hidden flex flex-col group/preview transition-all hover:shadow-lg relative cursor-pointer hover:border-slate-300 dark:hover:border-white/15 hover:scale-[1.005] active:scale-[0.99]"
+        className="bg-slate-50/50 dark:bg-surface-low/30 rounded-2xl border border-slate-100 dark:border-white/5 overflow-hidden flex flex-col group/preview transition-all relative cursor-pointer hover:border-slate-200/80 dark:hover:border-white/10 hover:scale-[1.005] active:scale-[0.99]"
       >
         {/* Pin Icon button in top-right */}
         <button
