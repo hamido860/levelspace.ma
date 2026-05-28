@@ -529,18 +529,18 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
   };
 
   return (
-    <div className="lesson-reader-shell w-full h-full flex flex-col overflow-hidden bg-slate-50/50 dark:bg-background select-none">
+    <div className="lesson-reader-shell w-full flex-grow flex flex-col overflow-hidden bg-slate-50/50 dark:bg-background select-none">
       
 
       {/* Responsive Grid/Single Column Layout Container */}
       <main className={hasSidebar
-        ? "w-full h-full grid grid-cols-1 lg:grid-cols-3 gap-5 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500"
+        ? "flex-grow min-h-0 w-full grid grid-cols-1 lg:grid-cols-3 gap-4 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500"
         : "max-w-2xl mx-auto mt-8 px-4 flex flex-col items-center justify-center animate-in fade-in slide-in-from-bottom-4 duration-500"
       }>
         
         {/* Main Content Column */}
         <div className={hasSidebar
-          ? "lg:col-span-2 flex flex-col h-full w-full overflow-hidden"
+          ? "lg:col-span-2 flex flex-col min-h-0 w-full overflow-hidden"
           : "w-full flex flex-col justify-start"
         }>
         
@@ -807,7 +807,7 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
 
       {/* Column 3: Suggestions & Next Lesson Preview Sidebar (1/3 width) - Rendered only if there are other lessons */}
       {hasSidebar && (
-        <div className="lg:col-span-1 h-full w-full overflow-y-auto no-scrollbar pr-1 pb-4 flex flex-col gap-4">
+        <div className="lg:col-span-1 min-h-0 w-full overflow-y-auto no-scrollbar pr-1 pb-4 flex flex-col gap-4">
           {(() => {
             const pinnedLessons = otherLessons.filter((l: any) => validPinnedIds.includes(l.id));
             const unpinnedLessons = otherLessons.filter((l: any) => !validPinnedIds.includes(l.id));

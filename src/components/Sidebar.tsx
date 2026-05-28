@@ -116,7 +116,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
       {/* Desktop Sidebar */}
       <aside 
         style={{ width: isCollapsed ? '64.9984px' : '176px' }}
-        className={`hidden md:flex h-screen fixed start-0 top-0 bg-surface-low flex-col p-4 gap-2 z-40 border-e border-ink/5 transition-all duration-300`}
+        className="hidden md:flex h-[calc(100vh-4rem)] fixed start-0 top-16 bg-white dark:bg-paper flex-col p-4 gap-2 z-40 border-e border-slate-200 dark:border-white/8 transition-all duration-300"
       >
         <div className={`mb-6 px-2 flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
           {!isCollapsed && <h1 style={{ fontSize: '10.75px', fontFamily: 'Arial' }} className="text-lg font-black tracking-tighter text-accent uppercase mb-0">{t('my_space')}</h1>}
