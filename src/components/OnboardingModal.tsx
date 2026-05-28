@@ -138,6 +138,23 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
     }
   }, [subjects]);
 
+  const handleSkip = async () => {
+    localStorage.setItem('has_completed_onboarding', 'true');
+    await db.settings.put({ key: 'has_completed_onboarding', value: 'true' });
+
+    if (user) {
+      try {
+        await updateProfile(user.id, {
+          onboarding_completed: true,
+        });
+      } catch (err: any) {
+        console.error('Failed to persist onboarding skip to database:', err.message);
+      }
+    }
+
+    onComplete();
+  };
+
   const handleComplete = async () => {
     // Save validation
     if (!selectedGradeId) {
@@ -527,7 +544,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
                 Back
               </button>
             ) : (
-              <div />
+              <button onClick={handleSkip} className="px-5 py-2.5 text-sm rounded-2xl font-bold text-muted hover:text-ink hover:bg-ink/5 transition-all">Skip for now</button>
             )}
 
             {step < totalSteps ? (
