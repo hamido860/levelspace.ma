@@ -89,7 +89,7 @@ export const ImageFetcher: React.FC<ImageFetcherProps> = ({ state, onChange, les
         <button
           type="submit"
           disabled={isLoading || !query.trim()}
-          className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-accent text-white rounded-lg text-[10px] font-bold uppercase tracking-normal hover:bg-ink transition-all disabled:opacity-50"
+          className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-accent text-white rounded-lg text-[10px] font-bold uppercase tracking-normal hover:bg-ink transition-all disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
         >
           {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Search'}
         </button>
@@ -169,7 +169,12 @@ export const ImageFetcher: React.FC<ImageFetcherProps> = ({ state, onChange, les
             className="fixed inset-0 z-[10000] flex items-center justify-center p-8 bg-ink/90 "
             onClick={() => setSelectedImage(null)}
           >
-            <button className="absolute top-8 right-8 text-paper hover:text-accent transition-colors">
+            <button
+              className="absolute top-8 right-8 text-paper hover:text-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 rounded-full p-2"
+              aria-label="Close preview"
+              title="Close preview"
+              onClick={() => setSelectedImage(null)}
+            >
               <X size={32} />
             </button>
             <div className="flex flex-col items-center max-w-4xl max-h-full" onClick={(e) => e.stopPropagation()}>
