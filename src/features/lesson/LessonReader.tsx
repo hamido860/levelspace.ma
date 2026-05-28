@@ -534,13 +534,13 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
 
       {/* Responsive Grid/Single Column Layout Container */}
       <main className={hasSidebar
-        ? "flex-grow min-h-0 w-full grid grid-cols-1 lg:grid-cols-3 gap-4 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500"
+        ? "flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-4 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500"
         : "max-w-2xl mx-auto mt-8 px-4 flex flex-col items-center justify-center animate-in fade-in slide-in-from-bottom-4 duration-500"
       }>
         
         {/* Main Content Column */}
         <div className={hasSidebar
-          ? "lg:col-span-2 flex flex-col min-h-0 w-full overflow-hidden"
+          ? "flex-grow flex flex-col min-h-0 w-full overflow-hidden"
           : "w-full flex flex-col justify-start"
         }>
         
@@ -805,72 +805,74 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
         </div>
       </div>
 
-      {/* Column 3: Suggestions & Next Lesson Preview Sidebar (1/3 width) - Rendered only if there are other lessons */}
+      {/* Column 3: Suggestions & Next Lesson Preview Sidebar (260px width) - Rendered only if there are other lessons */}
       {hasSidebar && (
-        <div className="lg:col-span-1 min-h-0 w-full overflow-y-auto no-scrollbar pr-1 pb-4 flex flex-col gap-4">
-          {(() => {
-            const pinnedLessons = otherLessons.filter((l: any) => validPinnedIds.includes(l.id));
-            const unpinnedLessons = otherLessons.filter((l: any) => !validPinnedIds.includes(l.id));
+        <div className="hidden lg:flex lg:w-[260px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-4">
+          <div className="flex-grow overflow-y-auto no-scrollbar pr-1 flex flex-col gap-4">
+            {(() => {
+              const pinnedLessons = otherLessons.filter((l: any) => validPinnedIds.includes(l.id));
+              const unpinnedLessons = otherLessons.filter((l: any) => !validPinnedIds.includes(l.id));
 
-            return (
-              <div className="flex flex-col gap-6 animate-in fade-in duration-500">
-                {/* Pinned study desk header & cards */}
-                <AnimatePresence mode="popLayout">
-                {pinnedLessons.length > 0 && (
-                  <motion.div
-                    key="pinned-section"
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10, transition: { duration: 0.2 } }}
-                    className="flex flex-col gap-3"
-                  >
+              return (
+                <div className="flex flex-col gap-6 animate-in fade-in duration-500">
+                  {/* Pinned study desk header & cards */}
+                  <AnimatePresence mode="popLayout">
+                  {pinnedLessons.length > 0 && (
+                    <motion.div
+                      key="pinned-section"
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10, transition: { duration: 0.2 } }}
+                      className="flex flex-col gap-3"
+                    >
 
+                      <div className="flex flex-col gap-4">
+                        <AnimatePresence mode="popLayout">
+                          {pinnedLessons.map(lesson => (
+                            <motion.div
+                              key={lesson.id}
+                              layout
+                              initial={{ opacity: 0, scale: 0.95 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
+                            >
+                              {renderLessonCard(lesson, true)}
+                            </motion.div>
+                          ))}
+                        </AnimatePresence>
+                      </div>
+                    </motion.div>
+                  )}
+                  </AnimatePresence>
+
+                  {/* General module lessons */}
+                  <div className="flex flex-col gap-3">
                     <div className="flex flex-col gap-4">
                       <AnimatePresence mode="popLayout">
-                        {pinnedLessons.map(lesson => (
+                        {unpinnedLessons.map(lesson => (
                           <motion.div
                             key={lesson.id}
                             layout
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -8, transition: { duration: 0.2 } }}
                           >
-                            {renderLessonCard(lesson, true)}
+                            {renderLessonCard(lesson, false)}
                           </motion.div>
                         ))}
                       </AnimatePresence>
+                      
+                      {unpinnedLessons.length === 0 && (
+                        <div className="p-6 text-center bg-slate-50 dark:bg-surface-low rounded-2xl border border-solid border-slate-200/50 dark:border-white/5 opacity-60">
+                          <p className="text-[10px] font-black text-slate-500 dark:text-ink-muted uppercase tracking-wider">All lessons pinned above</p>
+                        </div>
+                      )}
                     </div>
-                  </motion.div>
-                )}
-                </AnimatePresence>
-
-                {/* General module lessons */}
-                <div className="flex flex-col gap-3">
-                  <div className="flex flex-col gap-4">
-                    <AnimatePresence mode="popLayout">
-                      {unpinnedLessons.map(lesson => (
-                        <motion.div
-                          key={lesson.id}
-                          layout
-                          initial={{ opacity: 0, y: 8 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -8, transition: { duration: 0.2 } }}
-                        >
-                          {renderLessonCard(lesson, false)}
-                        </motion.div>
-                      ))}
-                    </AnimatePresence>
-                    
-                    {unpinnedLessons.length === 0 && (
-                      <div className="p-6 text-center bg-slate-50 dark:bg-surface-low rounded-2xl border border-solid border-slate-200/50 dark:border-white/5 opacity-60">
-                        <p className="text-[10px] font-black text-slate-500 dark:text-ink-muted uppercase tracking-wider">All lessons pinned above</p>
-                      </div>
-                    )}
                   </div>
                 </div>
-              </div>
-            );
-          })()}
+              );
+            })()}
+          </div>
         </div>
       )}
     </main>
