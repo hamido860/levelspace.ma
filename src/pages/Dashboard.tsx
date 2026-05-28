@@ -190,6 +190,20 @@ export const Dashboard: React.FC = () => {
   const reminders = remindersVal || [];
   const schedule = scheduleVal || [];
   const dbSettings = dbSettingsVal || [];
+
+  const activeReminders = useMemo(() => {
+    return reminders
+      .filter(r => !r.completed)
+      .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
+      .slice(0, 4);
+  }, [reminders]);
+
+  const upcomingEvents = useMemo(() => {
+    return schedule
+      .filter(e => e.date?.includes('-'))
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(0, 4);
+  }, [schedule]);
   const settingsMap = useMemo(() => Object.fromEntries(dbSettings.map(s => [s.key, s.value])), [dbSettings]);
 
   const selectedGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
@@ -519,11 +533,8 @@ export const Dashboard: React.FC = () => {
                   <div className="col-span-full py-8 flex justify-center items-center">
                     <Loader2 className="w-5 h-5 text-accent animate-spin" />
                   </div>
-                ) : reminders.filter(r => !r.completed).length > 0 ? (
-                  reminders
-                    .filter(r => !r.completed)
-                    .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
-                    .slice(0, 4)
+                ) : activeReminders.length > 0 ? (
+                  activeReminders
                     .map((reminder, i) => (
                       <motion.div 
                         key={reminder.id}
@@ -633,11 +644,8 @@ export const Dashboard: React.FC = () => {
                   <div className="py-8 flex justify-center items-center">
                     <Loader2 className="w-5 h-5 text-accent animate-spin" />
                   </div>
-                ) : schedule.filter(e => e.date?.includes('-')).length > 0 ? (
-                  schedule
-                    .filter(e => e.date?.includes('-'))
-                    .sort((a, b) => a.date.localeCompare(b.date))
-                    .slice(0, 4)
+                ) : upcomingEvents.length > 0 ? (
+                  upcomingEvents
                     .map((event) => {
                       const d = new Date(event.date);
                       return (
