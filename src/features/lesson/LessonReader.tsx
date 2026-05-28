@@ -529,7 +529,7 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
   };
 
   return (
-    <div className="lesson-reader-shell w-full flex-grow flex flex-col overflow-hidden bg-slate-50/50 dark:bg-background select-none">
+    <div className="w-full h-full flex flex-col overflow-hidden bg-slate-50/50 dark:bg-background select-none">
       
 
       {/* Responsive Grid/Single Column Layout Container */}
