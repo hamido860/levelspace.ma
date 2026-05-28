@@ -11,6 +11,7 @@ import { supabase } from '../db/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { LessonReader } from '../features/lesson/LessonReader';
+import { SupportZoneModal } from '../components/SupportZoneModal';
 import { useDisplayedLessonBlocks } from '../features/lesson/useDisplayedLessonBlocks';
 import { AIAssistant } from '../components/AIAssistant';
 import { getLessonSelectColumns, inferLegacyLessonSourceConfidence, inferLegacyLessonSourceName, inferLegacyLessonValidationStatus, isMissingLessonValidationColumnError } from '../services/lessonSupabase';
@@ -84,6 +85,16 @@ const normalizeSearchText = (value: string) =>
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .trim();
+
+const relativeTime = (ts: number) => {
+  const diff = Date.now() - ts;
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+};
 
 const getBlockText = (block: any) =>
   [
@@ -347,6 +358,145 @@ export const LessonView: React.FC = () => {
       return isAdmin || isStudentVisibleLesson(l);
     });
   }, [lessonsInModule, isAdmin]);
+
+  // Fetch notes for all lessons in this classroom/module
+  const lessonIdsForNotes = useMemo(() => (orderedLessons || []).map(l => l.id), [orderedLessons]);
+  const classroomNotes = useLiveQuery(
+    async () => {
+      if (lessonIdsForNotes.length === 0) return [];
+      return db.notes.where('lessonId').anyOf(lessonIdsForNotes).toArray();
+    },
+    [lessonIdsForNotes]
+  );
+
+  // Fetch all reminders/tasks to capture completed classroom checkmarks
+  const remindersVal = useLiveQuery(() => db.tasks.toArray());
+  const reminders = remindersVal || [];
+
+  // Local state to log Pomodoro focus timer starts dynamically
+  const [pomodoroLogs, setPomodoroLogs] = useState<Array<{
+    id: string;
+    title: string;
+    timestamp: number;
+  }>>([]);
+
+  const [timerSeconds, setTimerSeconds] = useState(1500); // 25 minutes
+  const [isTimerRunning, setIsTimerRunning] = useState(false);
+  const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
+
+  const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
+  const settingsMap = useMemo(() => Object.fromEntries(dbSettings.map(s => [s.key, s.value])), [dbSettings]);
+  const defaultDuration = Number(settingsMap['default_session_duration'] || localStorage.getItem('default_session_duration') || 25);
+  const currentGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
+
+  useEffect(() => {
+    if (defaultDuration) {
+      setTimerSeconds(defaultDuration * 60);
+    }
+  }, [defaultDuration]);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isTimerRunning && timerSeconds > 0) {
+      interval = setInterval(() => {
+        setTimerSeconds(prev => prev - 1);
+      }, 1000);
+    } else if (timerSeconds === 0) {
+      setIsTimerRunning(false);
+    }
+    return () => clearInterval(interval);
+  }, [isTimerRunning, timerSeconds]);
+
+  useEffect(() => {
+    if (isTimerRunning) {
+      setPomodoroLogs(prev => [
+        {
+          id: `pomodoro-${Date.now()}`,
+          title: 'Started Deep Focus',
+          timestamp: Date.now()
+        },
+        ...prev
+      ].slice(0, 5));
+    }
+  }, [isTimerRunning]);
+
+  const activityLogs = useMemo(() => {
+    const logs: Array<{
+      id: string;
+      type: 'lesson_completed' | 'lesson_pending' | 'note_added' | 'pomodoro_start' | 'reminder_completed';
+      title: string;
+      subtitle?: string;
+      timestamp: number;
+    }> = [];
+
+    // 1. Completed & Pending Lessons
+    (orderedLessons || []).forEach(lesson => {
+      if (lesson.status === 'done') {
+        logs.push({
+          id: `completed-${lesson.id}`,
+          type: 'lesson_completed',
+          title: lesson.title,
+          subtitle: 'Marked as completed',
+          timestamp: lesson.createdAt || Date.now()
+        });
+      } else if (lesson.status === 'pending') {
+        logs.push({
+          id: `pending-${lesson.id}`,
+          type: 'lesson_pending',
+          title: lesson.title,
+          subtitle: 'AI curation pending',
+          timestamp: lesson.createdAt || Date.now()
+        });
+      }
+    });
+
+    // 2. Classroom Study Notes
+    if (classroomNotes && orderedLessons) {
+      const lessonTitleById = new Map(orderedLessons.map(l => [l.id, l.title]));
+      classroomNotes.forEach(note => {
+        const lessonTitle = lessonTitleById.get(note.lessonId) || 'a lesson';
+        logs.push({
+          id: `note-${note.id}`,
+          type: 'note_added',
+          title: `Note in ${lessonTitle}`,
+          subtitle: note.content.length > 30 ? note.content.substring(0, 30) + '...' : note.content,
+          timestamp: note.createdAt
+        });
+      });
+    }
+
+    // 3. Completed Reminders (matching this subject module / category)
+    if (reminders && effectiveLesson) {
+      reminders.forEach(task => {
+        if (task.completed) {
+          const isRelated = task.title.toLowerCase().includes(effectiveLesson.title.toLowerCase()) || 
+                            (effectiveLesson.subject && task.title.toLowerCase().includes(effectiveLesson.subject.toLowerCase()));
+          if (isRelated) {
+            logs.push({
+              id: `task-${task.id}`,
+              type: 'reminder_completed',
+              title: task.title,
+              subtitle: 'Checklist reminder completed',
+              timestamp: task.createdAt || Date.now()
+            });
+          }
+        }
+      });
+    }
+
+    // 4. Pomodoro start events
+    pomodoroLogs.forEach(pl => {
+      logs.push({
+        id: pl.id,
+        type: 'pomodoro_start',
+        title: pl.title,
+        subtitle: 'Deep focus session started',
+        timestamp: pl.timestamp
+      });
+    });
+
+    return logs.sort((a, b) => b.timestamp - a.timestamp).slice(0, 5);
+  }, [orderedLessons, classroomNotes, reminders, effectiveLesson, pomodoroLogs]);
 
   const currentIndex = useMemo(() => {
     if (!orderedLessons || !effectiveLesson) return -1;
@@ -644,6 +794,14 @@ export const LessonView: React.FC = () => {
           onUpdateBanner={handleUpdateBanner}
           startAtTest={startAtTest}
           allLessonsInModule={orderedLessons}
+          timerSeconds={timerSeconds}
+          isTimerRunning={isTimerRunning}
+          onTimerRunningChange={setIsTimerRunning}
+          onTimerReset={() => { setIsTimerRunning(false); setTimerSeconds(defaultDuration * 60); }}
+          isSupportModalOpen={isSupportModalOpen}
+          onSupportModalOpenChange={setIsSupportModalOpen}
+          activityLogs={activityLogs}
+          defaultDuration={defaultDuration}
         />
 
         <Modal isOpen={showNoteModal} onClose={() => setShowNoteModal(false)} title="Add a note">
@@ -684,6 +842,12 @@ export const LessonView: React.FC = () => {
           subject={effectiveLesson.subject}
           grade={effectiveLesson.grade}
           strictRAG={true}
+        />
+
+        <SupportZoneModal
+          isOpen={isSupportModalOpen}
+          onClose={() => setIsSupportModalOpen(false)}
+          grade={currentGrade || "Grade 9"}
         />
       </div>
     </Layout>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   FileText,
@@ -25,7 +25,11 @@ import {
   Zap,
   Check,
   AlertTriangle,
-  Info
+  Info,
+  RefreshCw,
+  Timer,
+  Target,
+  Lightbulb
 } from 'lucide-react';
 import { Layout } from '../components/Layout';
 import { SEO } from '../components/SEO';
@@ -216,6 +220,9 @@ export const LevelUp: React.FC = () => {
   const [wikiSummary, setWikiSummary] = useState<WikiSummary | null>(null);
   const [wikiLoading, setWikiLoading] = useState(false);
 
+  // ─── Vocabulary Vault state ──────────────────────────────────────────────
+  const [vocab, setVocab] = useState<string[]>(['metacognition', 'heuristic', 'epistemology']);
+
   // Load surahs lazily when first entering Quran section
   useEffect(() => {
     if (mainTab === 'discover' && discoverSection === 'quran' && quranSurahs.length === 0) {
@@ -386,10 +393,80 @@ export const LevelUp: React.FC = () => {
     );
   }
 
+  // Pomodoro timer for right sidebar
+  const [timerSeconds, setTimerSeconds] = useState(25 * 60);
+  const [isTimerRunning, setIsTimerRunning] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(() => {
+    if (isTimerRunning) {
+      timerRef.current = setInterval(() => setTimerSeconds(s => s > 0 ? s - 1 : 0), 1000);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [isTimerRunning]);
+  const formatTime = (s: number) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+
   return (
-    <Layout>
+    <Layout fullWidth>
       <SEO title="LevelUp - Support Hub" />
-      <div className="space-y-6">
+      <div className="h-full w-full bg-background flex flex-col overflow-hidden p-4">
+        {/* 3-Column Layout */}
+        <div className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-4 overflow-hidden">
+
+          {/* Column 1: Left Sidebar — Tab Navigation */}
+          <div className="hidden lg:flex lg:w-[220px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-5">
+            <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-5">
+              <div>
+                <p className="text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-wider mb-3">LevelUp Sections</p>
+                <div className="space-y-1">
+                  {[
+                    { id: 'support', label: 'AI Explainer', icon: <Brain size={14} />, desc: 'Gap analysis & support' },
+                    { id: 'resources', label: 'Resource Vault', icon: <BookOpen size={14} />, desc: 'eBooks & materials' },
+                    { id: 'discover', label: 'References', icon: <Globe size={14} />, desc: 'Wikipedia & more' },
+                  ].map(tab => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setMainTab(tab.id as any)}
+                      className={`w-full flex items-start gap-3 p-3 rounded-xl border transition-all text-left ${
+                        mainTab === tab.id
+                          ? 'bg-accent/10 border-accent/30 text-accent'
+                          : 'bg-slate-50 dark:bg-surface-low/30 border-slate-100 dark:border-white/5 hover:border-accent/20'
+                      }`}
+                    >
+                      <span className={mainTab === tab.id ? 'text-accent' : 'text-slate-400'}>{tab.icon}</span>
+                      <div>
+                        <p className={`text-[11px] font-bold ${mainTab === tab.id ? 'text-accent' : 'text-slate-700 dark:text-ink'}`}>{tab.label}</p>
+                        <p className="text-[10px] text-slate-400 dark:text-ink-muted">{tab.desc}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-wider mb-3">My Progress</p>
+                <div className="space-y-2">
+                  {[
+                    { label: 'Resources Saved', value: resources.length, icon: <FileText size={13} /> },
+                    { label: 'Vocab Entries', value: vocab.length, icon: <BookMarked size={13} /> },
+                  ].map((s, i) => (
+                    <div key={i} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-surface-low/30 rounded-xl border border-slate-100 dark:border-white/5">
+                      <div className="flex items-center gap-2 text-slate-500 dark:text-ink-muted">
+                        {s.icon}
+                        <span className="text-[11px] font-medium">{s.label}</span>
+                      </div>
+                      <span className="text-sm font-bold text-slate-800 dark:text-ink">{s.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Column 2: Main Content */}
+          <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 p-6">
+            <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6">
 
         {/* Page Header */}
         <div className="border-b border-slate-100 dark:border-white/5 pb-5 mb-6">
@@ -827,7 +904,27 @@ export const LevelUp: React.FC = () => {
                       >
                         <div className="flex items-start justify-between gap-4">
                           <div>
-                            <h3 className="text-2xl font-bold text-slate-950 dark:text-ink">{entry.word}</h3>
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-2xl font-bold text-slate-950 dark:text-ink">{entry.word}</h3>
+                              <button
+                                onClick={() => {
+                                  const isSaved = vocab.includes(entry.word.toLowerCase());
+                                  if (isSaved) {
+                                    setVocab(prev => prev.filter(w => w !== entry.word.toLowerCase()));
+                                    toast.success(`Removed "${entry.word}" from your Vocabulary Vault.`);
+                                  } else {
+                                    setVocab(prev => [...prev, entry.word.toLowerCase()]);
+                                    toast.success(`Saved "${entry.word}" to your Vocabulary Vault!`);
+                                  }
+                                }}
+                                className={`p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-white/5 transition-all ${
+                                  vocab.includes(entry.word.toLowerCase()) ? 'text-accent' : 'text-slate-400 hover:text-slate-600'
+                                }`}
+                                title={vocab.includes(entry.word.toLowerCase()) ? "Remove from Vocabulary Vault" : "Save to Vocabulary Vault"}
+                              >
+                                <BookMarked size={16} className={vocab.includes(entry.word.toLowerCase()) ? "fill-current" : ""} />
+                              </button>
+                            </div>
                             {entry.phonetic && (
                               <p className="text-sm text-slate-400 dark:text-ink-muted font-mono mt-0.5">{entry.phonetic}</p>
                             )}
@@ -942,13 +1039,13 @@ export const LevelUp: React.FC = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {wikiResults.map(article => (
                       <button
-                        key={article.pageid}
-                        onClick={() => handleWikiArticle(article.title)}
+                        key={article.id}
+                        onClick={() => handleWikiArticle(article.key)}
                         className="p-4 bg-white border border-slate-200 rounded-2xl hover:border-accent/40 text-left transition-all group dark:bg-paper dark:border-white/8 dark:hover:border-white/15"
                         style={{ boxShadow: 'var(--ls-shadow)' }}
                       >
                         <h4 className="font-bold text-slate-950 dark:text-ink group-hover:text-accent transition-all line-clamp-1">{article.title}</h4>
-                        <p className="text-xs text-slate-400 dark:text-ink-muted mt-1 line-clamp-2" dangerouslySetInnerHTML={{ __html: article.snippet }} />
+                        <p className="text-xs text-slate-400 dark:text-ink-muted mt-1 line-clamp-2" dangerouslySetInnerHTML={{ __html: article.excerpt }} />
                       </button>
                     ))}
                   </div>
@@ -959,6 +1056,71 @@ export const LevelUp: React.FC = () => {
           </div>
         )}
 
+            </div>
+          </div>
+
+          {/* Column 3: Right Sidebar */}
+          <div className="hidden lg:flex lg:w-[260px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-5">
+            <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6 pr-1">
+
+              {/* Deep Focus Pomodoro */}
+              <section className="bg-slate-950 text-white rounded-2xl p-5 relative overflow-hidden">
+                <div className="relative z-10">
+                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Deep Focus</h3>
+                  <div className="text-3xl font-bold tracking-tight mb-3">{formatTime(timerSeconds)}</div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setIsTimerRunning(!isTimerRunning)}
+                      className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                        isTimerRunning ? 'bg-slate-800 text-white hover:bg-slate-700' : 'bg-accent text-white hover:bg-accent/90'
+                      }`}
+                    >
+                      {isTimerRunning ? 'Pause' : 'Start Timer'}
+                    </button>
+                    <button
+                      onClick={() => { setIsTimerRunning(false); setTimerSeconds(25 * 60); }}
+                      className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-700 transition-all"
+                    >
+                      <RefreshCw size={14} />
+                    </button>
+                  </div>
+                </div>
+              </section>
+
+              {/* Learning Tips */}
+              <section className="space-y-3">
+                <p className="text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-wider">Learning Tips</p>
+                {[
+                  { tip: 'Use AI Explainer to bridge gaps before moving on', icon: <Brain size={12} /> },
+                  { tip: 'Save reference resources to your Vault for offline review', icon: <BookOpen size={12} /> },
+                  { tip: 'Look up unfamiliar words in the dictionary tool', icon: <Lightbulb size={12} /> },
+                ].map((item, i) => (
+                  <div key={i} className="flex items-start gap-3 p-3 bg-slate-50 dark:bg-surface-low/30 rounded-xl border border-slate-100 dark:border-white/5">
+                    <div className="w-6 h-6 rounded-lg bg-accent/10 flex items-center justify-center text-accent shrink-0 mt-0.5">{item.icon}</div>
+                    <p className="text-[11px] text-slate-600 dark:text-ink-secondary leading-relaxed">{item.tip}</p>
+                  </div>
+                ))}
+              </section>
+
+              {/* Session Stats */}
+              <section className="space-y-2">
+                <p className="text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-wider">Session</p>
+                <div className="p-4 bg-slate-50 dark:bg-surface-low/30 rounded-xl border border-slate-100 dark:border-white/5 space-y-3">
+                  <div className="flex justify-between text-[11px]">
+                    <span className="text-slate-500 dark:text-ink-muted">Resources</span>
+                    <span className="font-bold text-slate-800 dark:text-ink">{resources.length}</span>
+                  </div>
+                  <div className="flex justify-between text-[11px]">
+                    <span className="text-slate-500 dark:text-ink-muted">Vocab</span>
+                    <span className="font-bold text-slate-800 dark:text-ink">{vocab.length}</span>
+                  </div>
+                </div>
+              </section>
+
+            </div>
+          </div>
+
+        </div>
       </div>
 
       {/* ─── DYNAMIC COGNITIVE AI EXPLAINER PANEL (POPUP OR CARD OVERLAY) ─── */}

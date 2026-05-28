@@ -22,7 +22,12 @@ import {
   Info,
   Camera,
   Award,
-  AlertTriangle
+  AlertTriangle,
+  Timer,
+  RefreshCw,
+  Activity,
+  CheckSquare,
+  Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { LessonBlock } from './LessonBlock';
@@ -70,6 +75,14 @@ type LessonReaderProps = {
   onUpdateBanner?: (url: string) => void;
   startAtTest?: boolean;
   allLessonsInModule?: any[];
+  timerSeconds: number;
+  isTimerRunning: boolean;
+  onTimerRunningChange: (running: boolean) => void;
+  onTimerReset: () => void;
+  isSupportModalOpen: boolean;
+  onSupportModalOpenChange: (open: boolean) => void;
+  activityLogs: any[];
+  defaultDuration: number;
 };
 
 const getBlockReadText = (item: DisplayedLessonBlock) =>
@@ -228,6 +241,14 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
   onUpdateBanner,
   startAtTest,
   allLessonsInModule = [],
+  timerSeconds,
+  isTimerRunning,
+  onTimerRunningChange,
+  onTimerReset,
+  isSupportModalOpen,
+  onSupportModalOpenChange,
+  activityLogs,
+  defaultDuration,
 }) => {
   const { t } = useLanguage();
   const [showImagePicker, setShowImagePicker] = useState(false);
@@ -533,16 +554,10 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
       
 
       {/* Responsive Grid/Single Column Layout Container */}
-      <main className={hasSidebar
-        ? "flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-4 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500"
-        : "max-w-2xl mx-auto mt-8 px-4 flex flex-col items-center justify-center animate-in fade-in slide-in-from-bottom-4 duration-500"
-      }>
+      <main className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-4 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
         
         {/* Main Content Column */}
-        <div className={hasSidebar
-          ? "flex-grow flex flex-col min-h-0 w-full overflow-hidden"
-          : "w-full flex flex-col justify-start"
-        }>
+        <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden">
         
         {/* Redesigned Card Container */}
         <div className="w-full h-full bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex flex-col">
@@ -805,49 +820,166 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
         </div>
       </div>
 
-      {/* Column 3: Suggestions & Next Lesson Preview Sidebar (260px width) - Rendered only if there are other lessons */}
-      {hasSidebar && (
-        <div className="hidden lg:flex lg:w-[260px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-4">
-          <div className="flex-grow overflow-y-auto no-scrollbar pr-1 flex flex-col gap-4">
-            {(() => {
-              const pinnedLessons = otherLessons.filter((l: any) => validPinnedIds.includes(l.id));
-              const unpinnedLessons = otherLessons.filter((l: any) => !validPinnedIds.includes(l.id));
+      {/* Column 3: Dynamic Widgets & Lesson Previews Sidebar (260px width) */}
+      <div className="hidden lg:flex lg:w-[260px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-4">
+        <div className="flex-grow overflow-y-auto no-scrollbar pr-1 flex flex-col gap-6">
+          
+          {/* Focus Timer */}
+          <section className="bg-slate-950 text-white rounded-2xl p-5 relative overflow-hidden group dark:bg-surface-low dark:text-ink shrink-0">
+            <div className="relative z-10 flex items-center justify-between">
+              <div>
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider dark:text-ink-muted">{t('deep_focus') || 'Deep Focus'}</h3>
+                <div className="text-3xl font-bold tracking-tight mt-1 mb-3">
+                  {(() => {
+                    const mins = Math.floor(timerSeconds / 60);
+                    const secs = timerSeconds % 60;
+                    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+                  })()}
+                </div>
+              </div>
+              <div className={`w-12 h-12 rounded-full border-4 flex items-center justify-center ${isTimerRunning ? 'border-accent text-accent animate-pulse' : 'border-slate-800 text-slate-600 dark:border-slate-200 dark:text-slate-400'}`}>
+                <Timer size={20} />
+              </div>
+            </div>
+            <div className="relative z-10 flex gap-2">
+              <button
+                onClick={() => onTimerRunningChange(!isTimerRunning)}
+                className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                  isTimerRunning
+                    ? 'bg-slate-800 text-white hover:bg-slate-700 dark:bg-surface-mid dark:text-ink'
+                    : 'bg-accent text-white hover:bg-accent/90'
+                }`}
+              >
+                {isTimerRunning ? (t('pause') || 'Pause') : (t('dashboard_start') || 'Start Timer')}
+              </button>
+              <button
+                onClick={onTimerReset}
+                className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-700 transition-all dark:bg-surface-mid dark:text-ink-muted"
+              >
+                <RefreshCw size={14} />
+              </button>
+            </div>
+          </section>
 
-              return (
-                <div className="flex flex-col gap-6 animate-in fade-in duration-500">
-                  {/* Pinned study desk header & cards */}
-                  <AnimatePresence mode="popLayout">
-                  {pinnedLessons.length > 0 && (
-                    <motion.div
-                      key="pinned-section"
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10, transition: { duration: 0.2 } }}
-                      className="flex flex-col gap-3"
-                    >
+          {/* Support Zone / MyLevel */}
+          <section className="bg-slate-950 text-white rounded-2xl p-5 relative overflow-hidden group dark:bg-surface-low dark:text-ink shrink-0">
+            <div className="relative z-10 flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider dark:text-ink-muted">Support Zone</h3>
+              </div>
+              <div className="w-10 h-10 rounded-full border-2 border-accent/30 text-accent flex items-center justify-center bg-accent/10">
+                <Activity size={18} className="text-accent" />
+              </div>
+            </div>
+            <div className="relative z-10 space-y-4">
+              <p className="text-sm font-medium text-slate-300 dark:text-ink-secondary leading-relaxed text-xs">
+                Check your real level, discover your gaps, and get a personal roadmap.
+              </p>
+              <button
+                onClick={() => onSupportModalOpenChange(true)}
+                className="w-full py-2.5 rounded-xl text-xs font-bold transition-all bg-accent text-white hover:bg-accent/90"
+              >
+                Start MyLevel Check
+              </button>
+            </div>
+          </section>
 
-                      <div className="flex flex-col gap-4">
-                        <AnimatePresence mode="popLayout">
-                          {pinnedLessons.map(lesson => (
-                            <motion.div
-                              key={lesson.id}
-                              layout
-                              initial={{ opacity: 0, scale: 0.95 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
-                            >
-                              {renderLessonCard(lesson, true)}
-                            </motion.div>
-                          ))}
-                        </AnimatePresence>
+          {/* Classroom Activity Log */}
+          <section className="space-y-4 pt-4 border-t border-slate-100 dark:border-white/5 shrink-0">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-950 dark:text-ink">{t('activity_log') || 'Classroom Activity'}</h3>
+              <span className="text-[9px] bg-slate-50 dark:bg-surface-low border border-slate-100 dark:border-white/5 text-slate-400 dark:text-ink-muted px-2 py-0.5 rounded-full font-bold">LIVE</span>
+            </div>
+            
+            <div className="space-y-3.5 max-h-[200px] overflow-y-auto no-scrollbar">
+              {activityLogs.length > 0 ? (
+                activityLogs.map((log) => {
+                  const relativeTimeText = (() => {
+                    const diff = Date.now() - log.timestamp;
+                    const minutes = Math.floor(diff / 60000);
+                    if (minutes < 60) return `${minutes}m ago`;
+                    const hours = Math.floor(minutes / 60);
+                    if (hours < 24) return `${hours}h ago`;
+                    const days = Math.floor(hours / 24);
+                    return `${days}d ago`;
+                  })();
+
+                  return (
+                    <div key={log.id} className="flex gap-3 items-start text-xs">
+                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                        log.type === 'lesson_completed'
+                          ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400'
+                          : log.type === 'note_added'
+                          ? 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400'
+                          : log.type === 'pomodoro_start'
+                          ? 'bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400'
+                          : log.type === 'reminder_completed'
+                          ? 'bg-violet-50 text-violet-600 dark:bg-violet-500/10 dark:text-violet-400'
+                          : 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400'
+                      }`}>
+                        {log.type === 'lesson_completed' ? (
+                          <CheckCircle2 size={14} />
+                        ) : log.type === 'note_added' ? (
+                          <FileText size={14} />
+                        ) : log.type === 'pomodoro_start' ? (
+                          <Timer size={14} />
+                        ) : log.type === 'reminder_completed' ? (
+                          <CheckSquare size={14} />
+                        ) : (
+                          <Loader2 size={14} className="animate-spin" />
+                        )}
                       </div>
-                    </motion.div>
-                  )}
-                  </AnimatePresence>
+                      <div className="space-y-0.5 min-w-0">
+                        <h4 className="font-bold text-slate-950 dark:text-ink truncate leading-snug text-[11px]" title={log.title}>
+                          {log.title}
+                        </h4>
+                        {log.subtitle && (
+                          <p className="text-[10px] text-slate-500 dark:text-ink-muted leading-relaxed line-clamp-1">
+                            {log.subtitle}
+                          </p>
+                        )}
+                        <p className="text-[9px] text-slate-400 dark:text-ink-muted">
+                          {relativeTimeText}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="py-6 text-center bg-slate-50/30 dark:bg-surface-low/10 rounded-xl border border-solid border-slate-100 dark:border-white/5">
+                  <p className="text-[10px] font-medium text-slate-400 dark:text-ink-muted">
+                    No recent activity. Start or review a lesson to log your progress!
+                  </p>
+                </div>
+              )}
+            </div>
+          </section>
 
-                  {/* General module lessons */}
-                  <div className="flex flex-col gap-3">
+          {/* Module Outline - rendered below the widgets */}
+          {otherLessons.length > 0 && (
+            <section className="space-y-4 pt-4 border-t border-slate-100 dark:border-white/5 shrink-0">
+              <h3 className="text-xs font-black text-slate-900 dark:text-ink uppercase tracking-wider">Module Syllabus</h3>
+              <div className="flex flex-col gap-4 max-h-[320px] overflow-y-auto pr-1 no-scrollbar">
+                {(() => {
+                  const pinnedLessons = otherLessons.filter((l: any) => validPinnedIds.includes(l.id));
+                  const unpinnedLessons = otherLessons.filter((l: any) => !validPinnedIds.includes(l.id));
+
+                  return (
                     <div className="flex flex-col gap-4">
+                      <AnimatePresence mode="popLayout">
+                        {pinnedLessons.map(lesson => (
+                          <motion.div
+                            key={lesson.id}
+                            layout
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
+                          >
+                            {renderLessonCard(lesson, true)}
+                          </motion.div>
+                        ))}
+                      </AnimatePresence>
+
                       <AnimatePresence mode="popLayout">
                         {unpinnedLessons.map(lesson => (
                           <motion.div
@@ -863,18 +995,19 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
                       </AnimatePresence>
                       
                       {unpinnedLessons.length === 0 && (
-                        <div className="p-6 text-center bg-slate-50 dark:bg-surface-low rounded-2xl border border-solid border-slate-200/50 dark:border-white/5 opacity-60">
-                          <p className="text-[10px] font-black text-slate-500 dark:text-ink-muted uppercase tracking-wider">All lessons pinned above</p>
+                        <div className="p-4 text-center bg-slate-50 dark:bg-surface-low rounded-xl border border-solid border-slate-200/50 dark:border-white/5 opacity-60">
+                          <p className="text-[9px] font-black text-slate-500 dark:text-ink-muted uppercase tracking-wider">All lessons pinned above</p>
                         </div>
                       )}
                     </div>
-                  </div>
-                </div>
-              );
-            })()}
-          </div>
+                  );
+                })()}
+              </div>
+            </section>
+          )}
+
         </div>
-      )}
+      </div>
     </main>
 
       {onUpdateBanner && (

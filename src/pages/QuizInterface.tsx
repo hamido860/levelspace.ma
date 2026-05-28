@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Layout } from '../components/Layout';
@@ -14,7 +14,11 @@ import {
   Trophy,
   RefreshCcw,
   Sparkles,
-  Target
+  Target,
+  Brain,
+  RefreshCw,
+  Zap,
+  Clock
 } from 'lucide-react';
 import { Quiz } from '../types';
 
@@ -46,6 +50,19 @@ export const QuizInterface: React.FC = () => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [isFinished, setIsFinished] = useState(false);
+  const [timerSeconds, setTimerSeconds] = useState(25 * 60);
+  const [isTimerRunning, setIsTimerRunning] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (isTimerRunning) {
+      timerRef.current = setInterval(() => setTimerSeconds(s => s > 0 ? s - 1 : 0), 1000);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [isTimerRunning]);
+  const formatTime = (s: number) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
   const currentQuestion = mockQuiz.questions[currentQuestionIndex];
   const totalQuestions = 10;
@@ -125,31 +142,78 @@ export const QuizInterface: React.FC = () => {
   }
 
   return (
-    <Layout>
-      <div className="max-w-4xl mx-auto space-y-20">
-        {/* Progress Bar Section */}
-        <div className="space-y-8">
-          <div className="flex justify-between items-end">
-            <div className="space-y-2">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-normal text-muted">
-                Question {currentQuestionIndex + 1} / {totalQuestions}
-              </span>
-              <h3 className="text-2xl font-serif font-medium">Current Trajectory</h3>
-            </div>
-            <div className="flex items-baseline gap-1">
-              <span className="text-4xl font-serif font-medium">{Math.round(progress)}</span>
-              <span className="text-sm font-mono text-muted uppercase tracking-normal">%</span>
+    <Layout fullWidth>
+      <div className="h-full w-full bg-background flex flex-col overflow-hidden p-4">
+        <div className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-4 overflow-hidden">
+
+          {/* Column 1: Left Sidebar — Quiz Info */}
+          <div className="hidden lg:flex lg:w-[220px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-5">
+            <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-5">
+              <div>
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-3">Quiz Info</p>
+                <div className="space-y-2">
+                  <div className="p-3 bg-slate-50 dark:bg-surface-low/30 rounded-xl border border-slate-100 dark:border-white/5">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Module</p>
+                    <p className="text-sm font-bold text-slate-800 dark:text-ink">{mockQuiz.moduleName}</p>
+                  </div>
+                  <div className="p-3 bg-slate-50 dark:bg-surface-low/30 rounded-xl border border-slate-100 dark:border-white/5">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Title</p>
+                    <p className="text-sm font-semibold text-slate-700 dark:text-ink leading-tight">{mockQuiz.title}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-3">Progress</p>
+                <div className="space-y-3">
+                  <div className="flex justify-between text-[11px]">
+                    <span className="text-slate-500">Question</span>
+                    <span className="font-bold text-slate-800 dark:text-ink">{currentQuestionIndex + 1} / {totalQuestions}</span>
+                  </div>
+                  <div className="h-2 w-full bg-slate-100 dark:bg-surface-mid rounded-full overflow-hidden">
+                    <div className="h-full bg-accent rounded-full transition-all" style={{ width: `${progress}%` }} />
+                  </div>
+                  <div className="flex justify-between text-[11px]">
+                    <span className="text-slate-500">Time Limit</span>
+                    <span className="font-bold text-slate-800 dark:text-ink">{mockQuiz.timeLimitMinutes} min</span>
+                  </div>
+                </div>
+              </div>
+
+              <button onClick={() => navigate(-1)}
+                className="flex items-center gap-2 p-3 bg-slate-50 dark:bg-surface-low/30 rounded-xl border border-slate-100 dark:border-white/5 hover:border-accent/30 transition-all w-full">
+                <ArrowLeft size={13} className="text-accent" />
+                <span className="text-[11px] font-semibold text-slate-700 dark:text-ink">Back to Lesson</span>
+              </button>
             </div>
           </div>
-          <div className="h-[2px] w-full bg-ink/5 rounded-full overflow-hidden">
-            <motion.div 
-              initial={{ width: 0 }}
-              animate={{ width: `${progress}%` }}
-              transition={{ duration: 0.8, ease: "easeOut" }}
-              className="h-full bg-accent"
-            />
-          </div>
-        </div>
+
+          {/* Column 2: Main Quiz Content */}
+          <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 p-8">
+            <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-12">
+              {/* Progress Bar Section */}
+              <div className="space-y-4">
+                <div className="flex justify-between items-end">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-mono font-bold uppercase tracking-normal text-muted">
+                      Question {currentQuestionIndex + 1} / {totalQuestions}
+                    </span>
+                    <h3 className="text-xl font-serif font-medium">Current Trajectory</h3>
+                  </div>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-3xl font-serif font-medium">{Math.round(progress)}</span>
+                    <span className="text-sm font-mono text-muted uppercase tracking-normal">%</span>
+                  </div>
+                </div>
+                <div className="h-[2px] w-full bg-ink/5 rounded-full overflow-hidden">
+                  <motion.div 
+                    initial={{ width: 0 }}
+                    animate={{ width: `${progress}%` }}
+                    transition={{ duration: 0.8, ease: "easeOut" }}
+                    className="h-full bg-accent"
+                  />
+                </div>
+              </div>
 
         {/* Question Area */}
         <div className="space-y-16">
@@ -229,18 +293,87 @@ export const QuizInterface: React.FC = () => {
           </motion.section>
 
           {/* Action Button */}
-          <div className="pt-12">
+          <div className="pt-8">
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={handleSubmit}
               disabled={!selectedOption}
-              className="group w-full py-8 bg-ink text-paper rounded-full font-medium text-sm uppercase tracking-normal flex items-center justify-center gap-4 shadow-md shadow-ink/20 disabled:opacity-20 disabled:grayscale disabled:cursor-not-allowed hover:bg-accent transition-all duration-300"
+              className="group w-full py-6 bg-ink text-paper rounded-full font-medium text-sm uppercase tracking-normal flex items-center justify-center gap-4 shadow-md shadow-ink/20 disabled:opacity-20 disabled:grayscale disabled:cursor-not-allowed hover:bg-accent transition-all duration-300"
             >
               Submit Response
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </motion.button>
           </div>
+        </div>
+            </div>
+          </div>
+
+          {/* Column 3: Right Sidebar */}
+          <div className="hidden lg:flex lg:w-[260px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-5">
+            <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6 pr-1">
+
+              {/* Focus Timer */}
+              <section className="bg-slate-950 text-white rounded-2xl p-5 relative overflow-hidden">
+                <div className="relative z-10">
+                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Deep Focus</h3>
+                  <div className="text-3xl font-bold tracking-tight mb-3">{formatTime(timerSeconds)}</div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setIsTimerRunning(!isTimerRunning)}
+                      className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                        isTimerRunning ? 'bg-slate-800 text-white hover:bg-slate-700' : 'bg-accent text-white hover:bg-accent/90'
+                      }`}
+                    >
+                      {isTimerRunning ? 'Pause' : 'Start Timer'}
+                    </button>
+                    <button
+                      onClick={() => { setIsTimerRunning(false); setTimerSeconds(25 * 60); }}
+                      className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-700 transition-all"
+                    >
+                      <RefreshCw size={14} />
+                    </button>
+                  </div>
+                </div>
+              </section>
+
+              {/* Quiz Tips */}
+              <section className="space-y-3">
+                <p className="text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-wider">Quiz Tips</p>
+                {[
+                  { tip: 'Read all options before selecting your answer', icon: <Brain size={12} /> },
+                  { tip: 'Eliminate obviously wrong answers first', icon: <Target size={12} /> },
+                  { tip: 'Trust your first instinct if unsure', icon: <Zap size={12} /> },
+                ].map((item, i) => (
+                  <div key={i} className="flex items-start gap-3 p-3 bg-slate-50 dark:bg-surface-low/30 rounded-xl border border-slate-100 dark:border-white/5">
+                    <div className="w-6 h-6 rounded-lg bg-accent/10 flex items-center justify-center text-accent shrink-0 mt-0.5">{item.icon}</div>
+                    <p className="text-[11px] text-slate-600 dark:text-ink-secondary leading-relaxed">{item.tip}</p>
+                  </div>
+                ))}
+              </section>
+
+              {/* Score Info */}
+              <section className="p-4 bg-slate-50 dark:bg-surface-low/30 rounded-2xl border border-slate-100 dark:border-white/5 space-y-3">
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Scoring</p>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-[11px]">
+                    <span className="text-slate-500">Per Question</span>
+                    <span className="font-bold text-slate-800 dark:text-ink">{mockQuiz.questions[0]?.points || 10} pts</span>
+                  </div>
+                  <div className="flex justify-between text-[11px]">
+                    <span className="text-slate-500">Total Questions</span>
+                    <span className="font-bold text-slate-800 dark:text-ink">{totalQuestions}</span>
+                  </div>
+                  <div className="flex justify-between text-[11px]">
+                    <span className="text-slate-500">Max Score</span>
+                    <span className="font-bold text-accent">{(mockQuiz.questions[0]?.points || 10) * totalQuestions} pts</span>
+                  </div>
+                </div>
+              </section>
+
+            </div>
+          </div>
+
         </div>
       </div>
     </Layout>
