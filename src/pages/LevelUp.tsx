@@ -36,6 +36,7 @@ import { SEO } from '../components/SEO';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { TabbedHeader, TabItem } from '../components/TabbedHeader';
 import { toast } from 'sonner';
 import Markdown from 'react-markdown';
 import remarkMath from 'remark-math';
@@ -407,6 +408,12 @@ export const LevelUp: React.FC = () => {
   }, [isTimerRunning]);
   const formatTime = (s: number) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
+  const tabItems: TabItem[] = [
+    { id: "support", label: "Support Hub (AI Explainer)", icon: Brain },
+    { id: "resources", label: "Resource Vault (eBooks)", icon: BookOpen },
+    { id: "discover", label: "Discover References", icon: Globe },
+  ];
+
   return (
     <Layout fullWidth>
       <SEO title="LevelUp - Support Hub" />
@@ -418,35 +425,13 @@ export const LevelUp: React.FC = () => {
           <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 p-6">
             <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6">
 
-        {/* Page Header */}
-        <div className="border-b border-slate-100 dark:border-white/5 pb-5 mb-6">
-          <h1 className="ls-page-title text-slate-950 dark:text-ink">
-            {t('library') || 'LevelUp'}
-          </h1>
-        </div>
-
-
-        {/* Global tab switcher */}
-        <div className="flex gap-1 border-b border-slate-200 dark:border-white/8">
-          {[
-            { id: 'support', label: 'Support Hub (AI Explainer)', icon: <Brain size={14} /> },
-            { id: 'resources', label: 'Resource Vault (eBooks)', icon: <BookOpen size={14} /> },
-            { id: 'discover', label: 'Discover References', icon: <Globe size={14} /> },
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setMainTab(tab.id as any)}
-              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${
-                mainTab === tab.id
-                  ? 'border-accent text-accent'
-                  : 'border-transparent text-slate-500 dark:text-ink-muted hover:text-slate-950 dark:hover:text-ink'
-              }`}
-            >
-              {tab.icon}
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        {/* Compact Shared Flat Tab Header */}
+        <TabbedHeader
+          title={t('library') || 'LevelUp'}
+          tabs={tabItems}
+          activeTab={mainTab}
+          onChangeTab={(id) => setMainTab(id as any)}
+        />
 
         {/* ─── TAB 1: SUPPORT HUB (AI EXPLAINER & GAP CONSOLE) ─── */}
         {mainTab === 'support' && (

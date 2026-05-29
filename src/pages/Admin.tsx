@@ -40,6 +40,7 @@ import {
 import { AdminCurriculumDebug } from "./AdminCurriculumDebug";
 import { AdminMcpLessons } from "./AdminMcpLessons";
 import { AiKeysModal } from "../components/settings/AiKeysModal";
+import { TabbedHeader, TabItem } from "../components/TabbedHeader";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface BrowseRow { [key: string]: any; }
@@ -828,7 +829,16 @@ export const Admin: React.FC = () => {
     setExecLoading(false);
   };
 
-  const tabs: Tab[] = ["overview", "grades", "queue", "rag", "browser", "ai", "curriculum", "mcp"];
+  const tabItems: TabItem[] = [
+    { id: "overview", label: "Overview", icon: ShieldCheck },
+    { id: "grades", label: "Grade Coverage", icon: GraduationCap },
+    { id: "queue", label: "Gen Queue", icon: Clock },
+    { id: "rag", label: "RAG / Embeddings", icon: Layers },
+    { id: "browser", label: "Table Browser", icon: Table2 },
+    { id: "ai", label: "AI Analyst", icon: Brain },
+    { id: "curriculum", label: "Curriculum", icon: Database },
+    { id: "mcp", label: "MCP Lessons", icon: PackageSearch },
+  ];
 
   // ── RENDER ────────────────────────────────────────────────────────────────
   return (
@@ -843,14 +853,13 @@ export const Admin: React.FC = () => {
           <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 p-6">
             <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6">
 
-      {/* Page Header */}
-      <div className="border-b border-slate-100 dark:border-white/5 pb-4 mb-4">
-        <div className="text-[10px] font-bold uppercase tracking-[0.24em] text-accent mb-1">Administrative Console</div>
-        <h1 className="text-xl font-black tracking-tight text-slate-950 dark:text-ink">Admin Dashboard</h1>
-        <p className="mt-1 text-[11px] leading-relaxed text-muted">
-          Global system metrics, Supabase table diagnostics, AI generation queue telemetry, and RAG vector search indices.
-        </p>
-      </div>
+      {/* Compact Shared Flat Tab Header */}
+      <TabbedHeader
+        title="Admin Dashboard"
+        tabs={tabItems}
+        activeTab={tab}
+        onChangeTab={(id) => setTab(id as Tab)}
+      />
 
       {dashboardError && (
         <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -858,29 +867,6 @@ export const Admin: React.FC = () => {
           <div className="mt-1">{dashboardError}</div>
         </div>
       )}
-
-      {/* Segmented Tabs Control */}
-      <div className="flex gap-1 bg-slate-50 dark:bg-surface-low/30 p-1 rounded-2xl border border-slate-100 dark:border-white/5 overflow-x-auto no-scrollbar mb-4 shrink-0">
-        {tabs.map((tabKey) => {
-          const tabConfig = ADMIN_TAB_CONFIG[tabKey];
-          const TabIcon = tabConfig.icon;
-          const isActive = tab === tabKey;
-          return (
-            <button
-              key={tabKey}
-              onClick={() => setTab(tabKey)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-                isActive
-                  ? 'bg-white dark:bg-paper text-accent shadow-sm border border-slate-200/50 dark:border-white/5'
-                  : 'text-slate-500 dark:text-ink-muted hover:text-slate-950 dark:hover:text-ink hover:bg-slate-200/40 dark:hover:bg-white/5'
-              }`}
-            >
-              <TabIcon className="w-3.5 h-3.5" />
-              {tabConfig.label}
-            </button>
-          );
-        })}
-      </div>
 
       {/* ── OVERVIEW ── */}
       {tab === "overview" && (
