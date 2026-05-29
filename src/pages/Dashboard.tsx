@@ -145,8 +145,10 @@ export const Dashboard: React.FC = () => {
   const allModulesVal = useLiveQuery(() => db.modules.toArray());
   const allLessonsVal = useLiveQuery(() => db.lessons.toArray());
   
-  const allModules = allModulesVal || [];
-  const allLessons = allLessonsVal || [];
+  // ⚡ Bolt: wrap fallback arrays in useMemo to guarantee referential stability and prevent
+  // downstream cascade of re-renders when live query values fluctuate.
+  const allModules = useMemo(() => allModulesVal || [], [allModulesVal]);
+  const allLessons = useMemo(() => allLessonsVal || [], [allLessonsVal]);
 
   const lessonCountByModuleId = useMemo(
     () => allLessons.reduce<Record<string, number>>((acc, l) => {
@@ -187,10 +189,20 @@ export const Dashboard: React.FC = () => {
 
   const isLoading = allModulesVal === undefined || allLessonsVal === undefined || remindersVal === undefined || scheduleVal === undefined || dbSettingsVal === undefined;
   
-  const reminders = remindersVal || [];
-  const schedule = scheduleVal || [];
-  const dbSettings = dbSettingsVal || [];
+  // ⚡ Bolt: ensure array references remain stable for undefined query states
+  const reminders = useMemo(() => remindersVal || [], [remindersVal]);
+  const schedule = useMemo(() => scheduleVal || [], [scheduleVal]);
+  const dbSettings = useMemo(() => dbSettingsVal || [], [dbSettingsVal]);
   const settingsMap = useMemo(() => Object.fromEntries(dbSettings.map(s => [s.key, s.value])), [dbSettings]);
+
+  // ⚡ Bolt: memoize heavy array filtering/sorting/slicing so it only executes when `reminders` change.
+  // Prevents doing it inline inside JSX where mutations (like .sort) violate React's rendering principles.
+  const pendingReminders = useMemo(() => {
+    return reminders
+      .filter(r => !r.completed)
+      .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
+      .slice(0, 5);
+  }, [reminders]);
 
   const selectedGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
   const selectedCountry = settingsMap['selected_country'] || localStorage.getItem('selected_country') || '';
@@ -418,12 +430,8 @@ export const Dashboard: React.FC = () => {
                       <div className="py-12 flex justify-center items-center">
                         <Loader2 className="w-5 h-5 text-accent animate-spin" />
                       </div>
-                    ) : reminders.filter(r => !r.completed).length > 0 ? (
-                      reminders
-                        .filter(r => !r.completed)
-                        .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
-                        .slice(0, 5)
-                        .map((reminder, i) => (
+                    ) : pendingReminders.length > 0 ? (
+                      pendingReminders.map((reminder, i) => (
                           <motion.div 
                             key={reminder.id}
                             initial={{ opacity: 0, y: 10 }}
