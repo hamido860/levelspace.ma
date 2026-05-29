@@ -409,9 +409,9 @@ export const LevelUp: React.FC = () => {
   const formatTime = (s: number) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
   const tabItems: TabItem[] = [
-    { id: "support", label: "Support Hub (AI Explainer)", icon: Brain },
-    { id: "resources", label: "Resource Vault (eBooks)", icon: BookOpen },
-    { id: "discover", label: "Discover References", icon: Globe },
+    { id: "support", label: "Support Hub", icon: Brain },
+    { id: "resources", label: "Resource Vault", icon: BookOpen },
+    { id: "discover", label: "Discover", icon: Globe },
   ];
 
   return (

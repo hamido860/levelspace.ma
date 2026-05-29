@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Layout } from "../components/Layout";
 import { SEO } from "../components/SEO";
+import { TabbedHeader, TabItem } from "../components/TabbedHeader";
 import {
   AiRecoveryDashboardKpis,
   loadAiRecoveryDashboardKpis,
@@ -1270,6 +1271,14 @@ export const AdminAiRecovery: React.FC = () => {
     }
   };
 
+  const recoveryTabItems: TabItem[] = [
+    { id: "dashboard", label: "Dashboard", icon: Wrench },
+    { id: "failed-jobs", label: "Failed Jobs", icon: AlertTriangle },
+    { id: "ai-tasks", label: "AI Tasks", icon: Bot },
+    { id: "recovered-lessons", label: "Recovered", icon: CheckCircle2 },
+    { id: "logs", label: "Logs", icon: Clock3 },
+  ];
+
   return (
     <Layout fullWidth>
       <SEO
@@ -1286,34 +1295,16 @@ export const AdminAiRecovery: React.FC = () => {
           <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 p-6">
             <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6">
               
-              {/* Page Header */}
-              <div className="border-b border-slate-100 dark:border-white/5 pb-4 mb-4">
-                <div className="text-[10px] font-bold uppercase tracking-[0.24em] text-accent mb-1">Administrative Console</div>
-                <h1 className="text-xl font-black tracking-tight text-slate-950 dark:text-ink">AI Recovery Console</h1>
-                <p className="mt-1 text-[11px] leading-relaxed text-muted">
-                  Live queue monitoring for failed content generation jobs, lesson pipeline AI throughput, and RAG vector indices.
-                </p>
-              </div>
-
-              {/* Segmented Tabs Control */}
-              <div className="flex gap-1 bg-slate-50 dark:bg-surface-low/30 p-1.5 rounded-2xl border border-slate-100 dark:border-white/5 overflow-x-auto no-scrollbar mb-4 shrink-0">
-                {RECOVERY_TABS.map((tab) => {
-                  const isActive = activeTab.key === tab.key;
-                  return (
-                    <button
-                      key={tab.path}
-                      onClick={() => navigate(tab.path)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-                        isActive
-                          ? 'bg-white dark:bg-paper text-accent shadow-sm border border-slate-200/50 dark:border-white/5'
-                          : 'text-slate-500 dark:text-ink-muted hover:text-slate-950 dark:hover:text-ink hover:bg-slate-200/40 dark:hover:bg-white/5'
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  );
-                })}
-              </div>
+      {/* Compact Shared Flat Tab Header */}
+      <TabbedHeader
+        title="AI Recovery Console"
+        tabs={recoveryTabItems}
+        activeTab={activeTab.key}
+        onChangeTab={(id) => {
+          const targetTab = RECOVERY_TABS.find((t) => t.key === id);
+          if (targetTab) navigate(targetTab.path);
+        }}
+      />
 
               {/* Active Tab State Description (Compact typography, no border card) */}
               <p className="text-[11px] text-muted -mt-2 px-1">

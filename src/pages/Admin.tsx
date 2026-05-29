@@ -831,13 +831,13 @@ export const Admin: React.FC = () => {
 
   const tabItems: TabItem[] = [
     { id: "overview", label: "Overview", icon: ShieldCheck },
-    { id: "grades", label: "Grade Coverage", icon: GraduationCap },
-    { id: "queue", label: "Gen Queue", icon: Clock },
-    { id: "rag", label: "RAG / Embeddings", icon: Layers },
-    { id: "browser", label: "Table Browser", icon: Table2 },
-    { id: "ai", label: "AI Analyst", icon: Brain },
+    { id: "grades", label: "Grades", icon: GraduationCap },
+    { id: "queue", label: "Queue", icon: Clock },
+    { id: "rag", label: "RAG", icon: Layers },
+    { id: "browser", label: "Tables", icon: Table2 },
+    { id: "ai", label: "AI", icon: Brain },
     { id: "curriculum", label: "Curriculum", icon: Database },
-    { id: "mcp", label: "MCP Lessons", icon: PackageSearch },
+    { id: "mcp", label: "MCP", icon: PackageSearch },
   ];
 
   // ── RENDER ────────────────────────────────────────────────────────────────
