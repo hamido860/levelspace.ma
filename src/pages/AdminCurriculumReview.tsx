@@ -211,21 +211,20 @@ export const AdminCurriculumReview: React.FC = () => {
           {/* Column 2: Fluid Main Workspace */}
           <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 p-6">
             <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6">
-              
-              {/* Page Header */}
-              <div className="border-b border-slate-100 dark:border-white/5 pb-5">
+                          {/* Page Header */}
+              <div className="border-b border-slate-100 dark:border-white/5 pb-4 mb-4">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <div className="text-[10px] font-bold uppercase tracking-[0.24em] text-accent mb-1">Administrative Console</div>
-                    <h1 className="text-2xl font-black tracking-tight text-slate-950 dark:text-ink">Curriculum Validation</h1>
-                    <p className="mt-2 text-xs leading-relaxed text-muted">
+                    <h1 className="text-xl font-black tracking-tight text-slate-950 dark:text-ink">Curriculum Validation</h1>
+                    <p className="mt-1 text-[11px] leading-relaxed text-muted">
                       Audit draft AI-assisted curriculum nodes, inspect mismatch diagnostic reviews, and authorize student publish states.
                     </p>
                   </div>
                   {selectedItem && (
                     <button
                       onClick={closeDrawer}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-ink/10 bg-paper px-3 py-1.5 text-xs font-semibold text-ink transition-all hover:bg-surface-low shrink-0 mt-4"
+                      className="inline-flex items-center gap-1.5 rounded-full border border-ink/10 bg-paper px-3 py-1.5 text-xs font-semibold text-ink transition-all hover:bg-surface-low shrink-0 mt-2"
                     >
                       <ArrowLeft className="h-3.5 w-3.5" />
                       Back to Queue

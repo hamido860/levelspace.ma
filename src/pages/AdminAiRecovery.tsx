@@ -1287,26 +1287,26 @@ export const AdminAiRecovery: React.FC = () => {
             <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6">
               
               {/* Page Header */}
-              <div className="border-b border-slate-100 dark:border-white/5 pb-5">
+              <div className="border-b border-slate-100 dark:border-white/5 pb-4 mb-4">
                 <div className="text-[10px] font-bold uppercase tracking-[0.24em] text-accent mb-1">Administrative Console</div>
-                <h1 className="text-2xl font-black tracking-tight text-slate-950 dark:text-ink">AI Recovery Console</h1>
-                <p className="mt-2 text-xs leading-relaxed text-muted">
+                <h1 className="text-xl font-black tracking-tight text-slate-950 dark:text-ink">AI Recovery Console</h1>
+                <p className="mt-1 text-[11px] leading-relaxed text-muted">
                   Live queue monitoring for failed content generation jobs, lesson pipeline AI throughput, and RAG vector indices.
                 </p>
               </div>
 
-              {/* Navigation Tab Bar */}
-              <div className="flex flex-wrap gap-2">
+              {/* Segmented Tabs Control */}
+              <div className="flex gap-1 bg-slate-50 dark:bg-surface-low/30 p-1.5 rounded-2xl border border-slate-100 dark:border-white/5 overflow-x-auto no-scrollbar mb-4 shrink-0">
                 {RECOVERY_TABS.map((tab) => {
                   const isActive = activeTab.key === tab.key;
                   return (
                     <button
                       key={tab.path}
                       onClick={() => navigate(tab.path)}
-                      className={`rounded-full border px-4 py-2 text-xs font-semibold transition-all ${
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
                         isActive
-                          ? "border-accent bg-accent text-white shadow-sm shadow-accent/20"
-                          : "border-ink/10 bg-paper text-muted hover:border-accent/40 hover:text-ink"
+                          ? 'bg-white dark:bg-paper text-accent shadow-sm border border-slate-200/50 dark:border-white/5'
+                          : 'text-slate-500 dark:text-ink-muted hover:text-slate-950 dark:hover:text-ink hover:bg-slate-200/40 dark:hover:bg-white/5'
                       }`}
                     >
                       {tab.label}
@@ -1315,11 +1315,10 @@ export const AdminAiRecovery: React.FC = () => {
                 })}
               </div>
 
-              {/* Active Tab State */}
-              <div className="rounded-2xl border border-ink/10 bg-paper px-4 py-3 shadow-sm">
-                <p className="text-xs font-semibold text-ink">{activeTab.label}</p>
-                <p className="mt-0.5 text-xs text-muted">{activeTab.description}</p>
-              </div>
+              {/* Active Tab State Description (Compact typography, no border card) */}
+              <p className="text-[11px] text-muted -mt-2 px-1">
+                {activeTab.description}
+              </p>
 
               {/* Dynamic Route View */}
               {loading ? <Spinner label="Loading AI Recovery metrics..." /> : null}

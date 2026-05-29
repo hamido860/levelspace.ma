@@ -35,7 +35,7 @@ import {
   Lightbulb, ListChecks, Map as MapIcon, ChevronRight,
   TrendingUp, TrendingDown, Info, Zap, KeyRound,
   Trash2, Wrench, Play, Pencil, ChevronDown, Brain, ShieldCheck, GraduationCap,
-  Copy, Check, PackageSearch, Activity
+  Copy, Check, PackageSearch, Activity, User
 } from "lucide-react";
 import { AdminCurriculumDebug } from "./AdminCurriculumDebug";
 import { AdminMcpLessons } from "./AdminMcpLessons";
@@ -247,20 +247,40 @@ const Spinner: React.FC = () => (
   </div>
 );
 
-const KPI: React.FC<{ label: string; value: number | string; sub?: string; variant?: "default" | "warn" | "danger" | "success" }> = ({
-  label, value, sub, variant = "default",
-}) => {
+const KPI: React.FC<{
+  label: string;
+  value: number | string;
+  sub?: string;
+  icon?: React.ElementType;
+  variant?: "default" | "warn" | "danger" | "success";
+}> = ({ label, value, sub, icon: Icon, variant = "default" }) => {
   const colors = {
-    default: "text-ink",
-    warn:    "text-amber-500",
-    danger:  "text-red-500",
-    success: "text-emerald-600",
+    default: "text-slate-950 dark:text-ink font-sans",
+    warn:    "text-amber-600 dark:text-amber-500",
+    danger:  "text-red-600 dark:text-red-500",
+    success: "text-emerald-600 dark:text-emerald-500",
   };
+  const iconBgs = {
+    default: "bg-slate-100 text-slate-600 dark:bg-white/5 dark:text-ink-muted",
+    warn:    "bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400",
+    danger:  "bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400",
+    success: "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400",
+  };
+
   return (
-    <div className="bg-paper rounded-xl border border-surface-mid p-4 shadow-sm">
-      <div className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-1">{label}</div>
-      <div className={`text-3xl font-extrabold ${colors[variant]}`}>{value}</div>
-      {sub && <div className="text-xs text-ink-muted mt-1">{sub}</div>}
+    <div className="bg-slate-50/50 dark:bg-paper/30 hover:bg-slate-100/50 dark:hover:bg-paper/50 transition-all rounded-2xl border border-slate-100 dark:border-white/5 p-3 flex items-center gap-3 shadow-sm">
+      {Icon && (
+        <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${iconBgs[variant]}`}>
+          <Icon size={16} />
+        </div>
+      )}
+      <div className="min-w-0 flex-grow">
+        <div className="text-[10px] font-bold text-slate-500 dark:text-ink-muted uppercase tracking-wider truncate mb-0.5">{label}</div>
+        <div className="flex items-baseline gap-1.5">
+          <span className={`text-lg font-black tracking-tight ${colors[variant]}`}>{value}</span>
+          {sub && <span className="text-[9px] text-slate-400 dark:text-ink-muted truncate font-medium">{sub}</span>}
+        </div>
+      </div>
     </div>
   );
 };
@@ -824,24 +844,23 @@ export const Admin: React.FC = () => {
             <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6">
 
       {/* Page Header */}
-      <div className="border-b border-slate-100 dark:border-white/5 pb-5 mb-6">
+      <div className="border-b border-slate-100 dark:border-white/5 pb-4 mb-4">
         <div className="text-[10px] font-bold uppercase tracking-[0.24em] text-accent mb-1">Administrative Console</div>
-        <h1 className="text-2xl font-black tracking-tight text-slate-950 dark:text-ink">Admin Dashboard</h1>
-        <p className="mt-2 text-xs leading-relaxed text-muted">
+        <h1 className="text-xl font-black tracking-tight text-slate-950 dark:text-ink">Admin Dashboard</h1>
+        <p className="mt-1 text-[11px] leading-relaxed text-muted">
           Global system metrics, Supabase table diagnostics, AI generation queue telemetry, and RAG vector search indices.
         </p>
       </div>
 
-
       {dashboardError && (
-        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           <div className="font-semibold">Live admin metrics are unavailable.</div>
           <div className="mt-1">{dashboardError}</div>
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex gap-1 border-b border-slate-200 dark:border-white/8 -mb-px overflow-x-auto pb-2 mb-6">
+      {/* Segmented Tabs Control */}
+      <div className="flex gap-1 bg-slate-50 dark:bg-surface-low/30 p-1 rounded-2xl border border-slate-100 dark:border-white/5 overflow-x-auto no-scrollbar mb-4 shrink-0">
         {tabs.map((tabKey) => {
           const tabConfig = ADMIN_TAB_CONFIG[tabKey];
           const TabIcon = tabConfig.icon;
@@ -850,13 +869,13 @@ export const Admin: React.FC = () => {
             <button
               key={tabKey}
               onClick={() => setTab(tabKey)}
-              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors whitespace-nowrap ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
                 isActive
-                  ? 'border-accent text-accent'
-                  : 'border-transparent text-slate-500 dark:text-ink-muted hover:text-slate-950 dark:hover:text-ink'
+                  ? 'bg-white dark:bg-paper text-accent shadow-sm border border-slate-200/50 dark:border-white/5'
+                  : 'text-slate-500 dark:text-ink-muted hover:text-slate-950 dark:hover:text-ink hover:bg-slate-200/40 dark:hover:bg-white/5'
               }`}
             >
-              <TabIcon className="w-4 h-4" />
+              <TabIcon className="w-3.5 h-3.5" />
               {tabConfig.label}
             </button>
           );
@@ -866,17 +885,17 @@ export const Admin: React.FC = () => {
       {/* ── OVERVIEW ── */}
       {tab === "overview" && (
         <div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
-            <KPI label="Total Topics" value={kpis.topics ?? "—"} sub="across all grades" />
-            <KPI label="Completed Jobs" value={kpis.completedJobs ?? "—"} sub="lesson_gen_queue status = done" variant="success" />
-            <KPI label="Queue Pending" value={kpis.pendingJobs ?? "—"} sub="lesson_gen_queue status = pending" variant="warn" />
-            <KPI label="Queue Failed" value={kpis.failedJobs ?? "—"} sub="lesson_gen_queue status = failed" variant="danger" />
-            <KPI label="Needs Review" value={kpis.recoveredLessonsNeedsReview ?? "—"} sub="teaching_contract.status = needs_review" variant="warn" />
-            <KPI label="Student Publish Ready" value={kpis.studentPublishReadyLessons ?? "—"} sub="needs_review + student_publish_allowed = true" variant="success" />
-            <KPI label="RAG Chunks" value={kpis.ragTotal ?? "—"} sub={`${pct(kpis.ragUsable, kpis.ragTotal)}% usable`} variant="success" />
-            <KPI label="RAG Linked" value={kpis.ragLinkedToTopic ?? "—"} sub="rag_chunks.topic_id is set" />
-            <KPI label="RAG Usable" value={kpis.ragUsable ?? "—"} sub="embedded + linked + done" variant="success" />
-            <KPI label="Users" value={kpis.users ?? "—"} sub="profiles" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 mb-4">
+            <KPI label="Total Topics" value={kpis.topics ?? "—"} sub="across all grades" icon={BookOpen} />
+            <KPI label="Completed Jobs" value={kpis.completedJobs ?? "—"} sub="status = done" icon={CheckCircle} variant="success" />
+            <KPI label="Queue Pending" value={kpis.pendingJobs ?? "—"} sub="status = pending" icon={Clock} variant="warn" />
+            <KPI label="Queue Failed" value={kpis.failedJobs ?? "—"} sub="status = failed" icon={AlertTriangle} variant="danger" />
+            <KPI label="Needs Review" value={kpis.recoveredLessonsNeedsReview ?? "—"} sub="teaching_contract = needs_review" icon={ListChecks} variant="warn" />
+            <KPI label="Publish Ready" value={kpis.studentPublishReadyLessons ?? "—"} sub="needs_review + allowed" icon={ShieldCheck} variant="success" />
+            <KPI label="RAG Chunks" value={kpis.ragTotal ?? "—"} sub={`${pct(kpis.ragUsable, kpis.ragTotal)}% usable`} icon={Layers} variant="success" />
+            <KPI label="RAG Linked" value={kpis.ragLinkedToTopic ?? "—"} sub="topic_id is set" icon={Cpu} />
+            <KPI label="RAG Usable" value={kpis.ragUsable ?? "—"} sub="embedded + linked + done" icon={Zap} variant="success" />
+            <KPI label="Users" value={kpis.users ?? "—"} sub="profiles" icon={User} />
           </div>
 
           {shouldOfferTopicRepair && (
