@@ -1288,11 +1288,10 @@ export const AdminAiRecovery: React.FC = () => {
               
               {/* Page Header */}
               <div className="border-b border-slate-100 dark:border-white/5 pb-5">
-                <div className="text-[10px] font-bold uppercase tracking-[0.24em] text-accent mb-1">Admin only</div>
+                <div className="text-[10px] font-bold uppercase tracking-[0.24em] text-accent mb-1">Administrative Console</div>
                 <h1 className="text-2xl font-black tracking-tight text-slate-950 dark:text-ink">AI Recovery Console</h1>
                 <p className="mt-2 text-xs leading-relaxed text-muted">
-                  Live recovery monitoring for lesson generation failures, lesson-generation AI task throughput, and
-                  recovered lesson review states. Counts come directly from Supabase.
+                  Live queue monitoring for failed content generation jobs, lesson pipeline AI throughput, and RAG vector indices.
                 </p>
               </div>
 

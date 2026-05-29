@@ -825,7 +825,11 @@ export const Admin: React.FC = () => {
 
       {/* Page Header */}
       <div className="border-b border-slate-100 dark:border-white/5 pb-5 mb-6">
-        <h1 className="ls-page-title text-slate-950 dark:text-ink">Admin Panel</h1>
+        <div className="text-[10px] font-bold uppercase tracking-[0.24em] text-accent mb-1">Administrative Console</div>
+        <h1 className="text-2xl font-black tracking-tight text-slate-950 dark:text-ink">Admin Dashboard</h1>
+        <p className="mt-2 text-xs leading-relaxed text-muted">
+          Global system metrics, Supabase table diagnostics, AI generation queue telemetry, and RAG vector search indices.
+        </p>
       </div>
 
 
