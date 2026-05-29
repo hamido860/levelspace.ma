@@ -4,10 +4,12 @@ import { toast } from "sonner";
 import {
   AlertTriangle,
   Bot,
+  Brain,
   CheckCircle2,
   Clock3,
   RefreshCw,
   ShieldAlert,
+  ShieldCheck,
   Sparkles,
   Wrench,
   X,
@@ -1371,6 +1373,27 @@ export const AdminAiRecovery: React.FC = () => {
                       Live Observability
                     </p>
                   </div>
+                </div>
+              </section>
+
+              {/* Admin Consoles Section */}
+              <section className="space-y-2">
+                <p className="text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-wider">Admin Consoles</p>
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={() => navigate('/admin')}
+                    className="w-full flex items-center gap-2 p-2 bg-slate-50 dark:bg-surface-low/30 text-ink rounded-xl border border-slate-100 dark:border-white/5 hover:border-accent/30 transition-all text-left"
+                  >
+                    <ShieldCheck size={12} className="text-accent" />
+                    <span className="text-[11px] font-semibold">Admin Dashboard</span>
+                  </button>
+                  <button
+                    onClick={() => navigate('/admin/curriculum-review')}
+                    className="w-full flex items-center gap-2 p-2 bg-slate-50 dark:bg-surface-low/30 text-ink rounded-xl border border-slate-100 dark:border-white/5 hover:border-accent/30 transition-all text-left"
+                  >
+                    <Brain size={12} className="text-accent" />
+                    <span className="text-[11px] font-semibold">Curriculum Review</span>
+                  </button>
                 </div>
               </section>
 

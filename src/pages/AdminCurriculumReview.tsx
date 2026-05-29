@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { AlertTriangle, ArrowLeft, BookCheck, ExternalLink, RefreshCw, Search, ShieldCheck, Sparkles, X } from "lucide-react";
+import { Activity, AlertTriangle, ArrowLeft, BookCheck, ExternalLink, RefreshCw, Search, ShieldCheck, Sparkles, X } from "lucide-react";
 import { Layout } from "../components/Layout";
 import { SEO } from "../components/SEO";
 import {
@@ -74,6 +75,7 @@ const getRawContentPreview = (detail: CurriculumReviewDetail | null) => {
 };
 
 export const AdminCurriculumReview: React.FC = () => {
+  const navigate = useNavigate();
   const [items, setItems] = useState<CurriculumReviewItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -511,6 +513,27 @@ export const AdminCurriculumReview: React.FC = () => {
                       Content Validation
                     </p>
                   </div>
+                </div>
+              </section>
+
+              {/* Admin Consoles Section */}
+              <section className="space-y-2">
+                <p className="text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-wider">Admin Consoles</p>
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={() => navigate('/admin')}
+                    className="w-full flex items-center gap-2 p-2 bg-slate-50 dark:bg-surface-low/30 text-ink rounded-xl border border-slate-100 dark:border-white/5 hover:border-accent/30 transition-all text-left"
+                  >
+                    <ShieldCheck size={12} className="text-accent" />
+                    <span className="text-[11px] font-semibold">Admin Dashboard</span>
+                  </button>
+                  <button
+                    onClick={() => navigate('/admin/ai-recovery')}
+                    className="w-full flex items-center gap-2 p-2 bg-slate-50 dark:bg-surface-low/30 text-ink rounded-xl border border-slate-100 dark:border-white/5 hover:border-accent/30 transition-all text-left"
+                  >
+                    <Activity size={12} className="text-accent" />
+                    <span className="text-[11px] font-semibold">AI Recovery Console</span>
+                  </button>
                 </div>
               </section>
 

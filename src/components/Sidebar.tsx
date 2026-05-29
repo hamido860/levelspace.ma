@@ -103,7 +103,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
 
   const adminNavItems: NavItem[] = [
     ...(isAdmin ? [
-      { label: 'Admin', icon: <ShieldCheck size={20} />, path: '/admin', matchPrefix: false }
+      { label: 'Admin Dashboard', icon: <ShieldCheck size={20} />, path: '/admin', matchPrefix: false },
+      { label: 'AI Recovery Console', icon: <Activity size={20} />, path: '/admin/ai-recovery', matchPrefix: true },
+      { label: 'Curriculum Review', icon: <Brain size={20} />, path: '/admin/curriculum-review', matchPrefix: true }
     ] : [])
   ];
 

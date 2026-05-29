@@ -35,7 +35,7 @@ import {
   Lightbulb, ListChecks, Map as MapIcon, ChevronRight,
   TrendingUp, TrendingDown, Info, Zap, KeyRound,
   Trash2, Wrench, Play, Pencil, ChevronDown, Brain, ShieldCheck, GraduationCap,
-  Copy, Check, PackageSearch
+  Copy, Check, PackageSearch, Activity
 } from "lucide-react";
 import { AdminCurriculumDebug } from "./AdminCurriculumDebug";
 import { AdminMcpLessons } from "./AdminMcpLessons";
@@ -1987,6 +1987,27 @@ export const Admin: React.FC = () => {
                   >
                     <KeyRound size={12} />
                     Manage Credentials
+                  </button>
+                </div>
+              </section>
+
+              {/* Admin Consoles Section */}
+              <section className="space-y-3">
+                <p className="text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-wider">Admin Consoles</p>
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={() => navigate('/admin/ai-recovery')}
+                    className="w-full flex items-center gap-2 p-3 bg-slate-50 dark:bg-surface-low/30 text-ink rounded-xl border border-slate-100 dark:border-white/5 hover:border-accent/30 transition-all text-left"
+                  >
+                    <Activity size={13} className="text-accent" />
+                    <span className="text-[11px] font-semibold text-slate-700 dark:text-ink font-medium">AI Recovery Console</span>
+                  </button>
+                  <button
+                    onClick={() => navigate('/admin/curriculum-review')}
+                    className="w-full flex items-center gap-2 p-3 bg-slate-50 dark:bg-surface-low/30 text-ink rounded-xl border border-slate-100 dark:border-white/5 hover:border-accent/30 transition-all text-left"
+                  >
+                    <Brain size={13} className="text-accent" />
+                    <span className="text-[11px] font-semibold text-slate-700 dark:text-ink font-medium">Curriculum Review</span>
                   </button>
                 </div>
               </section>
