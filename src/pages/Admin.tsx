@@ -812,9 +812,16 @@ export const Admin: React.FC = () => {
 
   // ── RENDER ────────────────────────────────────────────────────────────────
   return (
-    <Layout>
+    <Layout fullWidth>
       <SEO title="Admin Panel" />
-      <div className="admin-theme-scope">
+      <div className="admin-theme-scope h-full w-full bg-background flex flex-col overflow-hidden p-4">
+        
+        {/* Symmetrical 3-Column Layout Container */}
+        <div className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-4 overflow-hidden">
+        
+          {/* Column 2: Fluid Main Workspace */}
+          <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 p-6">
+            <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6">
 
       {/* Page Header */}
       <div className="border-b border-slate-100 dark:border-white/5 pb-5 mb-6">
@@ -1945,7 +1952,106 @@ export const Admin: React.FC = () => {
           </div>
         </div>
       )}
-      </div>
+            </div> {/* closes Div 4 (Column 2 scroll container) */}
+          </div> {/* closes Div 3 (Column 2 main container) */}
+
+          {/* Column 3: Right Action & Quick Diagnostics Sidebar */}
+          <div className="hidden lg:flex lg:w-[260px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-5">
+            <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6 pr-1">
+              
+              {/* Connection Status widget */}
+              <section className="bg-slate-950 text-white rounded-2xl p-5 relative overflow-hidden">
+                <div className="relative z-10 space-y-4">
+                  <div>
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">System Health</h3>
+                    <div className="flex items-center gap-2 mt-1">
+                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="text-xs font-bold font-mono">Supabase Online</span>
+                    </div>
+                  </div>
+                  <div className="h-px bg-white/10" />
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-mono text-white/40 uppercase">AI Provider</span>
+                    <p className="text-xs font-bold text-white flex items-center gap-1.5 capitalize">
+                      <Cpu size={12} className="text-accent" />
+                      {getAiProvider() || "Platform Mode"}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-mono text-white/40 uppercase">Active Model</span>
+                    <p className="text-[10px] font-mono text-white/70 truncate">{getAiModel() || "Default"}</p>
+                  </div>
+                  <button 
+                    onClick={() => setIsAiKeysOpen(true)}
+                    className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold uppercase tracking-normal transition-all"
+                  >
+                    <KeyRound size={12} />
+                    Manage Credentials
+                  </button>
+                </div>
+              </section>
+
+              {/* Quick Actions / Repairs */}
+              <section className="space-y-3">
+                <p className="text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-wider">Mission Control Repairs</p>
+                
+                <button
+                  onClick={refreshAll}
+                  disabled={loading}
+                  className="w-full flex items-center justify-between p-3 bg-slate-50 dark:bg-surface-low/30 rounded-xl border border-slate-100 dark:border-white/5 hover:border-accent/30 transition-all text-left"
+                >
+                  <div className="flex items-center gap-2 text-slate-700 dark:text-ink">
+                    <RefreshCw size={13} className={`text-accent ${loading ? 'animate-spin' : ''}`} />
+                    <span className="text-[11px] font-semibold font-medium">Refresh Metrics</span>
+                  </div>
+                  {lastRefresh && (
+                    <span className="text-[9px] font-mono text-slate-400">{lastRefresh.split(' ')[0]}</span>
+                  )}
+                </button>
+
+                <button
+                  onClick={handleRepairRagTopicLinks}
+                  disabled={ragRepairLoading}
+                  className="w-full flex items-center gap-2 p-3 bg-slate-50 dark:bg-surface-low/30 rounded-xl border border-slate-100 dark:border-white/5 hover:border-accent/30 transition-all text-left"
+                >
+                  <Wrench size={13} className="text-accent" />
+                  <span className="text-[11px] font-semibold text-slate-700 dark:text-ink font-medium">
+                    {ragRepairLoading ? "Repairing RAG..." : "Repair RAG Links"}
+                  </span>
+                </button>
+
+                <button
+                  onClick={handleRepairTopics}
+                  disabled={topicRepairLoading}
+                  className="w-full flex items-center gap-2 p-3 bg-slate-50 dark:bg-surface-low/30 rounded-xl border border-slate-100 dark:border-white/5 hover:border-accent/30 transition-all text-left"
+                >
+                  <Database size={13} className="text-accent" />
+                  <span className="text-[11px] font-semibold text-slate-700 dark:text-ink font-medium">
+                    {topicRepairLoading ? "Repairing..." : "Repair Topics"}
+                  </span>
+                </button>
+              </section>
+
+              {/* DB Tables health summary */}
+              <section className="space-y-3">
+                <p className="text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-wider">Table Status</p>
+                <div className="p-3 bg-slate-50 dark:bg-surface-low/30 rounded-xl border border-slate-100 dark:border-white/5 space-y-2.5 max-h-[220px] overflow-y-auto no-scrollbar">
+                  {tableHealth.slice(0, 5).map(t => (
+                    <div key={t.table_name} className="flex justify-between items-center text-[10px]">
+                      <span className="font-semibold text-slate-700 dark:text-ink truncate max-w-[120px]">{t.table_name}</span>
+                      <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-mono text-[9px] font-medium">
+                        {t.row_count ?? 0} rows
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+            </div>
+          </div>
+
+        </div> {/* closes Div 2 (3-column layout container) */}
+      </div> {/* closes Div 1 (admin-theme-scope) */}
       <AiKeysModal
         isOpen={isAiKeysOpen}
         onClose={() => setIsAiKeysOpen(false)}

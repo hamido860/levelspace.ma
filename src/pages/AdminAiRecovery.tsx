@@ -1269,128 +1269,165 @@ export const AdminAiRecovery: React.FC = () => {
   };
 
   return (
-    <Layout>
+    <Layout fullWidth>
       <SEO
         title="Admin AI Recovery"
         description="Admin-only AI Recovery dashboard with live Supabase metrics for failed jobs, AI tasks, and recovered lesson review states."
       />
 
-      <section className="space-y-6">
-        <div className="rounded-[28px] border border-ink/10 bg-paper p-6 shadow-sm">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div className="space-y-3">
-              <div className="text-[11px] font-bold uppercase tracking-[0.24em] text-accent">Admin only</div>
-              <div>
-                <h1 className="text-3xl font-black tracking-tight text-ink">AI Recovery</h1>
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
+      <div className="admin-theme-scope h-full w-full bg-background flex flex-col overflow-hidden p-4">
+        
+        {/* Symmetrical 3-Column Layout Container */}
+        <div className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-4 overflow-hidden">
+        
+          {/* Column 2: Fluid Main Workspace */}
+          <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 p-6">
+            <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6">
+              
+              {/* Page Header */}
+              <div className="border-b border-slate-100 dark:border-white/5 pb-5">
+                <div className="text-[10px] font-bold uppercase tracking-[0.24em] text-accent mb-1">Admin only</div>
+                <h1 className="text-2xl font-black tracking-tight text-slate-950 dark:text-ink">AI Recovery Console</h1>
+                <p className="mt-2 text-xs leading-relaxed text-muted">
                   Live recovery monitoring for lesson generation failures, lesson-generation AI task throughput, and
-                  recovered lesson review states. Counts come directly from Supabase and this shell does not enable any
-                  AI SQL generation yet.
+                  recovered lesson review states. Counts come directly from Supabase.
                 </p>
               </div>
+
+              {/* Navigation Tab Bar */}
+              <div className="flex flex-wrap gap-2">
+                {RECOVERY_TABS.map((tab) => {
+                  const isActive = activeTab.key === tab.key;
+                  return (
+                    <button
+                      key={tab.path}
+                      onClick={() => navigate(tab.path)}
+                      className={`rounded-full border px-4 py-2 text-xs font-semibold transition-all ${
+                        isActive
+                          ? "border-accent bg-accent text-white shadow-sm shadow-accent/20"
+                          : "border-ink/10 bg-paper text-muted hover:border-accent/40 hover:text-ink"
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Active Tab State */}
+              <div className="rounded-2xl border border-ink/10 bg-paper px-4 py-3 shadow-sm">
+                <p className="text-xs font-semibold text-ink">{activeTab.label}</p>
+                <p className="mt-0.5 text-xs text-muted">{activeTab.description}</p>
+              </div>
+
+              {/* Dynamic Route View */}
+              {loading ? <Spinner label="Loading AI Recovery metrics..." /> : null}
+
+              {!loading && error ? (
+                <StatePanel
+                  title="Unable to load AI Recovery metrics"
+                  body={error}
+                  tone="danger"
+                  actionLabel="Retry"
+                  onAction={() => void loadMetrics()}
+                />
+              ) : null}
+
+              {!loading && !error ? (
+                <>
+                  {totalSignals === 0 ? (
+                    <StatePanel
+                      title="No recovery activity yet"
+                      body="Supabase returned zero rows across the current recovery KPI queries, so there is no failed, pending, completed, or review-state recovery activity to show right now."
+                    />
+                  ) : null}
+
+                  {renderRouteShell()}
+                </>
+              ) : null}
+
+            </div> {/* closes Column 2 scroll container */}
+          </div> {/* closes Column 2 main container */}
+
+          {/* Column 3: Right Action & Quick Diagnostics Sidebar */}
+          <div className="hidden lg:flex lg:w-[260px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-5">
+            <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-5 pr-1">
+              
+              {/* Connection Status widget */}
+              <section className="bg-slate-950 text-white rounded-2xl p-5 relative overflow-hidden">
+                <div className="relative z-10 space-y-4">
+                  <div>
+                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">System Health</h3>
+                    <div className="flex items-center gap-2 mt-1">
+                      <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="text-[11px] font-bold font-mono">Supabase Online</span>
+                    </div>
+                  </div>
+                  <div className="h-px bg-white/10" />
+                  <div className="space-y-1">
+                    <span className="text-[9px] font-mono text-white/40 uppercase">Recovery Mode</span>
+                    <p className="text-[11px] font-bold text-white flex items-center gap-1.5 capitalize">
+                      <Sparkles size={11} className="text-accent" />
+                      Live Observability
+                    </p>
+                  </div>
+                </div>
+              </section>
+
+              {/* Refresh Actions */}
+              <section className="space-y-2">
+                <p className="text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-wider">Mission Control</p>
+                <button
+                  onClick={() => void handleRefresh()}
+                  disabled={loading || failedJobsLoading}
+                  className="w-full flex items-center justify-between p-3 bg-slate-50 dark:bg-surface-low/30 rounded-xl border border-slate-100 dark:border-white/5 hover:border-accent/30 transition-all text-left"
+                >
+                  <div className="flex items-center gap-2 text-slate-700 dark:text-ink">
+                    <RefreshCw size={12} className={`text-accent ${loading || failedJobsLoading ? 'animate-spin' : ''}`} />
+                    <span className="text-[11px] font-semibold">Refresh Metrics</span>
+                  </div>
+                  {lastUpdated && (
+                    <span className="text-[9px] font-mono text-slate-400">{lastUpdated.split(' ')[0]}</span>
+                  )}
+                </button>
+              </section>
+
+              {/* Stacked Compact KPIs */}
+              <section className="space-y-3">
+                <p className="text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-wider">Queue & Backlog Metrics</p>
+                <div className="flex flex-col gap-3">
+                  <div className="bg-slate-50 dark:bg-surface-low/20 rounded-xl p-3 border border-slate-100 dark:border-white/5">
+                    <div className="text-[9px] font-semibold text-muted uppercase tracking-wider">Failed jobs</div>
+                    <div className="text-2xl font-black text-destructive mt-0.5">{kpis.failedJobs}</div>
+                  </div>
+                  <div className="bg-slate-50 dark:bg-surface-low/20 rounded-xl p-3 border border-slate-100 dark:border-white/5">
+                    <div className="text-[9px] font-semibold text-muted uppercase tracking-wider">Pending AI tasks</div>
+                    <div className="text-2xl font-black text-amber-600 mt-0.5">{kpis.pendingAiTasks}</div>
+                  </div>
+                  <div className="bg-slate-50 dark:bg-surface-low/20 rounded-xl p-3 border border-slate-100 dark:border-white/5">
+                    <div className="text-[9px] font-semibold text-muted uppercase tracking-wider">Completed AI tasks</div>
+                    <div className="text-2xl font-black text-emerald-600 mt-0.5">{kpis.completedAiTasks}</div>
+                  </div>
+                  <div className="bg-slate-50 dark:bg-surface-low/20 rounded-xl p-3 border border-slate-100 dark:border-white/5">
+                    <div className="text-[9px] font-semibold text-muted uppercase tracking-wider">Needing review</div>
+                    <div className="text-2xl font-black text-amber-600 mt-0.5">{kpis.lessonsNeedingReview}</div>
+                  </div>
+                  <div className="bg-slate-50 dark:bg-surface-low/20 rounded-xl p-3 border border-slate-100 dark:border-white/5">
+                    <div className="text-[9px] font-semibold text-muted uppercase tracking-wider">Approved recovered</div>
+                    <div className="text-2xl font-black text-emerald-600 mt-0.5">{kpis.approvedRecoveredLessons}</div>
+                  </div>
+                  <div className="bg-slate-50 dark:bg-surface-low/20 rounded-xl p-3 border border-slate-100 dark:border-white/5">
+                    <div className="text-[9px] font-semibold text-muted uppercase tracking-wider">Rejected recovered</div>
+                    <div className="text-2xl font-black text-destructive mt-0.5">{kpis.rejectedRecoveredLessons}</div>
+                  </div>
+                </div>
+              </section>
+
             </div>
+          </div> {/* closes Column 3 */}
 
-            <div className="flex flex-col items-start gap-3 sm:items-end">
-              <button
-                onClick={() => void handleRefresh()}
-                className="inline-flex items-center gap-2 rounded-full bg-ink px-5 py-2.5 text-sm font-medium text-paper transition-colors hover:bg-accent"
-              >
-                <RefreshCw className={`h-4 w-4 ${loading || failedJobsLoading ? "animate-spin" : ""}`} />
-                Refresh metrics
-              </button>
-              {lastUpdated ? <p className="text-xs text-muted">Last updated {lastUpdated}</p> : null}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-3">
-          {RECOVERY_TABS.map((tab) => {
-            const isActive = activeTab.key === tab.key;
-            return (
-              <button
-                key={tab.path}
-                onClick={() => navigate(tab.path)}
-                className={`rounded-full border px-4 py-2 text-sm font-medium transition-all ${
-                  isActive
-                    ? "border-accent bg-accent text-white shadow-sm shadow-accent/20"
-                    : "border-ink/10 bg-paper text-muted hover:border-accent/40 hover:text-ink"
-                }`}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="rounded-3xl border border-ink/10 bg-paper px-5 py-4 shadow-sm">
-          <p className="text-sm font-medium text-ink">{activeTab.label}</p>
-          <p className="mt-1 text-sm text-muted">{activeTab.description}</p>
-        </div>
-
-        {loading ? <Spinner label="Loading AI Recovery metrics..." /> : null}
-
-        {!loading && error ? (
-          <StatePanel
-            title="Unable to load AI Recovery metrics"
-            body={error}
-            tone="danger"
-            actionLabel="Retry"
-            onAction={() => void loadMetrics()}
-          />
-        ) : null}
-
-        {!loading && !error ? (
-          <>
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              <KpiCard
-                label="Failed jobs"
-                value={kpis.failedJobs}
-                description="lesson_gen_queue rows where status = 'failed'"
-                tone="danger"
-              />
-              <KpiCard
-                label="Pending AI tasks"
-                value={kpis.pendingAiTasks}
-                description="ai_tasks rows where target_area = 'lesson_generation' and status = 'pending'"
-                tone="warning"
-              />
-              <KpiCard
-                label="Completed AI tasks"
-                value={kpis.completedAiTasks}
-                description="ai_tasks rows where target_area = 'lesson_generation' and status = 'completed'"
-                tone="success"
-              />
-              <KpiCard
-                label="Lessons needing review"
-                value={kpis.lessonsNeedingReview}
-                description="lessons where teaching_contract->>'status' = 'needs_review'"
-                tone="warning"
-              />
-              <KpiCard
-                label="Approved recovered lessons"
-                value={kpis.approvedRecoveredLessons}
-                description="lessons where teaching_contract->>'status' = 'approved'"
-                tone="success"
-              />
-              <KpiCard
-                label="Rejected recovered lessons"
-                value={kpis.rejectedRecoveredLessons}
-                description="lessons where teaching_contract->>'status' = 'rejected'"
-                tone="danger"
-              />
-            </div>
-
-            {totalSignals === 0 ? (
-              <StatePanel
-                title="No recovery activity yet"
-                body="Supabase returned zero rows across the current recovery KPI queries, so there is no failed, pending, completed, or review-state recovery activity to show right now."
-              />
-            ) : null}
-
-            {renderRouteShell()}
-          </>
-        ) : null}
-      </section>
+        </div> {/* closes 3-Column Layout Container */}
+      </div>
 
       {renderDiagnosticsDrawer()}
       {renderRecoveredLessonDrawer()}
