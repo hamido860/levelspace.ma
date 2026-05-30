@@ -33,6 +33,10 @@ import {
   selectStudentFacingValidatedContent,
 } from '../services/curriculumValidation';
 
+// Performance optimization: Stable empty array reference to prevent cascading re-renders
+// during useLiveQuery loading states, as new array references trigger useMemo recalculations.
+const EMPTY_ARRAY: any[] = [];
+
 const normalizeLessonTitle = (title: string | null | undefined) =>
   String(title || '').trim().toLocaleLowerCase();
 
@@ -316,13 +320,13 @@ export const ClassroomView: React.FC = () => {
   };
 
   const module = useLiveQuery(() => id ? db.modules.get(id) : undefined, [id]);
-  const allLessons = useLiveQuery(() => id ? db.lessons.where('moduleId').equals(id).sortBy('createdAt') : [], [id]);
+  const allLessons = useLiveQuery(() => id ? db.lessons.where('moduleId').equals(id).sortBy('createdAt') : EMPTY_ARRAY, [id]);
 
   // Fetch notes for all lessons in this classroom
   const lessonIds = useMemo(() => (allLessons || []).map(l => l.id), [allLessons]);
   const classroomNotes = useLiveQuery(
     async () => {
-      if (lessonIds.length === 0) return [];
+      if (lessonIds.length === 0) return EMPTY_ARRAY;
       return db.notes.where('lessonId').anyOf(lessonIds).toArray();
     },
     [lessonIds]
@@ -330,7 +334,7 @@ export const ClassroomView: React.FC = () => {
 
   // Fetch all reminders/tasks to capture completed classroom checkmarks
   const remindersVal = useLiveQuery(() => db.tasks.toArray());
-  const reminders = remindersVal || [];
+  const reminders = remindersVal || EMPTY_ARRAY;
 
   // Local state to log Pomodoro focus timer starts dynamically
   const [pomodoroLogs, setPomodoroLogs] = useState<Array<{
@@ -436,7 +440,7 @@ export const ClassroomView: React.FC = () => {
       setPinnedLessonIds([]);
     }
   }, [pinStorageKey, allLessons?.length]);
-  const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
+  const dbSettings = useLiveQuery(() => db.settings.toArray()) || EMPTY_ARRAY;
   const settingsMap = useMemo(() => Object.fromEntries(dbSettings.map(s => [s.key, s.value])), [dbSettings]);
 
   const defaultDuration = Number(settingsMap['default_session_duration'] || localStorage.getItem('default_session_duration') || 25);
