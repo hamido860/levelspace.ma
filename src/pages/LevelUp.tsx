@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import DOMPurify from 'dompurify';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   FileText,
@@ -980,7 +981,7 @@ export const LevelUp: React.FC = () => {
                         style={{ boxShadow: 'var(--ls-shadow)' }}
                       >
                         <h4 className="font-bold text-slate-950 dark:text-ink group-hover:text-accent transition-all line-clamp-1">{article.title}</h4>
-                        <p className="text-xs text-slate-400 dark:text-ink-muted mt-1 line-clamp-2" dangerouslySetInnerHTML={{ __html: article.excerpt }} />
+                        <p className="text-xs text-slate-400 dark:text-ink-muted mt-1 line-clamp-2" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(article.excerpt) }} />
                       </button>
                     ))}
                   </div>
