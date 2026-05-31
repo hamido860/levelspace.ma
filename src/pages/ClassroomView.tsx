@@ -33,7 +33,9 @@ import {
   selectStudentFacingValidatedContent,
 } from '../services/curriculumValidation';
 import { HorizontalSlider } from '../components/HorizontalSlider';
-import { LayoutGrid, Rows3 } from 'lucide-react';
+import { LayoutGrid, Rows3, Shuffle } from 'lucide-react';
+import { getCardGradient, randomBanner, randomCardGradient } from '../utils/cardColors';
+
 
 const normalizeLessonTitle = (title: string | null | undefined) =>
   String(title || '').trim().toLocaleLowerCase();
@@ -297,6 +299,22 @@ export const ClassroomView: React.FC = () => {
   const [activeDomainKey, setActiveDomainKey] = useState<string>('all');
   // Layout mode: grid or carousel
   const [layoutMode, setLayoutMode] = useState<'grid' | 'carousel'>('grid');
+  // Per-lesson banner / color overrides (bulk randomize)
+  const [lessonBannerOverrides, setLessonBannerOverrides] = useState<Record<string, string>>({});
+  const [lessonColorOverrides, setLessonColorOverrides] = useState<Record<string, string>>({});
+
+  const handleRandomizeAllBanners = () => {
+    const bannerMap: Record<string, string> = {};
+    const colorMap: Record<string, string> = {};
+    const allCards = [...(lessons || []), ...(visibleTopicFallbackRows || [])];
+    allCards.forEach((item: any) => {
+      bannerMap[item.id] = randomBanner();
+      colorMap[item.id] = randomCardGradient();
+    });
+    setLessonBannerOverrides(prev => ({ ...prev, ...bannerMap }));
+    setLessonColorOverrides(prev => ({ ...prev, ...colorMap }));
+  };
+
 
   // ── Pinned lessons state (module-scoped, shared with LessonReader) ──
   const pinStorageKey = `levelspace_pinned_lessons_${id || 'global'}`;
@@ -1547,6 +1565,16 @@ export const ClassroomView: React.FC = () => {
                       <ShieldCheck size={14} /> Audit Curriculum
                     </button>
                   )}
+                  {/* Randomize All */}
+                  <button
+                    type="button"
+                    onClick={handleRandomizeAllBanners}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-slate-100 dark:bg-surface-low text-slate-600 dark:text-ink-muted hover:bg-accent hover:text-white dark:hover:bg-accent dark:hover:text-white transition-all"
+                    title="Randomize all lesson card images & colors"
+                  >
+                    <Shuffle size={13} />
+                    Randomize
+                  </button>
                 </div>
               </div>
 
@@ -1719,16 +1747,16 @@ export const ClassroomView: React.FC = () => {
                                       style={{ width: '280px', minWidth: '280px', boxShadow: 'var(--ls-shadow)' }}
                                     >
                                       <div className={`px-5 py-3.5 flex items-center gap-2 text-white shrink-0 ${
-                                        isClickable ? 'bg-[#007A87] dark:bg-accent' : 'bg-slate-500 dark:bg-slate-700'
+                                        isClickable ? `bg-gradient-to-r ${lessonColorOverrides[lesson.id] || getCardGradient(lesson.id)}` : 'bg-slate-500 dark:bg-slate-700'
                                       }`}>
                                         <BookOpen className="w-4 h-4 shrink-0 text-white" />
                                         <h3 className="text-sm font-bold leading-tight truncate text-white" title={lesson.title}>{lesson.title}</h3>
                                       </div>
                                       <div className="h-24 w-full overflow-hidden relative border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-surface-low shrink-0">
                                         <img
-                                          src={lesson.bannerImage || getLessonIllustration(lesson.title, lesson.subject || module?.name)}
+                                          src={lessonBannerOverrides[lesson.id] || lesson.bannerImage || getLessonIllustration(lesson.title, lesson.subject || module?.name)}
                                           alt={lesson.title}
-                                          className={`w-full h-full object-cover transition-transform duration-700 ${isClickable ? 'group-hover:scale-105' : ''}`}
+                                          className={`w-full h-full object-cover transition-transform duration-700 opacity-75 ${isClickable ? 'group-hover:scale-105' : ''}`}
                                         />
                                       </div>
                                       <div className="p-4 flex-1 flex flex-col space-y-3">
@@ -1776,15 +1804,15 @@ export const ClassroomView: React.FC = () => {
                                   className="bg-white border border-slate-200 rounded-3xl overflow-hidden flex flex-col group hover:border-accent/30 hover:shadow-lg transition-all dark:bg-paper dark:border-white/8 shadow-sm cursor-pointer"
                                   style={{ width: '240px', minWidth: '240px' }}
                                 >
-                                  <div className="bg-[#007A87] px-4 py-3 flex items-center gap-2 text-white dark:bg-accent shrink-0">
+                                  <div className={`bg-gradient-to-r ${lessonColorOverrides[topic.id] || getCardGradient(topic.id)} px-4 py-3 flex items-center gap-2 text-white shrink-0`}>
                                     <BookOpen className="w-4 h-4 shrink-0 text-white" />
                                     <h3 className="text-sm font-bold truncate text-white" title={topic.title}>{topic.title}</h3>
                                   </div>
                                   <div className="h-20 w-full overflow-hidden border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-surface-low shrink-0">
                                     <img
-                                      src={getLessonIllustration(topic.title, module?.name)}
+                                      src={lessonBannerOverrides[topic.id] || getLessonIllustration(topic.title, module?.name)}
                                       alt={topic.title}
-                                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 opacity-75"
                                     />
                                   </div>
                                   <div className="p-3 flex-1 flex flex-col">
@@ -1845,9 +1873,7 @@ export const ClassroomView: React.FC = () => {
                                 style={{ boxShadow: 'var(--ls-shadow)' }}
                               >
                                 {/* Top Redesigned Teal Header Bar */}
-                                <div className={`px-5 py-3.5 flex items-center justify-between text-white shrink-0 ${
-                                  isClickable ? 'bg-[#007A87] dark:bg-accent' : 'bg-slate-500 dark:bg-slate-700'
-                                }`}>
+                                <div className={`bg-gradient-to-r ${lessonColorOverrides[lesson.id] || getCardGradient(lesson.id)} px-5 py-3.5 flex items-center justify-between text-white shrink-0`}>
                                   <div className="flex items-center gap-2 min-w-0">
                                     <BookOpen className="w-4 h-4 shrink-0 text-white" />
                                     <h3 className="text-sm font-bold leading-tight truncate text-white dark:text-white" title={lesson.title}>{lesson.title}</h3>
@@ -1865,9 +1891,9 @@ export const ClassroomView: React.FC = () => {
                                 {/* Horizontal Dynamic Illustration Banner */}
                                 <div className="h-24 w-full overflow-hidden relative border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-surface-low shrink-0">
                                   <img 
-                                    src={lesson.bannerImage || getLessonIllustration(lesson.title, lesson.subject || module?.name)}
+                                    src={lessonBannerOverrides[lesson.id] || lesson.bannerImage || getLessonIllustration(lesson.title, lesson.subject || module?.name)}
                                     alt={lesson.title}
-                                    className={`w-full h-full object-cover transition-transform duration-700 ${isClickable ? 'group-hover:scale-105' : ''}`}
+                                    className={`w-full h-full object-cover transition-transform duration-700 opacity-75 ${isClickable ? 'group-hover:scale-105' : ''}`}
                                   />
                                   <button
                                     type="button"
@@ -2023,8 +2049,7 @@ export const ClassroomView: React.FC = () => {
                               className="bg-white border border-slate-200 rounded-3xl overflow-hidden flex flex-col group hover:border-accent/30 hover:shadow-lg transition-all dark:bg-paper dark:border-white/8 shadow-sm cursor-pointer"
                               style={{ boxShadow: 'var(--ls-shadow)' }}
                             >
-                              {/* Top Redesigned Teal Header Bar */}
-                              <div className="bg-[#007A87] px-5 py-3.5 flex items-center justify-between text-white dark:bg-accent shrink-0">
+                              <div className={`bg-gradient-to-r ${lessonColorOverrides[topic.id] || getCardGradient(topic.id)} px-5 py-3.5 flex items-center justify-between text-white shrink-0`}>
                                 <div className="flex items-center gap-2 min-w-0">
                                   <BookOpen className="w-4 h-4 shrink-0 text-white" />
                                   <h3 className="text-sm font-bold leading-tight truncate text-white dark:text-white" title={topic.title}>{topic.title}</h3>
@@ -2042,9 +2067,9 @@ export const ClassroomView: React.FC = () => {
                               {/* Horizontal Dynamic Illustration Banner */}
                               <div className="h-24 w-full overflow-hidden relative border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-surface-low shrink-0">
                                 <img 
-                                  src={getLessonIllustration(topic.title, module?.name)}
+                                  src={lessonBannerOverrides[topic.id] || getLessonIllustration(topic.title, module?.name)}
                                   alt={topic.title}
-                                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 opacity-75"
                                 />
                               </div>
 

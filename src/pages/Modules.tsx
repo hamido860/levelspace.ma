@@ -25,7 +25,8 @@ import {
   LayoutGrid,
   Rows3,
   TrendingUp,
-  Zap
+  Zap,
+  Shuffle
 } from 'lucide-react';
 import { HorizontalSlider } from '../components/HorizontalSlider';
 import { generateCurriculum, checkAIProvider } from '../services/geminiService';
@@ -38,6 +39,7 @@ import { db } from '../db/db';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { AnnouncementBanner } from '../components/AnnouncementBanner';
+import { getCardGradient, randomBanner, randomCardGradient, CARD_GRADIENTS } from '../utils/cardColors';
 
 const relativeTime = (ts: number) => {
   const diff = Date.now() - ts;
@@ -558,6 +560,20 @@ export const Modules: React.FC = () => {
 
   // Layout mode: grid or carousel
   const [layoutMode, setLayoutMode] = useState<'grid' | 'carousel'>('grid');
+  // Per-module banner and color overrides (for bulk randomize)
+  const [moduleBannerOverrides, setModuleBannerOverrides] = useState<Record<string, string>>({});
+  const [moduleColorOverrides, setModuleColorOverrides] = useState<Record<string, string>>({});
+
+  const handleRandomizeAllBanners = () => {
+    const bannerMap: Record<string, string> = {};
+    const colorMap: Record<string, string> = {};
+    filteredModules.forEach(m => {
+      bannerMap[m.id] = randomBanner();
+      colorMap[m.id] = randomCardGradient();
+    });
+    setModuleBannerOverrides(bannerMap);
+    setModuleColorOverrides(colorMap);
+  };
 
   // --- Pomodoro state for right sidebar ---
   const [timerSeconds, setTimerSeconds] = useState(25 * 60);
@@ -628,13 +644,15 @@ export const Modules: React.FC = () => {
                       Slide
                     </button>
                   </div>
-                  <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:text-ink-muted dark:hover:bg-white/5 dark:hover:text-ink transition-all">
-                    <Filter className="w-3 h-3" />
-                    Filter
-                  </button>
-                  <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:text-ink-muted dark:hover:bg-white/5 dark:hover:text-ink transition-all">
-                    <ArrowUpDown className="w-3 h-3" />
-                    Sort
+                  {/* Randomize All */}
+                  <button
+                    type="button"
+                    onClick={handleRandomizeAllBanners}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-slate-100 dark:bg-surface-low text-slate-600 dark:text-ink-muted hover:bg-accent hover:text-white dark:hover:bg-accent dark:hover:text-white transition-all"
+                    title="Randomize all module card images & colors"
+                  >
+                    <Shuffle size={13} />
+                    Randomize
                   </button>
                 </div>
               </div>
@@ -686,7 +704,7 @@ export const Modules: React.FC = () => {
                       className="bg-white border border-slate-200 rounded-3xl overflow-hidden flex flex-col group hover:border-accent/30 hover:shadow-lg transition-all dark:bg-paper dark:border-white/8 shadow-sm cursor-pointer"
                       style={{ width: '300px', minWidth: '300px' }}
                     >
-                      <div className="bg-[#007A87] px-5 py-3.5 flex items-center justify-between text-white dark:bg-accent shrink-0">
+                      <div className={`bg-gradient-to-r ${moduleColorOverrides[module.id] || getCardGradient(module.id)} px-5 py-3.5 flex items-center justify-between text-white shrink-0`}>
                         <div className="flex items-center gap-2">
                           <BookOpen className="w-5 h-5 shrink-0 text-white" />
                           <h3 className="text-sm font-bold leading-tight truncate text-white max-w-[160px]">{module.name}</h3>
@@ -699,9 +717,9 @@ export const Modules: React.FC = () => {
                       </div>
                       <div className="h-24 w-full overflow-hidden relative border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-surface-low shrink-0">
                         <img
-                          src={getLessonIllustration(module.name, module.category)}
+                          src={moduleBannerOverrides[module.id] || getLessonIllustration(module.name, module.category)}
                           alt={module.name}
-                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 opacity-75"
                         />
                       </div>
                       <div className="p-4 flex-1 flex flex-col space-y-3">
@@ -753,8 +771,8 @@ export const Modules: React.FC = () => {
                   onClick={() => navigate(`/classroom/${module.id}`)}
                   className="bg-white border border-slate-200 rounded-3xl overflow-hidden flex flex-col group hover:border-accent/30 hover:shadow-lg transition-all dark:bg-paper dark:border-white/8 shadow-sm"
                 >
-                  {/* Top Redesigned Teal Header Bar */}
-                  <div className="bg-[#007A87] px-5 py-3.5 flex items-center justify-between text-white dark:bg-accent shrink-0">
+                  {/* Top Redesigned Header Bar with randomized gradient */}
+                  <div className={`bg-gradient-to-r ${moduleColorOverrides[module.id] || getCardGradient(module.id)} px-5 py-3.5 flex items-center justify-between text-white shrink-0`}>
                     <div className="flex items-center gap-2">
                       <BookOpen className="w-5 h-5 shrink-0 text-white" />
                       <h3 className="text-sm font-bold leading-tight truncate text-white max-w-[160px]">{module.name}</h3>
@@ -772,9 +790,9 @@ export const Modules: React.FC = () => {
                   {/* Horizontal Dynamic Illustration Banner */}
                   <div className="h-24 w-full overflow-hidden relative border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-surface-low shrink-0">
                     <img 
-                      src={getLessonIllustration(module.name, module.category)}
+                      src={moduleBannerOverrides[module.id] || getLessonIllustration(module.name, module.category)}
                       alt={module.name}
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 opacity-75"
                     />
                   </div>
 
