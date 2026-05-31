@@ -297,6 +297,7 @@ export const ClassroomView: React.FC = () => {
   const [activeDomainKey, setActiveDomainKey] = useState<string>('all');
   // Layout mode: grid or carousel
   const [layoutMode, setLayoutMode] = useState<'grid' | 'carousel'>('grid');
+  const [navigationCurriculumIds, setNavigationCurriculumIds] = useState<{ gradeId?: string; subjectId?: string }>({});
 
   // ── Pinned lessons state (module-scoped, shared with LessonReader) ──
   const pinStorageKey = `levelspace_pinned_lessons_${id || 'global'}`;
@@ -321,6 +322,14 @@ export const ClassroomView: React.FC = () => {
 
   const module = useLiveQuery(() => id ? db.modules.get(id) : undefined, [id]);
   const allLessons = useLiveQuery(() => id ? db.lessons.where('moduleId').equals(id).sortBy('createdAt') : [], [id]);
+  const lessonNavigationState = (extra: Record<string, unknown> = {}) => ({
+    from: `/classroom/${id}`,
+    classroomId: id,
+    moduleId: module?.id || id,
+    gradeId: navigationCurriculumIds.gradeId,
+    subjectId: navigationCurriculumIds.subjectId,
+    ...extra,
+  });
 
   // Fetch notes for all lessons in this classroom
   const lessonIds = useMemo(() => (allLessons || []).map(l => l.id), [allLessons]);
@@ -485,6 +494,29 @@ export const ClassroomView: React.FC = () => {
   const currentGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
   const currentCountry = settingsMap['selected_country'] || localStorage.getItem('selected_country') || '';
   const selectedBacTrack = settingsMap['selected_bac_track'] || localStorage.getItem('selected_bac_track') || '';
+  useEffect(() => {
+    if (!module) {
+      setNavigationCurriculumIds({});
+      return;
+    }
+
+    let isCancelled = false;
+    resolveCurriculumIds(currentGrade, module.name, module.category).then(({ gradeId, subjectId }) => {
+      if (!isCancelled) {
+        setNavigationCurriculumIds({
+          gradeId: gradeId || undefined,
+          subjectId: subjectId || undefined,
+        });
+      }
+    }).catch((error) => {
+      console.warn('[ClassroomView] Failed to resolve lesson navigation curriculum IDs:', error);
+      if (!isCancelled) setNavigationCurriculumIds({});
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [currentGrade, module]);
   const gradeCandidates = useMemo(() => getGradeCandidates(currentGrade), [currentGrade]);
   const normalizedGradeCandidates = useMemo(
     () => new Set(gradeCandidates.map((grade) => String(grade || '').trim().toLocaleLowerCase())),
@@ -1222,7 +1254,7 @@ export const ClassroomView: React.FC = () => {
         }
 
         if (autoNavigate) {
-          navigate(`/lesson/${newLessonId}`);
+          navigate(`/lesson/${newLessonId}`, { state: lessonNavigationState() });
         }
       }
     } catch (error) {
@@ -1827,15 +1859,15 @@ export const ClassroomView: React.FC = () => {
                                     const exercises = (lesson.blocks || []).filter((b: any) => b.purpose === 'practice' || b.purpose === 'exam' || b.type === 'practice' || b.type === 'exam');
                                     const hasTests = quizzes.length > 0 || exercises.length > 0;
                                     if (hasTests) {
-                                      navigate(`/lesson/${lesson.id}`, { state: { startAtTest: true } });
+                                      navigate(`/lesson/${lesson.id}`, { state: lessonNavigationState({ startAtTest: true }) });
                                     } else {
-                                      navigate(`/lesson/${lesson.id}`);
+                                      navigate(`/lesson/${lesson.id}`, { state: lessonNavigationState() });
                                     }
                                     return;
                                   }
 
                                   if (target.closest('.card-footer-actions') || target.closest('button')) return;
-                                  if (isClickable) navigate(`/lesson/${lesson.id}`);
+                                  if (isClickable) navigate(`/lesson/${lesson.id}`, { state: lessonNavigationState() });
                                 }}
                                 className={`bg-white border border-slate-200 rounded-3xl overflow-hidden flex flex-col group transition-all dark:bg-paper dark:border-white/8 shadow-sm ${
                                   isClickable 
@@ -1942,7 +1974,7 @@ export const ClassroomView: React.FC = () => {
                                       <div className="flex items-center gap-2 card-footer-actions">
                                         <button
                                           type="button"
-                                          onClick={(e) => { e.stopPropagation(); navigate(`/lesson/${lesson.id}`); }}
+                                          onClick={(e) => { e.stopPropagation(); navigate(`/lesson/${lesson.id}`, { state: lessonNavigationState() }); }}
                                           className="flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 text-xs font-bold text-white transition-colors shadow-sm"
                                         >
                                           <Play className="w-3 h-3 fill-current text-white" />
@@ -1956,7 +1988,7 @@ export const ClassroomView: React.FC = () => {
                                             return (
                                               <button
                                                 type="button"
-                                                onClick={(e) => { e.stopPropagation(); navigate(`/lesson/${lesson.id}`, { state: { startAtTest: true } }); }}
+                                                onClick={(e) => { e.stopPropagation(); navigate(`/lesson/${lesson.id}`, { state: lessonNavigationState({ startAtTest: true }) }); }}
                                                 className="rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-700 transition-colors dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:bg-surface-low flex items-center gap-1.5 shadow-sm"
                                               >
                                                 <Target size={12} className="text-accent shrink-0" />
@@ -1967,7 +1999,7 @@ export const ClassroomView: React.FC = () => {
                                           return (
                                             <button
                                               type="button"
-                                              onClick={(e) => { e.stopPropagation(); navigate(`/lesson/${lesson.id}`); }}
+                                              onClick={(e) => { e.stopPropagation(); navigate(`/lesson/${lesson.id}`, { state: lessonNavigationState() }); }}
                                               className="rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-700 transition-colors dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:bg-surface-low"
                                             >
                                               View Plan
@@ -2136,7 +2168,7 @@ export const ClassroomView: React.FC = () => {
                       {quizzes.map((quiz) => (
                         <div 
                           key={quiz.id} 
-                          onClick={() => navigate(`/lesson/${quiz.lesson_id}`, { state: { startAtTest: true } })}
+                          onClick={() => navigate(`/lesson/${quiz.lesson_id}`, { state: lessonNavigationState({ startAtTest: true }) })}
                           className="bg-white border border-slate-200 p-5 rounded-2xl hover:border-accent/30 transition-all cursor-pointer hover:shadow-md dark:bg-paper dark:border-white/8 shadow-sm"
                         >
                           <h4 className="font-bold text-slate-950 dark:text-ink">{quiz.title}</h4>
@@ -2171,7 +2203,7 @@ export const ClassroomView: React.FC = () => {
                       {exercises.map((exercise) => (
                         <div 
                           key={exercise.id} 
-                          onClick={() => navigate(`/lesson/${exercise.lesson_id}`, { state: { startAtTest: true } })}
+                          onClick={() => navigate(`/lesson/${exercise.lesson_id}`, { state: lessonNavigationState({ startAtTest: true }) })}
                           className="bg-white border border-slate-200 p-5 rounded-2xl hover:border-accent/30 transition-all cursor-pointer hover:shadow-md dark:bg-paper dark:border-white/8 shadow-sm"
                         >
                           <h4 className="font-bold text-slate-950 dark:text-ink">{exercise.title}</h4>

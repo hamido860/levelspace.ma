@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { BookOpen, Pause, Play, SkipForward } from 'lucide-react';
 import { SessionPlan } from '../services/planSessionService';
 import { TYPE_META } from './PlanSessionModal';
@@ -14,6 +14,7 @@ export function LiveHUD({
   onBlockDone: (index: number) => void;
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [blockIndex, setBlockIndex] = useState(0);
   const [secondsLeft, setSecondsLeft] = useState(plan.blocks[0].duration * 60);
   const [running, setRunning] = useState(true);
@@ -98,7 +99,7 @@ export function LiveHUD({
       <div className="flex gap-3 w-full max-w-xs">
         {block.lessonId && (
           <button
-            onClick={() => navigate(`/lesson/${block.lessonId}`)}
+            onClick={() => navigate(`/lesson/${block.lessonId}`, { state: { from: location.pathname } })}
             className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-slate-200 dark:border-white/8 text-xs font-semibold text-slate-700 dark:text-ink-secondary hover:bg-surface-low dark:hover:bg-surface-mid transition-colors"
           >
             <BookOpen size={13} />

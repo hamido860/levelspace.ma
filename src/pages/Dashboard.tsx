@@ -266,7 +266,7 @@ export const Dashboard: React.FC = () => {
           status: (lesson as any)._pending ? 'pending' : 'done',
           createdAt: Date.now()
         });
-        navigate(`/lesson/${newLessonId}`);
+        navigate(`/lesson/${newLessonId}`, { state: { from: '/dashboard', moduleId: selectedModule.id } });
       }
     } catch (error) {
       console.error("Failed to fetch or generate lesson:", error);
@@ -779,7 +779,6 @@ export const Dashboard: React.FC = () => {
         isOpen={isOnboardingOpen}
         onComplete={() => {
           setIsOnboardingOpen(false);
-          window.location.reload();
         }}
       />
 
