@@ -312,6 +312,8 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
   const [expandedBlockId, setExpandedBlockId] = useState<string | null>(displayedBlocks[0]?.id || null);
   const [viewedBlockIds, setViewedBlockIds] = useState<Set<string>>(new Set());
   const [activeBlockId, setActiveBlockId] = useState<string | null>(displayedBlocks[0]?.id || null);
+  // Slide direction: +1 = moving forward (next), -1 = moving backward (prev)
+  const [slideDirection, setSlideDirection] = useState<1 | -1>(1);
 
   // Audio speech boundary states for Karaoke visualizer
   const [speakingState, setSpeakingState] = useState<{
@@ -351,6 +353,7 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
     if (displayedBlocks.length === 0) return;
     if (currentBlockIndex < displayedBlocks.length - 1) {
       const nextBlock = displayedBlocks[currentBlockIndex + 1];
+      setSlideDirection(1);
       setExpandedBlockId(nextBlock.id);
       setActiveBlockId(nextBlock.id);
       setViewedBlockIds((prev) => {
@@ -371,6 +374,7 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
   const handleBackSection = () => {
     if (currentBlockIndex > 0) {
       const prevBlock = displayedBlocks[currentBlockIndex - 1];
+      setSlideDirection(-1);
       setExpandedBlockId(prevBlock.id);
       setActiveBlockId(prevBlock.id);
       setSpeakingState(null);
@@ -589,6 +593,16 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
                 <span>Edit Banner</span>
               </button>
             )}
+            {/* Exit Lesson Button - always visible top-right */}
+            <button
+              type="button"
+              onClick={onBack}
+              className="absolute top-3 right-3 z-20 flex items-center gap-1.5 bg-black/50 hover:bg-black/70 backdrop-blur-md border border-white/20 text-white px-3 py-1.5 rounded-full text-[10px] font-bold tracking-wider uppercase transition-all duration-200 shadow-md cursor-pointer hover:scale-105 active:scale-95"
+              title="Exit Lesson"
+            >
+              <ArrowLeft size={12} className="stroke-[2.5]" />
+              <span>Exit</span>
+            </button>
           </div>
 
           {/* Compact Progress, Filters & Tools Ribbon */}
@@ -726,68 +740,86 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
                 </div>
               )}
 
-              {/* Display blocks */}
-              <div className="flex-grow px-2">
+              {/* Display blocks — Slide animation via AnimatePresence */}
+              <div className="flex-grow px-2 overflow-hidden">
                 {displayedBlocks.length > 0 ? (() => {
                   const currentBlock = displayedBlocks[currentBlockIndex];
                   if (!currentBlock) return null;
                   const isViewed = viewedBlockIds.has(currentBlock.id);
 
-                  return (
-                    <div className="w-full h-full flex flex-col space-y-4 relative">
-                      <div className="pt-2 text-slate-700 leading-relaxed dark:text-ink-secondary">
-                        <LessonBlock
-                          item={currentBlock}
-                          isViewed={isViewed}
-                          reading={isSpeaking}
-                          quizAnswered={quizAnswered}
-                          quizCorrect={quizCorrect}
-                          quizSelectedOption={quizSelectedOption}
-                          exerciseResult={exerciseResult}
-                          exerciseHintShown={exerciseHintShown}
-                          examResult={examResult}
-                          examHintShown={examHintShown}
-                          onQuizAnswer={onQuizAnswer}
-                          onExerciseSubmit={onExerciseSubmit}
-                          onShowExerciseHint={onShowExerciseHint}
-                          onExamSubmit={onExamSubmit}
-                          onShowExamHint={onShowExamHint}
-                        />
+                  const slideVariants = {
+                    enter: (dir: number) => ({ x: dir > 0 ? '100%' : '-100%', opacity: 0 }),
+                    center: { x: 0, opacity: 1 },
+                    exit: (dir: number) => ({ x: dir > 0 ? '-100%' : '100%', opacity: 0 }),
+                  };
 
-                        {/* Available status tag for summary block */}
-                        {currentBlockIndex === displayedBlocks.length - 1 && (
-                          <div className="flex items-center justify-between mt-6 pt-3 border-t border-slate-100 dark:border-white/5">
-                            <span className="text-[10px] text-slate-400 dark:text-ink-muted italic">Résumé de la leçon completed</span>
-                            {hasTests ? (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const testBlock = displayedBlocks.find(b => b.purpose === 'quiz' || b.purpose === 'practice' || b.purpose === 'exam');
-                                  if (testBlock) {
-                                    setExpandedBlockId(testBlock.id);
-                                    setActiveBlockId(testBlock.id);
-                                    setViewedBlockIds(prev => {
-                                      const next = new Set(prev);
-                                      next.add(testBlock.id);
-                                      return next;
-                                    });
-                                  }
-                                }}
-                                className="inline-flex items-center gap-1.5 text-[10px] font-extrabold text-[#1B8354] dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 px-3 py-1.5 rounded-full transition-all cursor-pointer shadow-sm animate-pulse"
-                              >
-                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                                Take Test
-                              </button>
-                            ) : (
-                              <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-slate-400 dark:text-ink-muted">
-                                <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
-                                No test available
-                              </span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                  return (
+                    <AnimatePresence mode="wait" custom={slideDirection}>
+                      <motion.div
+                        key={currentBlock.id}
+                        custom={slideDirection}
+                        variants={slideVariants}
+                        initial="enter"
+                        animate="center"
+                        exit="exit"
+                        transition={{ type: 'spring', stiffness: 300, damping: 30, mass: 0.8 }}
+                        className="w-full flex flex-col space-y-4"
+                      >
+                        <div className="pt-2 text-slate-700 leading-relaxed dark:text-ink-secondary">
+                          <LessonBlock
+                            item={currentBlock}
+                            isViewed={isViewed}
+                            reading={isSpeaking}
+                            quizAnswered={quizAnswered}
+                            quizCorrect={quizCorrect}
+                            quizSelectedOption={quizSelectedOption}
+                            exerciseResult={exerciseResult}
+                            exerciseHintShown={exerciseHintShown}
+                            examResult={examResult}
+                            examHintShown={examHintShown}
+                            onQuizAnswer={onQuizAnswer}
+                            onExerciseSubmit={onExerciseSubmit}
+                            onShowExerciseHint={onShowExerciseHint}
+                            onExamSubmit={onExamSubmit}
+                            onShowExamHint={onShowExamHint}
+                          />
+
+                          {/* Available status tag for summary block */}
+                          {currentBlockIndex === displayedBlocks.length - 1 && (
+                            <div className="flex items-center justify-between mt-6 pt-3 border-t border-slate-100 dark:border-white/5">
+                              <span className="text-[10px] text-slate-400 dark:text-ink-muted italic">Résumé de la leçon completed</span>
+                              {hasTests ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const testBlock = displayedBlocks.find(b => b.purpose === 'quiz' || b.purpose === 'practice' || b.purpose === 'exam');
+                                    if (testBlock) {
+                                      setSlideDirection(1);
+                                      setExpandedBlockId(testBlock.id);
+                                      setActiveBlockId(testBlock.id);
+                                      setViewedBlockIds(prev => {
+                                        const next = new Set(prev);
+                                        next.add(testBlock.id);
+                                        return next;
+                                      });
+                                    }
+                                  }}
+                                  className="inline-flex items-center gap-1.5 text-[10px] font-extrabold text-[#1B8354] dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 px-3 py-1.5 rounded-full transition-all cursor-pointer shadow-sm animate-pulse"
+                                >
+                                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                  Take Test
+                                </button>
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-slate-400 dark:text-ink-muted">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+                                  No test available
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </motion.div>
+                    </AnimatePresence>
                   );
                 })() : (
                   <div className="text-center py-12 text-slate-400 dark:text-ink-muted bg-slate-50/50 dark:bg-surface-low rounded-2xl border border-solid border-slate-200/60 dark:border-white/5">

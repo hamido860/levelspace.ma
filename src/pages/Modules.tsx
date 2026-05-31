@@ -12,6 +12,7 @@ import {
   Library,
   Brain,
   ArrowRight,
+  ArrowLeft,
   Info,
   Sparkles,
   Loader2,
@@ -22,9 +23,11 @@ import {
   RefreshCw,
   Target,
   LayoutGrid,
+  Rows3,
   TrendingUp,
   Zap
 } from 'lucide-react';
+import { HorizontalSlider } from '../components/HorizontalSlider';
 import { generateCurriculum, checkAIProvider } from '../services/geminiService';
 import { getClassroomLoadPlan, mapSubjectsToModules, mergeModulesWithAiSuggestions, shouldRequestAiCurriculumSuggestions } from '../services/classroomLoader';
 import { getGradeCandidates, getSubjectCandidates, normalizeCurriculumValue } from '../services/curriculumMatching';
@@ -552,6 +555,9 @@ export const Modules: React.FC = () => {
     m.code.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Layout mode: grid or carousel
+  const [layoutMode, setLayoutMode] = useState<'grid' | 'carousel'>('grid');
+
   // --- Pomodoro state for right sidebar ---
   const [timerSeconds, setTimerSeconds] = useState(25 * 60);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
@@ -580,8 +586,47 @@ export const Modules: React.FC = () => {
             <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6">
               {/* Page Header */}
               <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/5 pb-5">
-                <h1 className="ls-page-title text-slate-950 dark:text-ink">Classrooms</h1>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => navigate('/dashboard')}
+                    className="flex items-center justify-center w-8 h-8 rounded-full bg-slate-100 hover:bg-accent hover:text-white dark:bg-surface-low dark:hover:bg-accent text-slate-600 dark:text-ink-secondary transition-all shadow-sm shrink-0 cursor-pointer"
+                    title="Back to Dashboard"
+                  >
+                    <ArrowLeft size={16} className="stroke-[2.5]" />
+                  </button>
+                  <h1 className="ls-page-title text-slate-950 dark:text-ink">Classrooms</h1>
+                </div>
                 <div className="flex items-center gap-2">
+                  {/* Layout Mode Toggle */}
+                  <div className="flex items-center gap-1 bg-slate-100 dark:bg-surface-low rounded-xl p-1">
+                    <button
+                      type="button"
+                      onClick={() => setLayoutMode('grid')}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all ${
+                        layoutMode === 'grid'
+                          ? 'bg-white dark:bg-paper text-slate-800 dark:text-ink shadow-sm'
+                          : 'text-slate-500 dark:text-ink-muted hover:text-slate-700 dark:hover:text-ink'
+                      }`}
+                      title="Grid view"
+                    >
+                      <LayoutGrid size={13} />
+                      Grid
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLayoutMode('carousel')}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all ${
+                        layoutMode === 'carousel'
+                          ? 'bg-white dark:bg-paper text-slate-800 dark:text-ink shadow-sm'
+                          : 'text-slate-500 dark:text-ink-muted hover:text-slate-700 dark:hover:text-ink'
+                      }`}
+                      title="Carousel view"
+                    >
+                      <Rows3 size={13} />
+                      Slide
+                    </button>
+                  </div>
                   <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:text-ink-muted dark:hover:bg-white/5 dark:hover:text-ink transition-all">
                     <Filter className="w-3 h-3" />
                     Filter
@@ -616,8 +661,77 @@ export const Modules: React.FC = () => {
                 </div>
               </section>
 
-        {/* Modules Grid */}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        {/* Modules List */}
+        {layoutMode === 'carousel' ? (
+          // ---- CAROUSEL (Horizontal Slider) MODE ----
+          <div className="mt-2">
+            <AnimatePresence>
+              {isLoading ? (
+                <div className="py-32 flex flex-col items-center justify-center space-y-4">
+                  <Loader2 className="w-8 h-8 text-accent animate-spin" />
+                  <p className="text-[10px] font-mono text-slate-500 dark:text-ink-muted">Curating from trusted resources...</p>
+                </div>
+              ) : filteredModules.length > 0 ? (
+                <HorizontalSlider>
+                  {filteredModules.map((module, i) => (
+                    <motion.div
+                      key={module.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.05, duration: 0.4 }}
+                      onClick={() => navigate(`/classroom/${module.id}`)}
+                      className="bg-white border border-slate-200 rounded-3xl overflow-hidden flex flex-col group hover:border-accent/30 hover:shadow-lg transition-all dark:bg-paper dark:border-white/8 shadow-sm cursor-pointer"
+                      style={{ width: '300px', minWidth: '300px' }}
+                    >
+                      <div className="bg-[#007A87] px-5 py-3.5 flex items-center justify-between text-white dark:bg-accent shrink-0">
+                        <div className="flex items-center gap-2">
+                          <BookOpen className="w-5 h-5 shrink-0 text-white" />
+                          <h3 className="text-sm font-bold leading-tight truncate text-white max-w-[160px]">{module.name}</h3>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          {module.category && module.category !== module.name && (
+                            <span className="bg-white/15 text-white text-[9px] font-bold px-2 py-0.5 rounded-md backdrop-blur-sm truncate max-w-[90px]">{module.category}</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="h-24 w-full overflow-hidden relative border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-surface-low shrink-0">
+                        <img
+                          src={getLessonIllustration(module.name, module.category)}
+                          alt={module.name}
+                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                        />
+                      </div>
+                      <div className="p-4 flex-1 flex flex-col space-y-3">
+                        <div className="flex items-center gap-2 text-xs">
+                          <BookOpen className="w-4 h-4 text-slate-400" />
+                          <span className="font-bold text-slate-800 dark:text-ink">{lessonCountByModuleId[module.id] ?? 0} Lessons</span>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-[11px] font-bold">
+                            <span className="text-slate-400 dark:text-ink-muted">Progress</span>
+                            <span className="text-slate-800 dark:text-ink">{module.progress}%</span>
+                          </div>
+                          <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden dark:bg-surface-mid">
+                            <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${module.progress}%` }} />
+                          </div>
+                        </div>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); navigate(`/classroom/${module.id}`); }}
+                          className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 text-xs font-bold text-white transition-colors shadow-sm mt-auto"
+                        >
+                          <Play className="w-3 h-3 fill-current text-white" />
+                          Start Lesson
+                        </button>
+                      </div>
+                    </motion.div>
+                  ))}
+                </HorizontalSlider>
+              ) : null}
+            </AnimatePresence>
+          </div>
+        ) : (
+          // ---- GRID MODE ----
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <AnimatePresence mode="popLayout">
             {isLoading ? (
               <div className="col-span-full py-32 flex flex-col items-center justify-center space-y-4 bg-white dark:bg-paper">
@@ -749,7 +863,8 @@ export const Modules: React.FC = () => {
               </motion.div>
             )}
           </AnimatePresence>
-        </div>
+          </div>
+        )}
         {/* Selection Summary Bar */}
               <motion.div 
                 initial={{ y: 50, opacity: 0 }}

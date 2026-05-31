@@ -775,7 +775,14 @@ export const LessonView: React.FC = () => {
           exerciseHintShown={exerciseHintShown}
           examResult={examResult}
           examHintShown={examHintShown}
-          onBack={() => navigate('/dashboard')}
+          onBack={() => {
+            const moduleId = effectiveLesson?.moduleId || curriculumContext?.subject_id || lesson?.moduleId;
+            if (moduleId) {
+              navigate(`/classroom/${moduleId}`);
+            } else {
+              navigate('/dashboard');
+            }
+          }}
           onDomainChange={setActiveDomain}
           onAddNote={() => setShowNoteModal(true)}
           onReadBlock={toggleReadAloud}
