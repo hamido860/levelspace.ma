@@ -25,9 +25,7 @@ import {
   LayoutGrid,
   Rows3,
   TrendingUp,
-  Zap,
-  ChevronDown,
-  ChevronUp
+  Zap
 } from 'lucide-react';
 import { HorizontalSlider } from '../components/HorizontalSlider';
 import { generateCurriculum, checkAIProvider } from '../services/geminiService';
@@ -612,7 +610,6 @@ export const Modules: React.FC = () => {
   // --- Pomodoro state for right sidebar ---
   const [timerSeconds, setTimerSeconds] = useState(25 * 60);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
-  const [showMetrics, setShowMetrics] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   useEffect(() => {
     if (isTimerRunning) {
@@ -679,16 +676,6 @@ export const Modules: React.FC = () => {
                       Slide
                     </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowMetrics((current) => !current)}
-                    aria-expanded={showMetrics}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:text-ink-muted dark:hover:bg-white/5 dark:hover:text-ink transition-all"
-                  >
-                    <LayoutGrid className="w-3 h-3" />
-                    {showMetrics ? 'Hide metrics' : 'Show metrics'}
-                    {showMetrics ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                  </button>
                   <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:text-ink-muted dark:hover:bg-white/5 dark:hover:text-ink transition-all">
                     <Filter className="w-3 h-3" />
                     Filter
@@ -703,7 +690,7 @@ export const Modules: React.FC = () => {
               <AnnouncementBanner bannerKey="classrooms_ad_cta" />
 
               {/* Symmetrical Stats Row */}
-              {showMetrics && <section className="mt-2">
+              <section className="mt-2">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   {[
                     { label: 'Total Subjects', value: modules.length, icon: <LayoutGrid size={16} /> },
@@ -723,7 +710,7 @@ export const Modules: React.FC = () => {
                     </div>
                   ))}
                 </div>
-              </section>}
+              </section>
 
         {/* Modules List */}
         {layoutMode === 'carousel' ? (

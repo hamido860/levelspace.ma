@@ -19,7 +19,9 @@ import {
   AlertCircle,
   Cloud,
   Activity,
-  Play
+  Play,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
@@ -134,6 +136,7 @@ export const Dashboard: React.FC = () => {
   const [isPlanSessionOpen, setIsPlanSessionOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
+  const [showMetrics, setShowMetrics] = useState(false);
 
   React.useEffect(() => {
     const hasCompleted = localStorage.getItem('has_completed_onboarding');
@@ -348,14 +351,23 @@ export const Dashboard: React.FC = () => {
           <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 p-6">
             <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6">
               {/* Page Header */}
-              <div className="border-b border-slate-100 dark:border-white/5 pb-5">
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/5 pb-5">
                 <h1 className="ls-page-title text-slate-950 dark:text-ink">
                   {t('dashboard') || 'Dashboard'}
                 </h1>
+                <button
+                  type="button"
+                  onClick={() => setShowMetrics(current => !current)}
+                  aria-expanded={showMetrics}
+                  className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-semibold text-slate-500 transition-all hover:bg-slate-100 hover:text-slate-700 dark:text-ink-muted dark:hover:bg-white/5 dark:hover:text-ink"
+                >
+                  {showMetrics ? 'Hide metrics' : 'Show metrics'}
+                  {showMetrics ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                </button>
               </div>
 
               {/* Progress & Stats Overview */}
-              <section className="mt-2">
+              {showMetrics && <section className="mt-2">
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                   {[
                     { label: 'Focus Quotient', value: '8.4', unit: '/10', icon: <Brain />, trend: '+12%' },
@@ -388,7 +400,7 @@ export const Dashboard: React.FC = () => {
                     </motion.div>
                   ))}
                 </div>
-              </section>
+              </section>}
 
               {/* Bottom Utilities: Interactive Calendar & Upcoming Assignments Grid */}
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
