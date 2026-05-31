@@ -67,3 +67,8 @@ The current onboarding logic exists in two main places:
 - `src/components/onboarding/SummaryStep.tsx` (Update to display correct dynamic names)
 - `src/components/OnboardingModal.tsx` (Fix queries, state management, and ensure it uses the refactored step components properly)
 - `src/pages/Onboarding.tsx` (Refactor or remove if `OnboardingModal` is the primary entry point, or update to use the dynamic Supabase flow)
+
+# Supabase Connection Verification
+The Supabase connection is currently **not configured**.
+- Attempting to check the health endpoint (`/api/health/supabase`) returns: `{"ok":false,"urlConfigured":false,"anonKeyConfigured":false,"serviceRoleConfigured":false,"error":"Supabase env missing"}`
+- This explains why the onboarding modal might appear empty or fail to load data, as the environment variables (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, etc.) are missing.
