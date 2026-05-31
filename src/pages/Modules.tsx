@@ -628,13 +628,13 @@ export const Modules: React.FC = () => {
       <SEO title={t('curriculum_classrooms_title') || 'Syllabus & Academic Classrooms'} />
       <div className="h-full w-full bg-background flex flex-col overflow-hidden p-4">
         {/* 3-Column Layout */}
-        <div className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-4 overflow-hidden">
+        <div className="flex-grow min-h-0 w-full flex flex-col xl:flex-row gap-4 overflow-hidden">
         
           {/* Column 2: Main Content */}
-          <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 p-6">
+          <div className="flex-grow min-w-0 flex flex-col min-h-0 w-full overflow-hidden bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 p-6">
             <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6">
               {/* Page Header */}
-              <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/5 pb-5">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-white/5 pb-5">
                 <div className="flex items-center gap-3">
                   <button
                     type="button"
@@ -646,7 +646,7 @@ export const Modules: React.FC = () => {
                   </button>
                   <h1 className="ls-page-title text-slate-950 dark:text-ink">Classrooms</h1>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   {/* Layout Mode Toggle */}
                   <div className="flex items-center gap-1 bg-slate-100 dark:bg-surface-low rounded-xl p-1">
                     <button
@@ -975,7 +975,7 @@ export const Modules: React.FC = () => {
           </div>
 
           {/* Column 3: Right Sidebar — Focus & Tools */}
-          <div className="hidden lg:flex lg:w-[260px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-5">
+          <div className="hidden xl:flex xl:w-[260px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-5">
             <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6 pr-1">
 
               {/* Deep Focus Pomodoro */}
