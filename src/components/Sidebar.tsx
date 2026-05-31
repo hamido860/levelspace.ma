@@ -107,10 +107,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
     ] : [])
   ];
 
-  const profileNavItems: NavItem[] = [
-    { label: t('profile'), icon: <User size={20} />, path: '/profile' }
-  ];
-
   return (
     <>
       {/* Desktop Sidebar */}
@@ -148,30 +144,27 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
           ))}
         </nav>
 
-        <div className="flex flex-col gap-1 pt-4 border-t border-ink/5 mt-auto">
-          {!isCollapsed && <p className="text-[10px] font-bold text-muted uppercase tracking-normal px-3 mb-2 opacity-50">{t('settings')}</p>}
-          {adminNavItems.map((item) => (
-            <SidebarNavItem
-              key={item.path}
-              item={item}
-              isActive={isItemActive(location.pathname, item)}
-              isCollapsed={isCollapsed}
-              onClick={() => navigate(item.path)}
-            />
-          ))}
-        </div>
+        {/* Dynamic CTA Banner (Only shown when expanded) */}
+        {!isCollapsed && (
+          <div className="bg-gradient-to-br from-emerald-500/15 via-teal-500/15 to-accent/15 border border-emerald-500/30 dark:from-emerald-500/8 dark:via-teal-500/8 dark:to-accent/8 dark:border-emerald-500/15 p-5 rounded-[1.75rem] relative overflow-hidden shadow-md space-y-4 mt-auto mx-1 select-none">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-accent/8 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl pointer-events-none" />
+            <div className="flex items-center gap-2.5">
+              <Brain size={18} className="text-emerald-500 shrink-0 animate-pulse" />
+              <h4 className="text-xs font-black uppercase tracking-widest text-slate-900 dark:text-ink">LevelUp Pro</h4>
+            </div>
+            <p className="text-[11px] font-semibold text-slate-600 dark:text-ink-muted leading-relaxed">
+              Gain unlimited generated lessons, smart roadmaps & elite AI crew features.
+            </p>
+            <button
+              onClick={() => navigate('/pricing')}
+              className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white dark:bg-emerald-600 dark:hover:bg-emerald-700 text-xs font-black uppercase tracking-widest rounded-xl shadow-md hover:shadow-lg transition-all duration-300 text-center cursor-pointer active:scale-[0.98]"
+            >
+              Upgrade
+            </button>
+          </div>
+        )}
 
-        <div className="mt-auto flex flex-col gap-1 pt-4 border-t border-ink/5">
-          {profileNavItems.map((item) => (
-            <SidebarNavItem
-              key={item.path}
-              item={item}
-              isActive={isItemActive(location.pathname, item)}
-              isCollapsed={isCollapsed}
-              onClick={() => navigate(item.path)}
-            />
-          ))}
-          
+        <div className={`flex flex-col gap-1 pt-4 border-t border-ink/5 ${isCollapsed ? 'mt-auto' : ''}`}>
           <button
             onClick={() => signOut()}
             aria-label={t("logout")}
@@ -186,7 +179,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
 
       {/* Mobile Bottom Navigation */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-surface-low border-t border-ink/5 z-50 px-4 flex items-center gap-2 overflow-x-auto no-scrollbar shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
-        {[...mainNavItems, ...adminNavItems, ...profileNavItems].map((item) => (
+        {[...mainNavItems, ...adminNavItems].map((item) => (
           <MobileNavItem
             key={`mobile-${item.path}`}
             item={item}

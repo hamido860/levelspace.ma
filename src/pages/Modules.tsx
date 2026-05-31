@@ -34,6 +34,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
+import { AnnouncementBanner } from '../components/AnnouncementBanner';
 
 const relativeTime = (ts: number) => {
   const diff = Date.now() - ts;
@@ -592,6 +593,8 @@ export const Modules: React.FC = () => {
                   </button>
                 </div>
               </div>
+
+              <AnnouncementBanner bannerKey="classrooms_ad_cta" />
 
               {/* Symmetrical Stats Row */}
               <section className="mt-2">
