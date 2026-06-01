@@ -348,6 +348,7 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
   const progressPercent = totalBlocks > 0 ? Math.round(((currentBlockIndex + 1) / totalBlocks) * 100) : 0;
 
   const currentBlock = displayedBlocks[currentBlockIndex] || displayedBlocks[0];
+  const hasNextDestination = currentBlockIndex < displayedBlocks.length - 1 || !!nextLesson;
 
   const handleContinue = () => {
     if (displayedBlocks.length === 0) return;
@@ -366,8 +367,8 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
       setSpeakingState(null);
       setIsSpeaking(false);
       window.speechSynthesis.cancel();
-    } else {
-      onBack();
+    } else if (nextLesson) {
+      onNavigateToLesson?.(nextLesson.id);
     }
   };
 
@@ -380,6 +381,10 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
       setSpeakingState(null);
       setIsSpeaking(false);
       window.speechSynthesis.cancel();
+    } else if (prevLesson) {
+      onNavigateToLesson?.(prevLesson.id);
+    } else {
+      onBack();
     }
   };
 
@@ -619,6 +624,10 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
                 </div>
               </div>
 
+              <span className="shrink-0 text-[9px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-ink-muted">
+                {[grade, subject, totalBlocks > 0 ? `${currentBlockIndex + 1}/${totalBlocks}` : null].filter(Boolean).join(' · ')}
+              </span>
+
               {/* Draft Pill */}
               {draftWarning && (
                 <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[9px] font-bold uppercase tracking-wider dark:bg-amber-900/30 dark:text-amber-400">
@@ -692,25 +701,14 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
             
             {/* Left Nav */}
             <div className="w-12 sm:w-16 shrink-0 flex flex-col items-center justify-center relative z-10">
-               {prevLesson ? (
-                  <button
-                    type="button"
-                    onClick={() => onNavigateToLesson?.(prevLesson.id)}
-                    className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 shadow-sm transition-all dark:bg-paper dark:border-white/10 dark:text-ink-secondary dark:hover:bg-surface-low cursor-pointer hover:scale-110 group"
-                    title="Previous Lesson"
-                  >
-                    <ArrowLeft size={16} />
-                  </button>
-                ) : currentBlockIndex > 0 ? (
-                  <button
-                    type="button"
-                    onClick={handleBackSection}
-                    className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 shadow-sm transition-all dark:bg-paper dark:border-white/10 dark:text-ink-secondary dark:hover:bg-surface-low cursor-pointer hover:scale-110 group"
-                    title="Previous Section"
-                  >
-                    <ChevronLeft size={20} />
-                  </button>
-                ) : null}
+              <button
+                type="button"
+                onClick={handleBackSection}
+                className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 shadow-sm transition-all dark:bg-paper dark:border-white/10 dark:text-ink-secondary dark:hover:bg-surface-low cursor-pointer hover:scale-110 group"
+                title={currentBlockIndex > 0 ? 'Previous Section' : prevLesson ? 'Previous Lesson' : 'Back'}
+              >
+                {currentBlockIndex > 0 ? <ChevronLeft size={20} /> : <ArrowLeft size={16} />}
+              </button>
             </div>
 
             {/* Main Content Area */}
@@ -835,8 +833,9 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
                <button 
                   type="button"
                   onClick={handleContinue}
-                  className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-600/20 transition-all cursor-pointer hover:scale-110 group"
-                  title={currentBlockIndex === displayedBlocks.length - 1 ? t('complete') : t('continue')}
+                  disabled={!hasNextDestination}
+                  className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-600/20 transition-all cursor-pointer hover:scale-110 group disabled:cursor-default disabled:opacity-40 disabled:hover:scale-100"
+                  title={currentBlockIndex === displayedBlocks.length - 1 ? (nextLesson ? 'Next Lesson' : t('complete')) : t('continue')}
                 >
                   <ChevronRight size={20} className="stroke-[3]" />
                 </button>

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase, getProfile, checkSupabaseConnection } from '../db/supabase';
+import { ensureBrowserSupabaseConfigured } from '../lib/supabase/client';
 import { syncService } from '../services/syncService';
 import { db } from '../db/db';
 
@@ -84,8 +85,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [dbConnected, user?.id]);
 
   useEffect(() => {
-    refreshDbConnection();
-
     const handleSession = async (currentSession: Session | null) => {
       setSession(currentSession);
       
@@ -113,13 +112,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
     };
 
-    // 1. Listen for Supabase Auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      await handleSession(session);
-    });
+    let isCancelled = false;
+    let subscription: { unsubscribe: () => void } | null = null;
 
-    // 2. Initial session check
     const initAuth = async () => {
+      await ensureBrowserSupabaseConfigured();
+      if (isCancelled) return;
+
+      const { data } = supabase.auth.onAuthStateChange(async (_event: string, session: Session | null) => {
+        await handleSession(session);
+      });
+      subscription = data.subscription;
+
+      void refreshDbConnection();
       const { data: { session } } = await supabase.auth.getSession();
       await handleSession(session);
     };
@@ -127,7 +132,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     initAuth();
 
     return () => {
-      subscription.unsubscribe();
+      isCancelled = true;
+      subscription?.unsubscribe();
     };
   }, []);
 

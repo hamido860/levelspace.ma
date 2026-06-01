@@ -1,13 +1,29 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { motion } from 'motion/react';
 import {
-  GraduationCap, ArrowRight, CheckCircle2, Sparkles, BookOpen, Layers,
-  BookA, BrainCircuit, LibraryBig, Globe, BookMarked
+  ArrowLeft,
+  ArrowRight,
+  BookA,
+  BookMarked,
+  BookOpen,
+  BrainCircuit,
+  Check,
+  CheckCircle2,
+  ChartNoAxesCombined,
+  ClipboardCheck,
+  Globe,
+  GraduationCap,
+  Layers,
+  LibraryBig,
+  Search,
+  Sparkles,
+  Target,
+  WandSparkles,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { updateProfile, supabase } from '../db/supabase';
 import { db } from '../db/db';
-import { useNavigate } from 'react-router-dom';
 
 interface OnboardingModalProps {
   isOpen: boolean;
@@ -15,469 +31,656 @@ interface OnboardingModalProps {
   inline?: boolean;
 }
 
-const CYCLE_ICONS: Record<string, any> = {
-  'التعليم الإبتدائي (Enseignement Primaire)': BookA,
-  'التعليم الثانوي الإعدادي (Collège)': LibraryBig,
-  'التعليم الثانوي التأهيلي (Lycée)': GraduationCap,
-};
+interface CurriculumEntity {
+  id: string;
+  name: string;
+  code?: string;
+}
+
+const VALUE_PREVIEWS = [
+  {
+    eyebrow: 'Classroom mapped',
+    title: 'Your curriculum, organized',
+    detail: 'Grade-aware learning path',
+    metric: '12 modules',
+    icon: Layers,
+    accent: 'text-blue-300',
+    tile: 'bg-blue-400/15',
+  },
+  {
+    eyebrow: 'AI guidance ready',
+    title: 'Lessons built around you',
+    detail: 'Smart explanations and practice',
+    metric: 'Always tuned',
+    icon: WandSparkles,
+    accent: 'text-violet-300',
+    tile: 'bg-violet-400/15',
+  },
+  {
+    eyebrow: 'Progress visible',
+    title: 'Know your next move',
+    detail: 'Focus, mastery, and review signals',
+    metric: '+18% mastery',
+    icon: ChartNoAxesCombined,
+    accent: 'text-emerald-300',
+    tile: 'bg-emerald-400/15',
+  },
+] as const;
+
+const normalizeLabel = (value = '') =>
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
 
 function getCycleIcon(cycleName: string) {
-  for (const [key, icon] of Object.entries(CYCLE_ICONS)) {
-    if (cycleName?.includes(key) || key.includes(cycleName || '')) return icon;
-  }
+  const normalized = normalizeLabel(cycleName);
+
+  if (normalized.includes('primaire')) return BookA;
+  if (normalized.includes('college')) return LibraryBig;
+  if (normalized.includes('lycee')) return GraduationCap;
   return BrainCircuit;
 }
 
-function shouldShowTrackSelector(cycleName: string | undefined, gradeName: string | undefined) {
-  if (!cycleName || !gradeName) return false;
-  return cycleName.toLowerCase().includes('lycée') || gradeName.toLowerCase().includes('bac') || gradeName.toLowerCase().includes('tronc commun');
+function shouldShowTrackSelector(cycleName = '', gradeName = '') {
+  const label = normalizeLabel(`${cycleName} ${gradeName}`);
+  return label.includes('lycee') || label.includes('bac') || label.includes('tronc commun');
 }
 
-export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComplete, inline = false }) => {
+export const OnboardingModal: React.FC<OnboardingModalProps> = ({
+  isOpen,
+  onComplete,
+  inline = false,
+}) => {
   const { profile, user } = useAuth();
   const navigate = useNavigate();
-  
   const [step, setStep] = useState(0);
-  
-  // Data from Supabase
-  const [cycles, setCycles] = useState<any[]>([]);
-  const [grades, setGrades] = useState<any[]>([]);
-  const [subjects, setSubjects] = useState<any[]>([]);
-  const [tracks, setTracks] = useState<any[]>([]);
-  const [options, setOptions] = useState<any[]>([]);
-
-  // Selected State (IDs)
+  const [cycles, setCycles] = useState<CurriculumEntity[]>([]);
+  const [grades, setGrades] = useState<CurriculumEntity[]>([]);
+  const [subjects, setSubjects] = useState<CurriculumEntity[]>([]);
+  const [tracks, setTracks] = useState<CurriculumEntity[]>([]);
+  const [options, setOptions] = useState<CurriculumEntity[]>([]);
   const [selectedCycleId, setSelectedCycleId] = useState('');
   const [selectedGradeId, setSelectedGradeId] = useState('');
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
   const [selectedTrackId, setSelectedTrackId] = useState('');
   const [selectedOptionId, setSelectedOptionId] = useState('');
+  const [subjectQuery, setSubjectQuery] = useState('');
+  const [loadingInitialData, setLoadingInitialData] = useState(false);
+  const [loadingSubjects, setLoadingSubjects] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [activeValueIndex, setActiveValueIndex] = useState(0);
+  const [showWelcomeCta, setShowWelcomeCta] = useState(false);
 
-  // Selected Entities for display
-  const selectedCycle = cycles.find(c => c.id === selectedCycleId);
-  const selectedGrade = grades.find(g => g.id === selectedGradeId);
-  const selectedSubject = subjects.find(s => s.id === selectedSubjectId);
-  const selectedTrack = tracks.find(t => t.id === selectedTrackId);
-  const selectedOption = options.find(o => o.id === selectedOptionId);
-
-  const [loading, setLoading] = useState(false);
-
-  const userName = profile?.full_name || (user?.email ? user.email.split('@')[0] : 'Explorer');
-
+  const selectedCycle = cycles.find((cycle) => cycle.id === selectedCycleId);
+  const selectedGrade = grades.find((grade) => grade.id === selectedGradeId);
+  const selectedSubject = subjects.find((subject) => subject.id === selectedSubjectId);
+  const selectedTrack = tracks.find((track) => track.id === selectedTrackId);
+  const selectedOption = options.find((option) => option.id === selectedOptionId);
   const requiresTrack = shouldShowTrackSelector(selectedCycle?.name, selectedGrade?.name);
+  const userName = profile?.full_name || user?.email?.split('@')[0] || 'Explorer';
 
-  let totalSteps = 4; // Welcome, Cycle, Grade, Subject, Done
-  if (requiresTrack) {
-    totalSteps = 6;
-  }
+  const stepLabels = requiresTrack
+    ? ['Welcome', 'Level', 'Grade', 'Subject', 'Track', 'Language', 'Ready']
+    : ['Welcome', 'Level', 'Grade', 'Subject', 'Ready'];
+  const totalSteps = stepLabels.length - 1;
+  const progress = Math.round((step / totalSteps) * 100);
+
+  const filteredSubjects = useMemo(() => {
+    const query = normalizeLabel(subjectQuery.trim());
+    if (!query) return subjects;
+    return subjects.filter((subject) => normalizeLabel(subject.name).includes(query));
+  }, [subjectQuery, subjects]);
 
   useEffect(() => {
-    if (isOpen || inline) {
-      supabase.from('cycles').select('*').order('cycle_order').then(({ data }) => setCycles(data || []));
-      supabase.from('bac_tracks').select('*').order('track_order').then(({ data }) => setTracks(data || []));
-      supabase.from('bac_international_options').select('*').then(({ data }) => setOptions(data || []));
+    if (!isOpen && !inline) return;
+
+    const interval = window.setInterval(() => {
+      setActiveValueIndex((current) => (current + 1) % VALUE_PREVIEWS.length);
+    }, 2800);
+
+    return () => window.clearInterval(interval);
+  }, [inline, isOpen]);
+
+  useEffect(() => {
+    if (step !== 0 || (!isOpen && !inline)) {
+      setShowWelcomeCta(false);
+      return;
     }
-  }, [isOpen, inline]);
+
+    const timeout = window.setTimeout(() => setShowWelcomeCta(true), 2000);
+    return () => window.clearTimeout(timeout);
+  }, [inline, isOpen, step]);
 
   useEffect(() => {
-    if (selectedCycleId) {
-      supabase.from('grades').select('*').eq('cycle_id', selectedCycleId).order('grade_order')
-        .then(({ data }) => setGrades(data || []));
-    } else {
+    if (!isOpen && !inline) return;
+
+    const fetchInitialData = async () => {
+      setLoadingInitialData(true);
+      setErrorMessage('');
+
+      const [cyclesResult, tracksResult, optionsResult] = await Promise.all([
+        supabase.from('cycles').select('*').order('cycle_order'),
+        supabase.from('bac_tracks').select('*').order('track_order'),
+        supabase.from('bac_international_options').select('*'),
+      ]);
+
+      const firstError = cyclesResult.error || tracksResult.error || optionsResult.error;
+      if (firstError) {
+        setErrorMessage('We could not load your academic options. Please refresh and try again.');
+      }
+
+      setCycles(cyclesResult.data || []);
+      setTracks(tracksResult.data || []);
+      setOptions(optionsResult.data || []);
+      setLoadingInitialData(false);
+    };
+
+    fetchInitialData();
+  }, [inline, isOpen]);
+
+  useEffect(() => {
+    if (!selectedCycleId) {
       setGrades([]);
+      return;
     }
+
+    supabase
+      .from('grades')
+      .select('*')
+      .eq('cycle_id', selectedCycleId)
+      .order('grade_order')
+      .then(({ data, error }) => {
+        if (error) setErrorMessage('We could not load grades for this level. Please try again.');
+        setGrades(data || []);
+      });
   }, [selectedCycleId]);
 
   useEffect(() => {
-    if (selectedGradeId) {
-      const getSubjectsForGrade = async (gradeId: string) => {
-        setLoading(true);
-        const { data } = await supabase
-          .from('grade_subjects')
-          .select('subjects(id, name, code)')
-          .eq('grade_id', gradeId);
-        
-        const mappedSubjects = data?.map((d: any) => d.subjects).filter(Boolean) || [];
-        setSubjects(mappedSubjects);
-        setLoading(false);
-      };
-      getSubjectsForGrade(selectedGradeId);
-    } else {
+    if (!selectedGradeId) {
       setSubjects([]);
+      return;
     }
-  }, [selectedGradeId]);
 
-  const handleNext = () => setStep(s => Math.min(s + 1, totalSteps));
-  const handleBack = () => setStep(s => Math.max(s - 1, 0));
+    const fetchSubjects = async () => {
+      setLoadingSubjects(true);
+      setSubjectQuery('');
+      const { data, error } = await supabase
+        .from('grade_subjects')
+        .select('subjects(id, name, code)')
+        .eq('grade_id', selectedGradeId);
+
+      if (error) setErrorMessage('We could not load subjects for this grade. You can continue without one.');
+      setSubjects(data?.map((item: any) => item.subjects).filter(Boolean) || []);
+      setLoadingSubjects(false);
+    };
+
+    fetchSubjects();
+  }, [selectedGradeId]);
 
   const handleCycleChange = (id: string) => {
     setSelectedCycleId(id);
-    setSelectedGradeId("");
-    setSelectedSubjectId("");
-    setSelectedTrackId("");
-    setSelectedOptionId("");
+    setSelectedGradeId('');
+    setSelectedSubjectId('');
+    setSelectedTrackId('');
+    setSelectedOptionId('');
+    setErrorMessage('');
   };
 
   const handleGradeChange = (id: string) => {
     setSelectedGradeId(id);
-    setSelectedSubjectId("");
-    setSelectedTrackId("");
-    setSelectedOptionId("");
+    setSelectedSubjectId('');
+    setSelectedTrackId('');
+    setSelectedOptionId('');
+    setErrorMessage('');
   };
 
+  const isContinueDisabled =
+    saving ||
+    (step === 1 && !selectedCycleId) ||
+    (step === 2 && !selectedGradeId) ||
+    (step === 4 && requiresTrack && tracks.length > 0 && !selectedTrackId) ||
+    (step === 5 && requiresTrack && options.length > 0 && !selectedOptionId);
+
   const handleComplete = async () => {
-    if (!selectedGradeId) return;
+    if (!selectedGradeId || saving) return;
 
-    localStorage.setItem('selected_country', 'Morocco');
-    localStorage.setItem('selected_cycle', selectedCycle?.name || '');
-    localStorage.setItem('selected_grade', selectedGrade?.name || '');
-    if (selectedTrack) localStorage.setItem('selected_bac_track', selectedTrack.id);
-    if (selectedOption) localStorage.setItem('selected_option', selectedOption.id);
-    localStorage.setItem('has_completed_onboarding', 'true');
+    setSaving(true);
+    setErrorMessage('');
 
-    await db.settings.put({ key: 'selected_country', value: 'Morocco' });
-    await db.settings.put({ key: 'selected_cycle', value: selectedCycle?.name || '' });
-    await db.settings.put({ key: 'selected_grade', value: selectedGrade?.name || '' });
-    if (selectedTrack) await db.settings.put({ key: 'selected_bac_track', value: selectedTrack.id });
-    if (selectedOption) await db.settings.put({ key: 'selected_option', value: selectedOption.id });
-    await db.settings.put({ key: 'has_completed_onboarding', value: 'true' });
+    try {
+      localStorage.setItem('selected_country', 'Morocco');
+      localStorage.setItem('selected_cycle', selectedCycle?.name || '');
+      localStorage.setItem('selected_grade', selectedGrade?.name || '');
+      localStorage.setItem('has_completed_onboarding', 'true');
+      if (selectedTrack) localStorage.setItem('selected_bac_track', selectedTrack.id);
+      if (selectedOption) localStorage.setItem('selected_option', selectedOption.id);
 
-    if (user) {
-      try {
-        await updateProfile(user.id, {
-          onboarding_completed: true,
-          selected_grade: selectedGrade?.name || '',
-          selected_bac_track: selectedTrackId || null,
-        });
-      } catch (err: any) {
-        console.error('Failed to persist onboarding to database:', err.message);
+      await db.settings.bulkPut([
+        { key: 'selected_country', value: 'Morocco' },
+        { key: 'selected_cycle', value: selectedCycle?.name || '' },
+        { key: 'selected_grade', value: selectedGrade?.name || '' },
+        { key: 'has_completed_onboarding', value: 'true' },
+        ...(selectedTrack ? [{ key: 'selected_bac_track', value: selectedTrack.id }] : []),
+        ...(selectedOption ? [{ key: 'selected_option', value: selectedOption.id }] : []),
+      ]);
+
+      if (user) {
+        try {
+          await updateProfile(user.id, {
+            onboarding_completed: true,
+            selected_grade: selectedGrade?.name || '',
+            selected_bac_track: selectedTrackId || null,
+          });
+        } catch (profileError) {
+          console.error('Failed to persist onboarding profile:', profileError);
+        }
       }
-    }
 
-    if (onComplete) {
-      onComplete();
-    }
-
-    if (inline) {
-      navigate('/modules');
+      onComplete?.();
+      if (inline) navigate('/modules');
+    } catch (error) {
+      console.error('Failed to persist onboarding:', error);
+      setErrorMessage('Your setup could not be saved. Please try again.');
+      setSaving(false);
     }
   };
 
   if (!isOpen && !inline) return null;
 
+  const renderStepHeading = (
+    icon: React.ReactNode,
+    eyebrow: string,
+    title: string,
+    description: string,
+  ) => (
+    <div className="mb-4 flex items-start gap-3">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-accent/10 bg-accent/5 text-accent">
+        {icon}
+      </div>
+      <div>
+        <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-accent">{eyebrow}</p>
+        <h2 className="text-lg font-bold text-ink sm:text-xl">{title}</h2>
+        <p className="mt-0.5 text-xs leading-relaxed text-muted sm:text-sm">{description}</p>
+      </div>
+    </div>
+  );
+
+  const selectionCardClass = (selected: boolean) =>
+    `group flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-all focus:outline-none focus:ring-2 focus:ring-accent/30 ${
+      selected
+        ? 'border-accent bg-accent/5 shadow-sm'
+        : 'border-surface-mid bg-paper hover:border-accent/30 hover:bg-accent/[0.02]'
+    }`;
+
+  const activeValue = VALUE_PREVIEWS[activeValueIndex];
+  const ActiveValueIcon = activeValue.icon;
+
   const content = (
-    <div className="p-6 md:p-10 min-h-[425px] flex flex-col">
-      <AnimatePresence mode="wait">
-        {step === 0 && (
-          <motion.div key="step-0" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="flex-1 flex flex-col items-center justify-center text-center space-y-8">
-            <div className="relative">
-              <div className="absolute -inset-4 bg-accent/20 blur-2xl rounded-full animate-pulse" />
-              <div className="relative w-20 h-20 bg-accent rounded-3xl flex items-center justify-center text-paper shadow-md rotate-3">
-                <Sparkles className="w-8 h-8" />
-              </div>
+    <div className="relative grid min-h-[480px] max-h-[calc(100vh-1.5rem)] lg:min-h-[520px] lg:grid-cols-[0.78fr_1.22fr]">
+      <aside className="relative hidden overflow-hidden bg-slate-950 p-5 text-white lg:flex lg:flex-col lg:justify-between">
+        <div className="absolute -right-20 -top-16 h-64 w-64 rounded-full bg-accent/30 blur-3xl" />
+        <div className="absolute -bottom-20 -left-14 h-56 w-56 rounded-full bg-blue-400/20 blur-3xl" />
+        <div className="relative">
+          <div className="mb-6 flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent text-white shadow-lg shadow-accent/30">
+              <Sparkles className="h-5 w-5" />
             </div>
-            <div className="space-y-4">
-              <h1 className="text-xl sm:text-3xl font-display font-bold text-ink leading-[1.1] tracking-tight">
-                Welcome to Levelspace.<br />
-                <span className="text-accent capitalize">{userName}</span>
-              </h1>
-              <p className="text-muted text-sm max-w-sm mx-auto font-medium leading-relaxed">
-                Before we start, let's find your level.
-              </p>
+            <span className="font-display text-lg font-bold tracking-tight">Levelspace</span>
+          </div>
+          <p className="mb-2 text-[9px] font-bold uppercase tracking-[0.18em] text-blue-300">Your learning command center</p>
+          <h2 className="max-w-xs text-xl font-bold leading-tight">Build a space that understands where you are going.</h2>
+          <p className="mt-2 max-w-xs text-[11px] leading-relaxed text-white/60">
+            A few quick choices shape your curriculum, classrooms, and AI guidance from the very first lesson.
+          </p>
+        </div>
+
+        <div className="relative my-3">
+          <motion.div
+            key={activeValue.eyebrow}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35 }}
+            className="rounded-xl border border-white/10 bg-white/[0.06] p-2.5 shadow-xl shadow-black/10"
+          >
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${activeValue.tile} ${activeValue.accent}`}>
+                <ActiveValueIcon className="h-4 w-4" />
+              </span>
+              <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-white/60">
+                Live preview
+              </span>
+            </div>
+            <p className={`text-[9px] font-bold uppercase tracking-[0.16em] ${activeValue.accent}`}>{activeValue.eyebrow}</p>
+            <p className="mt-1 text-sm font-bold text-white">{activeValue.title}</p>
+            <div className="mt-2 flex items-center gap-2">
+              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10">
+                <motion.div
+                  key={`${activeValue.eyebrow}-progress`}
+                  initial={{ width: '18%' }}
+                  animate={{ width: '82%' }}
+                  transition={{ duration: 2.4, ease: 'easeOut' }}
+                  className="h-full rounded-full bg-blue-400"
+                />
+              </div>
+              <span className="text-[9px] font-bold text-white/60">{activeValue.metric}</span>
             </div>
           </motion.div>
-        )}
+          <div className="mt-2 flex justify-center gap-1.5">
+            {VALUE_PREVIEWS.map((preview, index) => (
+              <span key={preview.eyebrow} className={`h-1 rounded-full transition-all ${index === activeValueIndex ? 'w-5 bg-blue-300' : 'w-1 bg-white/20'}`} />
+            ))}
+          </div>
+        </div>
 
-        {step === 1 && (
-          <motion.div key="step-1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="flex-1 flex flex-col">
-            <div className="flex items-center gap-4 mb-8">
-              <div className="w-10 h-10 bg-gradient-to-b from-accent/10 to-transparent border border-accent/10 rounded-xl flex items-center justify-center text-accent shadow-sm">
-                <Layers className="w-5 h-5" />
-              </div>
-              <div>
-                <h2 className="text-lg font-display font-semibold text-ink tracking-tight">FirstStep</h2>
-                <p className="text-muted text-sm">Answer a few simple questions. This helps us choose the best path for you.</p>
-              </div>
+        <div className="relative space-y-2">
+          {[
+            ['01', 'Curriculum-aware classrooms'],
+            ['02', 'Lessons matched to your grade'],
+            ['03', 'AI guidance tuned to your path'],
+          ].map(([number, label]) => (
+            <div key={number} className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+              <span className="text-[10px] font-bold tracking-widest text-blue-300">{number}</span>
+              <span className="text-xs font-medium text-white/80">{label}</span>
             </div>
-            
-            <div className="grid grid-cols-1 gap-4 overflow-y-auto max-h-[300px] pr-2 custom-scrollbar">
-              {cycles.map(cycle => {
-                const Icon = getCycleIcon(cycle.name);
-                return (
-                  <button
-                    key={cycle.id}
-                    onClick={() => handleCycleChange(cycle.id)}
-                    className={`p-5 rounded-[1.5rem] border-2 transition-all text-left flex items-start gap-4 group ${
-                      selectedCycleId === cycle.id
-                        ? 'bg-accent/5 border-accent shadow-sm shadow-accent/10 scale-[1.02]'
-                        : 'bg-surface-low border-transparent hover:border-accent/30 hover:bg-paper hover:shadow-md'
-                    }`}
-                  >
-                    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 transition-colors ${
-                      selectedCycleId === cycle.id ? 'bg-accent text-paper' : 'bg-surface-mid text-ink-secondary group-hover:bg-accent/10 group-hover:text-accent'
-                    }`}>
-                      <Icon className="w-5 h-5" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className={`font-bold text-base leading-tight mb-1 ${selectedCycleId === cycle.id ? 'text-accent' : 'text-ink'}`}>
-                        {cycle.name}
-                      </h3>
-                    </div>
-                    {selectedCycleId === cycle.id && <CheckCircle2 className="w-5 h-5 text-accent shrink-0" />}
-                  </button>
-                )
-              })}
-            </div>
-          </motion.div>
-        )}
+          ))}
+        </div>
+      </aside>
 
-        {step === 2 && (
-          <motion.div key="step-2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="flex-1 flex flex-col">
-            <div className="flex items-center gap-4 mb-8">
-              <div className="w-10 h-10 bg-gradient-to-b from-accent/10 to-transparent border border-accent/10 rounded-xl flex items-center justify-center text-accent shadow-sm">
-                <GraduationCap className="w-5 h-5" />
+      <section className="relative flex min-w-0 flex-col overflow-hidden bg-paper">
+        <div className="border-b border-surface-mid px-4 pb-3 pt-4 sm:px-6">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 lg:hidden">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent text-white">
+                <Sparkles className="h-4 w-4" />
               </div>
-              <div>
-                <h2 className="text-lg font-display font-semibold text-ink tracking-tight">Select Grade</h2>
-                <p className="text-muted">Which specific year are you currently in?</p>
-              </div>
+              <span className="font-display text-sm font-bold text-ink">Levelspace</span>
             </div>
+            <p className="ml-auto text-[10px] font-bold uppercase tracking-[0.14em] text-muted">
+              {step === 0 ? 'Personalize your space' : `Step ${Math.min(step, totalSteps)} of ${totalSteps}`}
+            </p>
+          </div>
 
-            <div className="grid grid-cols-2 gap-3 overflow-y-auto max-h-[300px] pr-2 custom-scrollbar">
-              {grades.map(grade => (
-                <button
-                  key={grade.id}
-                  onClick={() => handleGradeChange(grade.id)}
-                  className={`p-3 rounded-xl border-2 text-sm font-bold transition-all text-center flex items-center justify-center gap-2 ${
-                    selectedGradeId === grade.id
-                      ? 'bg-accent border-accent text-paper shadow-sm shadow-accent/20'
-                      : 'bg-surface-low border-transparent text-ink hover:border-accent/30 hover:bg-paper'
-                  }`}
+          <div className="h-1.5 overflow-hidden rounded-full bg-surface-mid">
+            <motion.div
+              className="h-full rounded-full bg-accent"
+              initial={{ width: 0 }}
+              animate={{ width: `${progress}%` }}
+              transition={{ duration: 0.3 }}
+            />
+          </div>
+
+          <div className="mt-2.5 hidden items-center justify-between gap-1 sm:flex">
+            {stepLabels.map((label, index) => (
+              <div key={label} className={`flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider ${index <= step ? 'text-accent' : 'text-muted/60'}`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${index <= step ? 'bg-accent' : 'bg-surface-mid'}`} />
+                {label}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+          <>
+            {step === 0 && (
+              <motion.div
+                key="welcome"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="flex flex-1 flex-col justify-center"
+              >
+                <motion.div
+                  key={`${activeValue.eyebrow}-welcome`}
+                  initial={{ opacity: 0, x: 12 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.35 }}
+                  className="mb-3 hidden items-center gap-3 self-end rounded-2xl border border-surface-mid bg-surface-low/70 px-3 py-2.5 shadow-sm sm:flex"
                 >
-                  {grade.name}
-                  {selectedGradeId === grade.id && <CheckCircle2 className="w-4 h-4" />}
-                </button>
-              ))}
-            </div>
-          </motion.div>
-        )}
-
-        {step === 3 && (
-          <motion.div key="step-3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="flex-1 flex flex-col">
-            <div className="flex items-center gap-4 mb-8">
-              <div className="w-10 h-10 bg-gradient-to-b from-accent/10 to-transparent border border-accent/10 rounded-xl flex items-center justify-center text-accent shadow-sm">
-                <BookMarked className="w-5 h-5" />
-              </div>
-              <div>
-                <h2 className="text-lg font-display font-semibold text-ink tracking-tight">Select Primary Subject</h2>
-                <p className="text-muted">Optional: focus on a specific subject.</p>
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto max-h-[300px] pr-2 custom-scrollbar">
-              {loading ? (
-                <p className="text-sm text-muted">Loading subjects...</p>
-              ) : subjects.length === 0 ? (
-                <div className="p-4 bg-surface-low rounded-xl border border-ink/5 text-center text-muted text-sm">
-                  No subjects configured for this grade yet.
+                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent/10 text-accent">
+                    <ActiveValueIcon className="h-4 w-4" />
+                  </span>
+                  <span>
+                    <span className="block text-[9px] font-bold uppercase tracking-[0.16em] text-accent">{activeValue.eyebrow}</span>
+                    <span className="mt-0.5 block text-xs font-bold text-ink">{activeValue.detail}</span>
+                  </span>
+                  <ClipboardCheck className="ml-2 h-4 w-4 text-emerald-500" />
+                </motion.div>
+                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-accent/10 text-accent">
+                  <WandSparkles className="h-5 w-5" />
                 </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {subjects.map(subject => (
-                    <button
-                      key={subject.id}
-                      onClick={() => setSelectedSubjectId(subject.id)}
-                      className={`p-3 rounded-xl border-2 text-sm font-bold transition-all text-left flex items-center justify-between group ${
-                        selectedSubjectId === subject.id
-                          ? 'bg-accent/10 border-accent text-accent shadow-md'
-                          : 'bg-surface-low border-transparent text-ink hover:border-accent/30 hover:bg-paper'
-                      }`}
-                    >
-                      <span className="truncate">{subject.name}</span>
-                      {selectedSubjectId === subject.id && <CheckCircle2 className="w-5 h-5 shrink-0 ml-2" />}
-                    </button>
+                <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-accent">Less than one minute</p>
+                <h1 className="max-w-lg text-[1.35rem] font-bold leading-tight text-ink sm:text-[1.7rem]">
+                  Welcome, <span className="text-accent">{userName}</span>.
+                  <br />
+                  Let&apos;s shape your space.
+                </h1>
+                <p className="mt-2 max-w-md text-xs leading-relaxed text-muted">
+                  Tell us your current academic level. Levelspace will use it to organize your classrooms and make every AI suggestion more relevant.
+                </p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                  {['Your level', 'Your grade', 'Your focus'].map((label) => (
+                    <div key={label} className="rounded-xl border border-surface-mid bg-surface-low px-3 py-2 text-[11px] font-semibold text-ink-secondary">
+                      <Check className="mb-1.5 h-4 w-4 text-accent" />
+                      {label}
+                    </div>
                   ))}
                 </div>
-              )}
-            </div>
-          </motion.div>
-        )}
+              </motion.div>
+            )}
 
-        {step === 4 && requiresTrack && (
-          <motion.div key="step-4" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="flex-1 flex flex-col">
-            <div className="flex items-center gap-4 mb-8">
-              <div className="w-10 h-10 bg-gradient-to-b from-accent/10 to-transparent border border-accent/10 rounded-xl flex items-center justify-center text-accent shadow-sm">
-                <BookOpen className="w-5 h-5" />
-              </div>
-              <div>
-                <h2 className="text-lg font-display font-semibold text-ink tracking-tight">Specialty / Track</h2>
-                <p className="text-muted">Choose your specific focus area.</p>
-              </div>
-            </div>
+            {step === 1 && (
+              <motion.div key="cycle" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }}>
+                {renderStepHeading(<Layers className="h-5 w-5" />, 'Academic level', 'Where are you studying now?', 'Choose the stage that best matches your current studies.')}
+                {loadingInitialData ? (
+                  <div className="rounded-2xl border border-surface-mid bg-surface-low p-5 text-sm text-muted">Loading academic levels...</div>
+                ) : (
+                  <div className="grid max-h-[260px] gap-2 overflow-y-auto pr-1 custom-scrollbar sm:max-h-[300px]">
+                    {cycles.map((cycle) => {
+                      const Icon = getCycleIcon(cycle.name);
+                      const selected = selectedCycleId === cycle.id;
+                      return (
+                        <button type="button" key={cycle.id} aria-pressed={selected} onClick={() => handleCycleChange(cycle.id)} className={selectionCardClass(selected)}>
+                          <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${selected ? 'bg-accent text-white' : 'bg-surface-low text-ink-secondary'}`}>
+                            <Icon className="h-5 w-5" />
+                          </span>
+                          <span className="flex-1 text-sm font-bold leading-snug text-ink">{cycle.name}</span>
+                          {selected && <CheckCircle2 className="h-5 w-5 shrink-0 text-accent" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </motion.div>
+            )}
 
-            <div className="grid grid-cols-1 gap-3 overflow-y-auto max-h-[300px] pr-2 custom-scrollbar">
-              {tracks.length === 0 ? (
-                <div className="p-4 bg-surface-low rounded-xl border border-ink/5 text-center text-muted text-sm">
-                  No tracks configured.
+            {step === 2 && (
+              <motion.div key="grade" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }}>
+                {renderStepHeading(<GraduationCap className="h-5 w-5" />, 'Your grade', 'Which year are you in?', 'This anchors your lessons to the right curriculum and difficulty level.')}
+                <div className="grid max-h-[270px] grid-cols-2 gap-2 overflow-y-auto pr-1 custom-scrollbar sm:max-h-[310px]">
+                  {grades.map((grade) => {
+                    const selected = selectedGradeId === grade.id;
+                    return (
+                      <button type="button" key={grade.id} aria-pressed={selected} onClick={() => handleGradeChange(grade.id)} className={`${selectionCardClass(selected)} justify-center px-3 text-center`}>
+                        <span className={`text-sm font-bold ${selected ? 'text-accent' : 'text-ink'}`}>{grade.name}</span>
+                        {selected && <CheckCircle2 className="h-4 w-4 shrink-0 text-accent" />}
+                      </button>
+                    );
+                  })}
                 </div>
-              ) : (
-                tracks.map(track => (
-                  <button
-                    key={track.id}
-                    onClick={() => setSelectedTrackId(track.id)}
-                    className={`p-3 rounded-xl border-2 text-sm font-bold transition-all text-left flex items-center justify-between group ${
-                      selectedTrackId === track.id
-                        ? 'bg-accent/10 border-accent text-accent shadow-md'
-                        : 'bg-surface-low border-transparent text-ink hover:border-accent/30 hover:bg-paper'
-                    }`}
-                  >
-                    {track.name}
-                    {selectedTrackId === track.id && <CheckCircle2 className="w-5 h-5" />}
-                  </button>
-                ))
-              )}
-            </div>
-          </motion.div>
-        )}
+              </motion.div>
+            )}
 
-        {step === 5 && requiresTrack && (
-          <motion.div key="step-option" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="flex-1 flex flex-col">
-            <div className="flex items-center gap-4 mb-8">
-              <div className="w-10 h-10 bg-gradient-to-b from-accent/10 to-transparent border border-accent/10 rounded-xl flex items-center justify-center text-accent shadow-sm">
-                <Globe className="w-5 h-5" />
-              </div>
-              <div>
-                <h2 className="text-lg font-display font-semibold text-ink tracking-tight">Language Option</h2>
-                <p className="text-muted">In which language do you study scientific subjects?</p>
-              </div>
-            </div>
+            {step === 3 && (
+              <motion.div key="subject" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }}>
+                {renderStepHeading(<BookMarked className="h-5 w-5" />, 'Optional focus', 'Choose a primary subject', 'Pick one to personalize your starting view, or skip this for now.')}
+                {subjects.length > 5 && (
+                  <label className="mb-3 flex items-center gap-2 rounded-xl border border-surface-mid bg-paper px-3 py-2.5 focus-within:border-accent/40">
+                    <Search className="h-4 w-4 text-muted" />
+                    <input value={subjectQuery} onChange={(event) => setSubjectQuery(event.target.value)} placeholder="Search subjects" className="w-full bg-transparent text-sm text-ink outline-none placeholder:text-muted" />
+                  </label>
+                )}
+                {loadingSubjects ? (
+                  <div className="rounded-2xl border border-surface-mid bg-surface-low p-5 text-sm text-muted">Loading subjects...</div>
+                ) : subjects.length === 0 ? (
+                  <div className="rounded-2xl border border-surface-mid bg-surface-low p-5 text-sm leading-relaxed text-muted">
+                    No subjects are configured for this grade yet. You can continue and add your classrooms later.
+                  </div>
+                ) : (
+                  <div className="grid max-h-[240px] gap-2 overflow-y-auto pr-1 sm:max-h-[280px] sm:grid-cols-2 custom-scrollbar">
+                    {filteredSubjects.map((subject) => {
+                      const selected = selectedSubjectId === subject.id;
+                      return (
+                        <button type="button" key={subject.id} aria-pressed={selected} onClick={() => setSelectedSubjectId(selected ? '' : subject.id)} className={selectionCardClass(selected)}>
+                          <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${selected ? 'bg-accent text-white' : 'bg-surface-low text-muted'}`}>
+                            <BookOpen className="h-4 w-4" />
+                          </span>
+                          <span className="flex-1 truncate text-sm font-bold text-ink">{subject.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </motion.div>
+            )}
 
-            <div className="grid grid-cols-1 gap-4">
-              {options.length === 0 ? (
-                <div className="p-4 bg-surface-low rounded-xl border border-ink/5 text-center text-muted text-sm">
-                  No language options configured.
+            {step === 4 && requiresTrack && (
+              <motion.div key="track" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }}>
+                {renderStepHeading(<Target className="h-5 w-5" />, 'Specialty', 'Choose your academic track', 'Your track helps Levelspace surface the most relevant lessons and exam preparation.')}
+                <div className="grid max-h-[270px] gap-2 overflow-y-auto pr-1 custom-scrollbar sm:max-h-[310px]">
+                  {tracks.length === 0 ? (
+                    <div className="rounded-2xl border border-surface-mid bg-surface-low p-5 text-sm text-muted">No tracks are configured yet. You can continue.</div>
+                  ) : tracks.map((track) => {
+                    const selected = selectedTrackId === track.id;
+                    return (
+                      <button type="button" key={track.id} aria-pressed={selected} onClick={() => setSelectedTrackId(track.id)} className={selectionCardClass(selected)}>
+                        <span className="flex-1 text-sm font-bold text-ink">{track.name}</span>
+                        {selected && <CheckCircle2 className="h-5 w-5 text-accent" />}
+                      </button>
+                    );
+                  })}
                 </div>
-              ) : (
-                options.map(opt => (
-                  <button
-                    key={opt.id}
-                    onClick={() => setSelectedOptionId(opt.id)}
-                    className={`p-4 rounded-xl border-2 text-sm transition-all text-left flex items-start justify-between group ${
-                      selectedOptionId === opt.id
-                        ? 'bg-accent/5 border-accent shadow-md'
-                        : 'bg-surface-low border-transparent hover:border-accent/30 hover:bg-paper'
-                    }`}
-                  >
-                    <div>
-                      <h3 className={`font-bold text-base mb-1 ${selectedOptionId === opt.id ? 'text-accent' : 'text-ink'}`}>{opt.name}</h3>
+              </motion.div>
+            )}
+
+            {step === 5 && requiresTrack && (
+              <motion.div key="language" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }}>
+                {renderStepHeading(<Globe className="h-5 w-5" />, 'Language option', 'How do you study science?', 'Choose the language used for your scientific subjects.')}
+                <div className="grid gap-3">
+                  {options.length === 0 ? (
+                    <div className="rounded-2xl border border-surface-mid bg-surface-low p-5 text-sm text-muted">No language options are configured yet. You can continue.</div>
+                  ) : options.map((option) => {
+                    const selected = selectedOptionId === option.id;
+                    return (
+                      <button type="button" key={option.id} aria-pressed={selected} onClick={() => setSelectedOptionId(option.id)} className={selectionCardClass(selected)}>
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-low text-muted"><Globe className="h-5 w-5" /></span>
+                        <span className="flex-1 text-sm font-bold text-ink">{option.name}</span>
+                        {selected && <CheckCircle2 className="h-5 w-5 text-accent" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </motion.div>
+            )}
+
+            {step === totalSteps && (
+              <motion.div key="ready" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }}>
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600">
+                  <CheckCircle2 className="h-6 w-6" />
+                </div>
+                <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-600">You are ready</p>
+                <h2 className="text-2xl font-bold leading-tight text-ink sm:text-3xl">Your learning space now has a starting point.</h2>
+                <p className="mt-2 text-xs leading-relaxed text-muted sm:text-sm">Your classrooms and AI guidance will begin with this academic context. Preferences can still grow with you.</p>
+                <div className="mt-4 rounded-xl border border-surface-mid bg-surface-low p-3">
+                  {[
+                    ['Level', selectedCycle?.name],
+                    ['Grade', selectedGrade?.name],
+                    ['Focus', selectedSubject?.name || 'Add later'],
+                    ...(selectedTrack ? [['Track', selectedTrack.name]] : []),
+                    ...(selectedOption ? [['Language', selectedOption.name]] : []),
+                  ].map(([label, value]) => (
+                    <div key={label} className="flex items-start justify-between gap-4 border-b border-surface-mid py-2 last:border-0">
+                      <span className="text-xs font-bold uppercase tracking-wider text-muted">{label}</span>
+                      <span className="max-w-[68%] text-right text-sm font-bold text-ink">{value}</span>
                     </div>
-                    {selectedOptionId === opt.id && <CheckCircle2 className="w-5 h-5 text-accent mt-2" />}
-                  </button>
-                ))
-              )}
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </>
+
+          {errorMessage && <p role="alert" className="mt-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">{errorMessage}</p>}
+
+          {step > 0 && <div className="mt-auto flex items-center justify-between gap-3 border-t border-surface-mid pt-4">
+            {step > 0 ? (
+              <button type="button" onClick={() => setStep((current) => Math.max(current - 1, 0))} className="ls-button-ghost">
+                <ArrowLeft className="h-4 w-4" />
+                Back
+              </button>
+            ) : <span />}
+
+            {step < totalSteps ? (
+              <button type="button" disabled={isContinueDisabled} onClick={() => setStep((current) => Math.min(current + 1, totalSteps))} className="ls-button-primary px-4 py-2.5">
+                {step === 3 ? 'Continue' : 'Next step'}
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            ) : (
+              <button type="button" disabled={saving} onClick={handleComplete} className="inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-bold text-white transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60">
+                {saving ? 'Saving your space...' : 'Enter Levelspace'}
+                {!saving && <ArrowRight className="h-4 w-4" />}
+              </button>
+            )}
+          </div>}
+        </div>
+
+        {step === 0 && showWelcomeCta && (
+          <motion.div
+            role="dialog"
+            aria-label="Create your Levelspace"
+            initial={{ opacity: 0, scale: 0.94, y: 12 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[2px]"
+          >
+            <div className="w-full max-w-sm rounded-2xl border border-amber-300/50 bg-amber-50 p-4 text-slate-950 shadow-2xl shadow-black/30 sm:p-5">
+              <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-amber-400 text-slate-950 shadow-md shadow-amber-500/30">
+                <Sparkles className="h-5 w-5" />
+              </div>
+              <p className="text-[9px] font-black uppercase tracking-[0.2em] text-amber-700">Your space is waiting</p>
+              <h2 className="mt-1 text-xl font-bold leading-tight">Ready to make Levelspace yours?</h2>
+              <p className="mt-2 text-xs leading-relaxed text-slate-600">
+                Give us your academic level and we will personalize your classrooms, lessons, and AI guidance.
+              </p>
+              <button
+                type="button"
+                onClick={() => setStep(1)}
+                className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-3 text-sm font-black text-slate-950 shadow-lg shadow-amber-500/25 transition hover:bg-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-300 focus:ring-offset-2"
+              >
+                Create your space now
+                <ArrowRight className="h-4 w-4" />
+              </button>
             </div>
           </motion.div>
         )}
-
-        {step === totalSteps && (
-           <motion.div key="step-final" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="flex-1 flex flex-col items-center justify-center text-center space-y-10">
-             <div className="relative">
-               <div className="absolute -inset-6 bg-emerald-500/20 blur-3xl rounded-full" />
-               <div className="relative w-16 h-16 bg-gradient-to-br from-emerald-500/20 to-emerald-500/5 border border-emerald-500/20 rounded-full flex items-center justify-center text-paper shadow-md">
-                 <CheckCircle2 className="w-10 h-10" />
-               </div>
-             </div>
-
-             <div className="space-y-2">
-                <h2 className="text-xl sm:text-3xl font-display font-bold text-ink tracking-tight">
-                  Your Starting Level is Ready
-                </h2>
-                <p className="text-muted font-medium text-base">We will guide you step by step.</p>
-              </div>
-
-             <div className="w-full bg-surface-low border border-ink/5 rounded-2xl p-5 text-left text-sm space-y-4">
-               <div className="flex justify-between border-b border-ink/5 pb-3">
-                 <span className="text-muted font-bold uppercase text-sm tracking-wider">Cycle</span>
-                 <span className="font-bold text-ink">{selectedCycle?.name}</span>
-               </div>
-               <div className="flex justify-between border-b border-ink/5 pb-3">
-                 <span className="text-muted font-bold uppercase text-sm tracking-wider">Grade</span>
-                 <span className="font-bold text-ink">{selectedGrade?.name}</span>
-               </div>
-               {selectedSubject && (
-                 <div className="flex justify-between border-b border-ink/5 pb-3">
-                   <span className="text-muted font-bold uppercase text-sm tracking-wider">Subject</span>
-                   <span className="font-bold text-ink truncate max-w-[200px]">{selectedSubject.name}</span>
-                 </div>
-               )}
-               {requiresTrack && selectedTrack && (
-                 <div className="flex justify-between border-b border-ink/5 pb-3">
-                   <span className="text-muted font-bold uppercase text-sm tracking-wider">Track</span>
-                   <span className="font-bold text-ink text-right max-w-[200px] truncate">{selectedTrack.name}</span>
-                 </div>
-               )}
-               {requiresTrack && selectedOption && (
-                 <div className="flex justify-between">
-                   <span className="text-muted font-bold uppercase text-sm tracking-wider">Option</span>
-                   <span className="font-bold text-ink truncate max-w-[200px]">{selectedOption.name}</span>
-                 </div>
-               )}
-             </div>
-           </motion.div>
-        )}
-      </AnimatePresence>
-
-      <div className="mt-8 flex items-center justify-between pt-6 border-t border-ink/10 relative z-10 w-full">
-        {step > 0 ? (
-          <button onClick={handleBack} className="px-5 py-2.5 text-sm rounded-2xl font-bold text-muted hover:text-ink hover:bg-ink/5 transition-all flex items-center gap-2 group">
-            <ArrowRight className="w-4 h-4 rotate-180 group-hover:-translate-x-1 transition-transform" />
-            Back
-          </button>
-        ) : <div />}
-
-        {step < totalSteps ? (
-          <button
-            onClick={handleNext}
-            disabled={
-              (step === 1 && !selectedCycleId) ||
-              (step === 2 && !selectedGradeId) ||
-              (step === 4 && requiresTrack && !selectedTrackId) ||
-              (step === 5 && requiresTrack && !selectedOptionId)
-            }
-            className="px-5 py-2 text-sm bg-ink text-paper rounded-xl font-semibold flex items-center gap-2 hover:bg-ink/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:-translate-y-0.5"
-          >
-            Continue
-            <ArrowRight className="w-4 h-4" />
-          </button>
-        ) : (
-          <button onClick={handleComplete} className="px-6 py-2.5 text-sm bg-accent text-paper rounded-2xl font-bold flex items-center gap-2 hover:bg-[var(--accent-hover)] transition-all shadow-md shadow-accent/20 hover:-translate-y-1 group">
-            Enter Platform
-            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-          </button>
-        )}
-      </div>
+      </section>
     </div>
   );
 
   if (inline) {
     return (
-      <div className="w-full max-w-xl mx-auto rounded-[2rem] shadow-md overflow-hidden border border-ink/10 relative bg-paper mt-10">
-        <div className="absolute inset-0 bg-gradient-to-br from-accent/5 via-transparent to-transparent pointer-events-none" />
-        <div className="absolute top-0 left-0 w-full h-1 bg-ink/5">
-          <motion.div className="h-full bg-accent" initial={{ width: '0%' }} animate={{ width: `${(step / totalSteps) * 100}%` }} transition={{ duration: 0.3 }} />
-        </div>
+      <div className="relative mx-auto my-4 w-full max-w-[54rem] overflow-hidden rounded-2xl border border-surface-mid bg-paper shadow-xl">
         {content}
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-ink/40">
-      <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} className="bg-paper w-full max-w-xl rounded-[2rem] shadow-md overflow-hidden border border-ink/10 relative">
-        <div className="absolute inset-0 bg-gradient-to-br from-accent/5 via-transparent to-transparent pointer-events-none" />
-        <div className="absolute top-0 left-0 w-full h-1 bg-ink/5">
-          <motion.div className="h-full bg-accent" initial={{ width: '0%' }} animate={{ width: `${(step / totalSteps) * 100}%` }} transition={{ duration: 0.3 }} />
-        </div>
+    <div className="fixed inset-0 z-[200] flex items-center justify-center overflow-y-auto bg-slate-950/60 p-2 backdrop-blur-sm sm:p-4">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.98, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        className="my-auto w-full max-w-[54rem] overflow-hidden rounded-2xl border border-white/10 bg-paper shadow-2xl"
+      >
         {content}
       </motion.div>
     </div>

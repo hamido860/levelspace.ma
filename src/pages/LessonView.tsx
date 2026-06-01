@@ -64,6 +64,27 @@ type CurriculumContext = {
   lesson_status?: string | null;
 };
 
+type LessonNavigationState = {
+  from?: string;
+  classroomId?: string;
+  moduleId?: string;
+  gradeId?: string;
+  subjectId?: string;
+  startAtTest?: boolean;
+};
+
+const getAvailabilityRank = (lesson: any) => {
+  const state = getLessonAvailabilityState(lesson);
+  switch (state) {
+    case 'published': return 5;
+    case 'needs_review': return 4;
+    case 'draft_with_content': return 3;
+    case 'locked': return 2;
+    case 'rejected': return 1;
+    default: return 0;
+  }
+};
+
 const stripMarkdown = (text: string) =>
   text
     .replace(/```[\s\S]*?```/g, ' ')
@@ -131,8 +152,7 @@ const getExpectedAnswer = (block: any) =>
     '',
   ).trim();
 
-const PendingLessonView: React.FC<{ title: string; lessonId: string; onReady: () => void }> = ({ title, lessonId, onReady }) => {
-  const navigate = useNavigate();
+const PendingLessonView: React.FC<{ title: string; lessonId: string; onReady: () => void; onBack: () => void }> = ({ title, lessonId, onReady, onBack }) => {
   const [stage, setStage] = useState(0);
   const stages = ['Preparing lesson', 'Organizing sections', 'Checking content', 'Saving'];
 
@@ -159,8 +179,8 @@ const PendingLessonView: React.FC<{ title: string; lessonId: string; onReady: ()
           <p className="text-sm font-medium text-accent">{stages[stage]}...</p>
           <p className="text-xs text-muted">The lesson will be available when preparation finishes.</p>
         </div>
-        <button onClick={() => navigate('/dashboard')} className="text-xs text-muted transition-colors hover:text-accent">
-          Back to dashboard
+        <button onClick={onBack} className="text-xs text-muted transition-colors hover:text-accent">
+          Back
         </button>
       </div>
     </Layout>
@@ -174,13 +194,15 @@ export const LessonView: React.FC = () => {
   const { t, language } = useLanguage();
   const { isAdmin } = useAuth();
   const lesson = useLiveQuery(() => (id ? db.lessons.get(id) : undefined), [id]);
+  const navigationState = (location.state || {}) as LessonNavigationState;
 
-  const startAtTest = location.state?.startAtTest || false;
+  const startAtTest = navigationState.startAtTest || false;
 
   const [supabaseLesson, setSupabaseLesson] = useState<SupabaseLessonRecord | null>(null);
   const [supabaseQuizzes, setSupabaseQuizzes] = useState<any[]>([]);
   const [supabaseExercises, setSupabaseExercises] = useState<any[]>([]);
   const [curriculumContext, setCurriculumContext] = useState<CurriculumContext | null>(null);
+  const [curriculumOrderedLessons, setCurriculumOrderedLessons] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeDomain, setActiveDomain] = useState('all');
   const [showNoteModal, setShowNoteModal] = useState(false);
@@ -208,6 +230,8 @@ export const LessonView: React.FC = () => {
     setActiveDomain('all');
     setSupabaseQuizzes([]);
     setSupabaseExercises([]);
+    setCurriculumContext(null);
+    setCurriculumOrderedLessons([]);
   }, [id]);
 
   useEffect(() => {
@@ -239,18 +263,6 @@ export const LessonView: React.FC = () => {
         if (isCancelled) return;
         const lessonsList = (data as SupabaseLessonRecord[]) || [];
         
-        const getAvailabilityRank = (l: any) => {
-          const state = getLessonAvailabilityState(l);
-          switch (state) {
-            case 'published': return 5;
-            case 'needs_review': return 4;
-            case 'draft_with_content': return 3;
-            case 'locked': return 2;
-            case 'rejected': return 1;
-            default: return 0;
-          }
-        };
-
         let foundLesson: SupabaseLessonRecord | null = null;
         if (lessonsList.length > 0) {
           const sortedLessons = [...lessonsList].sort((a, b) => getAvailabilityRank(b) - getAvailabilityRank(a));
@@ -344,6 +356,111 @@ export const LessonView: React.FC = () => {
     return undefined;
   }, [lesson, supabaseLesson, curriculumContext]);
 
+  const smartBackTarget = useMemo(() => {
+    if (navigationState.from) return navigationState.from;
+    const classroomId = navigationState.classroomId || navigationState.moduleId || effectiveLesson?.moduleId || lesson?.moduleId;
+    return classroomId ? `/classroom/${classroomId}` : '/dashboard';
+  }, [effectiveLesson?.moduleId, lesson?.moduleId, navigationState.classroomId, navigationState.from, navigationState.moduleId]);
+
+  const lessonNavigationState = useMemo<LessonNavigationState>(() => ({
+    ...navigationState,
+    classroomId: navigationState.classroomId || navigationState.moduleId || effectiveLesson?.moduleId || lesson?.moduleId,
+    moduleId: navigationState.moduleId || effectiveLesson?.moduleId || lesson?.moduleId,
+    gradeId: navigationState.gradeId || curriculumContext?.grade_id || undefined,
+    subjectId: navigationState.subjectId || curriculumContext?.subject_id || undefined,
+    startAtTest: false,
+  }), [curriculumContext?.grade_id, curriculumContext?.subject_id, effectiveLesson?.moduleId, lesson?.moduleId, navigationState]);
+
+  useEffect(() => {
+    const gradeId = curriculumContext?.grade_id || navigationState.gradeId;
+    const subjectId = curriculumContext?.subject_id || navigationState.subjectId;
+    if (!gradeId || !subjectId) {
+      setCurriculumOrderedLessons([]);
+      return;
+    }
+
+    let isCancelled = false;
+    const fetchCurriculumLessons = async () => {
+      try {
+        const fetchTopics = async (includeDomains: boolean) => supabase
+          .from('topics')
+          .select(includeDomains ? 'id, title, subject_domains(domain_order)' : 'id, title')
+          .eq('grade_id', gradeId)
+          .eq('subject_id', subjectId)
+          .order('title', { ascending: true });
+
+        let { data: topics, error: topicsError } = await fetchTopics(true);
+        if (topicsError) {
+          const fallback = await fetchTopics(false);
+          topics = fallback.data;
+          topicsError = fallback.error;
+        }
+        if (topicsError) throw topicsError;
+
+        const orderedTopics = [...(topics || [])].sort((left: any, right: any) => {
+          const leftDomainOrder = Number(left.subject_domains?.domain_order ?? 999);
+          const rightDomainOrder = Number(right.subject_domains?.domain_order ?? 999);
+          return leftDomainOrder - rightDomainOrder || String(left.title || '').localeCompare(String(right.title || ''));
+        });
+        const topicIds = orderedTopics.map((topic: any) => topic.id).filter(Boolean);
+        if (topicIds.length === 0) {
+          if (!isCancelled) setCurriculumOrderedLessons([]);
+          return;
+        }
+
+        const fetchLessons = async (includeValidation: boolean) => supabase
+          .from('lessons')
+          .select(getLessonSelectColumns({ includeTags: true, includeValidation }))
+          .in('topic_id', topicIds);
+
+        let lessonRows;
+        try {
+          const { data, error } = await fetchLessons(true);
+          if (error) throw error;
+          lessonRows = data;
+        } catch (error) {
+          if (!isMissingLessonValidationColumnError(error)) throw error;
+          const { data, error: fallbackError } = await fetchLessons(false);
+          if (fallbackError) throw fallbackError;
+          lessonRows = data;
+        }
+
+        const lessonsByTopic = new Map<string, any>();
+        for (const row of lessonRows || []) {
+          const topicId = String(row.topic_id || '');
+          if (!topicId) continue;
+          const current = lessonsByTopic.get(topicId);
+          if (!current || getAvailabilityRank(row) > getAvailabilityRank(current)) {
+            lessonsByTopic.set(topicId, row);
+          }
+        }
+
+        const ordered = orderedTopics
+          .map((topic: any) => lessonsByTopic.get(String(topic.id)))
+          .filter(Boolean)
+          .filter((row: any) => isAdmin || isStudentVisibleLesson(row))
+          .map((row: any) => ({
+            ...row,
+            id: row.id,
+            title: row.lesson_title,
+            moduleId: navigationState.moduleId || navigationState.classroomId || lesson?.moduleId,
+            grade: curriculumContext?.grade_name || row.grade || '',
+            subject: curriculumContext?.subject_name || row.subject || '',
+          }));
+
+        if (!isCancelled) setCurriculumOrderedLessons(ordered);
+      } catch (error) {
+        console.warn('[LessonView] Failed to load curriculum lesson navigation:', error);
+        if (!isCancelled) setCurriculumOrderedLessons([]);
+      }
+    };
+
+    fetchCurriculumLessons();
+    return () => {
+      isCancelled = true;
+    };
+  }, [curriculumContext, isAdmin, lesson?.moduleId, navigationState.classroomId, navigationState.gradeId, navigationState.moduleId, navigationState.subjectId]);
+
   // Use moduleId from effective lesson, falling back to subject_id from curriculum or the lesson's own module
   const targetModuleId = effectiveLesson?.moduleId || curriculumContext?.subject_id || lesson?.moduleId;
   const lessonsInModule = useLiveQuery(
@@ -351,13 +468,15 @@ export const LessonView: React.FC = () => {
     [targetModuleId]
   );
 
-  const orderedLessons = useMemo(() => {
+  const localOrderedLessons = useMemo(() => {
     if (!lessonsInModule) return [];
     return lessonsInModule.filter((l) => {
       if (l.status === 'suggested') return false;
       return isAdmin || isStudentVisibleLesson(l);
     });
   }, [lessonsInModule, isAdmin]);
+
+  const orderedLessons = curriculumOrderedLessons.length > 0 ? curriculumOrderedLessons : localOrderedLessons;
 
   // Fetch notes for all lessons in this classroom/module
   const lessonIdsForNotes = useMemo(() => (orderedLessons || []).map(l => l.id), [orderedLessons]);
@@ -717,7 +836,7 @@ export const LessonView: React.FC = () => {
         <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 px-6 text-center">
           <AlertCircle className="h-12 w-12 text-error" />
           <p className="font-medium text-ink">{t('lesson_not_found')}</p>
-          <button onClick={() => navigate('/dashboard')} className="text-accent hover:underline">{t('return_to_dashboard')}</button>
+          <button onClick={() => navigate(smartBackTarget)} className="text-accent hover:underline">Back</button>
         </div>
       </Layout>
     );
@@ -730,14 +849,14 @@ export const LessonView: React.FC = () => {
           <AlertCircle className="h-12 w-12 text-error" />
           <p className="font-medium text-ink">{t('lesson_unavailable')}</p>
           <p className="max-w-lg text-sm text-muted">{t('lesson_unavailable_desc')}</p>
-          <button onClick={() => navigate('/dashboard')} className="text-accent hover:underline">{t('return_to_dashboard')}</button>
+          <button onClick={() => navigate(smartBackTarget)} className="text-accent hover:underline">Back</button>
         </div>
       </Layout>
     );
   }
 
   if (effectiveLesson.status === 'pending' && !hasStoredContent) {
-    return <PendingLessonView title={effectiveLesson.title} lessonId={id!} onReady={() => window.location.reload()} />;
+    return <PendingLessonView title={effectiveLesson.title} lessonId={id!} onReady={() => window.location.reload()} onBack={() => navigate(smartBackTarget)} />;
   }
 
   return (
@@ -775,14 +894,7 @@ export const LessonView: React.FC = () => {
           exerciseHintShown={exerciseHintShown}
           examResult={examResult}
           examHintShown={examHintShown}
-          onBack={() => {
-            const moduleId = effectiveLesson?.moduleId || curriculumContext?.subject_id || lesson?.moduleId;
-            if (moduleId) {
-              navigate(`/classroom/${moduleId}`);
-            } else {
-              navigate('/dashboard');
-            }
-          }}
+          onBack={() => navigate(smartBackTarget)}
           onDomainChange={setActiveDomain}
           onAddNote={() => setShowNoteModal(true)}
           onReadBlock={toggleReadAloud}
@@ -795,7 +907,7 @@ export const LessonView: React.FC = () => {
           blockRefs={blockRefs}
           prevLesson={prevLesson}
           nextLesson={nextLesson}
-          onNavigateToLesson={(lessonId) => navigate(`/lesson/${lessonId}`)}
+          onNavigateToLesson={(lessonId) => navigate(`/lesson/${lessonId}`, { state: lessonNavigationState })}
           hasTests={hasTests}
           bannerImage={effectiveLesson.bannerImage}
           onUpdateBanner={handleUpdateBanner}

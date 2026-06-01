@@ -11,10 +11,13 @@ export const checkSupabaseConnection = async () => {
   }
 
   try {
-    const response = await fetch("/api/health/supabase");
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data.ok) {
-      console.warn("Supabase health check failed", data.error || response.statusText);
+    const { error } = await supabase
+      .from("curricula")
+      .select("id")
+      .limit(1);
+
+    if (error) {
+      console.warn("Supabase health check failed", error.message);
       return false;
     }
     return true;
