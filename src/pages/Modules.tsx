@@ -1122,9 +1122,6 @@ export const Modules: React.FC = () => {
             </div>
           </div>
 
-            </div>
-          </div>
-
         </div>
       </div>
     </Layout>
