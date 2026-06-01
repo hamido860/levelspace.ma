@@ -90,6 +90,8 @@ const getIconForCategory = (category: string) => {
   return <Library className="w-5 h-5" />;
 };
 
+const EMPTY_ARRAY: any[] = [];
+
 const getLessonIllustration = (title: string | null | undefined, category?: string | null | undefined) => {
   const t = String(title || '').toLowerCase();
   const c = String(category || '').toLowerCase();
@@ -344,9 +346,9 @@ export const Modules: React.FC = () => {
   const aiUnavailableMsg = 'AI curriculum suggestions require an API key.';
 
   const dbModules = useLiveQuery(() => db.modules.toArray());
-  const allLessons = useLiveQuery(() => db.lessons.toArray()) || [];
+  const allLessons = useLiveQuery(() => db.lessons.toArray()) || EMPTY_ARRAY;
 
-  const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
+  const dbSettings = useLiveQuery(() => db.settings.toArray()) || EMPTY_ARRAY;
   const settingsMap = useMemo(() => Object.fromEntries(dbSettings.map(s => [s.key, s.value])), [dbSettings]);
 
   const country = settingsMap['selected_country'] || localStorage.getItem('selected_country') || '';
@@ -605,10 +607,10 @@ export const Modules: React.FC = () => {
     await db.modules.bulkPut(updates);
   };
 
-  const filteredModules = modules.filter(m => 
+  const filteredModules = useMemo(() => modules.filter(m =>
     m.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
     m.code.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  ), [modules, searchQuery]);
 
   // Layout mode: grid or carousel
   const [layoutMode, setLayoutMode] = useState<'grid' | 'carousel'>('grid');
@@ -659,7 +661,7 @@ export const Modules: React.FC = () => {
   }, [isTimerRunning]);
   const formatTime = (s: number) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
-  const selectedModules = modules.filter(m => m.selected);
+  const selectedModules = useMemo(() => modules.filter(m => m.selected), [modules]);
 
   return (
     <Layout fullWidth>
