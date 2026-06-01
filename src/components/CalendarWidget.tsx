@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
@@ -97,6 +97,7 @@ export const CalendarWidget: React.FC = () => {
   const [selectedDay, setSelectedDay] = useState<Date>(new Date());
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ title: '', time: '', type: 'general' as string });
+  const [weather, setWeather] = useState<{ temp: number; description: string; bgUrl: string } | null>(null);
 
   const scheduleEventsVal = useLiveQuery(() => db.schedule.toArray());
   const tasksVal = useLiveQuery(() => db.tasks.toArray());
@@ -105,6 +106,51 @@ export const CalendarWidget: React.FC = () => {
 
   const scheduleEvents = scheduleEventsVal ?? [];
   const tasks = tasksVal ?? [];
+
+  // Fetch current weather for Rabat, Morocco dynamically
+  useEffect(() => {
+    fetch('https://api.open-meteo.com/v1/forecast?latitude=34.0209&longitude=-6.8416&current_weather=true')
+      .then(res => res.json())
+      .then(data => {
+        if (data?.current_weather) {
+          const temp = Math.round(data.current_weather.temperature);
+          const code = data.current_weather.weathercode;
+          
+          let desc = 'Clear Sky';
+          let bg = 'https://images.unsplash.com/photo-1504386106331-3e4e71742958?auto=format&fit=crop&q=80&w=600'; // Sunny
+          
+          if (code === 0) {
+            desc = 'Clear Sky';
+            bg = 'https://images.unsplash.com/photo-1504386106331-3e4e71742958?auto=format&fit=crop&q=80&w=600';
+          } else if (code >= 1 && code <= 3) {
+            desc = 'Partly Cloudy';
+            bg = 'https://images.unsplash.com/photo-1534088568595-a066f410bcda?auto=format&fit=crop&q=80&w=600';
+          } else if (code === 45 || code === 48) {
+            desc = 'Foggy Mist';
+            bg = 'https://images.unsplash.com/photo-1487621167305-5d248087c724?auto=format&fit=crop&q=80&w=600';
+          } else if ((code >= 51 && code <= 65) || (code >= 80 && code <= 82)) {
+            desc = 'Rain Showers';
+            bg = 'https://images.unsplash.com/photo-1438029071396-1e831a7fa6d8?auto=format&fit=crop&q=80&w=600';
+          } else if (code >= 71 && code <= 77) {
+            desc = 'Snowy Breeze';
+            bg = 'https://images.unsplash.com/photo-1483664852095-d6cc6870702d?auto=format&fit=crop&q=80&w=600';
+          } else if (code >= 95) {
+            desc = 'Thunderstorm';
+            bg = 'https://images.unsplash.com/photo-1472141521881-95d0e87e2e39?auto=format&fit=crop&q=80&w=600';
+          }
+          
+          setWeather({ temp, description: desc, bgUrl: bg });
+        }
+      })
+      .catch(() => {
+        // Safe Fallback
+        setWeather({
+          temp: 22,
+          description: 'Clear Sky',
+          bgUrl: 'https://images.unsplash.com/photo-1504386106331-3e4e71742958?auto=format&fit=crop&q=80&w=600'
+        });
+      });
+  }, []);
 
   // Build date → events map
   const eventsByDate = useMemo(() => {
@@ -165,9 +211,16 @@ export const CalendarWidget: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-xs font-black bg-gradient-to-r from-ink via-accent to-purple-600 dark:from-white dark:via-accent dark:to-purple-400 bg-clip-text text-transparent leading-tight font-display tracking-tight">
-            {format(currentMonth, 'MMMM yyyy')}
-          </h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-xs font-black bg-gradient-to-r from-ink via-accent to-purple-600 dark:from-white dark:via-accent dark:to-purple-400 bg-clip-text text-transparent leading-tight font-display tracking-tight">
+              {format(currentMonth, 'MMMM yyyy')}
+            </h3>
+            {weather && (
+              <span className="text-[8px] font-mono font-bold bg-accent-soft text-accent border border-accent/15 px-1.5 py-0.5 rounded-md flex items-center gap-0.5">
+                Rabat {weather.temp}°C
+              </span>
+            )}
+          </div>
           <p className="text-[8px] font-bold text-slate-400/80 dark:text-ink-muted/40 mt-0.5 uppercase tracking-wider font-mono">
             Moroccan Academic Calendar
           </p>
@@ -384,8 +437,17 @@ export const CalendarWidget: React.FC = () => {
               transition={{ type: 'spring', damping: 28, stiffness: 320 }}
               className="relative w-full max-w-[620px] bg-white dark:bg-paper border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden flex flex-col md:flex-row shadow-2xl z-10"
             >
-              {/* Left Column (Brand Context) */}
+              {/* Left Column (Brand Context with Weather Overlay Background) */}
               <div className="w-full md:w-[240px] shrink-0 p-6 bg-gradient-to-br from-slate-950 via-purple-950/90 to-slate-950 border-b md:border-b-0 md:border-r border-white/5 relative overflow-hidden flex flex-col justify-between min-h-[140px] md:min-h-[360px]">
+                {/* Weather Backdrop Image with Reduced Opacity */}
+                {weather && (
+                  <img
+                    src={weather.bgUrl}
+                    alt="Weather Backdrop"
+                    className="absolute inset-0 object-cover w-full h-full opacity-20 pointer-events-none mix-blend-overlay"
+                  />
+                )}
+                
                 {/* Radial Glow */}
                 <div className="absolute inset-0 pointer-events-none opacity-40 bg-[radial-gradient(circle_at_center,rgba(139,92,246,0.35)_0%,transparent_70%)]" />
                 
@@ -399,6 +461,18 @@ export const CalendarWidget: React.FC = () => {
                   <h4 className="text-sm font-bold text-white mt-2 font-display">
                     Create Dashboard Event
                   </h4>
+                  
+                  {/* Dynamic weather info pill */}
+                  {weather && (
+                    <div className="mt-3 flex items-center gap-1.5 bg-white/5 backdrop-blur-md px-2 py-0.5 rounded-lg border border-white/5 w-fit">
+                      <span className="text-[8px] font-mono font-bold text-white leading-none">
+                        {weather.temp}°C
+                      </span>
+                      <span className="text-[7px] font-mono text-purple-300 leading-none">
+                        {weather.description}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="relative z-10 border-t border-white/10 pt-4 mt-4 md:mt-0">
