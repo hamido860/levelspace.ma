@@ -4,7 +4,7 @@ import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths,
 } from 'date-fns';
-import { ChevronLeft, ChevronRight, Plus, X, Flag, Star, GraduationCap, BookOpen, CalendarDays, Sparkles } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, X, Flag, Star, GraduationCap, BookOpen, CalendarDays, Sparkles, Bell } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 
@@ -83,11 +83,11 @@ const BADGE_COLOR: Record<string, string> = {
 };
 
 function EventIcon({ type }: { type: string }) {
-  if (type === 'national') return <Flag className="w-3 h-3 shrink-0" />;
-  if (type === 'religious') return <Star className="w-3 h-3 shrink-0" />;
-  if (type === 'school_break') return <GraduationCap className="w-3 h-3 shrink-0" />;
-  if (type === 'exam' || type === 'controle') return <BookOpen className="w-3 h-3 shrink-0" />;
-  return <CalendarDays className="w-3 h-3 shrink-0" />;
+  if (type === 'national') return <Flag className="w-3.5 h-3.5 shrink-0" />;
+  if (type === 'religious') return <Star className="w-3.5 h-3.5 shrink-0" />;
+  if (type === 'school_break') return <GraduationCap className="w-3.5 h-3.5 shrink-0" />;
+  if (type === 'exam' || type === 'controle') return <BookOpen className="w-3.5 h-3.5 shrink-0" />;
+  return <CalendarDays className="w-3.5 h-3.5 shrink-0" />;
 }
 
 type EventEntry = { type: string; label: string; id?: string };
@@ -96,6 +96,7 @@ export const CalendarWidget: React.FC = () => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<Date>(new Date());
   const [showAdd, setShowAdd] = useState(false);
+  const [showReminders, setShowReminders] = useState(false);
   const [form, setForm] = useState({ title: '', time: '', type: 'general' as string });
   const [weather, setWeather] = useState<{ temp: number; description: string; bgUrl: string } | null>(null);
 
@@ -207,12 +208,12 @@ export const CalendarWidget: React.FC = () => {
   ];
 
   return (
-    <div className="rounded-2xl border border-surface-mid bg-paper p-3.5 dark:border-white/5 dark:bg-paper shadow-sm space-y-3 max-w-full">
+    <div className="relative rounded-2xl border border-surface-mid bg-paper p-4 dark:border-white/5 dark:bg-paper shadow-sm space-y-3 max-w-full">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-white/5">
         <div>
           <div className="flex items-center gap-2">
-            <h3 className="text-xs font-black bg-gradient-to-r from-ink via-accent to-purple-600 dark:from-white dark:via-accent dark:to-purple-400 bg-clip-text text-transparent leading-tight font-display tracking-tight">
+            <h3 className="text-sm font-black bg-gradient-to-r from-ink via-accent to-purple-600 dark:from-white dark:via-accent dark:to-purple-400 bg-clip-text text-transparent leading-tight font-display tracking-tight">
               {format(currentMonth, 'MMMM yyyy')}
             </h3>
             {weather && (
@@ -221,10 +222,12 @@ export const CalendarWidget: React.FC = () => {
               </span>
             )}
           </div>
-          <p className="text-[8px] font-bold text-slate-400/80 dark:text-ink-muted/40 mt-0.5 uppercase tracking-wider font-mono">
+          <p className="text-[9px] font-bold text-slate-400/80 dark:text-ink-muted/40 mt-0.5 uppercase tracking-wider font-mono">
             Moroccan Academic Calendar
           </p>
         </div>
+        
+        {/* Navigation, Reminders, and Add buttons row */}
         <div className="flex items-center gap-1.5">
           <div className="flex items-center gap-0.5 bg-surface-low dark:bg-surface-mid/40 p-0.5 rounded-lg border border-slate-100 dark:border-white/5">
             <button
@@ -249,6 +252,26 @@ export const CalendarWidget: React.FC = () => {
             </button>
           </div>
 
+          {/* Quick-action Reminders Bell */}
+          <button
+            onClick={() => setShowReminders(true)}
+            className={`relative p-1.5 rounded-lg transition-all duration-200 cursor-pointer shadow-sm hover:scale-105 active:scale-95 flex items-center justify-center border ${
+              selectedEvents.length > 0
+                ? 'bg-accent/15 border-accent/30 text-accent'
+                : 'bg-surface-low dark:bg-surface-mid/40 border-slate-100 dark:border-white/5 text-slate-500 dark:text-ink-muted'
+            }`}
+            title="View Reminders"
+            aria-label="View Reminders"
+          >
+            <Bell size={11} className={selectedEvents.length > 0 ? 'animate-bounce' : ''} />
+            {selectedEvents.length > 0 && (
+              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-error text-white text-[7px] font-black rounded-full flex items-center justify-center animate-pulse">
+                {selectedEvents.length}
+              </span>
+            )}
+          </button>
+
+          {/* Quick-action Add Event Plus */}
           <button
             onClick={() => setShowAdd(true)}
             className="p-1.5 rounded-lg bg-accent/10 hover:bg-accent/20 text-accent transition-all duration-200 cursor-pointer shadow-sm hover:scale-105 active:scale-95 flex items-center justify-center border border-accent/20"
@@ -330,10 +353,10 @@ export const CalendarWidget: React.FC = () => {
                   alt="" 
                   className={`absolute inset-0 object-cover w-full h-full pointer-events-none mix-blend-overlay ${
                     todayBool 
-                      ? 'opacity-[0.08] dark:opacity-[0.12]' 
+                      ? 'opacity-[0.15] dark:opacity-[0.22]' 
                       : primaryType 
-                        ? 'opacity-[0.10] dark:opacity-[0.17]' 
-                        : 'opacity-[0.02] dark:opacity-[0.05]'
+                        ? 'opacity-[0.20] dark:opacity-[0.30]' 
+                        : 'opacity-[0.05] dark:opacity-[0.10]'
                   }`} 
                 />
               )}
@@ -364,7 +387,7 @@ export const CalendarWidget: React.FC = () => {
       </div>
 
       {/* Legend */}
-      <div className="flex flex-wrap gap-x-3 gap-y-1 pb-1.5 border-b border-slate-100 dark:border-white/5">
+      <div className="flex flex-wrap gap-x-3 gap-y-1 pb-1.5">
         {[
           { type: 'national', label: 'National' },
           { type: 'religious', label: 'Religious' },
@@ -379,87 +402,83 @@ export const CalendarWidget: React.FC = () => {
         ))}
       </div>
 
-      {/* Selected day panel */}
-      <div className="pt-1 space-y-2">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-[11px] font-bold text-slate-950 dark:text-ink font-display tracking-tight">
-              {format(selectedDay, 'EEEE, MMM d, yyyy')}
-            </p>
-            <p className="text-[9px] font-mono font-bold text-slate-400 dark:text-ink-muted/60 mt-0.5">
-              {isLoading
-                ? 'Loading events...'
-                : selectedEvents.length === 0
-                  ? 'No events scheduled'
-                  : `${selectedEvents.length} event${selectedEvents.length > 1 ? 's' : ''} planned`}
-            </p>
-          </div>
-          <button
-            onClick={() => setShowAdd(true)}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-accent text-white text-[9px] font-bold hover:bg-accent-hover active:scale-95 transition-all duration-200 shadow-sm hover:shadow cursor-pointer"
+      {/* Reminders Popover Overlay inside the same card */}
+      <AnimatePresence>
+        {showReminders && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="absolute inset-x-3 inset-y-3 bg-white/98 dark:bg-[#161B22]/98 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-2xl p-4 flex flex-col justify-between shadow-2xl z-20"
           >
-            <Plus size={10} />
-            Add event
-          </button>
-        </div>
-
-        <AnimatePresence mode="popLayout">
-          {isLoading ? (
-            <motion.div
-              key="loading"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="py-4 flex justify-center items-center"
-            >
-              <div className="w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-            </motion.div>
-          ) : selectedEvents.length > 0 ? (
-            <div className="space-y-1.5">
-              {selectedEvents.map((ev, i) => (
-                <motion.div
-                  key={`${ev.label}-${i}`}
-                  layout
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-                  className={`flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-[11px] font-medium group transition-all hover:scale-[1.01] ${
-                    BADGE_COLOR[ev.type] ?? BADGE_COLOR.general
-                  }`}
+            <div className="space-y-3 flex-1 flex flex-col min-h-0">
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/5 pb-2">
+                <div>
+                  <span className="text-[8px] font-mono font-bold text-accent uppercase tracking-wider block">Reminders List</span>
+                  <h4 className="text-xs font-bold text-slate-950 dark:text-ink font-display tracking-tight leading-none mt-0.5">
+                    {format(selectedDay, 'EEEE, MMM d, yyyy')}
+                  </h4>
+                </div>
+                <button
+                  onClick={() => setShowReminders(false)}
+                  className="w-6 h-6 rounded-full bg-surface-low hover:bg-surface-mid dark:bg-surface-mid dark:text-ink-muted text-slate-500 hover:text-slate-950 flex items-center justify-center cursor-pointer transition-colors"
                 >
-                  <div className={`p-1 rounded-lg bg-white/20 dark:bg-black/10`}>
-                    <EventIcon type={ev.type} />
+                  <X size={12} />
+                </button>
+              </div>
+
+              {/* Scrollable reminders list */}
+              <div className="overflow-y-auto flex-1 pr-1 space-y-1.5 no-scrollbar">
+                {isLoading ? (
+                  <div className="py-8 flex justify-center items-center">
+                    <div className="w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
                   </div>
-                  <span className="flex-1 truncate font-semibold">{ev.label}</span>
-                  {ev.id && (
-                    <button
-                      onClick={() => handleDelete(ev.id!)}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 cursor-pointer"
-                      aria-label="Delete event"
+                ) : selectedEvents.length > 0 ? (
+                  selectedEvents.map((ev, i) => (
+                    <div
+                      key={`${ev.label}-${i}`}
+                      className={`flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-[10px] font-medium border ${
+                        BADGE_COLOR[ev.type] ?? BADGE_COLOR.general
+                      }`}
                     >
-                      <X size={10} />
-                    </button>
-                  )}
-                </motion.div>
-              ))}
+                      <div className="p-1 rounded-lg bg-white/20 dark:bg-black/10 shrink-0">
+                        <EventIcon type={ev.type} />
+                      </div>
+                      <span className="flex-1 truncate font-semibold leading-tight">{ev.label}</span>
+                      {ev.id && (
+                        <button
+                          onClick={() => handleDelete(ev.id!)}
+                          className="p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 cursor-pointer shrink-0"
+                          aria-label="Delete reminder"
+                        >
+                          <X size={10} />
+                        </button>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-6 text-center">
+                    <CalendarDays className="w-5 h-5 text-slate-300 dark:text-ink-muted/30 mb-1" />
+                    <p className="text-[9px] text-slate-400 dark:text-ink-muted/40 italic">
+                      No reminders scheduled today.
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
-          ) : (
-            <motion.div
-              key="empty"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="border border-dashed border-slate-200 dark:border-white/5 rounded-2xl p-4 text-center"
-            >
-              <CalendarDays className="w-4 h-4 text-slate-300 dark:text-ink-muted/30 mx-auto mb-1" />
-              <p className="text-[9px] text-slate-400 dark:text-ink-muted/40 italic">
-                No academic breaks or personal schedules today.
-              </p>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+
+            <div className="flex gap-2 pt-2 border-t border-slate-100 dark:border-white/5 mt-2">
+              <button
+                onClick={() => { setShowReminders(false); setShowAdd(true); }}
+                className="flex-1 h-8 rounded-lg bg-accent text-white text-[9px] font-bold hover:bg-accent-hover transition-all duration-200 cursor-pointer flex items-center justify-center gap-1 shadow-sm hover:shadow"
+              >
+                <Plus size={10} />
+                Add Event
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Add-event modal */}
       <AnimatePresence>
@@ -484,12 +503,12 @@ export const CalendarWidget: React.FC = () => {
             >
               {/* Left Column (Brand Context with Weather Overlay Background) */}
               <div className="w-full md:w-[240px] shrink-0 p-6 bg-gradient-to-br from-slate-950 via-purple-950/90 to-slate-950 border-b md:border-b-0 md:border-r border-white/5 relative overflow-hidden flex flex-col justify-between min-h-[140px] md:min-h-[360px]">
-                {/* Weather Backdrop Image with Reduced Opacity */}
+                {/* Weather Backdrop Image with Visible yet Sophisticated Opacity */}
                 {weather && (
                   <img
                     src={weather.bgUrl}
                     alt="Weather Backdrop"
-                    className="absolute inset-0 object-cover w-full h-full opacity-12 pointer-events-none mix-blend-overlay"
+                    className="absolute inset-0 object-cover w-full h-full opacity-35 pointer-events-none mix-blend-overlay"
                   />
                 )}
                 
