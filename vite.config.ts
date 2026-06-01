@@ -5,13 +5,40 @@ import {defineConfig, loadEnv} from 'vite';
 
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
+  const publicSupabaseUrl =
+    env.NEXT_PUBLIC_SUPABASE_URL ||
+    env.SUPABASE_URL ||
+    env.VITE_SUPABASE_URL ||
+    '';
+  const publicSupabaseAnonKey =
+    env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    env.SUPABASE_ANON_KEY ||
+    env.VITE_SUPABASE_ANON_KEY ||
+    '';
   const apiProxyTarget =
     env.VITE_API_PROXY_TARGET ||
     process.env.VITE_API_PROXY_TARGET ||
     process.env.API_PROXY_TARGET ||
     'http://127.0.0.1:4321';
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [
+      react(),
+      tailwindcss(),
+      {
+        name: 'emit-public-supabase-config',
+        generateBundle() {
+          this.emitFile({
+            type: 'asset',
+            fileName: 'supabase-config.json',
+            source: JSON.stringify({
+              configured: Boolean(publicSupabaseUrl && publicSupabaseAnonKey),
+              url: publicSupabaseUrl || null,
+              anonKey: publicSupabaseAnonKey || null,
+            }),
+          });
+        },
+      },
+    ],
     envPrefix: ['VITE_', 'NEXT_PUBLIC_'],
     build: {
       chunkSizeWarningLimit: 600,
