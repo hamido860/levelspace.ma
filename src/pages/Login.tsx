@@ -135,6 +135,40 @@ export const Login: React.FC = () => {
               </p>
             </div>
 
+            {/* Tab Selector */}
+            <div className="flex bg-slate-100 dark:bg-surface-low rounded-xl p-1 shrink-0">
+              <button
+                type="button"
+                onClick={() => setMode('login')}
+                className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  mode === 'login'
+                    ? 'bg-white dark:bg-paper text-slate-800 dark:text-ink shadow-sm'
+                    : 'text-slate-500 dark:text-ink-muted hover:text-slate-700 dark:hover:text-ink'
+                }`}
+              >
+                Sign In
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode('signup')}
+                className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  mode === 'signup'
+                    ? 'bg-white dark:bg-paper text-slate-800 dark:text-ink shadow-sm'
+                    : 'text-slate-500 dark:text-ink-muted hover:text-slate-700 dark:hover:text-ink'
+                }`}
+              >
+                Sign Up
+              </button>
+              <button
+                type="button"
+                onClick={handleDemoAdminLogin}
+                className="flex-1 py-2 rounded-lg text-xs font-semibold text-accent hover:bg-accent/5 transition-all flex items-center justify-center gap-1 cursor-pointer"
+              >
+                <Sparkles size={11} />
+                Demo Admin
+              </button>
+            </div>
+
             {error && (
               <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-xl flex items-center gap-3 text-destructive text-xs">
                 <AlertCircle className="w-4 h-4 shrink-0" />
@@ -208,7 +242,7 @@ export const Login: React.FC = () => {
               type="button"
               disabled={loading}
               onClick={handleDemoAdminLogin}
-              className="w-full h-12 border border-accent/20 bg-accent/5 text-accent rounded-xl flex items-center justify-center gap-2 text-sm font-medium hover:bg-accent/10 transition-all disabled:opacity-50"
+              className="w-full h-12 border border-accent/20 bg-accent/5 text-accent rounded-xl flex items-center justify-center gap-2 text-sm font-medium hover:bg-accent/10 transition-all disabled:opacity-50 cursor-pointer"
             >
               <Sparkles className="w-4 h-4" />
               Continue as Demo Admin

@@ -15,7 +15,7 @@ import { useLanguage } from '../context/LanguageContext';
 
 export const Landing: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, signInDemoAdmin } = useAuth();
   const { t } = useLanguage();
 
   const handleCTA = () => {
@@ -23,6 +23,15 @@ export const Landing: React.FC = () => {
       navigate('/dashboard');
     } else {
       navigate('/login');
+    }
+  };
+
+  const handleDemoAdmin = async () => {
+    try {
+      await signInDemoAdmin();
+      navigate('/admin');
+    } catch (err) {
+      console.error('Demo Admin login failed:', err);
     }
   };
 
@@ -38,9 +47,17 @@ export const Landing: React.FC = () => {
             <span className="text-xl font-display font-bold tracking-tight">LevelSpace</span>
           </div>
           <div className="flex items-center gap-4">
+            {!user && (
+              <button 
+                onClick={handleDemoAdmin}
+                className="px-5 py-2.5 border border-accent/20 bg-accent/5 text-accent rounded-full font-medium text-sm hover:bg-accent/10 transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <span>Demo Admin</span>
+              </button>
+            )}
             <button 
               onClick={handleCTA}
-              className="px-6 py-2.5 bg-ink text-paper rounded-full font-medium text-sm hover:bg-accent transition-colors flex items-center gap-2"
+              className="px-6 py-2.5 bg-ink text-paper rounded-full font-medium text-sm hover:bg-accent transition-colors flex items-center gap-2 cursor-pointer"
             >
               {user ? t('dashboard') : 'Sign In'}
               <ArrowRight className="w-4 h-4" />
@@ -104,14 +121,22 @@ export const Landing: React.FC = () => {
           >
             <button 
               onClick={handleCTA}
-              className="w-full sm:w-auto px-8 py-4 bg-accent text-paper rounded-full font-bold text-lg shadow-md shadow-accent/20 hover:bg-accent-hover hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2"
+              className="w-full sm:w-auto px-8 py-4 bg-accent text-paper rounded-full font-bold text-lg shadow-md shadow-accent/20 hover:bg-accent-hover hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               {t('hero_cta_primary')}
               <ArrowRight className="w-5 h-5" />
             </button>
+            {!user && (
+              <button 
+                onClick={handleDemoAdmin}
+                className="w-full sm:w-auto px-8 py-4 bg-paper text-ink border border-ink/10 rounded-full font-bold text-lg hover:bg-accent/10 hover:text-accent hover:border-accent/30 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span>Demo Admin</span>
+              </button>
+            )}
             <button 
               onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
-              className="w-full sm:w-auto px-8 py-4 bg-paper text-ink border border-ink/10 rounded-full font-bold text-lg hover:bg-surface-low transition-all"
+              className="w-full sm:w-auto px-8 py-4 bg-paper text-ink border border-ink/10 rounded-full font-bold text-lg hover:bg-surface-low transition-all cursor-pointer"
             >
               {t('hero_cta_secondary')}
             </button>
