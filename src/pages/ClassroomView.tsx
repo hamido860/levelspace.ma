@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Layout } from '../components/Layout';
 import { SEO } from '../components/SEO';
-import { ShieldCheck, AlertTriangle, ArrowLeft, BookOpen, Plus, ChevronRight, CheckCircle2, Clock, Brain, Sparkles, Loader2, Play, Target, Dumbbell, Database, Pin, Timer, RefreshCw, Activity, FileText, CheckSquare } from 'lucide-react';
+import { ShieldCheck, AlertTriangle, ArrowLeft, BookOpen, Plus, ChevronRight, CheckCircle2, Clock, Brain, Sparkles, Loader2, Play, Target, Dumbbell, Database, Pin, Timer, RefreshCw, Activity, FileText, CheckSquare, ChevronDown, ChevronUp } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { SupportZoneModal } from '../components/SupportZoneModal';
 import { db } from '../db/db';
@@ -313,6 +313,23 @@ export const ClassroomView: React.FC = () => {
     });
     setLessonBannerOverrides(prev => ({ ...prev, ...bannerMap }));
     setLessonColorOverrides(prev => ({ ...prev, ...colorMap }));
+  };
+
+  const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
+  const [sidebarCollapsedSections, setSidebarCollapsedSections] = useState<Record<string, boolean>>({
+    telemetry: false,
+    pomodoro: false,
+    support: false,
+    activityLog: false,
+  });
+
+  const toggleCardExpansion = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpandedCards(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const toggleSidebarSection = (section: string) => {
+    setSidebarCollapsedSections(prev => ({ ...prev, [section]: !prev[section] }));
   };
 
 
@@ -1569,7 +1586,7 @@ export const ClassroomView: React.FC = () => {
                   <button
                     type="button"
                     onClick={handleRandomizeAllBanners}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-slate-100 dark:bg-surface-low text-slate-600 dark:text-ink-muted hover:bg-accent hover:text-white dark:hover:bg-accent dark:hover:text-white transition-all"
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-slate-100 dark:bg-surface-low text-slate-600 dark:text-ink-muted hover:bg-slate-200 dark:hover:bg-surface-mid transition-all"
                     title="Randomize all lesson card images & colors"
                   >
                     <Shuffle size={13} />
@@ -1920,110 +1937,104 @@ export const ClassroomView: React.FC = () => {
                                     </svg>
                                   </button>
                                 </div>
-
+                                
                                 {/* Card Body */}
-                                <div className="p-5 flex-1 flex flex-col space-y-4">
-                                  <div className="grid grid-cols-2 gap-4 text-sm border-b border-slate-100 pb-4 dark:border-white/6 items-center">
-                                    {(() => {
-                                      const quizzes = (lesson.blocks || []).filter((b: any) => b.purpose === 'quiz' || b.type === 'quiz');
-                                      const exercises = (lesson.blocks || []).filter((b: any) => b.purpose === 'practice' || b.purpose === 'exam' || b.type === 'practice' || b.type === 'exam');
-                                      const hasTests = quizzes.length > 0 || exercises.length > 0;
-                                      return (
-                                        <div className="space-y-1 practice-test-metrics-trigger cursor-pointer hover:bg-slate-50 dark:hover:bg-surface-low rounded-xl p-1.5 transition-all" title={hasTests ? "Click to take practice test directly" : ""}>
-                                          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 dark:text-ink">
-                                            <Target className="w-3.5 h-3.5 text-accent shrink-0" />
-                                            <span>Practice Test</span>
+                                  <div className="p-5 flex-1 flex flex-col space-y-4">
+                                    <AnimatePresence>
+                                      {expandedCards[lesson.id] && (
+                                        <motion.div
+                                          initial={{ height: 0, opacity: 0 }}
+                                          animate={{ height: 'auto', opacity: 1 }}
+                                          exit={{ height: 0, opacity: 0 }}
+                                          transition={{ duration: 0.25 }}
+                                          className="overflow-hidden space-y-4"
+                                        >
+                                          <div className="grid grid-cols-2 gap-4 text-sm border-b border-slate-100 pb-4 dark:border-white/6 items-center">
+                                            {(() => {
+                                              const quizzes = (lesson.blocks || []).filter((b: any) => b.purpose === 'quiz' || b.type === 'quiz');
+                                              const exercises = (lesson.blocks || []).filter((b: any) => b.purpose === 'practice' || b.purpose === 'exam' || b.type === 'practice' || b.type === 'exam');
+                                              const hasTests = quizzes.length > 0 || exercises.length > 0;
+                                              return (
+                                                <div className="space-y-1 practice-test-metrics-trigger cursor-pointer hover:bg-slate-50 dark:hover:bg-surface-low rounded-xl p-1.5 transition-all" title={hasTests ? "Click to take practice test directly" : ""}>
+                                                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 dark:text-ink">
+                                                    <Target className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                                                    <span>Practice Test</span>
+                                                  </div>
+                                                  <p className="text-[10px] text-slate-500 dark:text-ink-muted leading-tight">
+                                                    {hasTests 
+                                                      ? `${quizzes.length} Quizzes • ${exercises.length} Exercises`
+                                                      : 'No tests generated yet'}
+                                                  </p>
+                                                </div>
+                                              );
+                                            })()}
+                                            <div className="space-y-1">
+                                              <div className="flex justify-between text-[11px] font-bold">
+                                                <span className="text-slate-400 dark:text-ink-muted">Progress</span>
+                                                <span className="text-slate-800 dark:text-ink">{lesson.status === 'done' ? '100%' : '0%'}</span>
+                                              </div>
+                                              <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden dark:bg-surface-mid">
+                                                <div 
+                                                  className={`h-full rounded-full ${lesson.status === 'done' ? 'bg-slate-700 dark:bg-slate-400' : 'bg-slate-300 dark:bg-surface-high'}`} 
+                                                  style={{ width: lesson.status === 'done' ? '100%' : '0%' }} 
+                                                />
+                                              </div>
+                                            </div>
                                           </div>
-                                          <p className="text-[10px] text-slate-500 dark:text-ink-muted leading-tight">
-                                            {hasTests 
-                                              ? `${quizzes.length} Quizzes • ${exercises.length} Exercises`
-                                              : 'No tests generated yet'}
-                                          </p>
+
+                                          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-ink-muted">
+                                            <Clock className="w-4 h-4 text-slate-400 shrink-0" />
+                                            <span>
+                                              Last Active: {lesson.createdAt ? relativeTime(lesson.createdAt) : 'No activity yet'}
+                                            </span>
+                                          </div>
+                                        </motion.div>
+                                      )}
+                                    </AnimatePresence>
+
+                                    <div className="pt-2 flex items-center justify-between border-t border-slate-100 dark:border-white/6">
+                                      {isClickable ? (
+                                        <div className="flex items-center gap-2 card-footer-actions">
+                                          <button
+                                            type="button"
+                                            onClick={(e) => { e.stopPropagation(); navigate(`/lesson/${lesson.id}`); }}
+                                            className="flex items-center gap-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white dark:bg-white/10 dark:hover:bg-white/20 px-3.5 py-2 text-xs font-bold transition-all shadow-sm"
+                                          >
+                                            <Play className="w-3 h-3 fill-current text-white" />
+                                            {lesson.status === 'done' ? 'Review' : 'Start Lesson'}
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={(e) => toggleCardExpansion(lesson.id, e)}
+                                            className="rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-700 transition-all dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:bg-surface-low flex items-center gap-1"
+                                          >
+                                            {expandedCards[lesson.id] ? 'Hide Details' : 'Show Details'}
+                                            <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${expandedCards[lesson.id] ? 'rotate-180' : ''}`} />
+                                          </button>
                                         </div>
-                                      );
-                                    })()}
-                                    <div className="space-y-1">
-                                      <div className="flex justify-between text-[11px] font-bold">
-                                        <span className="text-slate-400 dark:text-ink-muted">Progress</span>
-                                        <span className="text-slate-800 dark:text-ink">{lesson.status === 'done' ? '100%' : '0%'}</span>
-                                      </div>
-                                      <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden dark:bg-surface-mid">
-                                        <div 
-                                          className={`h-full rounded-full ${lesson.status === 'done' ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-surface-high'}`} 
-                                          style={{ width: lesson.status === 'done' ? '100%' : '0%' }} 
-                                        />
-                                      </div>
+                                      ) : (
+                                        <div className="flex-1 text-[11px] text-slate-500 dark:text-ink-muted font-medium pr-2 leading-relaxed">
+                                          {availabilityState === 'needs_review' 
+                                            ? 'Lesson exists but is waiting for review' 
+                                            : 'Starter lesson available for admin review'}
+                                        </div>
+                                      )}
+
+                                      {isClickable ? (
+                                        <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
+                                          lesson.status === 'done' ? 'text-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-400'
+                                        }`}>
+                                          <span className={`h-1.5 w-1.5 rounded-full ${lesson.status === 'done' ? 'bg-slate-800 dark:bg-white animate-pulse' : 'bg-slate-300'}`} />
+                                          {lesson.status === 'done' ? 'Completed' : 'Available'}
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                          <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+                                          {availabilityState === 'needs_review' ? 'Under Review' : 'Draft'}
+                                        </span>
+                                      )}
                                     </div>
                                   </div>
-
-                                  <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-ink-muted">
-                                    <Clock className="w-4 h-4 text-slate-400 shrink-0" />
-                                    <span>
-                                      Last Active: {lesson.createdAt ? relativeTime(lesson.createdAt) : 'No activity yet'}
-                                    </span>
-                                  </div>
-
-                                  <div className="pt-2 flex items-center justify-between border-t border-slate-100 dark:border-white/6">
-                                    {isClickable ? (
-                                      <div className="flex items-center gap-2 card-footer-actions">
-                                        <button
-                                          type="button"
-                                          onClick={(e) => { e.stopPropagation(); navigate(`/lesson/${lesson.id}`); }}
-                                          className="flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 text-xs font-bold text-white transition-colors shadow-sm"
-                                        >
-                                          <Play className="w-3 h-3 fill-current text-white" />
-                                          {lesson.status === 'done' ? 'Review' : 'Start Lesson'}
-                                        </button>
-                                        {(() => {
-                                          const quizzes = (lesson.blocks || []).filter((b: any) => b.purpose === 'quiz' || b.type === 'quiz');
-                                          const exercises = (lesson.blocks || []).filter((b: any) => b.purpose === 'practice' || b.purpose === 'exam' || b.type === 'practice' || b.type === 'exam');
-                                          const hasTests = quizzes.length > 0 || exercises.length > 0;
-                                          if (hasTests) {
-                                            return (
-                                              <button
-                                                type="button"
-                                                onClick={(e) => { e.stopPropagation(); navigate(`/lesson/${lesson.id}`, { state: { startAtTest: true } }); }}
-                                                className="rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-700 transition-colors dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:bg-surface-low flex items-center gap-1.5 shadow-sm"
-                                              >
-                                                <Target size={12} className="text-accent shrink-0" />
-                                                Take Test
-                                              </button>
-                                            );
-                                          }
-                                          return (
-                                            <button
-                                              type="button"
-                                              onClick={(e) => { e.stopPropagation(); navigate(`/lesson/${lesson.id}`); }}
-                                              className="rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-700 transition-colors dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:bg-surface-low"
-                                            >
-                                              View Plan
-                                            </button>
-                                          );
-                                        })()}
-                                      </div>
-                                    ) : (
-                                      <div className="flex-1 text-[11px] text-slate-500 dark:text-ink-muted font-medium pr-2 leading-relaxed">
-                                        {availabilityState === 'needs_review' 
-                                          ? 'Lesson exists but is waiting for review' 
-                                          : 'Starter lesson available for admin review'}
-                                      </div>
-                                    )}
-
-                                    {isClickable ? (
-                                      <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
-                                        lesson.status === 'done' ? 'text-emerald-700 dark:text-emerald-400' : 'text-accent'
-                                      }`}>
-                                        <span className={`h-1.5 w-1.5 rounded-full ${lesson.status === 'done' ? 'bg-emerald-500 animate-pulse' : 'bg-accent'}`} />
-                                        {lesson.status === 'done' ? 'Completed' : 'Available'}
-                                      </span>
-                                    ) : (
-                                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                                        <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
-                                        {availabilityState === 'needs_review' ? 'Under Review' : 'Draft'}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
                               </motion.div>
                             );
                           }) : (
@@ -2331,180 +2342,219 @@ export const ClassroomView: React.FC = () => {
           <div className="hidden lg:flex lg:w-[260px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-5">
             <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6 pr-1">
               
-              {/* Subject Telemetry Card */}
-              <section className="bg-slate-950 text-white rounded-2xl p-5 relative overflow-hidden group dark:bg-surface-low dark:text-ink shrink-0">
-                <div className="relative z-10 flex items-center justify-between mb-4">
-                  <div>
-                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-wider dark:text-ink-muted">Telemetry</h3>
-                    <h4 className="text-sm font-bold text-white mt-1 dark:text-ink truncate max-w-[140px]" title={module.name}>{module.name} Status</h4>
-                  </div>
-                  <div className="w-10 h-10 rounded-full border-2 border-emerald-500/30 text-emerald-400 flex items-center justify-center bg-emerald-500/10">
-                    <Activity size={18} />
-                  </div>
-                </div>
+              {/* Subject Telemetry Card - Collapsible */}
+              <section className="bg-slate-900 text-white rounded-2xl p-5 relative overflow-hidden dark:bg-surface-low shrink-0">
+                <button 
+                  type="button" 
+                  onClick={() => toggleSidebarSection('telemetry')} 
+                  className="w-full flex items-center justify-between text-[10px] font-black text-slate-400 uppercase tracking-wider dark:text-ink-muted outline-none"
+                >
+                  <span>Telemetry</span>
+                  {sidebarCollapsedSections.telemetry ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                </button>
                 
-                <div className="relative z-10 space-y-4">
-                  {/* Progress bar */}
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-xs font-bold">
-                      <span className="text-slate-400 dark:text-ink-muted">Syllabus Progress</span>
-                      <span className="text-white dark:text-ink">
-                        {lessons.length > 0 ? Math.round((lessons.filter(l => l.status === 'done').length / lessons.length) * 100) : (module.progress || 0)}%
-                      </span>
-                    </div>
-                    <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden dark:bg-surface-mid">
-                      <div 
-                        className="h-full rounded-full bg-emerald-500 transition-all duration-500" 
-                        style={{ 
-                          width: `${lessons.length > 0 ? Math.round((lessons.filter(l => l.status === 'done').length / lessons.length) * 100) : (module.progress || 0)}%` 
-                        }} 
-                      />
-                    </div>
-                  </div>
+                <AnimatePresence initial={false}>
+                  {!sidebarCollapsedSections.telemetry && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden mt-3 space-y-4"
+                    >
+                      <h4 className="text-sm font-bold text-white dark:text-ink truncate max-w-[180px]" title={module.name}>{module.name} Status</h4>
+                      {/* Progress bar */}
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-xs font-bold">
+                          <span className="text-slate-400 dark:text-ink-muted">Syllabus Progress</span>
+                          <span className="text-white dark:text-ink">
+                            {lessons.length > 0 ? Math.round((lessons.filter(l => l.status === 'done').length / lessons.length) * 100) : (module.progress || 0)}%
+                          </span>
+                        </div>
+                        <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden dark:bg-surface-mid">
+                          <div 
+                            className="h-full rounded-full bg-slate-400 transition-all duration-500" 
+                            style={{ 
+                              width: `${lessons.length > 0 ? Math.round((lessons.filter(l => l.status === 'done').length / lessons.length) * 100) : (module.progress || 0)}%` 
+                            }} 
+                          />
+                        </div>
+                      </div>
 
-                  {/* Telemetry stats grid */}
-                  <div className="grid grid-cols-2 gap-3 text-xs border-t border-slate-800 pt-3 dark:border-white/5">
-                    <div>
-                      <p className="text-slate-500 dark:text-ink-muted font-medium">Completed</p>
-                      <p className="text-base font-bold text-white dark:text-ink mt-0.5">
-                        {lessons.filter(l => l.status === 'done').length} / {lessons.length}
+                      {/* Telemetry stats grid */}
+                      <div className="grid grid-cols-2 gap-3 text-xs border-t border-slate-800 pt-3 dark:border-white/5">
+                        <div>
+                          <p className="text-slate-500 dark:text-ink-muted font-medium">Completed</p>
+                          <p className="text-base font-bold text-white dark:text-ink mt-0.5">
+                            {lessons.filter(l => l.status === 'done').length} / {lessons.length}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-slate-500 dark:text-ink-muted font-medium">Total Tests</p>
+                          <p className="text-base font-bold text-white dark:text-ink mt-0.5">
+                            {quizzes.length + exercises.length}
+                          </p>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </section>
+
+              {/* Focus Timer Card - Collapsible */}
+              <section className="bg-slate-900 text-white rounded-2xl p-5 relative overflow-hidden group dark:bg-surface-low dark:text-ink shrink-0">
+                <button 
+                  type="button" 
+                  onClick={() => toggleSidebarSection('pomodoro')} 
+                  className="w-full flex items-center justify-between text-[10px] font-black text-slate-400 uppercase tracking-wider dark:text-ink-muted outline-none"
+                >
+                  <span>{t('deep_focus') || 'Deep Focus'}</span>
+                  {sidebarCollapsedSections.pomodoro ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                </button>
+
+                <AnimatePresence initial={false}>
+                  {!sidebarCollapsedSections.pomodoro && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden mt-3 space-y-3"
+                    >
+                      <div className="text-3xl font-bold tracking-tight text-white dark:text-ink">
+                        {formatTime(timerSeconds)}
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setIsTimerRunning(!isTimerRunning)}
+                          className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                            isTimerRunning
+                              ? 'bg-slate-800 text-white hover:bg-slate-700 dark:bg-surface-mid'
+                              : 'bg-white text-slate-900 hover:bg-slate-100'
+                          }`}
+                        >
+                          {isTimerRunning ? (t('pause') || 'Pause') : (t('dashboard_start') || 'Start Timer')}
+                        </button>
+                        <button
+                          onClick={() => { setIsTimerRunning(false); setTimerSeconds(defaultDuration * 60); }}
+                          className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-700 transition-all dark:bg-surface-mid"
+                        >
+                          <RefreshCw size={14} />
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </section>
+
+              {/* Support Zone / MyLevel - Collapsible */}
+              <section className="bg-slate-900 text-white rounded-2xl p-5 relative overflow-hidden group dark:bg-surface-low dark:text-ink shrink-0">
+                <button 
+                  type="button" 
+                  onClick={() => toggleSidebarSection('support')} 
+                  className="w-full flex items-center justify-between text-[10px] font-black text-slate-400 uppercase tracking-wider dark:text-ink-muted outline-none"
+                >
+                  <span>Support Zone</span>
+                  {sidebarCollapsedSections.support ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                </button>
+                
+                <AnimatePresence initial={false}>
+                  {!sidebarCollapsedSections.support && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden mt-3 space-y-4"
+                    >
+                      <p className="text-slate-300 dark:text-ink-secondary text-[11px] leading-relaxed">
+                        Check your real level, discover your gaps, and get a personal roadmap.
                       </p>
-                    </div>
-                    <div>
-                      <p className="text-slate-500 dark:text-ink-muted font-medium">Total Tests</p>
-                      <p className="text-base font-bold text-white dark:text-ink mt-0.5">
-                        {quizzes.length + exercises.length}
-                      </p>
-                    </div>
-                  </div>
-                </div>
+                      <button
+                        onClick={() => setIsSupportModalOpen(true)}
+                        className="w-full py-2.5 rounded-xl text-xs font-bold transition-all bg-white text-slate-900 hover:bg-slate-100"
+                      >
+                        Start MyLevel Check
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </section>
 
-              {/* Focus Timer Card */}
-              <section className="bg-slate-950 text-white rounded-2xl p-5 relative overflow-hidden group dark:bg-surface-low dark:text-ink shrink-0">
-                <div className="relative z-10 flex items-center justify-between">
-                  <div>
-                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-wider dark:text-ink-muted">{t('deep_focus') || 'Deep Focus'}</h3>
-                    <div className="text-3xl font-bold tracking-tight mt-1 mb-3">
-                      {formatTime(timerSeconds)}
-                    </div>
-                  </div>
-                  <div className={`w-12 h-12 rounded-full border-4 flex items-center justify-center ${isTimerRunning ? 'border-accent text-accent animate-pulse' : 'border-slate-800 text-slate-600 dark:border-slate-200 dark:text-slate-400'}`}>
-                    <Timer size={20} />
-                  </div>
-                </div>
-                <div className="relative z-10 flex gap-2">
-                  <button
-                    onClick={() => setIsTimerRunning(!isTimerRunning)}
-                    className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${
-                      isTimerRunning
-                        ? 'bg-slate-800 text-white hover:bg-slate-700 dark:bg-surface-mid dark:text-ink'
-                        : 'bg-accent text-white hover:bg-accent/90'
-                    }`}
-                  >
-                    {isTimerRunning ? (t('pause') || 'Pause') : (t('dashboard_start') || 'Start Timer')}
-                  </button>
-                  <button
-                    onClick={() => { setIsTimerRunning(false); setTimerSeconds(defaultDuration * 60); }}
-                    className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-700 transition-all dark:bg-surface-mid dark:text-ink-muted"
-                  >
-                    <RefreshCw size={14} />
-                  </button>
-                </div>
-              </section>
-
-              {/* Support Zone / MyLevel */}
-              <section className="bg-slate-950 text-white rounded-2xl p-5 relative overflow-hidden group dark:bg-surface-low dark:text-ink shrink-0">
-                <div className="relative z-10 flex items-center justify-between mb-4">
-                  <div>
-                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-wider dark:text-ink-muted">Support Zone</h3>
-                  </div>
-                  <div className="w-10 h-10 rounded-full border-2 border-accent/30 text-accent flex items-center justify-center bg-accent/10">
-                    <Activity size={18} />
-                  </div>
-                </div>
-                <div className="relative z-10 space-y-4">
-                  <p className="text-sm font-medium text-slate-300 dark:text-ink-secondary leading-relaxed text-xs">
-                    Check your real level, discover your gaps, and get a personal roadmap.
-                  </p>
-                  <button
-                    onClick={() => setIsSupportModalOpen(true)}
-                    className="w-full py-2.5 rounded-xl text-xs font-bold transition-all bg-accent text-white hover:bg-accent/90"
-                  >
-                    Start MyLevel Check
-                  </button>
-                </div>
-              </section>
-
-              {/* Classroom Activity Log Card */}
+              {/* Classroom Activity Log Card - Collapsible borderless list */}
               <section className="space-y-4 pt-4 border-t border-slate-100 dark:border-white/5 shrink-0">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-bold text-slate-950 dark:text-ink uppercase tracking-wider">{t('activity_log') || 'Activity Log'}</h3>
-                  <span className="text-[9px] bg-slate-50 dark:bg-surface-low border border-slate-100 dark:border-white/5 text-slate-400 dark:text-ink-muted px-2 py-0.5 rounded-full font-bold">LIVE</span>
-                </div>
+                <button 
+                  type="button" 
+                  onClick={() => toggleSidebarSection('activityLog')} 
+                  className="w-full flex items-center justify-between text-xs font-bold text-slate-950 dark:text-ink uppercase tracking-wider outline-none"
+                >
+                  <div className="flex items-center gap-2">
+                    <span>{t('activity_log') || 'Activity Log'}</span>
+                    <span className="text-[9px] bg-slate-50 dark:bg-surface-low border border-slate-100 dark:border-white/5 text-slate-400 dark:text-ink-muted px-2 py-0.5 rounded-full font-bold">LIVE</span>
+                  </div>
+                  {sidebarCollapsedSections.activityLog ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                </button>
                 
-                <div className="space-y-3.5 max-h-[220px] overflow-y-auto no-scrollbar">
-                  {activityLogs.length > 0 ? (
-                    activityLogs.map((log) => {
-                      const relativeTimeText = (() => {
-                        const diff = Date.now() - log.timestamp;
-                        const minutes = Math.floor(diff / 60000);
-                        if (minutes < 60) return `${minutes}m ago`;
-                        const hours = Math.floor(minutes / 60);
-                        if (hours < 24) return `${hours}h ago`;
-                        const days = Math.floor(hours / 24);
-                        return `${days}d ago`;
-                      })();
+                <AnimatePresence initial={false}>
+                  {!sidebarCollapsedSections.activityLog && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden mt-3"
+                    >
+                      <div className="space-y-3.5 max-h-[220px] overflow-y-auto no-scrollbar">
+                        {activityLogs.length > 0 ? (
+                          activityLogs.map((log) => {
+                            const relativeTimeText = (() => {
+                              const diff = Date.now() - log.timestamp;
+                              const minutes = Math.floor(diff / 60000);
+                              if (minutes < 60) return `${minutes}m ago`;
+                              const hours = Math.floor(minutes / 60);
+                              if (hours < 24) return `${hours}h ago`;
+                              const days = Math.floor(hours / 24);
+                              return `${days}d ago`;
+                            })();
 
-                      return (
-                        <div key={log.id} className="flex gap-3 items-start text-xs">
-                          <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
-                            log.type === 'lesson_completed'
-                              ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400'
-                              : log.type === 'note_added'
-                              ? 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400'
-                              : log.type === 'pomodoro_start'
-                              ? 'bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400'
-                              : log.type === 'reminder_completed'
-                              ? 'bg-violet-50 text-violet-600 dark:bg-violet-500/10 dark:text-violet-400'
-                              : 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400'
-                          }`}>
-                            {log.type === 'lesson_completed' ? (
-                              <CheckCircle2 size={14} />
-                            ) : log.type === 'note_added' ? (
-                              <FileText size={14} />
-                            ) : log.type === 'pomodoro_start' ? (
-                              <Timer size={14} />
-                            ) : log.type === 'reminder_completed' ? (
-                              <CheckSquare size={14} />
-                            ) : (
-                              <Loader2 size={14} className="animate-spin" />
-                            )}
-                          </div>
-                          <div className="space-y-0.5 min-w-0">
-                            <h4 className="font-bold text-slate-950 dark:text-ink truncate leading-snug text-[11px]" title={log.title}>
-                              {log.title}
-                            </h4>
-                            {log.subtitle && (
-                              <p className="text-[10px] text-slate-500 dark:text-ink-muted leading-relaxed line-clamp-1">
-                                {log.subtitle}
-                              </p>
-                            )}
-                            <p className="text-[9px] text-slate-400 dark:text-ink-muted">
-                              {relativeTimeText}
+                            return (
+                              <div key={log.id} className="flex gap-3 items-start text-xs py-0.5">
+                                <div className="text-slate-400 shrink-0 mt-0.5">
+                                  {log.type === 'lesson_completed' ? (
+                                    <CheckCircle2 size={12} />
+                                  ) : log.type === 'note_added' ? (
+                                    <FileText size={12} />
+                                  ) : log.type === 'pomodoro_start' ? (
+                                    <Timer size={12} />
+                                  ) : log.type === 'reminder_completed' ? (
+                                    <CheckSquare size={12} />
+                                  ) : (
+                                    <Loader2 size={12} className="animate-spin" />
+                                  )}
+                                </div>
+                                <div className="space-y-0.5 min-w-0">
+                                  <h4 className="font-bold text-slate-900 dark:text-ink truncate leading-snug text-[11px]" title={log.title}>
+                                    {log.title}
+                                  </h4>
+                                  {log.subtitle && (
+                                    <p className="text-[10px] text-slate-500 dark:text-ink-muted leading-relaxed line-clamp-1">
+                                      {log.subtitle}
+                                    </p>
+                                  )}
+                                  <p className="text-[9px] text-slate-400 dark:text-ink-muted">
+                                    {relativeTimeText}
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <div className="py-6 text-center bg-slate-50/10 dark:bg-surface-low/5 rounded-xl border border-solid border-slate-100 dark:border-white/5">
+                            <p className="text-[10px] font-medium text-slate-400 dark:text-ink-muted">
+                              No recent activity.
                             </p>
                           </div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className="py-6 text-center bg-slate-50/30 dark:bg-surface-low/10 rounded-xl border border-solid border-slate-100 dark:border-white/5">
-                      <p className="text-[10px] font-medium text-slate-400 dark:text-ink-muted">
-                        No recent activity. Start or review a lesson to log your progress!
-                      </p>
-                    </div>
+                        )}
+                      </div>
+                    </motion.div>
                   )}
-                </div>
+                </AnimatePresence>
               </section>
 
             </div>

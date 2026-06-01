@@ -26,7 +26,11 @@ import {
   Rows3,
   TrendingUp,
   Zap,
-  Shuffle
+  Shuffle,
+  ChevronDown,
+  ChevronUp,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { HorizontalSlider } from '../components/HorizontalSlider';
 import { generateCurriculum, checkAIProvider } from '../services/geminiService';
@@ -563,6 +567,24 @@ export const Modules: React.FC = () => {
   // Per-module banner and color overrides (for bulk randomize)
   const [moduleBannerOverrides, setModuleBannerOverrides] = useState<Record<string, string>>({});
   const [moduleColorOverrides, setModuleColorOverrides] = useState<Record<string, string>>({});
+  
+  // Clean UI layout states
+  const [showStats, setShowStats] = useState(false);
+  const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
+  const [sidebarCollapsedSections, setSidebarCollapsedSections] = useState<Record<string, boolean>>({
+    pomodoro: false,
+    studyTips: false,
+    progress: false,
+  });
+
+  const toggleSidebarSection = (section: string) => {
+    setSidebarCollapsedSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
+
+  const toggleCardExpansion = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpandedCards(prev => ({ ...prev, [id]: !prev[id] }));
+  };
 
   const handleRandomizeAllBanners = () => {
     const bannerMap: Record<string, string> = {};
@@ -644,11 +666,25 @@ export const Modules: React.FC = () => {
                       Slide
                     </button>
                   </div>
+                  {/* Toggle Global Stats Row */}
+                  <button
+                    type="button"
+                    onClick={() => setShowStats(!showStats)}
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all ${
+                      showStats
+                        ? 'bg-slate-900 text-white dark:bg-white/10 dark:text-white'
+                        : 'bg-slate-100 dark:bg-surface-low text-slate-600 dark:text-ink-muted hover:bg-slate-200'
+                    }`}
+                    title="Toggle curriculum statistics overview"
+                  >
+                    {showStats ? <EyeOff size={13} /> : <Eye size={13} />}
+                    {showStats ? 'Hide Stats' : 'Show Stats'}
+                  </button>
                   {/* Randomize All */}
                   <button
                     type="button"
                     onClick={handleRandomizeAllBanners}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-slate-100 dark:bg-surface-low text-slate-600 dark:text-ink-muted hover:bg-accent hover:text-white dark:hover:bg-accent dark:hover:text-white transition-all"
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-slate-100 dark:bg-surface-low text-slate-600 dark:text-ink-muted hover:bg-slate-200 dark:hover:bg-surface-mid transition-all"
                     title="Randomize all module card images & colors"
                   >
                     <Shuffle size={13} />
@@ -659,28 +695,38 @@ export const Modules: React.FC = () => {
 
               <AnnouncementBanner bannerKey="classrooms_ad_cta" />
 
-              {/* Symmetrical Stats Row */}
-              <section className="mt-2">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  {[
-                    { label: 'Total Subjects', value: modules.length, icon: <LayoutGrid size={16} /> },
-                    { label: 'Active Classrooms', value: selectedModules.length, icon: <Zap size={16} /> },
-                    { label: 'With Lessons', value: Object.keys(lessonCountByModuleId).length, icon: <BookOpen size={16} /> },
-                  ].map((s, i) => (
-                    <div key={i} className="bg-slate-50/50 dark:bg-surface-low/30 p-4 rounded-2xl border border-slate-100 dark:border-white/5 flex items-center justify-between shadow-sm hover:border-accent/30 transition-all cursor-default">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-surface-low flex items-center justify-center text-slate-400 dark:text-ink-muted shrink-0">
-                          {s.icon}
+              {/* Symmetrical Stats Row - Collapsible */}
+              <AnimatePresence>
+                {showStats && (
+                  <motion.section 
+                    initial={{ height: 0, opacity: 0, marginBottom: 0 }}
+                    animate={{ height: 'auto', opacity: 1, marginBottom: 16 }}
+                    exit={{ height: 0, opacity: 0, marginBottom: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="overflow-hidden mt-2"
+                  >
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      {[
+                        { label: 'Total Subjects', value: modules.length, icon: <LayoutGrid size={16} /> },
+                        { label: 'Active Classrooms', value: selectedModules.length, icon: <Zap size={16} /> },
+                        { label: 'With Lessons', value: Object.keys(lessonCountByModuleId).length, icon: <BookOpen size={16} /> },
+                      ].map((s, i) => (
+                        <div key={i} className="bg-slate-50/50 dark:bg-surface-low/30 p-4 rounded-2xl border border-slate-100 dark:border-white/5 flex items-center justify-between shadow-sm hover:border-slate-200 dark:hover:border-white/10 transition-all cursor-default">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-surface-low flex items-center justify-center text-slate-400 dark:text-ink-muted shrink-0">
+                              {s.icon}
+                            </div>
+                            <div>
+                              <p className="text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-normal">{s.label}</p>
+                              <span className="text-lg font-bold text-slate-800 dark:text-ink">{s.value}</span>
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-normal">{s.label}</p>
-                          <span className="text-lg font-bold text-slate-800 dark:text-ink">{s.value}</span>
-                        </div>
-                      </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </section>
+                  </motion.section>
+                )}
+              </AnimatePresence>
 
         {/* Modules List */}
         {layoutMode === 'carousel' ? (
@@ -798,53 +844,67 @@ export const Modules: React.FC = () => {
 
                   {/* Card Body */}
                   <div className="p-5 flex-1 flex flex-col space-y-4">
-                    {/* Metrics grid */}
-                    <div className="grid grid-cols-2 gap-4 text-sm border-b border-slate-100 pb-4 dark:border-white/6 items-center">
-                      <div className="flex items-center gap-2">
-                        <BookOpen className="w-4 h-4 text-slate-400 dark:text-ink-muted" />
-                        <span className="font-bold text-slate-800 dark:text-ink">{lessonCountByModuleId[module.id] ?? 0} Lessons</span>
-                      </div>
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-[11px] font-bold">
-                          <span className="text-slate-400 dark:text-ink-muted">Progress</span>
-                          <span className="text-slate-800 dark:text-ink">{module.progress}%</span>
-                        </div>
-                        <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden dark:bg-surface-mid">
-                          <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${module.progress}%` }} />
-                        </div>
-                      </div>
-                    </div>
+                    {/* Toggled Metrics Section */}
+                    <AnimatePresence>
+                      {expandedCards[module.id] && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.25 }}
+                          className="overflow-hidden space-y-4"
+                        >
+                          {/* Metrics grid */}
+                          <div className="grid grid-cols-2 gap-4 text-sm border-b border-slate-100 pb-4 dark:border-white/6 items-center">
+                            <div className="flex items-center gap-2">
+                              <BookOpen className="w-4 h-4 text-slate-400 dark:text-ink-muted" />
+                              <span className="font-bold text-slate-800 dark:text-ink">{lessonCountByModuleId[module.id] ?? 0} Lessons</span>
+                            </div>
+                            <div className="space-y-1">
+                              <div className="flex justify-between text-[11px] font-bold">
+                                <span className="text-slate-400 dark:text-ink-muted">Progress</span>
+                                <span className="text-slate-800 dark:text-ink">{module.progress}%</span>
+                              </div>
+                              <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden dark:bg-surface-mid">
+                                <div className="h-full bg-slate-700 dark:bg-slate-400 rounded-full" style={{ width: `${module.progress}%` }} />
+                              </div>
+                            </div>
+                          </div>
 
-                    {/* Last activity */}
-                    <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-ink-muted">
-                      <Clock className="w-4 h-4 text-slate-400 shrink-0" />
-                      <span>
-                        Last Active: {lastActivityByModuleId[module.id] ? relativeTime(lastActivityByModuleId[module.id]) : 'No activity yet'}
-                      </span>
-                    </div>
+                          {/* Last activity */}
+                          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-ink-muted pb-1">
+                            <Clock className="w-4 h-4 text-slate-400 shrink-0" />
+                            <span>
+                              Last Active: {lastActivityByModuleId[module.id] ? relativeTime(lastActivityByModuleId[module.id]) : 'No activity yet'}
+                            </span>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
 
                     {/* Footer: status + actions */}
                     <div className="pt-2 flex items-center justify-between border-t border-slate-100 dark:border-white/6">
                       <div className="flex items-center gap-2">
                         <button
                           onClick={(e) => { e.stopPropagation(); navigate(`/classroom/${module.id}`); }}
-                          className="flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 text-xs font-bold text-white transition-colors shadow-sm"
+                          className="flex items-center gap-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white dark:bg-white/10 dark:hover:bg-white/20 px-3.5 py-2 text-xs font-bold transition-all shadow-sm"
                         >
                           <Play className="w-3 h-3 fill-current text-white" />
                           Start Lesson
                         </button>
                         <button
-                          onClick={(e) => { e.stopPropagation(); toggleModule(module.id); }}
-                          className="rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-700 transition-colors dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:bg-surface-low"
+                          onClick={(e) => toggleCardExpansion(module.id, e)}
+                          className="rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-700 transition-all dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:bg-surface-low flex items-center gap-1"
                         >
-                          View Plan
+                          {expandedCards[module.id] ? 'Hide Details' : 'Show Details'}
+                          <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${expandedCards[module.id] ? 'rotate-180' : ''}`} />
                         </button>
                       </div>
 
                       <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
-                        module.selected ? 'text-accent' : 'text-emerald-700 dark:text-emerald-400'
+                        module.selected ? 'text-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-400'
                       }`}>
-                        <span className={`h-1.5 w-1.5 rounded-full ${module.selected ? 'bg-accent' : 'bg-emerald-500 animate-pulse'}`} />
+                        <span className={`h-1.5 w-1.5 rounded-full ${module.selected ? 'bg-slate-800 dark:bg-white animate-pulse' : 'bg-slate-300 dark:bg-surface-high'}`} />
                         {module.selected ? 'Active' : 'Available'}
                       </span>
                     </div>
@@ -928,28 +988,45 @@ export const Modules: React.FC = () => {
           <div className="hidden lg:flex lg:w-[260px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-5">
             <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6 pr-1">
 
-              {/* Deep Focus Pomodoro */}
-              <section className="bg-slate-950 text-white rounded-2xl p-5 relative overflow-hidden">
-                <div className="relative z-10">
-                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Deep Focus</h3>
-                  <div className="text-3xl font-bold tracking-tight mb-3">{formatTime(timerSeconds)}</div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setIsTimerRunning(!isTimerRunning)}
-                      className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${
-                        isTimerRunning ? 'bg-slate-800 text-white hover:bg-slate-700' : 'bg-accent text-white hover:bg-accent/90'
-                      }`}
+              {/* Deep Focus Pomodoro - Premium Calmer Box */}
+              <section className="bg-slate-900 text-white rounded-2xl p-5 relative overflow-hidden dark:bg-surface-low">
+                <button 
+                  type="button" 
+                  onClick={() => toggleSidebarSection('pomodoro')} 
+                  className="w-full flex items-center justify-between text-xs font-bold text-slate-400 uppercase tracking-wider dark:text-ink-muted outline-none"
+                >
+                  <span>Deep Focus</span>
+                  {sidebarCollapsedSections.pomodoro ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                </button>
+                
+                <AnimatePresence initial={false}>
+                  {!sidebarCollapsedSections.pomodoro && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden mt-3"
                     >
-                      {isTimerRunning ? 'Pause' : 'Start Timer'}
-                    </button>
-                    <button
-                      onClick={() => { setIsTimerRunning(false); setTimerSeconds(25 * 60); }}
-                      className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-700 transition-all"
-                    >
-                      <RefreshCw size={14} />
-                    </button>
-                  </div>
-                </div>
+                      <div className="text-3xl font-bold tracking-tight mb-3 text-white dark:text-ink">{formatTime(timerSeconds)}</div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setIsTimerRunning(!isTimerRunning)}
+                          className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                            isTimerRunning ? 'bg-slate-800 text-white hover:bg-slate-700' : 'bg-white text-slate-900 hover:bg-slate-100'
+                          }`}
+                        >
+                          {isTimerRunning ? 'Pause' : 'Start Timer'}
+                        </button>
+                        <button
+                          onClick={() => { setIsTimerRunning(false); setTimerSeconds(25 * 60); }}
+                          className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-700 transition-all dark:bg-surface-mid"
+                        >
+                          <RefreshCw size={14} />
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </section>
 
               {/* Active Classrooms */}
@@ -961,10 +1038,10 @@ export const Modules: React.FC = () => {
                       <button
                         key={m.id}
                         onClick={() => navigate(`/classroom/${m.id}`)}
-                        className="w-full flex items-center gap-2.5 p-3 bg-slate-50 dark:bg-surface-low/30 rounded-xl border border-slate-100 dark:border-white/5 hover:border-accent/30 transition-all text-left group"
+                        className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left hover:bg-slate-100 dark:hover:bg-surface-low transition-all group"
                       >
-                        <div className="w-7 h-7 rounded-lg bg-accent/10 flex items-center justify-center text-accent shrink-0 group-hover:bg-accent group-hover:text-white transition-colors">
-                          <BookOpen size={12} />
+                        <div className="w-6 h-6 rounded bg-slate-100 dark:bg-surface-low flex items-center justify-center text-slate-500 shrink-0 transition-colors">
+                          <BookOpen size={11} />
                         </div>
                         <span className="text-[11px] font-semibold text-slate-700 dark:text-ink truncate">{m.name}</span>
                       </button>
@@ -973,36 +1050,77 @@ export const Modules: React.FC = () => {
                 </section>
               )}
 
-              {/* Study Tips */}
+              {/* Study Tips - Borderless & Collapsible */}
               <section className="space-y-3">
-                <p className="text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-wider">Study Tips</p>
-                {[
-                  { tip: 'Pick 2–3 subjects per day for deep work', icon: <Target size={12} /> },
-                  { tip: 'Use the Pomodoro: 25 min focus, 5 min break', icon: <Timer size={12} /> },
-                  { tip: 'Review yesterday\'s material before starting new', icon: <BookOpen size={12} /> },
-                ].map((item, i) => (
-                  <div key={i} className="flex items-start gap-3 p-3 bg-slate-50 dark:bg-surface-low/30 rounded-xl border border-slate-100 dark:border-white/5">
-                    <div className="w-6 h-6 rounded-lg bg-accent/10 flex items-center justify-center text-accent shrink-0 mt-0.5">{item.icon}</div>
-                    <p className="text-[11px] text-slate-600 dark:text-ink-secondary leading-relaxed">{item.tip}</p>
-                  </div>
-                ))}
+                <button 
+                  type="button" 
+                  onClick={() => toggleSidebarSection('studyTips')}
+                  className="w-full flex items-center justify-between text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-wider outline-none"
+                >
+                  <span>Study Tips</span>
+                  {sidebarCollapsedSections.studyTips ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
+                </button>
+                
+                <AnimatePresence initial={false}>
+                  {!sidebarCollapsedSections.studyTips && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden space-y-3"
+                    >
+                      {[
+                        { tip: 'Pick 2–3 subjects per day for deep work', icon: <Target size={12} /> },
+                        { tip: 'Use the Pomodoro: 25 min focus, 5 min break', icon: <Timer size={12} /> },
+                        { tip: 'Review yesterday\'s material before starting new', icon: <BookOpen size={12} /> },
+                      ].map((item, i) => (
+                        <div key={i} className="flex items-start gap-3 py-1 text-slate-600 dark:text-ink-secondary">
+                          <div className="text-slate-400 shrink-0 mt-0.5">{item.icon}</div>
+                          <p className="text-[11px] leading-relaxed">{item.tip}</p>
+                        </div>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </section>
 
-              {/* Progress Summary */}
+              {/* Progress Summary - Borderless & Collapsible */}
               <section className="space-y-3">
-                <p className="text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-wider">Progress</p>
-                {modules.slice(0, 4).map(m => (
-                  <div key={m.id} className="space-y-1">
-                    <div className="flex justify-between text-[10px]">
-                      <span className="font-semibold text-slate-700 dark:text-ink truncate max-w-[140px]">{m.name}</span>
-                      <span className="text-slate-400 dark:text-ink-muted">{m.progress}%</span>
-                    </div>
-                    <div className="h-1.5 w-full bg-slate-100 dark:bg-surface-mid rounded-full overflow-hidden">
-                      <div className="h-full bg-accent rounded-full transition-all" style={{ width: `${m.progress}%` }} />
-                    </div>
-                  </div>
-                ))}
+                <button 
+                  type="button"
+                  onClick={() => toggleSidebarSection('progress')}
+                  className="w-full flex items-center justify-between text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-wider outline-none"
+                >
+                  <span>Progress</span>
+                  {sidebarCollapsedSections.progress ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
+                </button>
+                
+                <AnimatePresence initial={false}>
+                  {!sidebarCollapsedSections.progress && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden space-y-3"
+                    >
+                      {modules.slice(0, 4).map(m => (
+                        <div key={m.id} className="space-y-1">
+                          <div className="flex justify-between text-[10px]">
+                            <span className="font-semibold text-slate-600 dark:text-ink truncate max-w-[140px]">{m.name}</span>
+                            <span className="text-slate-400 dark:text-ink-muted">{m.progress}%</span>
+                          </div>
+                          <div className="h-1 w-full bg-slate-100 dark:bg-surface-mid rounded-full overflow-hidden">
+                            <div className="h-full bg-slate-700 dark:bg-slate-400 rounded-full transition-all" style={{ width: `${m.progress}%` }} />
+                          </div>
+                        </div>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </section>
+
+            </div>
+          </div>
 
             </div>
           </div>
