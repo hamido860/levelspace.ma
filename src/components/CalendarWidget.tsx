@@ -330,10 +330,10 @@ export const CalendarWidget: React.FC = () => {
                   alt="" 
                   className={`absolute inset-0 object-cover w-full h-full pointer-events-none mix-blend-overlay ${
                     todayBool 
-                      ? 'opacity-[0.12] dark:opacity-[0.18]' 
+                      ? 'opacity-[0.08] dark:opacity-[0.12]' 
                       : primaryType 
-                        ? 'opacity-[0.16] dark:opacity-[0.26]' 
-                        : 'opacity-[0.04] dark:opacity-[0.08]'
+                        ? 'opacity-[0.10] dark:opacity-[0.17]' 
+                        : 'opacity-[0.02] dark:opacity-[0.05]'
                   }`} 
                 />
               )}
@@ -489,7 +489,7 @@ export const CalendarWidget: React.FC = () => {
                   <img
                     src={weather.bgUrl}
                     alt="Weather Backdrop"
-                    className="absolute inset-0 object-cover w-full h-full opacity-20 pointer-events-none mix-blend-overlay"
+                    className="absolute inset-0 object-cover w-full h-full opacity-12 pointer-events-none mix-blend-overlay"
                   />
                 )}
                 
