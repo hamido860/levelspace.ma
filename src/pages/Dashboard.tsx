@@ -7,6 +7,8 @@ import {
   RefreshCw,
   Settings,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Check,
   Plus,
   Search,
@@ -134,6 +136,15 @@ export const Dashboard: React.FC = () => {
   const [isPlanSessionOpen, setIsPlanSessionOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
+  const [showStatsOverview, setShowStatsOverview] = useState(false);
+  const [sidebarCollapsedSections, setSidebarCollapsedSections] = useState<Record<string, boolean>>({
+    pomodoro: true,
+    support: true,
+    stats: true
+  });
+  const toggleSidebarSection = (section: string) => {
+    setSidebarCollapsedSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
 
   React.useEffect(() => {
     const hasCompleted = localStorage.getItem('has_completed_onboarding');
@@ -355,39 +366,60 @@ export const Dashboard: React.FC = () => {
               </div>
 
               {/* Progress & Stats Overview */}
-              <section className="mt-2">
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  {[
-                    { label: 'Focus Quotient', value: '8.4', unit: '/10', icon: <Brain />, trend: '+12%' },
-                    { label: 'Deep Work Total', value: '24.5', unit: 'hrs', icon: <Timer />, trend: '+4.2h' },
-                    { label: 'Mastery Delta', value: '+18', unit: '%', icon: <Zap />, trend: 'Optimal' },
-                    { label: 'Lessons to Review', value: '2', unit: '', icon: <AlertCircle />, trend: '-1 this week' }
-                  ].map((stat, i) => (
-                    <motion.div 
-                      key={i}
-                      initial={{ opacity: 0, y: 10 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.05 }}
-                      viewport={{ once: true }}
-                      className="bg-slate-50/50 dark:bg-surface-low/30 p-5 rounded-2xl border border-slate-100 dark:border-white/5 space-y-3 shadow-sm hover:border-accent/30 transition-all cursor-default"
+              <section className="mt-2 space-y-3">
+                <div className="flex items-center justify-between py-2.5 px-4 bg-slate-50/50 dark:bg-surface-low/10 rounded-2xl border border-slate-100 dark:border-white/5 transition-all">
+                  <div className="flex items-center gap-2">
+                    <Activity size={14} className="text-slate-400 dark:text-ink-muted shrink-0" />
+                    <span className="text-[11px] font-bold text-slate-500 dark:text-ink-secondary uppercase tracking-wider">Study Analytics</span>
+                  </div>
+                  <button 
+                    type="button"
+                    onClick={() => setShowStatsOverview(!showStatsOverview)}
+                    className="text-xs font-bold text-accent hover:underline flex items-center gap-1 focus:outline-none"
+                  >
+                    {showStatsOverview ? 'Hide Details' : 'Show Details'}
+                  </button>
+                </div>
+
+                <AnimatePresence initial={false}>
+                  {showStatsOverview && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden"
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-surface-low flex items-center justify-center text-slate-400 dark:text-ink-muted">
-                          {React.cloneElement(stat.icon as React.ReactElement<any>, { size: 16 })}
-                        </div>
-                        <span className="text-[9px] font-bold text-emerald-500 uppercase tracking-normal">{stat.trend}</span>
-                      </div>
-                      
-                      <div className="space-y-1">
-                        <p className="text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-normal">{stat.label}</p>
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-2xl font-bold text-slate-800 dark:text-ink">{stat.value}</span>
-                          <span className="text-[10px] font-medium text-slate-400 dark:text-ink-muted">{stat.unit}</span>
-                        </div>
+                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 pt-1 pb-2">
+                        {[
+                          { label: 'Focus Quotient', value: '8.4', unit: '/10', icon: <Brain />, trend: '+12%' },
+                          { label: 'Deep Work Total', value: '24.5', unit: 'hrs', icon: <Timer />, trend: '+4.2h' },
+                          { label: 'Mastery Delta', value: '+18', unit: '%', icon: <Zap />, trend: 'Optimal' },
+                          { label: 'Lessons to Review', value: '2', unit: '', icon: <AlertCircle />, trend: '-1 this week' }
+                        ].map((stat, i) => (
+                          <div 
+                            key={i}
+                            className="bg-slate-50/50 dark:bg-surface-low/30 p-5 rounded-2xl border border-slate-100 dark:border-white/5 space-y-3 shadow-sm hover:border-accent/30 transition-all cursor-default"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-surface-low flex items-center justify-center text-slate-400 dark:text-ink-muted">
+                                {React.cloneElement(stat.icon as React.ReactElement<any>, { size: 16 })}
+                              </div>
+                              <span className="text-[9px] font-bold text-emerald-500 uppercase tracking-normal">{stat.trend}</span>
+                            </div>
+                            
+                            <div className="space-y-1">
+                              <p className="text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-normal">{stat.label}</p>
+                              <div className="flex items-baseline gap-1">
+                                <span className="text-2xl font-bold text-slate-800 dark:text-ink">{stat.value}</span>
+                                <span className="text-[10px] font-medium text-slate-400 dark:text-ink-muted">{stat.unit}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </motion.div>
-                  ))}
-                </div>
+                  )}
+                </AnimatePresence>
               </section>
 
               {/* Bottom Utilities: Interactive Calendar & Upcoming Assignments Grid */}
@@ -472,77 +504,117 @@ export const Dashboard: React.FC = () => {
           <div className="hidden lg:flex lg:w-[260px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-5">
             <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6 pr-1">
               
-              {/* Focus Timer */}
-              <section className="bg-slate-950 text-white rounded-2xl p-5 relative overflow-hidden group dark:bg-surface-low dark:text-ink animate-in fade-in duration-500">
-                <div className="relative z-10 flex items-center justify-between">
-                  <div>
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider dark:text-ink-muted">{t('deep_focus') || 'Deep Focus'}</h3>
-                    <div className="text-3xl font-bold tracking-tight mt-1 mb-3">
-                      {formatTime(timerSeconds)}
-                    </div>
-                  </div>
-                  <div className={`w-12 h-12 rounded-full border-4 flex items-center justify-center ${isTimerRunning ? 'border-accent text-accent animate-pulse' : 'border-slate-800 text-slate-600 dark:border-slate-200 dark:text-slate-400'}`}>
-                    <Timer size={20} />
-                  </div>
-                </div>
-                <div className="relative z-10 flex gap-2">
-                  <button
-                    onClick={() => setIsTimerRunning(!isTimerRunning)}
-                    className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${
-                      isTimerRunning
-                        ? 'bg-slate-800 text-white hover:bg-slate-700 dark:bg-surface-mid dark:text-ink'
-                        : 'bg-accent text-white hover:bg-accent/90'
-                    }`}
-                  >
-                    {isTimerRunning ? (t('pause') || 'Pause') : (t('dashboard_start') || 'Start Timer')}
-                  </button>
-                  <button
-                    onClick={() => { setIsTimerRunning(false); setTimerSeconds(defaultDuration * 60); }}
-                    className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-700 transition-all dark:bg-surface-mid dark:text-ink-muted"
-                  >
-                    <RefreshCw size={14} />
-                  </button>
-                </div>
+              {/* Deep Focus Pomodoro - Premium Calmer Box */}
+              <section className="bg-slate-900 text-white rounded-2xl p-5 relative dark:bg-surface-low">
+                <button 
+                  type="button" 
+                  onClick={() => toggleSidebarSection('pomodoro')} 
+                  className="w-full flex items-center justify-between text-xs font-bold text-slate-400 uppercase tracking-wider dark:text-ink-muted outline-none"
+                >
+                  <span>Deep Focus</span>
+                  {sidebarCollapsedSections.pomodoro ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                </button>
+                
+                <AnimatePresence initial={false}>
+                  {!sidebarCollapsedSections.pomodoro && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden mt-3"
+                    >
+                      <div className="text-3xl font-bold tracking-tight mb-3 text-white dark:text-ink">{formatTime(timerSeconds)}</div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setIsTimerRunning(!isTimerRunning)}
+                          className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                            isTimerRunning ? 'bg-slate-800 text-white hover:bg-slate-700' : 'bg-white text-slate-900 hover:bg-slate-100'
+                          }`}
+                        >
+                          {isTimerRunning ? 'Pause' : 'Start Timer'}
+                        </button>
+                        <button
+                          onClick={() => { setIsTimerRunning(false); setTimerSeconds(defaultDuration * 60); }}
+                          className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-700 transition-all dark:bg-surface-mid"
+                        >
+                          <RefreshCw size={14} />
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </section>
 
-              {/* Support Zone / MyLevel */}
-              <section className="bg-slate-950 text-white rounded-2xl p-5 relative overflow-hidden group dark:bg-surface-low dark:text-ink animate-in fade-in duration-500">
-                <div className="relative z-10 flex items-center justify-between mb-4">
-                  <div>
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider dark:text-ink-muted">Support Zone</h3>
-                  </div>
-                  <div className="w-10 h-10 rounded-full border-2 border-accent/30 text-accent flex items-center justify-center bg-accent/10">
-                    <Activity size={18} />
-                  </div>
-                </div>
-                <div className="relative z-10 space-y-4">
-                  <p className="text-sm font-medium text-slate-300 dark:text-ink-secondary leading-relaxed">
-                    Check your real level, discover your gaps, and get a personal roadmap.
-                  </p>
-                  <button
-                    onClick={() => setIsSupportModalOpen(true)}
-                    className="w-full py-2.5 rounded-xl text-xs font-bold transition-all bg-accent text-white hover:bg-accent/90"
-                  >
-                    Start MyLevel Check
-                  </button>
-                </div>
+              {/* Support Zone / MyLevel - Collapsible & Premium borderless box */}
+              <section className="space-y-3">
+                <button 
+                  type="button" 
+                  onClick={() => toggleSidebarSection('support')}
+                  className="w-full flex items-center justify-between text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-wider outline-none"
+                >
+                  <span>Support Zone</span>
+                  {sidebarCollapsedSections.support ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
+                </button>
+                
+                <AnimatePresence initial={false}>
+                  {!sidebarCollapsedSections.support && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden mt-1"
+                    >
+                      <div className="p-4 bg-slate-50 dark:bg-surface-low/30 rounded-2xl border border-slate-100 dark:border-white/5 space-y-4 shadow-sm">
+                        <p className="text-xs text-slate-600 dark:text-ink-secondary leading-relaxed">
+                          Check your real level, discover your gaps, and get a personal roadmap.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setIsSupportModalOpen(true)}
+                          className="w-full py-2.5 rounded-xl text-xs font-bold transition-all bg-slate-900 text-white hover:bg-slate-800 dark:bg-white/10 dark:hover:bg-white/20"
+                        >
+                          Start MyLevel Check
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </section>
 
-              {/* Learning Stats */}
-              <section className="space-y-4 pt-4 border-t border-slate-100 dark:border-white/5">
-                <h3 className="text-sm font-bold text-slate-950 dark:text-ink">{t('learning_stats') || 'Stats'}</h3>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium text-slate-500 dark:text-ink-muted">{t('active_modules') || 'Active Modules'}</span>
-                    <span className="font-bold text-slate-950 dark:text-ink">{activeModules.length}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium text-slate-500 dark:text-ink-muted">{t('avg_completion') || 'Avg Completion'}</span>
-                    <span className="font-bold text-slate-950 dark:text-ink">
-                      {Math.round(activeModules.reduce((acc, m) => acc + m.progress, 0) / (activeModules.length || 1))}%
-                    </span>
-                  </div>
-                </div>
+              {/* Learning Stats - Collapsible & Premium borderless box */}
+              <section className="space-y-3">
+                <button 
+                  type="button" 
+                  onClick={() => toggleSidebarSection('stats')}
+                  className="w-full flex items-center justify-between text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-wider outline-none"
+                >
+                  <span>Learning Stats</span>
+                  {sidebarCollapsedSections.stats ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
+                </button>
+                
+                <AnimatePresence initial={false}>
+                  {!sidebarCollapsedSections.stats && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden mt-1"
+                    >
+                      <div className="p-4 bg-slate-50 dark:bg-surface-low/30 rounded-2xl border border-slate-100 dark:border-white/5 space-y-3 shadow-sm">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-slate-500 dark:text-ink-muted">{t('active_modules') || 'Active Modules'}</span>
+                          <span className="font-bold text-slate-800 dark:text-ink">{activeModules.length}</span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span className="text-slate-500 dark:text-ink-muted">{t('avg_completion') || 'Avg Completion'}</span>
+                          <span className="font-bold text-slate-800 dark:text-ink">
+                            {Math.round(activeModules.reduce((acc, m) => acc + m.progress, 0) / (activeModules.length || 1))}%
+                          </span>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </section>
 
             </div>

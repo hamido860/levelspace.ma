@@ -796,14 +796,14 @@ export const Modules: React.FC = () => {
                         <div className="flex items-center gap-2 mt-auto">
                           <button
                             onClick={(e) => { e.stopPropagation(); navigate(`/classroom/${module.id}`); }}
-                            className="flex-grow flex items-center justify-center gap-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-white/10 dark:hover:bg-white/20 px-3.5 py-2 text-xs font-bold transition-all shadow-sm"
+                            className="flex-grow flex items-center justify-center gap-1.5 rounded-xl bg-slate-900 text-white hover:text-accent dark:bg-white/10 dark:text-ink dark:hover:text-accent px-3.5 py-2 text-xs font-bold transition-all shadow-sm"
                           >
-                            <Play className="w-3 h-3 fill-current text-white" />
-                            Start Lesson
+                            <Play className="w-3 h-3 fill-current" />
+                            Start
                           </button>
                           <button
                             onClick={(e) => toggleCardExpansion(module.id, e)}
-                            className="rounded-xl border border-slate-200 bg-white hover:bg-slate-50 p-2 text-xs font-bold text-slate-700 transition-all dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:bg-surface-low flex items-center justify-center"
+                            className="rounded-xl border border-slate-200 bg-white p-2 text-xs font-bold text-slate-700 hover:text-accent transition-colors dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:text-accent flex items-center justify-center"
                           >
                             <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${expandedCards[module.id] ? 'rotate-180' : ''}`} />
                           </button>
@@ -906,16 +906,16 @@ export const Modules: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <button
                           onClick={(e) => { e.stopPropagation(); navigate(`/classroom/${module.id}`); }}
-                          className="flex items-center gap-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white dark:bg-white/10 dark:hover:bg-white/20 px-3.5 py-2 text-xs font-bold transition-all shadow-sm"
+                          className="flex items-center gap-1.5 rounded-lg bg-slate-900 text-white hover:text-accent dark:bg-white/10 dark:text-ink dark:hover:text-accent px-3.5 py-2 text-xs font-bold transition-all shadow-sm"
                         >
-                          <Play className="w-3 h-3 fill-current text-white" />
-                          Start Lesson
+                          <Play className="w-3 h-3 fill-current" />
+                          Start
                         </button>
                         <button
                           onClick={(e) => toggleCardExpansion(module.id, e)}
-                          className="rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-700 transition-all dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:bg-surface-low flex items-center gap-1"
+                          className="rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 hover:text-accent transition-colors dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:text-accent flex items-center gap-1"
                         >
-                          {expandedCards[module.id] ? 'Hide Details' : 'Show Details'}
+                          Details
                           <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${expandedCards[module.id] ? 'rotate-180' : ''}`} />
                         </button>
                       </div>
@@ -1008,7 +1008,7 @@ export const Modules: React.FC = () => {
             <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6 pr-1">
 
               {/* Deep Focus Pomodoro - Premium Calmer Box */}
-              <section className="bg-slate-900 text-white rounded-2xl p-5 relative overflow-hidden dark:bg-surface-low">
+              <section className="bg-slate-900 text-white rounded-2xl p-5 relative dark:bg-surface-low">
                 <button 
                   type="button" 
                   onClick={() => toggleSidebarSection('pomodoro')} 

@@ -16,6 +16,8 @@ import {
   Globe,
   ChevronRight,
   ChevronLeft,
+  ChevronDown,
+  ChevronUp,
   Loader2,
   Volume2,
   BookMarked,
@@ -197,6 +199,18 @@ export const LevelUp: React.FC = () => {
   const [selectedResource, setSelectedResource] = useState<ResourceItem | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newResource, setNewResource] = useState({ title: '', description: '', url: '' });
+  const [expandedResources, setExpandedResources] = useState<Record<string, boolean>>({});
+  const toggleResourceDetails = (id: string) => {
+    setExpandedResources(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+  const [sidebarCollapsedSections, setSidebarCollapsedSections] = useState<Record<string, boolean>>({
+    pomodoro: true,
+    learningTips: true,
+    sessionStats: true
+  });
+  const toggleSidebarSection = (section: string) => {
+    setSidebarCollapsedSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
 
   // ─── Reference Suite Tab state ───────────────────────────────────────────
   const [discoverSection, setDiscoverSection] = useState<'quran' | 'dict' | 'wiki'>('quran');
@@ -614,56 +628,79 @@ export const LevelUp: React.FC = () => {
 
               {/* Resource Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {filteredResources.map((res) => (
-                  <div
-                    key={res.id}
-                    className="bg-white p-5 rounded-2xl border border-slate-200 group hover:border-accent/30 hover:shadow-lg transition-all dark:border-white/8 dark:bg-paper flex flex-col justify-between min-h-[180px]"
-                    style={{ boxShadow: 'var(--ls-shadow)' }}
-                  >
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${
-                          res.format === 'cheatsheet' ? 'bg-amber-500/10 text-amber-500' :
-                          res.format === 'pdf' ? 'bg-red-500/10 text-red-500' : 'bg-blue-500/10 text-blue-500'
-                        }`}>
-                          {res.format}
-                        </span>
-                        <span className="text-[10px] text-muted">{res.size}</span>
+                {filteredResources.map((res) => {
+                  const isExpanded = !!expandedResources[res.id];
+                  return (
+                    <div
+                      key={res.id}
+                      className="bg-white p-5 rounded-2xl border border-slate-200 group hover:border-accent/30 hover:shadow-lg transition-all dark:border-white/8 dark:bg-paper flex flex-col justify-between min-h-[140px]"
+                      style={{ boxShadow: 'var(--ls-shadow)' }}
+                    >
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${
+                            res.format === 'cheatsheet' ? 'bg-amber-500/10 text-amber-500' :
+                            res.format === 'pdf' ? 'bg-red-500/10 text-red-500' : 'bg-blue-500/10 text-blue-500'
+                          }`}>
+                            {res.format}
+                          </span>
+                          {isExpanded && <span className="text-[10px] text-muted">{res.size}</span>}
+                        </div>
+
+                        <div className="space-y-1">
+                          <h4 className="font-bold text-slate-950 dark:text-ink group-hover:text-accent transition-colors line-clamp-1">{res.title}</h4>
+                          <p className="text-[10px] text-slate-400 dark:text-ink-muted">{res.category}</p>
+                        </div>
+
+                        <AnimatePresence initial={false}>
+                          {isExpanded && (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: 'auto', opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              className="overflow-hidden space-y-3 pt-2"
+                            >
+                              <p className="text-[10px] text-slate-400 dark:text-ink-muted">By {res.author}</p>
+                              <p className="text-[11px] text-slate-500 leading-relaxed dark:text-ink-muted">
+                                {res.description}
+                              </p>
+                              <div className="pt-2 border-t border-slate-100 dark:border-white/5 flex items-center justify-between">
+                                <span className="text-[9px] font-mono text-slate-400">Added {res.addedDate}</span>
+                                {res.downloadUrl ? (
+                                  <a
+                                    href={res.downloadUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="flex items-center gap-1 text-[11px] font-bold text-accent hover:underline"
+                                  >
+                                    Access Portal <ExternalLink size={10} />
+                                  </a>
+                                ) : (
+                                  <button
+                                    onClick={() => setSelectedResource(res)}
+                                    className="flex items-center gap-1 text-[11px] font-bold text-accent hover:underline cursor-pointer"
+                                  >
+                                    View Document <ChevronRight size={12} />
+                                  </button>
+                                )}
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
 
-                      <div className="space-y-1">
-                        <h4 className="font-bold text-slate-950 dark:text-ink group-hover:text-accent transition-colors line-clamp-1">{res.title}</h4>
-                        <p className="text-[10px] text-slate-400 dark:text-ink-muted">By {res.author} • {res.category}</p>
-                      </div>
-
-                      <p className="text-[11px] text-slate-500 leading-relaxed dark:text-ink-muted line-clamp-2">
-                        {res.description}
-                      </p>
-                    </div>
-
-                    <div className="pt-4 border-t border-slate-100 dark:border-white/5 flex items-center justify-between mt-4">
-                      <span className="text-[9px] font-mono text-slate-400">Added {res.addedDate}</span>
-                      
-                      {res.downloadUrl ? (
-                        <a
-                          href={res.downloadUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="flex items-center gap-1 text-[11px] font-bold text-accent hover:underline"
-                        >
-                          Access Portal <ExternalLink size={10} />
-                        </a>
-                      ) : (
+                      <div className="mt-4 pt-3 border-t border-slate-50 dark:border-white/5 flex justify-end">
                         <button
-                          onClick={() => setSelectedResource(res)}
-                          className="flex items-center gap-1 text-[11px] font-bold text-accent hover:underline cursor-pointer"
+                          type="button"
+                          onClick={() => toggleResourceDetails(res.id)}
+                          className="text-[11px] font-bold text-slate-500 hover:text-accent dark:text-ink-muted dark:hover:text-accent transition-colors focus:outline-none"
                         >
-                          View Document <ChevronRight size={12} />
+                          {isExpanded ? 'Hide Details' : 'Show Details'}
                         </button>
-                      )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
             </div>
@@ -999,58 +1036,113 @@ export const LevelUp: React.FC = () => {
           <div className="hidden lg:flex lg:w-[260px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-5">
             <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6 pr-1">
 
-              {/* Deep Focus Pomodoro */}
-              <section className="bg-slate-950 text-white rounded-2xl p-5 relative overflow-hidden">
-                <div className="relative z-10">
-                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Deep Focus</h3>
-                  <div className="text-3xl font-bold tracking-tight mb-3">{formatTime(timerSeconds)}</div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setIsTimerRunning(!isTimerRunning)}
-                      className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${
-                        isTimerRunning ? 'bg-slate-800 text-white hover:bg-slate-700' : 'bg-accent text-white hover:bg-accent/90'
-                      }`}
+              {/* Deep Focus Pomodoro - Premium Calmer Box */}
+              <section className="bg-slate-900 text-white rounded-2xl p-5 relative dark:bg-surface-low">
+                <button 
+                  type="button" 
+                  onClick={() => toggleSidebarSection('pomodoro')} 
+                  className="w-full flex items-center justify-between text-xs font-bold text-slate-400 uppercase tracking-wider dark:text-ink-muted outline-none"
+                >
+                  <span>Deep Focus</span>
+                  {sidebarCollapsedSections.pomodoro ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                </button>
+                
+                <AnimatePresence initial={false}>
+                  {!sidebarCollapsedSections.pomodoro && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden mt-3"
                     >
-                      {isTimerRunning ? 'Pause' : 'Start Timer'}
-                    </button>
-                    <button
-                      onClick={() => { setIsTimerRunning(false); setTimerSeconds(25 * 60); }}
-                      className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-700 transition-all"
-                    >
-                      <RefreshCw size={14} />
-                    </button>
-                  </div>
-                </div>
+                      <div className="text-3xl font-bold tracking-tight mb-3 text-white dark:text-ink">{formatTime(timerSeconds)}</div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setIsTimerRunning(!isTimerRunning)}
+                          className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                            isTimerRunning ? 'bg-slate-800 text-white hover:bg-slate-700' : 'bg-white text-slate-900 hover:bg-slate-100'
+                          }`}
+                        >
+                          {isTimerRunning ? 'Pause' : 'Start Timer'}
+                        </button>
+                        <button
+                          onClick={() => { setIsTimerRunning(false); setTimerSeconds(25 * 60); }}
+                          className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-700 transition-all dark:bg-surface-mid"
+                        >
+                          <RefreshCw size={14} />
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </section>
 
-              {/* Learning Tips */}
+              {/* Learning Tips - Collapsible & Borderless */}
               <section className="space-y-3">
-                <p className="text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-wider">Learning Tips</p>
-                {[
-                  { tip: 'Use AI Explainer to bridge gaps before moving on', icon: <Brain size={12} /> },
-                  { tip: 'Save reference resources to your Vault for offline review', icon: <BookOpen size={12} /> },
-                  { tip: 'Look up unfamiliar words in the dictionary tool', icon: <Lightbulb size={12} /> },
-                ].map((item, i) => (
-                  <div key={i} className="flex items-start gap-3 p-3 bg-slate-50 dark:bg-surface-low/30 rounded-xl border border-slate-100 dark:border-white/5">
-                    <div className="w-6 h-6 rounded-lg bg-accent/10 flex items-center justify-center text-accent shrink-0 mt-0.5">{item.icon}</div>
-                    <p className="text-[11px] text-slate-600 dark:text-ink-secondary leading-relaxed">{item.tip}</p>
-                  </div>
-                ))}
+                <button 
+                  type="button" 
+                  onClick={() => toggleSidebarSection('learningTips')}
+                  className="w-full flex items-center justify-between text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-wider outline-none"
+                >
+                  <span>Learning Tips</span>
+                  {sidebarCollapsedSections.learningTips ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
+                </button>
+                
+                <AnimatePresence initial={false}>
+                  {!sidebarCollapsedSections.learningTips && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden space-y-3 mt-1"
+                    >
+                      {[
+                        { tip: 'Use AI Explainer to bridge gaps before moving on', icon: <Brain size={12} /> },
+                        { tip: 'Save reference resources to your Vault for offline review', icon: <BookOpen size={12} /> },
+                        { tip: 'Look up unfamiliar words in the dictionary tool', icon: <Lightbulb size={12} /> },
+                      ].map((item, i) => (
+                        <div key={i} className="flex items-start gap-3 p-3 bg-slate-50 dark:bg-surface-low/30 rounded-xl border border-slate-100 dark:border-white/5">
+                          <div className="w-6 h-6 rounded-lg bg-accent/10 flex items-center justify-center text-accent shrink-0 mt-0.5">{item.icon}</div>
+                          <p className="text-[11px] text-slate-600 dark:text-ink-secondary leading-relaxed">{item.tip}</p>
+                        </div>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </section>
 
-              {/* Session Stats */}
-              <section className="space-y-2">
-                <p className="text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-wider">Session</p>
-                <div className="p-4 bg-slate-50 dark:bg-surface-low/30 rounded-xl border border-slate-100 dark:border-white/5 space-y-3">
-                  <div className="flex justify-between text-[11px]">
-                    <span className="text-slate-500 dark:text-ink-muted">Resources</span>
-                    <span className="font-bold text-slate-800 dark:text-ink">{resources.length}</span>
-                  </div>
-                  <div className="flex justify-between text-[11px]">
-                    <span className="text-slate-500 dark:text-ink-muted">Vocab</span>
-                    <span className="font-bold text-slate-800 dark:text-ink">{vocab.length}</span>
-                  </div>
-                </div>
+              {/* Session Stats - Collapsible & Borderless */}
+              <section className="space-y-3">
+                <button 
+                  type="button" 
+                  onClick={() => toggleSidebarSection('sessionStats')}
+                  className="w-full flex items-center justify-between text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-wider outline-none"
+                >
+                  <span>Session stats</span>
+                  {sidebarCollapsedSections.sessionStats ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
+                </button>
+                
+                <AnimatePresence initial={false}>
+                  {!sidebarCollapsedSections.sessionStats && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden mt-1"
+                    >
+                      <div className="p-4 bg-slate-50 dark:bg-surface-low/30 rounded-xl border border-slate-100 dark:border-white/5 space-y-3">
+                        <div className="flex justify-between text-[11px]">
+                          <span className="text-slate-500 dark:text-ink-muted">Resources</span>
+                          <span className="font-bold text-slate-800 dark:text-ink">{resources.length}</span>
+                        </div>
+                        <div className="flex justify-between text-[11px]">
+                          <span className="text-slate-500 dark:text-ink-muted">Vocab</span>
+                          <span className="font-bold text-slate-800 dark:text-ink">{vocab.length}</span>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </section>
 
             </div>
