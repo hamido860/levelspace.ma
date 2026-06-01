@@ -161,7 +161,7 @@ export const CalendarWidget: React.FC = () => {
   ];
 
   return (
-    <div className="ls-card-pad space-y-4">
+    <div className="ls-card-pad space-y-3.5 max-w-full">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -178,7 +178,7 @@ export const CalendarWidget: React.FC = () => {
             className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-surface-low transition-all duration-200 cursor-pointer hover:scale-105 active:scale-95"
             aria-label="Previous month"
           >
-            <ChevronLeft size={13} className="text-slate-500 dark:text-ink-muted" />
+            <ChevronLeft size={12} className="text-slate-500 dark:text-ink-muted" />
           </button>
           <button
             onClick={() => { setCurrentMonth(new Date()); setSelectedDay(new Date()); }}
@@ -191,20 +191,22 @@ export const CalendarWidget: React.FC = () => {
             className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-surface-low transition-all duration-200 cursor-pointer hover:scale-105 active:scale-95"
             aria-label="Next month"
           >
-            <ChevronRight size={13} className="text-slate-500 dark:text-ink-muted" />
+            <ChevronRight size={12} className="text-slate-500 dark:text-ink-muted" />
           </button>
         </div>
       </div>
 
       {/* Day-of-week headers */}
-      <div className="grid grid-cols-7 gap-y-1">
+      <div className="grid grid-cols-7 gap-1 bg-slate-100/40 dark:bg-white/2 p-1 rounded-xl border border-slate-100/50 dark:border-white/5 mb-1">
         {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => (
-          <div key={d} className="text-[9px] font-mono font-bold text-slate-400/60 dark:text-ink-muted/40 text-center pb-1.5">
+          <div key={d} className="text-[9px] font-mono font-bold text-slate-400 dark:text-ink-muted/50 text-center py-0.5">
             {d}
           </div>
         ))}
+      </div>
 
-        {/* Day cells */}
+      {/* Day cells grid */}
+      <div className="grid grid-cols-7 gap-1.5">
         {calendarDays.map((day, i) => {
           const dateStr = format(day, 'yyyy-MM-dd');
           const inMonth = isSameMonth(day, currentMonth);
@@ -215,39 +217,45 @@ export const CalendarWidget: React.FC = () => {
           return (
             <button
               key={i}
-              onClick={() => setSelectedDay(day)}
-              className={`relative flex flex-col items-center justify-center py-2.5 rounded-xl transition-all duration-200 ease-out hover:scale-108 active:scale-95 cursor-pointer ${
-                !inMonth ? 'opacity-25 pointer-events-none' : ''
-              } ${
-                isSelected
-                  ? 'bg-gradient-to-tr from-accent to-purple-600 text-white shadow-md shadow-accent/20 ring-2 ring-accent/30 font-semibold'
-                  : todayBool
-                    ? 'border border-accent/40 bg-accent-soft text-accent font-bold shadow-sm'
-                    : 'text-slate-950 dark:text-ink hover:bg-surface-low dark:hover:bg-surface-mid/60'
+              onClick={() => inMonth && setSelectedDay(day)}
+              disabled={!inMonth}
+              className={`relative aspect-square w-full flex flex-col items-center justify-between p-1.5 rounded-xl transition-all duration-200 ease-out hover:scale-108 active:scale-95 cursor-pointer border ${
+                !inMonth
+                  ? 'opacity-20 text-slate-300 dark:text-ink-muted/20 border-transparent bg-transparent cursor-default pointer-events-none'
+                  : isSelected
+                    ? 'bg-gradient-to-tr from-accent to-purple-600 text-white shadow-md shadow-accent/25 border-transparent font-bold'
+                    : todayBool
+                      ? 'border-accent/40 bg-accent-soft text-accent font-bold shadow-sm'
+                      : 'text-slate-950 dark:text-ink hover:bg-surface-low dark:hover:bg-surface-mid/60 border-slate-100/50 dark:border-white/5 bg-slate-50/50 dark:bg-white/2'
               }`}
             >
-              <span className="text-[11px] font-medium leading-none">
+              {/* Day Number */}
+              <span className="text-[10px] font-semibold leading-none self-center pt-0.5">
                 {format(day, 'd')}
               </span>
-              {dots.length > 0 && (
-                <div className="flex gap-0.5 mt-1.5">
-                  {dots.map((ev, di) => (
-                    <div
-                      key={di}
-                      className={`w-[4px] h-[4px] rounded-full transition-all ${
-                        isSelected ? 'bg-white/90 shadow-sm' : (DOT_COLOR[ev.type] ?? 'bg-slate-400')
-                      }`}
-                    />
-                  ))}
-                </div>
-              )}
+              
+              {/* Event indicators */}
+              <div className="flex gap-0.5 justify-center w-full min-h-[4px] mb-0.5">
+                {dots.length > 0 && inMonth && (
+                  <>
+                    {dots.map((ev, di) => (
+                      <div
+                        key={di}
+                        className={`w-[4px] h-[4px] rounded-full transition-all ${
+                          isSelected ? 'bg-white/90 shadow-sm' : (DOT_COLOR[ev.type] ?? 'bg-slate-400')
+                        }`}
+                      />
+                    ))}
+                  </>
+                )}
+              </div>
             </button>
           );
         })}
       </div>
 
       {/* Legend */}
-      <div className="flex flex-wrap gap-x-3.5 gap-y-1.5 pb-1 border-b border-slate-100 dark:border-white/5 pb-3">
+      <div className="flex flex-wrap gap-x-3.5 gap-y-1.5 pb-2 border-b border-slate-100 dark:border-white/5">
         {[
           { type: 'national', label: 'National' },
           { type: 'religious', label: 'Religious' },
@@ -263,7 +271,7 @@ export const CalendarWidget: React.FC = () => {
       </div>
 
       {/* Selected day panel */}
-      <div className="pt-2 space-y-3">
+      <div className="pt-1.5 space-y-2.5">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs font-bold text-slate-950 dark:text-ink font-display tracking-tight">
@@ -281,7 +289,7 @@ export const CalendarWidget: React.FC = () => {
             onClick={() => setShowAdd(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent text-white text-[10px] font-bold hover:bg-accent-hover active:scale-95 transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer"
           >
-            <Plus size={12} />
+            <Plus size={11} />
             Add event
           </button>
         </div>
@@ -293,7 +301,7 @@ export const CalendarWidget: React.FC = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="py-6 flex justify-center items-center"
+              className="py-5 flex justify-center items-center"
             >
               <div className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin" />
             </motion.div>
@@ -333,9 +341,9 @@ export const CalendarWidget: React.FC = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="border border-dashed border-slate-200 dark:border-white/5 rounded-2xl p-6 text-center"
+              className="border border-dashed border-slate-200 dark:border-white/5 rounded-2xl p-5 text-center"
             >
-              <CalendarDays className="w-6 h-6 text-slate-300 dark:text-ink-muted/30 mx-auto mb-2" />
+              <CalendarDays className="w-5 h-5 text-slate-300 dark:text-ink-muted/30 mx-auto mb-1.5" />
               <p className="text-[10px] text-slate-400 dark:text-ink-muted/40 italic">
                 No academic breaks or personal schedules today.
               </p>
