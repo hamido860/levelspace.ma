@@ -276,14 +276,44 @@ export const CalendarWidget: React.FC = () => {
           const inMonth = isSameMonth(day, currentMonth);
           const todayBool = isSameDay(day, new Date());
           const isSelected = isSameDay(day, selectedDay);
-          const dots = (eventsByDate[dateStr] ?? []).slice(0, 3);
+          const events = eventsByDate[dateStr] ?? [];
+          const dots = events.slice(0, 3);
+
+          // Determine the primary type of event for this day to set background image
+          let primaryType = '';
+          if (events.length > 0) {
+            const types = events.map(e => e.type);
+            if (types.includes('national')) primaryType = 'national';
+            else if (types.includes('religious')) primaryType = 'religious';
+            else if (types.includes('school_break')) primaryType = 'school_break';
+            else if (types.includes('exam') || types.includes('controle')) primaryType = 'exam';
+            else primaryType = 'event';
+          }
+
+          // Background image mapping based on day type
+          let cellImg = '';
+          if (primaryType === 'national') {
+            cellImg = 'https://images.unsplash.com/photo-1539650116574-8efeb43e2750?auto=format&fit=crop&q=40&w=120'; // Moroccan theme
+          } else if (primaryType === 'religious') {
+            cellImg = 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=40&w=120'; // Moon/Starry
+          } else if (primaryType === 'school_break') {
+            cellImg = 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&q=40&w=120'; // School
+          } else if (primaryType === 'exam') {
+            cellImg = 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&q=40&w=120'; // Books
+          } else if (primaryType === 'event') {
+            cellImg = 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&q=40&w=120'; // Workspace
+          } else if (todayBool) {
+            cellImg = 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&q=40&w=120'; // Tech Glow
+          } else if (inMonth) {
+            cellImg = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=20&w=80'; // Abstract wave texture
+          }
 
           return (
             <button
               key={i}
               onClick={() => inMonth && setSelectedDay(day)}
               disabled={!inMonth}
-              className={`relative aspect-square w-full flex flex-col items-center justify-between p-1 rounded-lg transition-all duration-200 ease-out hover:scale-108 active:scale-95 cursor-pointer border ${
+              className={`relative aspect-square w-full flex flex-col items-center justify-between p-1 rounded-lg transition-all duration-200 ease-out hover:scale-108 active:scale-95 cursor-pointer border overflow-hidden ${
                 !inMonth
                   ? 'opacity-20 text-slate-300 dark:text-ink-muted/20 border-transparent bg-transparent cursor-default pointer-events-none'
                   : isSelected
@@ -293,13 +323,28 @@ export const CalendarWidget: React.FC = () => {
                       : 'text-slate-950 dark:text-ink hover:bg-surface-low dark:hover:bg-surface-mid/60 border-slate-100/50 dark:border-white/5 bg-slate-50/50 dark:bg-white/2'
               }`}
             >
+              {/* Subtle background image overlay inside active day cell */}
+              {inMonth && cellImg && !isSelected && (
+                <img 
+                  src={cellImg} 
+                  alt="" 
+                  className={`absolute inset-0 object-cover w-full h-full pointer-events-none mix-blend-overlay ${
+                    todayBool 
+                      ? 'opacity-[0.12] dark:opacity-[0.18]' 
+                      : primaryType 
+                        ? 'opacity-[0.16] dark:opacity-[0.26]' 
+                        : 'opacity-[0.04] dark:opacity-[0.08]'
+                  }`} 
+                />
+              )}
+
               {/* Day Number */}
-              <span className="text-[9px] font-semibold leading-none self-center pt-0.5">
+              <span className="relative z-10 text-[9px] font-semibold leading-none self-center pt-0.5">
                 {format(day, 'd')}
               </span>
               
               {/* Event indicators */}
-              <div className="flex gap-0.5 justify-center w-full min-h-[3px] mb-0.5">
+              <div className="relative z-10 flex gap-0.5 justify-center w-full min-h-[3px] mb-0.5">
                 {dots.length > 0 && inMonth && (
                   <>
                     {dots.map((ev, di) => (
