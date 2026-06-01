@@ -2103,7 +2103,8 @@ export const ClassroomView: React.FC = () => {
                                   alt={topic.title}
                                   className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 opacity-75"
                                 />
-                                                     {/* Card Body */}
+                              </div>
+                              {/* Card Body */}
                               <div className="p-5 flex-1 flex flex-col space-y-4">
                                 <AnimatePresence>
                                   {expandedCards[topic.id] && (
