@@ -30,7 +30,9 @@ export interface ScheduleEvent {
   title: string;
   time: string;
   location: string;
+  type?: string;
 }
+
 
 export interface Lesson {
   id: string;

@@ -4,7 +4,7 @@ import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths,
 } from 'date-fns';
-import { ChevronLeft, ChevronRight, Plus, X, Flag, Star, GraduationCap, BookOpen, CalendarDays } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, X, Flag, Star, GraduationCap, BookOpen, CalendarDays, Sparkles } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 
@@ -63,31 +63,31 @@ const HOLIDAYS: Holiday[] = [
 ];
 
 const DOT_COLOR: Record<string, string> = {
-  national: 'bg-red-500',
-  religious: 'bg-emerald-500',
-  school_break: 'bg-purple-500',
-  exam: 'bg-orange-500',
-  controle: 'bg-orange-500',
+  national: 'bg-error',
+  religious: 'bg-success',
+  school_break: 'bg-gold',
+  exam: 'bg-warning',
+  controle: 'bg-warning',
   event: 'bg-accent',
-  general: 'bg-blue-400',
+  general: 'bg-ink-muted',
 };
 
 const BADGE_COLOR: Record<string, string> = {
-  national: 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400',
-  religious: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400',
-  school_break: 'bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-400',
-  exam: 'bg-orange-50 text-orange-700 dark:bg-orange-950/40 dark:text-orange-400',
-  controle: 'bg-orange-50 text-orange-700 dark:bg-orange-950/40 dark:text-orange-400',
-  event: 'bg-accent-soft text-accent',
-  general: 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400',
+  national: 'bg-error-soft text-error border border-error/10',
+  religious: 'bg-success-soft text-success border border-success/10',
+  school_break: 'bg-gold-soft text-gold border border-gold/10',
+  exam: 'bg-warning-soft text-warning border border-warning/10',
+  controle: 'bg-warning-soft text-warning border border-warning/10',
+  event: 'bg-accent-soft text-accent border border-accent/10',
+  general: 'bg-surface-low text-ink-secondary dark:bg-surface-mid dark:text-ink border border-surface-mid/10',
 };
 
 function EventIcon({ type }: { type: string }) {
-  if (type === 'national') return <Flag className="w-3 h-3 shrink-0" />;
-  if (type === 'religious') return <Star className="w-3 h-3 shrink-0" />;
-  if (type === 'school_break') return <GraduationCap className="w-3 h-3 shrink-0" />;
-  if (type === 'exam' || type === 'controle') return <BookOpen className="w-3 h-3 shrink-0" />;
-  return <CalendarDays className="w-3 h-3 shrink-0" />;
+  if (type === 'national') return <Flag className="w-3.5 h-3.5 shrink-0" />;
+  if (type === 'religious') return <Star className="w-3.5 h-3.5 shrink-0" />;
+  if (type === 'school_break') return <GraduationCap className="w-3.5 h-3.5 shrink-0" />;
+  if (type === 'exam' || type === 'controle') return <BookOpen className="w-3.5 h-3.5 shrink-0" />;
+  return <CalendarDays className="w-3.5 h-3.5 shrink-0" />;
 }
 
 type EventEntry = { type: string; label: string; id?: string };
@@ -116,7 +116,7 @@ export const CalendarWidget: React.FC = () => {
     HOLIDAYS.forEach(h => push(h.date, { type: h.type, label: h.name }));
 
     scheduleEvents.forEach(e => {
-      if (e.date?.includes('-')) push(e.date, { type: 'event', label: e.title, id: e.id });
+      if (e.date?.includes('-')) push(e.date, { type: e.type || 'event', label: e.title, id: e.id });
     });
 
     tasks
@@ -143,6 +143,7 @@ export const CalendarWidget: React.FC = () => {
       title: form.title,
       time: form.time,
       location: '',
+      type: form.type,
     });
     setForm({ title: '', time: '', type: 'general' });
     setShowAdd(false);
@@ -152,34 +153,43 @@ export const CalendarWidget: React.FC = () => {
     await db.schedule.delete(id);
   };
 
+  const EVENT_TYPES = [
+    { value: 'general', label: 'General', icon: CalendarDays },
+    { value: 'exam', label: 'Exam', icon: BookOpen },
+    { value: 'controle', label: 'Controle', icon: Star },
+    { value: 'assignment', label: 'Task', icon: GraduationCap },
+  ];
+
   return (
     <div className="ls-card-pad space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-bold text-slate-950 dark:text-ink leading-tight">
+          <h3 className="text-sm font-bold text-slate-950 dark:text-ink leading-tight font-display tracking-tight">
             {format(currentMonth, 'MMMM yyyy')}
           </h3>
-          <p className="text-[9px] font-medium text-slate-400 dark:text-ink-muted/60 mt-0.5 uppercase tracking-wider">
+          <p className="text-[9px] font-bold text-slate-400 dark:text-ink-muted/50 mt-0.5 uppercase tracking-wider font-mono">
             Moroccan Academic Calendar
           </p>
         </div>
-        <div className="flex items-center gap-0.5">
+        <div className="flex items-center gap-1 bg-surface-low dark:bg-surface-mid/40 p-0.5 rounded-xl border border-slate-100 dark:border-white/5">
           <button
             onClick={() => setCurrentMonth(m => subMonths(m, 1))}
-            className="p-1.5 rounded-lg hover:bg-surface-low transition-colors dark:hover:bg-surface-mid"
+            className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-surface-low transition-all duration-200 cursor-pointer hover:scale-105 active:scale-95"
+            aria-label="Previous month"
           >
             <ChevronLeft size={13} className="text-slate-500 dark:text-ink-muted" />
           </button>
           <button
             onClick={() => { setCurrentMonth(new Date()); setSelectedDay(new Date()); }}
-            className="px-2 py-1 text-[9px] font-bold text-accent hover:bg-accent-soft rounded-lg transition-colors"
+            className="px-2.5 py-1 text-[9px] font-mono font-bold text-accent hover:bg-white dark:hover:bg-surface-low rounded-lg transition-all duration-200 cursor-pointer"
           >
             Today
           </button>
           <button
             onClick={() => setCurrentMonth(m => addMonths(m, 1))}
-            className="p-1.5 rounded-lg hover:bg-surface-low transition-colors dark:hover:bg-surface-mid"
+            className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-surface-low transition-all duration-200 cursor-pointer hover:scale-105 active:scale-95"
+            aria-label="Next month"
           >
             <ChevronRight size={13} className="text-slate-500 dark:text-ink-muted" />
           </button>
@@ -187,9 +197,9 @@ export const CalendarWidget: React.FC = () => {
       </div>
 
       {/* Day-of-week headers */}
-      <div className="grid grid-cols-7">
+      <div className="grid grid-cols-7 gap-y-1">
         {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => (
-          <div key={d} className="text-[9px] font-bold text-slate-400/60 dark:text-ink-muted/40 text-center pb-1.5">
+          <div key={d} className="text-[9px] font-mono font-bold text-slate-400/60 dark:text-ink-muted/40 text-center pb-1.5">
             {d}
           </div>
         ))}
@@ -206,25 +216,27 @@ export const CalendarWidget: React.FC = () => {
             <button
               key={i}
               onClick={() => setSelectedDay(day)}
-              className={`relative flex flex-col items-center justify-center py-1.5 rounded-lg transition-colors ${
+              className={`relative flex flex-col items-center justify-center py-2.5 rounded-xl transition-all duration-200 ease-out hover:scale-108 active:scale-95 cursor-pointer ${
                 !inMonth ? 'opacity-25 pointer-events-none' : ''
               } ${
                 isSelected
-                  ? 'bg-accent text-white'
+                  ? 'bg-gradient-to-tr from-accent to-purple-600 text-white shadow-md shadow-accent/20 ring-2 ring-accent/30 font-semibold'
                   : todayBool
-                    ? 'bg-accent-soft text-accent font-bold'
-                    : 'text-slate-950 dark:text-ink hover:bg-surface-low dark:hover:bg-surface-mid'
+                    ? 'border border-accent/40 bg-accent-soft text-accent font-bold shadow-sm'
+                    : 'text-slate-950 dark:text-ink hover:bg-surface-low dark:hover:bg-surface-mid/60'
               }`}
             >
               <span className="text-[11px] font-medium leading-none">
                 {format(day, 'd')}
               </span>
               {dots.length > 0 && (
-                <div className="flex gap-px mt-1">
+                <div className="flex gap-0.5 mt-1.5">
                   {dots.map((ev, di) => (
                     <div
                       key={di}
-                      className={`w-[3px] h-[3px] rounded-full ${isSelected ? 'bg-white/70' : (DOT_COLOR[ev.type] ?? 'bg-slate-400')}`}
+                      className={`w-[4px] h-[4px] rounded-full transition-all ${
+                        isSelected ? 'bg-white/90 shadow-sm' : (DOT_COLOR[ev.type] ?? 'bg-slate-400')
+                      }`}
                     />
                   ))}
                 </div>
@@ -235,7 +247,7 @@ export const CalendarWidget: React.FC = () => {
       </div>
 
       {/* Legend */}
-      <div className="flex flex-wrap gap-x-3 gap-y-1 pb-1">
+      <div className="flex flex-wrap gap-x-3.5 gap-y-1.5 pb-1 border-b border-slate-100 dark:border-white/5 pb-3">
         {[
           { type: 'national', label: 'National' },
           { type: 'religious', label: 'Religious' },
@@ -243,33 +255,33 @@ export const CalendarWidget: React.FC = () => {
           { type: 'exam', label: 'Exam / task' },
           { type: 'event', label: 'My events' },
         ].map(({ type, label }) => (
-          <div key={type} className="flex items-center gap-1">
-            <div className={`w-1.5 h-1.5 rounded-full ${DOT_COLOR[type]}`} />
-            <span className="text-[9px] font-medium text-slate-400 dark:text-ink-muted/50">{label}</span>
+          <div key={type} className="flex items-center gap-1.5">
+            <div className={`w-2 h-2 rounded-full ${DOT_COLOR[type]}`} />
+            <span className="text-[9px] font-mono font-bold text-slate-400 dark:text-ink-muted/50">{label}</span>
           </div>
         ))}
       </div>
 
       {/* Selected day panel */}
-      <div className="border-t border-slate-100 dark:border-white/8 pt-4 space-y-3">
+      <div className="pt-2 space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs font-bold text-slate-950 dark:text-ink">
-              {format(selectedDay, 'EEEE, MMM d')}
+            <p className="text-xs font-bold text-slate-950 dark:text-ink font-display tracking-tight">
+              {format(selectedDay, 'EEEE, MMM d, yyyy')}
             </p>
-            <p className="text-[10px] text-slate-400 dark:text-ink-muted/60 mt-0.5">
+            <p className="text-[10px] font-mono font-bold text-slate-400 dark:text-ink-muted/60 mt-0.5">
               {isLoading
                 ? 'Loading events...'
                 : selectedEvents.length === 0
-                  ? 'No events'
-                  : `${selectedEvents.length} event${selectedEvents.length > 1 ? 's' : ''}`}
+                  ? 'No events scheduled'
+                  : `${selectedEvents.length} event${selectedEvents.length > 1 ? 's' : ''} planned`}
             </p>
           </div>
           <button
             onClick={() => setShowAdd(true)}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-accent text-white text-[10px] font-bold hover:bg-accent-hover transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent text-white text-[10px] font-bold hover:bg-accent-hover active:scale-95 transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer"
           >
-            <Plus size={10} />
+            <Plus size={12} />
             Add event
           </button>
         </div>
@@ -281,45 +293,53 @@ export const CalendarWidget: React.FC = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="py-4 flex justify-center items-center"
+              className="py-6 flex justify-center items-center"
             >
-              <div className="w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+              <div className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin" />
             </motion.div>
           ) : selectedEvents.length > 0 ? (
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               {selectedEvents.map((ev, i) => (
                 <motion.div
                   key={`${ev.label}-${i}`}
                   layout
-                  initial={{ opacity: 0, x: -6 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -6 }}
-                  transition={{ delay: i * 0.04 }}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium group ${BADGE_COLOR[ev.type] ?? BADGE_COLOR.general}`}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium group transition-all hover:scale-[1.01] ${
+                    BADGE_COLOR[ev.type] ?? BADGE_COLOR.general
+                  }`}
                 >
-                  <EventIcon type={ev.type} />
-                  <span className="flex-1 truncate">{ev.label}</span>
+                  <div className={`p-1.5 rounded-lg bg-white/20 dark:bg-black/10`}>
+                    <EventIcon type={ev.type} />
+                  </div>
+                  <span className="flex-1 truncate font-semibold">{ev.label}</span>
                   {ev.id && (
                     <button
                       onClick={() => handleDelete(ev.id!)}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-black/10"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 cursor-pointer"
+                      aria-label="Delete event"
                     >
-                      <X size={10} />
+                      <X size={12} />
                     </button>
                   )}
                 </motion.div>
               ))}
             </div>
           ) : (
-            <motion.p
+            <motion.div
               key="empty"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="text-[10px] text-slate-400 dark:text-ink-muted/40 italic"
+              className="border border-dashed border-slate-200 dark:border-white/5 rounded-2xl p-6 text-center"
             >
-              Click "Add event" to create something for this day.
-            </motion.p>
+              <CalendarDays className="w-6 h-6 text-slate-300 dark:text-ink-muted/30 mx-auto mb-2" />
+              <p className="text-[10px] text-slate-400 dark:text-ink-muted/40 italic">
+                No academic breaks or personal schedules today.
+              </p>
+            </motion.div>
           )}
         </AnimatePresence>
       </div>
@@ -334,82 +354,150 @@ export const CalendarWidget: React.FC = () => {
             className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4"
           >
             <motion.div
-              className="absolute inset-0 bg-ink/40"
+              className="absolute inset-0 bg-ink/50 backdrop-blur-sm"
               onClick={() => setShowAdd(false)}
             />
+            
             <motion.div
-              initial={{ opacity: 0, y: 24, scale: 0.97 }}
+              initial={{ opacity: 0, y: 24, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 16, scale: 0.97 }}
-              transition={{ type: 'spring', damping: 26, stiffness: 360 }}
-              className="relative w-full max-w-sm bg-white dark:bg-paper rounded-xl p-6 space-y-5"
-              style={{ boxShadow: 'var(--ls-shadow-hover)' }}
+              exit={{ opacity: 0, y: 16, scale: 0.96 }}
+              transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+              className="relative w-full max-w-[620px] bg-white dark:bg-paper border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden flex flex-col md:flex-row shadow-2xl z-10"
             >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] font-mono uppercase tracking-[0.15em] text-accent">New Event</p>
-                  <h3 className="text-lg font-bold text-slate-950 dark:text-ink mt-0.5">
-                    {format(selectedDay, 'EEEE, MMM d')}
-                  </h3>
+              {/* Left Column (Brand Context) */}
+              <div className="w-full md:w-[240px] shrink-0 p-6 bg-gradient-to-br from-slate-950 via-purple-950/90 to-slate-950 border-b md:border-b-0 md:border-r border-white/5 relative overflow-hidden flex flex-col justify-between min-h-[140px] md:min-h-[360px]">
+                {/* Radial Glow */}
+                <div className="absolute inset-0 pointer-events-none opacity-40 bg-[radial-gradient(circle_at_center,rgba(139,92,246,0.35)_0%,transparent_70%)]" />
+                
+                <div className="relative z-10">
+                  <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center border border-white/10 mb-4 shadow-lg shadow-purple-500/10">
+                    <Sparkles className="w-5 h-5 text-purple-400 animate-pulse" />
+                  </div>
+                  <p className="text-[10px] font-mono font-bold text-purple-400 uppercase tracking-widest leading-none">
+                    Command Center
+                  </p>
+                  <h4 className="text-sm font-bold text-white mt-2 font-display">
+                    Create Dashboard Event
+                  </h4>
                 </div>
-                <button
-                  onClick={() => setShowAdd(false)}
-                  className="w-8 h-8 rounded-full bg-surface-low flex items-center justify-center text-slate-500 hover:text-slate-950 transition-colors dark:bg-surface-mid dark:text-ink-muted dark:hover:text-ink"
-                >
-                  <X size={14} />
-                </button>
+
+                <div className="relative z-10 border-t border-white/10 pt-4 mt-4 md:mt-0">
+                  <span className="text-[28px] font-bold font-mono tracking-tight text-white leading-none">
+                    {format(selectedDay, 'dd')}
+                  </span>
+                  <div className="mt-1">
+                    <p className="text-[10px] font-bold font-mono text-purple-300 uppercase tracking-widest">
+                      {format(selectedDay, 'MMMM yyyy')}
+                    </p>
+                    <p className="text-[9px] font-medium text-white/50 uppercase mt-0.5 font-mono">
+                      {format(selectedDay, 'EEEE')}
+                    </p>
+                  </div>
+                </div>
               </div>
 
-              <div className="space-y-3">
-                <input
-                  autoFocus
-                  type="text"
-                  placeholder="Event title…"
-                  value={form.title}
-                  onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
-                  onKeyDown={e => e.key === 'Enter' && handleSave()}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-950 outline-none focus:border-accent/50 transition-all placeholder:text-slate-400 dark:border-white/8 dark:bg-surface-low dark:text-ink dark:placeholder:text-ink-muted"
-                />
-                <div className="grid grid-cols-2 gap-3">
+              {/* Right Column (Form Details) */}
+              <div className="p-6 flex-1 bg-paper/60 backdrop-blur-md flex flex-col justify-between space-y-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-[9px] font-mono font-bold text-accent uppercase tracking-wider">Configure Item</span>
+                    <h3 className="text-base font-bold text-slate-950 dark:text-ink mt-0.5 font-display">
+                      Event Details
+                    </h3>
+                  </div>
+                  <button
+                    onClick={() => setShowAdd(false)}
+                    className="w-8 h-8 rounded-full bg-surface-low hover:bg-surface-mid text-slate-500 hover:text-slate-950 transition-colors dark:bg-surface-mid dark:text-ink-muted dark:hover:text-ink flex items-center justify-center cursor-pointer active:scale-90"
+                    aria-label="Close dialog"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+
+                <div className="space-y-4">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-medium text-slate-400 dark:text-ink-muted/60">Time (optional)</label>
+                    <label className="text-[10px] font-mono font-bold text-slate-400 dark:text-ink-muted/60 uppercase tracking-wider block">
+                      Title
+                    </label>
                     <input
-                      type="time"
-                      value={form.time}
-                      onChange={e => setForm(p => ({ ...p, time: e.target.value }))}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-950 outline-none focus:border-accent/50 transition-all dark:border-white/8 dark:bg-surface-low dark:text-ink"
+                      autoFocus
+                      type="text"
+                      placeholder="e.g. Science Exam Prep..."
+                      value={form.title}
+                      onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
+                      onKeyDown={e => e.key === 'Enter' && handleSave()}
+                      className="w-full h-11 px-4 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-surface-low text-sm text-slate-950 dark:text-ink outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/40 transition-all placeholder:text-slate-400 dark:placeholder:text-ink-muted/50"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-medium text-slate-400 dark:text-ink-muted/60">Type</label>
-                    <select
-                      value={form.type}
-                      onChange={e => setForm(p => ({ ...p, type: e.target.value }))}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-950 outline-none focus:border-accent/50 transition-all appearance-none dark:border-white/8 dark:bg-surface-low dark:text-ink"
-                    >
-                      <option value="general">General</option>
-                      <option value="exam">Exam</option>
-                      <option value="controle">Controle</option>
-                      <option value="assignment">Assignment</option>
-                    </select>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-mono font-bold text-slate-400 dark:text-ink-muted/60 uppercase tracking-wider block">
+                        Time (optional)
+                      </label>
+                      <input
+                        type="time"
+                        value={form.time}
+                        onChange={e => setForm(p => ({ ...p, time: e.target.value }))}
+                        className="w-full h-11 px-4 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-surface-low text-sm text-slate-950 dark:text-ink outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/40 transition-all"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-mono font-bold text-slate-400 dark:text-ink-muted/60 uppercase tracking-wider block">
+                        Target Timezone
+                      </label>
+                      <div className="w-full h-11 px-4 rounded-xl border border-slate-200 dark:border-white/10 bg-surface-low/50 dark:bg-surface-low/30 text-xs text-ink-muted flex items-center font-mono">
+                        GMT+01:00 (Rabat)
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Custom Tactile Select Options */}
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-mono font-bold text-slate-400 dark:text-ink-muted/60 uppercase tracking-wider block">
+                      Event Category
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {EVENT_TYPES.map(t => {
+                        const IconComponent = t.icon;
+                        const isSel = form.type === t.value;
+                        return (
+                          <button
+                            key={t.value}
+                            type="button"
+                            onClick={() => setForm(p => ({ ...p, type: t.value }))}
+                            className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-xs font-semibold transition-all duration-200 hover:scale-[1.02] active:scale-95 cursor-pointer ${
+                              isSel
+                                ? 'border-accent/40 bg-accent-soft text-accent shadow-sm shadow-accent/5'
+                                : 'border-slate-200 dark:border-white/8 bg-surface-low/40 dark:bg-surface-low/20 text-ink-secondary dark:text-ink-muted hover:border-ink/10 dark:hover:border-white/20'
+                            }`}
+                          >
+                            <IconComponent className="w-3.5 h-3.5 shrink-0" />
+                            <span className="capitalize">{t.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="flex gap-2 pt-1">
-                <button
-                  onClick={() => setShowAdd(false)}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-medium text-slate-600 bg-surface-low hover:bg-surface-mid transition-colors dark:bg-surface-mid dark:text-ink-secondary"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSave}
-                  disabled={!form.title.trim()}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white bg-accent hover:bg-accent-hover transition-colors disabled:opacity-40"
-                >
-                  Save
-                </button>
+                <div className="flex gap-3 pt-3">
+                  <button
+                    onClick={() => setShowAdd(false)}
+                    className="flex-1 h-11 rounded-xl text-sm font-semibold text-slate-600 bg-surface-low hover:bg-surface-mid transition-all duration-200 dark:bg-surface-mid dark:text-ink-secondary cursor-pointer hover:-translate-y-0.5 active:scale-95"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSave}
+                    disabled={!form.title.trim()}
+                    className="flex-1 h-11 rounded-xl text-sm font-semibold text-white bg-accent hover:bg-accent-hover transition-all duration-200 disabled:opacity-40 disabled:hover:translate-y-0 cursor-pointer shadow-sm hover:shadow-md hover:-translate-y-0.5 active:scale-95"
+                  >
+                    Save Event
+                  </button>
+                </div>
               </div>
             </motion.div>
           </motion.div>
