@@ -83,11 +83,11 @@ const BADGE_COLOR: Record<string, string> = {
 };
 
 function EventIcon({ type }: { type: string }) {
-  if (type === 'national') return <Flag className="w-3.5 h-3.5 shrink-0" />;
-  if (type === 'religious') return <Star className="w-3.5 h-3.5 shrink-0" />;
-  if (type === 'school_break') return <GraduationCap className="w-3.5 h-3.5 shrink-0" />;
-  if (type === 'exam' || type === 'controle') return <BookOpen className="w-3.5 h-3.5 shrink-0" />;
-  return <CalendarDays className="w-3.5 h-3.5 shrink-0" />;
+  if (type === 'national') return <Flag className="w-3 h-3 shrink-0" />;
+  if (type === 'religious') return <Star className="w-3 h-3 shrink-0" />;
+  if (type === 'school_break') return <GraduationCap className="w-3 h-3 shrink-0" />;
+  if (type === 'exam' || type === 'controle') return <BookOpen className="w-3 h-3 shrink-0" />;
+  return <CalendarDays className="w-3 h-3 shrink-0" />;
 }
 
 type EventEntry = { type: string; label: string; id?: string };
@@ -161,52 +161,63 @@ export const CalendarWidget: React.FC = () => {
   ];
 
   return (
-    <div className="ls-card-pad space-y-3.5 max-w-full">
+    <div className="rounded-2xl border border-surface-mid bg-paper p-3.5 dark:border-white/5 dark:bg-paper shadow-sm space-y-3 max-w-full">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-bold text-slate-950 dark:text-ink leading-tight font-display tracking-tight">
+          <h3 className="text-xs font-black bg-gradient-to-r from-ink via-accent to-purple-600 dark:from-white dark:via-accent dark:to-purple-400 bg-clip-text text-transparent leading-tight font-display tracking-tight">
             {format(currentMonth, 'MMMM yyyy')}
           </h3>
-          <p className="text-[9px] font-bold text-slate-400 dark:text-ink-muted/50 mt-0.5 uppercase tracking-wider font-mono">
+          <p className="text-[8px] font-bold text-slate-400/80 dark:text-ink-muted/40 mt-0.5 uppercase tracking-wider font-mono">
             Moroccan Academic Calendar
           </p>
         </div>
-        <div className="flex items-center gap-1 bg-surface-low dark:bg-surface-mid/40 p-0.5 rounded-xl border border-slate-100 dark:border-white/5">
+        <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-0.5 bg-surface-low dark:bg-surface-mid/40 p-0.5 rounded-lg border border-slate-100 dark:border-white/5">
+            <button
+              onClick={() => setCurrentMonth(m => subMonths(m, 1))}
+              className="p-1 rounded hover:bg-white dark:hover:bg-surface-low transition-all duration-200 cursor-pointer hover:scale-105 active:scale-95"
+              aria-label="Previous month"
+            >
+              <ChevronLeft size={11} className="text-slate-500 dark:text-ink-muted" />
+            </button>
+            <button
+              onClick={() => { setCurrentMonth(new Date()); setSelectedDay(new Date()); }}
+              className="px-2 py-0.5 text-[8px] font-mono font-bold text-accent hover:bg-white dark:hover:bg-surface-low rounded-lg transition-all duration-200 cursor-pointer"
+            >
+              Today
+            </button>
+            <button
+              onClick={() => setCurrentMonth(m => addMonths(m, 1))}
+              className="p-1 rounded hover:bg-white dark:hover:bg-surface-low transition-all duration-200 cursor-pointer hover:scale-105 active:scale-95"
+              aria-label="Next month"
+            >
+              <ChevronRight size={11} className="text-slate-500 dark:text-ink-muted" />
+            </button>
+          </div>
+
           <button
-            onClick={() => setCurrentMonth(m => subMonths(m, 1))}
-            className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-surface-low transition-all duration-200 cursor-pointer hover:scale-105 active:scale-95"
-            aria-label="Previous month"
+            onClick={() => setShowAdd(true)}
+            className="p-1.5 rounded-lg bg-accent/10 hover:bg-accent/20 text-accent transition-all duration-200 cursor-pointer shadow-sm hover:scale-105 active:scale-95 flex items-center justify-center border border-accent/20"
+            title="Add event"
+            aria-label="Add event"
           >
-            <ChevronLeft size={12} className="text-slate-500 dark:text-ink-muted" />
-          </button>
-          <button
-            onClick={() => { setCurrentMonth(new Date()); setSelectedDay(new Date()); }}
-            className="px-2.5 py-1 text-[9px] font-mono font-bold text-accent hover:bg-white dark:hover:bg-surface-low rounded-lg transition-all duration-200 cursor-pointer"
-          >
-            Today
-          </button>
-          <button
-            onClick={() => setCurrentMonth(m => addMonths(m, 1))}
-            className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-surface-low transition-all duration-200 cursor-pointer hover:scale-105 active:scale-95"
-            aria-label="Next month"
-          >
-            <ChevronRight size={12} className="text-slate-500 dark:text-ink-muted" />
+            <Plus size={11} className="text-accent font-bold" />
           </button>
         </div>
       </div>
 
       {/* Day-of-week headers */}
-      <div className="grid grid-cols-7 gap-1 bg-slate-100/40 dark:bg-white/2 p-1 rounded-xl border border-slate-100/50 dark:border-white/5 mb-1">
+      <div className="grid grid-cols-7 gap-1 bg-slate-100/40 dark:bg-white/2 p-0.5 rounded-lg border border-slate-100/50 dark:border-white/5 mb-0.5">
         {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => (
-          <div key={d} className="text-[9px] font-mono font-bold text-slate-400 dark:text-ink-muted/50 text-center py-0.5">
+          <div key={d} className="text-[8px] font-mono font-bold text-slate-400 dark:text-ink-muted/50 text-center py-0.5">
             {d}
           </div>
         ))}
       </div>
 
       {/* Day cells grid */}
-      <div className="grid grid-cols-7 gap-1.5">
+      <div className="grid grid-cols-7 gap-1">
         {calendarDays.map((day, i) => {
           const dateStr = format(day, 'yyyy-MM-dd');
           const inMonth = isSameMonth(day, currentMonth);
@@ -219,29 +230,29 @@ export const CalendarWidget: React.FC = () => {
               key={i}
               onClick={() => inMonth && setSelectedDay(day)}
               disabled={!inMonth}
-              className={`relative aspect-square w-full flex flex-col items-center justify-between p-1.5 rounded-xl transition-all duration-200 ease-out hover:scale-108 active:scale-95 cursor-pointer border ${
+              className={`relative aspect-square w-full flex flex-col items-center justify-between p-1 rounded-lg transition-all duration-200 ease-out hover:scale-108 active:scale-95 cursor-pointer border ${
                 !inMonth
                   ? 'opacity-20 text-slate-300 dark:text-ink-muted/20 border-transparent bg-transparent cursor-default pointer-events-none'
                   : isSelected
-                    ? 'bg-gradient-to-tr from-accent to-purple-600 text-white shadow-md shadow-accent/25 border-transparent font-bold'
+                    ? 'bg-gradient-to-tr from-accent via-indigo-500 to-purple-500 text-white shadow-md shadow-accent/25 border-transparent font-bold'
                     : todayBool
-                      ? 'border-accent/40 bg-accent-soft text-accent font-bold shadow-sm'
+                      ? 'border border-accent bg-accent-soft/30 text-accent font-bold shadow-sm'
                       : 'text-slate-950 dark:text-ink hover:bg-surface-low dark:hover:bg-surface-mid/60 border-slate-100/50 dark:border-white/5 bg-slate-50/50 dark:bg-white/2'
               }`}
             >
               {/* Day Number */}
-              <span className="text-[10px] font-semibold leading-none self-center pt-0.5">
+              <span className="text-[9px] font-semibold leading-none self-center pt-0.5">
                 {format(day, 'd')}
               </span>
               
               {/* Event indicators */}
-              <div className="flex gap-0.5 justify-center w-full min-h-[4px] mb-0.5">
+              <div className="flex gap-0.5 justify-center w-full min-h-[3px] mb-0.5">
                 {dots.length > 0 && inMonth && (
                   <>
                     {dots.map((ev, di) => (
                       <div
                         key={di}
-                        className={`w-[4px] h-[4px] rounded-full transition-all ${
+                        className={`w-[3px] h-[3px] rounded-full transition-all ${
                           isSelected ? 'bg-white/90 shadow-sm' : (DOT_COLOR[ev.type] ?? 'bg-slate-400')
                         }`}
                       />
@@ -255,7 +266,7 @@ export const CalendarWidget: React.FC = () => {
       </div>
 
       {/* Legend */}
-      <div className="flex flex-wrap gap-x-3.5 gap-y-1.5 pb-2 border-b border-slate-100 dark:border-white/5">
+      <div className="flex flex-wrap gap-x-3 gap-y-1 pb-1.5 border-b border-slate-100 dark:border-white/5">
         {[
           { type: 'national', label: 'National' },
           { type: 'religious', label: 'Religious' },
@@ -263,21 +274,21 @@ export const CalendarWidget: React.FC = () => {
           { type: 'exam', label: 'Exam / task' },
           { type: 'event', label: 'My events' },
         ].map(({ type, label }) => (
-          <div key={type} className="flex items-center gap-1.5">
-            <div className={`w-2 h-2 rounded-full ${DOT_COLOR[type]}`} />
-            <span className="text-[9px] font-mono font-bold text-slate-400 dark:text-ink-muted/50">{label}</span>
+          <div key={type} className="flex items-center gap-1">
+            <div className={`w-1.5 h-1.5 rounded-full ${DOT_COLOR[type]}`} />
+            <span className="text-[8px] font-mono font-bold text-slate-400 dark:text-ink-muted/50">{label}</span>
           </div>
         ))}
       </div>
 
       {/* Selected day panel */}
-      <div className="pt-1.5 space-y-2.5">
+      <div className="pt-1 space-y-2">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs font-bold text-slate-950 dark:text-ink font-display tracking-tight">
+            <p className="text-[11px] font-bold text-slate-950 dark:text-ink font-display tracking-tight">
               {format(selectedDay, 'EEEE, MMM d, yyyy')}
             </p>
-            <p className="text-[10px] font-mono font-bold text-slate-400 dark:text-ink-muted/60 mt-0.5">
+            <p className="text-[9px] font-mono font-bold text-slate-400 dark:text-ink-muted/60 mt-0.5">
               {isLoading
                 ? 'Loading events...'
                 : selectedEvents.length === 0
@@ -287,9 +298,9 @@ export const CalendarWidget: React.FC = () => {
           </div>
           <button
             onClick={() => setShowAdd(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent text-white text-[10px] font-bold hover:bg-accent-hover active:scale-95 transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-accent text-white text-[9px] font-bold hover:bg-accent-hover active:scale-95 transition-all duration-200 shadow-sm hover:shadow cursor-pointer"
           >
-            <Plus size={11} />
+            <Plus size={10} />
             Add event
           </button>
         </div>
@@ -301,12 +312,12 @@ export const CalendarWidget: React.FC = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="py-5 flex justify-center items-center"
+              className="py-4 flex justify-center items-center"
             >
-              <div className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+              <div className="w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
             </motion.div>
           ) : selectedEvents.length > 0 ? (
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {selectedEvents.map((ev, i) => (
                 <motion.div
                   key={`${ev.label}-${i}`}
@@ -315,21 +326,21 @@ export const CalendarWidget: React.FC = () => {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -6 }}
                   transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium group transition-all hover:scale-[1.01] ${
+                  className={`flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-[11px] font-medium group transition-all hover:scale-[1.01] ${
                     BADGE_COLOR[ev.type] ?? BADGE_COLOR.general
                   }`}
                 >
-                  <div className={`p-1.5 rounded-lg bg-white/20 dark:bg-black/10`}>
+                  <div className={`p-1 rounded-lg bg-white/20 dark:bg-black/10`}>
                     <EventIcon type={ev.type} />
                   </div>
                   <span className="flex-1 truncate font-semibold">{ev.label}</span>
                   {ev.id && (
                     <button
                       onClick={() => handleDelete(ev.id!)}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 cursor-pointer"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 cursor-pointer"
                       aria-label="Delete event"
                     >
-                      <X size={12} />
+                      <X size={10} />
                     </button>
                   )}
                 </motion.div>
@@ -341,10 +352,10 @@ export const CalendarWidget: React.FC = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="border border-dashed border-slate-200 dark:border-white/5 rounded-2xl p-5 text-center"
+              className="border border-dashed border-slate-200 dark:border-white/5 rounded-2xl p-4 text-center"
             >
-              <CalendarDays className="w-5 h-5 text-slate-300 dark:text-ink-muted/30 mx-auto mb-1.5" />
-              <p className="text-[10px] text-slate-400 dark:text-ink-muted/40 italic">
+              <CalendarDays className="w-4 h-4 text-slate-300 dark:text-ink-muted/30 mx-auto mb-1" />
+              <p className="text-[9px] text-slate-400 dark:text-ink-muted/40 italic">
                 No academic breaks or personal schedules today.
               </p>
             </motion.div>
