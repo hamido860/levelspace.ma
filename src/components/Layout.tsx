@@ -24,7 +24,7 @@ export const Layout: React.FC<LayoutProps> = ({
       
       <main 
         className={`flex-grow ${fullWidth ? 'h-screen overflow-hidden' : 'min-h-screen'} flex flex-col w-full pb-20 md:pb-0 transition-all duration-300 ${
-          hideSidebar ? '' : `pt-16 ${isCollapsed ? 'md:ps-[81px]' : 'md:ps-[276px]'}`
+          hideSidebar ? '' : `pt-16 ${isCollapsed ? 'md:ps-[85px]' : 'md:ps-[254px]'}`
         }`}
       >
         {!hideSidebar && <Topbar isCollapsed={isCollapsed} gradeOverride={topbarGradeOverride} />}

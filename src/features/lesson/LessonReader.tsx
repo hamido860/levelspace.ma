@@ -569,7 +569,7 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
         <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden">
         
         {/* Redesigned Card Container */}
-        <div className="w-full h-full bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex flex-col">
+        <div className="w-full h-full bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex flex-col">
           
           {/* Top Full-bleed Image Banner */}
           <div className="h-28 w-full relative bg-slate-100 dark:bg-surface-low shrink-0 overflow-hidden border-b border-slate-100 dark:border-white/5 group">
@@ -852,7 +852,7 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
       </div>
 
       {/* Column 3: Dynamic Widgets & Lesson Previews Sidebar (260px width) */}
-      <div className="hidden lg:flex lg:w-[260px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-4">
+      <div className="hidden lg:flex lg:w-[260px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-4">
         <div className="flex-grow overflow-y-auto no-scrollbar pr-1 flex flex-col gap-6">
           
           {/* Focus Timer */}

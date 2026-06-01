@@ -90,7 +90,7 @@ const EMPTY_KPIS: AiRecoveryDashboardKpis = {
 };
 
 const Spinner: React.FC<{ label?: string }> = ({ label = "Loading..." }) => (
-  <div className="flex items-center justify-center gap-3 rounded-3xl border border-ink/10 bg-paper px-6 py-12 text-sm text-muted shadow-sm">
+  <div className="flex items-center justify-center gap-3 rounded-xl border border-ink/10 bg-paper px-6 py-12 text-sm text-muted shadow-sm">
     <RefreshCw className="h-4 w-4 animate-spin" />
     {label}
   </div>
@@ -109,7 +109,7 @@ const StatePanel: React.FC<{
       : "border-ink/10 bg-paper text-ink";
 
   return (
-    <div className={`rounded-3xl border px-6 py-8 shadow-sm ${toneClasses}`}>
+    <div className={`rounded-xl border px-6 py-8 shadow-sm ${toneClasses}`}>
       <div className="flex items-start gap-3">
         {tone === "danger" ? <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" /> : <Sparkles className="mt-0.5 h-5 w-5 shrink-0" />}
         <div className="space-y-2">
@@ -146,7 +146,7 @@ const KpiCard: React.FC<{
           : "text-ink";
 
   return (
-    <div className="rounded-3xl border border-ink/10 bg-paper p-5 shadow-sm">
+    <div className="rounded-xl border border-ink/10 bg-paper p-5 shadow-sm">
       <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-muted">{label}</div>
       <div className={`mt-3 text-4xl font-black tracking-tight ${valueClasses}`}>{value}</div>
       <p className="mt-2 text-sm text-muted">{description}</p>
@@ -536,7 +536,7 @@ export const AdminAiRecovery: React.FC = () => {
     }
 
     return (
-      <div className="overflow-hidden rounded-3xl border border-ink/10 bg-paper shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-ink/10 bg-paper shadow-sm">
         <div className="flex items-center justify-between border-b border-ink/10 px-5 py-4">
           <div>
             <h2 className="text-lg font-semibold text-ink">Failed lesson generation jobs</h2>
@@ -656,7 +656,7 @@ export const AdminAiRecovery: React.FC = () => {
     }
 
     return (
-      <div className="overflow-hidden rounded-3xl border border-ink/10 bg-paper shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-ink/10 bg-paper shadow-sm">
         <div className="flex flex-col gap-4 border-b border-ink/10 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-ink">Recovered lessons review queue</h2>
@@ -810,33 +810,33 @@ export const AdminAiRecovery: React.FC = () => {
             {!diagnosticsLoading && selectedDiagnostics ? (
               <>
                 <div className="grid gap-4 md:grid-cols-2">
-                  <div className="rounded-3xl border border-ink/10 bg-surface-low p-4">
+                  <div className="rounded-xl border border-ink/10 bg-surface-low p-4">
                     <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Job ID</div>
                     <div className="mt-2 font-mono text-sm text-ink">{selectedDiagnostics.job_id}</div>
                   </div>
-                  <div className="rounded-3xl border border-ink/10 bg-surface-low p-4">
+                  <div className="rounded-xl border border-ink/10 bg-surface-low p-4">
                     <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Topic ID</div>
                     <div className="mt-2 font-mono text-sm text-ink">{selectedDiagnostics.topic_id || "—"}</div>
                   </div>
-                  <div className="rounded-3xl border border-ink/10 bg-surface-low p-4">
+                  <div className="rounded-xl border border-ink/10 bg-surface-low p-4">
                     <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Topic title</div>
                     <div className="mt-2 text-sm text-ink">{formatNullable(selectedDiagnostics.topic_title)}</div>
                   </div>
-                  <div className="rounded-3xl border border-ink/10 bg-surface-low p-4">
+                  <div className="rounded-xl border border-ink/10 bg-surface-low p-4">
                     <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Grade</div>
                     <div className="mt-2 text-sm text-ink">{formatNullable(selectedDiagnostics.grade_name)}</div>
                   </div>
-                  <div className="rounded-3xl border border-ink/10 bg-surface-low p-4">
+                  <div className="rounded-xl border border-ink/10 bg-surface-low p-4">
                     <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Subject</div>
                     <div className="mt-2 text-sm text-ink">{formatNullable(selectedDiagnostics.subject_name)}</div>
                   </div>
-                  <div className="rounded-3xl border border-ink/10 bg-surface-low p-4">
+                  <div className="rounded-xl border border-ink/10 bg-surface-low p-4">
                     <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Attempts</div>
                     <div className="mt-2 text-sm text-ink">{selectedDiagnostics.attempts ?? 0}</div>
                   </div>
                 </div>
 
-                <div className="rounded-3xl border border-destructive/15 bg-destructive/5 p-5">
+                <div className="rounded-xl border border-destructive/15 bg-destructive/5 p-5">
                   <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-destructive">Last error</div>
                   <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-destructive">
                     {formatNullable(selectedDiagnostics.last_error)}
@@ -844,11 +844,11 @@ export const AdminAiRecovery: React.FC = () => {
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
-                  <div className="rounded-3xl border border-ink/10 bg-paper p-5 shadow-sm">
+                  <div className="rounded-xl border border-ink/10 bg-paper p-5 shadow-sm">
                     <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Existing lessons count</div>
                     <div className="mt-3 text-3xl font-black text-ink">{selectedDiagnostics.existing_lessons_count}</div>
                   </div>
-                  <div className="rounded-3xl border border-ink/10 bg-paper p-5 shadow-sm">
+                  <div className="rounded-xl border border-ink/10 bg-paper p-5 shadow-sm">
                     <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Existing lesson_blocks count</div>
                     <div className="mt-3 text-3xl font-black text-ink">
                       {selectedDiagnostics.existing_lesson_blocks_count ?? "—"}
@@ -860,12 +860,12 @@ export const AdminAiRecovery: React.FC = () => {
                 </div>
 
                 {selectedDiagnostics.existing_task ? (
-                  <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5 text-sm text-emerald-700">
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-5 text-sm text-emerald-700">
                     Existing recovery task: {selectedDiagnostics.existing_task.id} ({selectedDiagnostics.existing_task.status})
                   </div>
                 ) : null}
 
-                <div className="rounded-3xl border border-ink/10 bg-paper p-5 shadow-sm">
+                <div className="rounded-xl border border-ink/10 bg-paper p-5 shadow-sm">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <h3 className="text-lg font-semibold text-ink">Ordered topic outlines</h3>
@@ -893,7 +893,7 @@ export const AdminAiRecovery: React.FC = () => {
                   ) : (
                     <div className="mt-4 space-y-4">
                       {selectedDiagnostics.ordered_topic_outlines.map((outline, index) => (
-                        <div key={`${selectedDiagnostics.job_id}-outline-${index}`} className="rounded-3xl border border-ink/10 bg-surface-low p-4">
+                        <div key={`${selectedDiagnostics.job_id}-outline-${index}`} className="rounded-xl border border-ink/10 bg-surface-low p-4">
                           <div className="mb-3 text-sm font-semibold text-ink">
                             {outlineHeadline(outline as Record<string, unknown>, index)}
                           </div>
@@ -904,7 +904,7 @@ export const AdminAiRecovery: React.FC = () => {
                   )}
                 </div>
 
-                <div className="rounded-3xl border border-ink/10 bg-paper p-5 shadow-sm">
+                <div className="rounded-xl border border-ink/10 bg-paper p-5 shadow-sm">
                   <h3 className="text-lg font-semibold text-ink">Timestamps</h3>
                   <div className="mt-4 grid gap-4 md:grid-cols-3">
                     <div>
@@ -948,7 +948,7 @@ export const AdminAiRecovery: React.FC = () => {
 
     return (
       <div className="space-y-6">
-        <div className="rounded-3xl border border-ink/10 bg-paper p-5 shadow-sm">
+        <div className="rounded-xl border border-ink/10 bg-paper p-5 shadow-sm">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <label className="space-y-2">
               <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Event type</span>
@@ -1010,7 +1010,7 @@ export const AdminAiRecovery: React.FC = () => {
             body="No recovery events matched the current filters across ai_task_logs, ai_tasks.logs, and error_recovery_log."
           />
         ) : (
-          <div className="overflow-hidden rounded-3xl border border-ink/10 bg-paper shadow-sm">
+          <div className="overflow-hidden rounded-xl border border-ink/10 bg-paper shadow-sm">
             <div className="flex items-center justify-between border-b border-ink/10 px-5 py-4">
               <div>
                 <h2 className="text-lg font-semibold text-ink">AI Recovery event stream</h2>
@@ -1110,41 +1110,41 @@ export const AdminAiRecovery: React.FC = () => {
             {!recoveredLessonLoading && selectedRecoveredLesson ? (
               <>
                 <div className="grid gap-4 md:grid-cols-2">
-                  <div className="rounded-3xl border border-ink/10 bg-surface-low p-4">
+                  <div className="rounded-xl border border-ink/10 bg-surface-low p-4">
                     <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Lesson title</div>
                     <div className="mt-2 text-sm text-ink">{formatNullable(selectedRecoveredLesson.lesson.lesson_title)}</div>
                   </div>
-                  <div className="rounded-3xl border border-ink/10 bg-surface-low p-4">
+                  <div className="rounded-xl border border-ink/10 bg-surface-low p-4">
                     <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Topic</div>
                     <div className="mt-2 text-sm text-ink">{formatNullable(selectedRecoveredLesson.lesson.topic_title)}</div>
                     <div className="mt-1 font-mono text-xs text-muted">{selectedRecoveredLesson.lesson.topic_id || "—"}</div>
                   </div>
-                  <div className="rounded-3xl border border-ink/10 bg-surface-low p-4">
+                  <div className="rounded-xl border border-ink/10 bg-surface-low p-4">
                     <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Grade</div>
                     <div className="mt-2 text-sm text-ink">{formatNullable(selectedRecoveredLesson.lesson.grade)}</div>
                   </div>
-                  <div className="rounded-3xl border border-ink/10 bg-surface-low p-4">
+                  <div className="rounded-xl border border-ink/10 bg-surface-low p-4">
                     <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Subject</div>
                     <div className="mt-2 text-sm text-ink">{formatNullable(selectedRecoveredLesson.lesson.subject)}</div>
                   </div>
-                  <div className="rounded-3xl border border-ink/10 bg-surface-low p-4">
+                  <div className="rounded-xl border border-ink/10 bg-surface-low p-4">
                     <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Source type</div>
                     <div className="mt-2 text-sm text-ink">{formatNullable(selectedRecoveredLesson.lesson.source_type)}</div>
                   </div>
-                  <div className="rounded-3xl border border-ink/10 bg-surface-low p-4">
+                  <div className="rounded-xl border border-ink/10 bg-surface-low p-4">
                     <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Student publish allowed</div>
                     <div className="mt-2 text-sm text-ink">{selectedRecoveredLesson.lesson.student_publish_allowed ? "true" : "false"}</div>
                   </div>
                 </div>
 
-                <div className="rounded-3xl border border-ink/10 bg-paper p-5 shadow-sm">
+                <div className="rounded-xl border border-ink/10 bg-paper p-5 shadow-sm">
                   <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Teaching contract</div>
                   <div className="mt-4">
                     <JsonPreview value={selectedRecoveredLesson.lesson.teaching_contract} />
                   </div>
                 </div>
 
-                <div className="rounded-3xl border border-ink/10 bg-paper p-5 shadow-sm">
+                <div className="rounded-xl border border-ink/10 bg-paper p-5 shadow-sm">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <h3 className="text-lg font-semibold text-ink">Blocks</h3>
@@ -1196,7 +1196,7 @@ export const AdminAiRecovery: React.FC = () => {
     switch (activeTab.key) {
       case "dashboard":
         return (
-          <div className="rounded-3xl border border-ink/10 bg-paper p-6 shadow-sm">
+          <div className="rounded-xl border border-ink/10 bg-paper p-6 shadow-sm">
             <h2 className="text-xl font-semibold text-ink">Recovery overview</h2>
             <p className="mt-2 text-sm text-muted">
               This dashboard is intentionally read-only for now. It surfaces the live recovery backlog and review load
@@ -1207,7 +1207,7 @@ export const AdminAiRecovery: React.FC = () => {
       case "failed-jobs":
         return (
           <div className="space-y-6">
-            <div className="rounded-3xl border border-ink/10 bg-paper p-6 shadow-sm">
+            <div className="rounded-xl border border-ink/10 bg-paper p-6 shadow-sm">
               <div className="flex items-center gap-3">
                 <ShieldAlert className="h-5 w-5 text-destructive" />
                 <h2 className="text-xl font-semibold text-ink">Failed lesson jobs</h2>
@@ -1222,7 +1222,7 @@ export const AdminAiRecovery: React.FC = () => {
         );
       case "ai-tasks":
         return (
-          <div className="rounded-3xl border border-ink/10 bg-paper p-6 shadow-sm">
+          <div className="rounded-xl border border-ink/10 bg-paper p-6 shadow-sm">
             <div className="flex items-center gap-3">
               <Bot className="h-5 w-5 text-accent" />
               <h2 className="text-xl font-semibold text-ink">Lesson generation AI tasks</h2>
@@ -1236,7 +1236,7 @@ export const AdminAiRecovery: React.FC = () => {
       case "recovered-lessons":
         return (
           <div className="space-y-6">
-            <div className="rounded-3xl border border-ink/10 bg-paper p-6 shadow-sm">
+            <div className="rounded-xl border border-ink/10 bg-paper p-6 shadow-sm">
               <div className="flex items-center gap-3">
                 <CheckCircle2 className="h-5 w-5 text-emerald-600" />
                 <h2 className="text-xl font-semibold text-ink">Recovered lesson review queue</h2>
@@ -1253,7 +1253,7 @@ export const AdminAiRecovery: React.FC = () => {
       case "logs":
         return (
           <div className="space-y-6">
-            <div className="rounded-3xl border border-ink/10 bg-paper p-6 shadow-sm">
+            <div className="rounded-xl border border-ink/10 bg-paper p-6 shadow-sm">
               <div className="flex items-center gap-3">
                 <Clock3 className="h-5 w-5 text-muted" />
                 <h2 className="text-xl font-semibold text-ink">Recovery logs and observability</h2>
@@ -1292,7 +1292,7 @@ export const AdminAiRecovery: React.FC = () => {
         <div className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-4 overflow-hidden">
         
           {/* Column 2: Fluid Main Workspace */}
-          <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 p-6">
+          <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 p-6">
             <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6">
               
       {/* Compact Shared Flat Tab Header */}
@@ -1341,7 +1341,7 @@ export const AdminAiRecovery: React.FC = () => {
           </div> {/* closes Column 2 main container */}
 
           {/* Column 3: Right Action & Quick Diagnostics Sidebar */}
-          <div className="hidden lg:flex lg:w-[260px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-5">
+          <div className="hidden lg:flex lg:w-[260px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-5">
             <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-5 pr-1">
               
               {/* Connection Status widget */}

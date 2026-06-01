@@ -17,7 +17,7 @@ const severityClass = {
 } as const;
 
 const DebugSection: React.FC<{ title: string; description: string; rows: CurriculumDebugRow[] }> = ({ title, description, rows }) => (
-  <section className="rounded-3xl border border-ink/5 bg-paper p-5">
+  <section className="rounded-xl border border-ink/5 bg-paper p-5">
     <div className="mb-4 flex items-start justify-between gap-4">
       <div>
         <h2 className="text-lg font-bold text-ink">{title}</h2>
@@ -69,7 +69,7 @@ export const AdminCurriculumDebug: React.FC = () => {
 
   return (
       <div className="space-y-6">
-        <div className="flex flex-col gap-4 rounded-3xl bg-ink p-6 text-paper md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-4 rounded-xl bg-ink p-6 text-paper md:flex-row md:items-center md:justify-between">
           <div className="flex items-start gap-4">
             <div className="rounded-2xl bg-paper/10 p-3">
               <Database className="h-6 w-6" />
@@ -100,7 +100,7 @@ export const AdminCurriculumDebug: React.FC = () => {
         )}
 
         {loading ? (
-          <div className="rounded-3xl border border-ink/5 bg-paper p-10 text-center text-sm font-semibold text-muted">
+          <div className="rounded-xl border border-ink/5 bg-paper p-10 text-center text-sm font-semibold text-muted">
             Loading curriculum diagnostics...
           </div>
         ) : (

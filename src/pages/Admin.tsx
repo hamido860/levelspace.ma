@@ -850,7 +850,7 @@ export const Admin: React.FC = () => {
         <div className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-4 overflow-hidden">
         
           {/* Column 2: Fluid Main Workspace */}
-          <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 p-6">
+          <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 p-6">
             <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6">
 
       {/* Compact Shared Flat Tab Header */}
@@ -1965,7 +1965,7 @@ export const Admin: React.FC = () => {
           </div> {/* closes Div 3 (Column 2 main container) */}
 
           {/* Column 3: Right Action & Quick Diagnostics Sidebar */}
-          <div className="hidden lg:flex lg:w-[260px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-5">
+          <div className="hidden lg:flex lg:w-[260px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-5">
             <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6 pr-1">
               
               {/* Connection Status widget */}

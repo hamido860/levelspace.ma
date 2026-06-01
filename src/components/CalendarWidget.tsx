@@ -342,7 +342,7 @@ export const CalendarWidget: React.FC = () => {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 16, scale: 0.97 }}
               transition={{ type: 'spring', damping: 26, stiffness: 360 }}
-              className="relative w-full max-w-sm bg-white dark:bg-paper rounded-3xl p-6 space-y-5"
+              className="relative w-full max-w-sm bg-white dark:bg-paper rounded-xl p-6 space-y-5"
               style={{ boxShadow: 'var(--ls-shadow-hover)' }}
             >
               <div className="flex items-center justify-between">

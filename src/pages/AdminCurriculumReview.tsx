@@ -26,7 +26,7 @@ const CONTENT_TYPE_LABELS: Record<CurriculumReviewContentType, string> = {
 };
 
 const Spinner: React.FC<{ label?: string }> = ({ label = "Loading..." }) => (
-  <div className="flex items-center justify-center gap-3 rounded-3xl border border-ink/10 bg-paper px-6 py-12 ls-body-text shadow-sm">
+  <div className="flex items-center justify-center gap-3 rounded-xl border border-ink/10 bg-paper px-6 py-12 ls-body-text shadow-sm">
     <RefreshCw className="h-4 w-4 animate-spin" />
     {label}
   </div>
@@ -209,7 +209,7 @@ export const AdminCurriculumReview: React.FC = () => {
         <div className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-4 overflow-hidden">
         
           {/* Column 2: Fluid Main Workspace */}
-          <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 p-6">
+          <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 p-6">
             <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6">
                           {/* Page Header */}
               <div className="border-b border-slate-100 dark:border-white/5 pb-4 mb-4">
@@ -494,7 +494,7 @@ export const AdminCurriculumReview: React.FC = () => {
           </div> {/* closes Column 2 main container */}
 
           {/* Column 3: Right Action & Quick Diagnostics Sidebar */}
-          <div className="hidden lg:flex lg:w-[260px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-5">
+          <div className="hidden lg:flex lg:w-[260px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-5">
             <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-5 pr-1">
               
               {/* Connection Status widget */}

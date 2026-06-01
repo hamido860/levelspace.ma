@@ -213,7 +213,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            className="fixed bottom-6 right-6 w-[380px] h-[600px] max-h-[80vh] bg-paper rounded-3xl shadow-md flex flex-col z-50 border border-ink/10 overflow-hidden"
+            className="fixed bottom-6 right-6 w-[380px] h-[600px] max-h-[80vh] bg-paper rounded-xl shadow-md flex flex-col z-50 border border-ink/10 overflow-hidden"
           >
             {/* Header */}
             <div className="p-4 bg-ink text-paper flex items-center justify-between shrink-0">

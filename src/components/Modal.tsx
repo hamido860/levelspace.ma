@@ -50,7 +50,7 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className={`relative w-full ${maxWidthClass} bg-paper rounded-3xl shadow-md overflow-hidden flex flex-col max-h-[90vh]`}
+            className={`relative w-full ${maxWidthClass} bg-paper rounded-xl shadow-md overflow-hidden flex flex-col max-h-[90vh]`}
             dir={dir}
           >
             <div className="flex items-center justify-between p-6 border-b border-ink/5">

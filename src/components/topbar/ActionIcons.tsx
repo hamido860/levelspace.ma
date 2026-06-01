@@ -7,9 +7,12 @@ import {
   Sun,
   Moon,
   WifiOff,
+  User,
+  ShieldCheck,
 } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
 
 const LANGUAGE_META = {
   en: { short: 'EN', label: 'English' },
@@ -24,6 +27,7 @@ export const ActionIcons: React.FC = () => {
   const location = useLocation();
   const { language, setLanguage, t } = useLanguage();
   const { theme, toggleTheme } = useTheme();
+  const { isAdmin } = useAuth();
   
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
 
@@ -79,6 +83,24 @@ export const ActionIcons: React.FC = () => {
           <span className="text-[10px] font-black uppercase tracking-normal">
             {currentLanguageMeta.short}
           </span>
+        </button>
+        {isAdmin && (
+          <button
+            onClick={() => navigate('/admin')}
+            title="Admin Dashboard"
+            aria-label="Admin Dashboard"
+            className={`text-muted hover:text-accent hover:bg-surface-mid transition-all p-2 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 ${location.pathname === '/admin' ? 'text-accent bg-accent/5' : ''}`}
+          >
+            <ShieldCheck size={18} />
+          </button>
+        )}
+        <button
+          onClick={() => navigate('/profile')}
+          title={t('profile')}
+          aria-label={t('profile')}
+          className={`text-muted hover:text-accent hover:bg-surface-mid transition-all p-2 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 ${location.pathname === '/profile' ? 'text-accent bg-accent/5' : ''}`}
+        >
+          <User size={18} />
         </button>
         <button
           onClick={() => navigate('/settings')}

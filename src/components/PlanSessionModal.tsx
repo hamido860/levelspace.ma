@@ -224,7 +224,7 @@ export const PlanSessionModal: React.FC<Props> = ({ isOpen, onClose, onStartTime
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 24 }}
             transition={{ type: 'spring', damping: 28, stiffness: 340 }}
-            className="relative w-full sm:max-w-lg bg-white dark:bg-paper rounded-t-3xl sm:rounded-3xl flex flex-col max-h-[92vh] overflow-hidden"
+            className="relative w-full sm:max-w-lg bg-white dark:bg-paper rounded-t-3xl sm:rounded-xl flex flex-col max-h-[92vh] overflow-hidden"
             style={{ boxShadow: 'var(--ls-shadow-hover)' }}
           >
             {/* Header */}

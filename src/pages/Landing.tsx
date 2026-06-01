@@ -128,7 +128,7 @@ export const Landing: React.FC = () => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.8 }}
-              className="md:col-span-2 relative rounded-3xl border border-ink/10 bg-paper shadow-md overflow-hidden aspect-[16/9] md:aspect-auto md:h-[400px] group"
+              className="md:col-span-2 relative rounded-xl border border-ink/10 bg-paper shadow-md overflow-hidden aspect-[16/9] md:aspect-auto md:h-[400px] group"
             >
               <div className="absolute inset-0 bg-ink/10 group-hover:bg-transparent transition-colors z-10"></div>
               <img 
@@ -144,7 +144,7 @@ export const Landing: React.FC = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.8, delay: 0.2 }}
-                className="relative rounded-3xl border border-ink/10 bg-paper shadow-md overflow-hidden h-[188px] group"
+                className="relative rounded-xl border border-ink/10 bg-paper shadow-md overflow-hidden h-[188px] group"
               >
                 <div className="absolute inset-0 bg-ink/10 group-hover:bg-transparent transition-colors z-10"></div>
                 <img 
@@ -159,7 +159,7 @@ export const Landing: React.FC = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.8, delay: 0.4 }}
-                className="relative rounded-3xl border border-ink/10 bg-paper shadow-md overflow-hidden h-[188px] group"
+                className="relative rounded-xl border border-ink/10 bg-paper shadow-md overflow-hidden h-[188px] group"
               >
                 <div className="absolute inset-0 bg-ink/10 group-hover:bg-transparent transition-colors z-10"></div>
                 <img 
@@ -206,7 +206,7 @@ export const Landing: React.FC = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.5, delay: i * 0.1 }}
-                className="p-8 rounded-3xl bg-surface-low border border-ink/5 hover:border-accent/20 transition-colors group"
+                className="p-8 rounded-xl bg-surface-low border border-ink/5 hover:border-accent/20 transition-colors group"
               >
                 <div className="w-12 h-12 bg-paper rounded-2xl flex items-center justify-center text-accent shadow-sm mb-6 group-hover:scale-110 transition-transform">
                   {feature.icon}

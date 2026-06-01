@@ -92,7 +92,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
   onComplete,
   inline = false,
 }) => {
-  const { profile, user } = useAuth();
+  const { profile, user, isAdmin } = useAuth();
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
   const [cycles, setCycles] = useState<CurriculumEntity[]>([]);
@@ -105,6 +105,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
   const [selectedTrackId, setSelectedTrackId] = useState('');
   const [selectedOptionId, setSelectedOptionId] = useState('');
+  const [skipping, setSkipping] = useState(false);
   const [subjectQuery, setSubjectQuery] = useState('');
   const [loadingInitialData, setLoadingInitialData] = useState(false);
   const [loadingSubjects, setLoadingSubjects] = useState(false);
@@ -238,10 +239,41 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
 
   const isContinueDisabled =
     saving ||
+    skipping ||
     (step === 1 && !selectedCycleId) ||
     (step === 2 && !selectedGradeId) ||
     (step === 4 && requiresTrack && tracks.length > 0 && !selectedTrackId) ||
     (step === 5 && requiresTrack && options.length > 0 && !selectedOptionId);
+
+  const handleSkip = async () => {
+    if (saving || skipping) return;
+
+    setSkipping(true);
+    setErrorMessage('');
+
+    try {
+      localStorage.setItem('has_completed_onboarding', 'true');
+      await db.settings.put({ key: 'has_completed_onboarding', value: 'true' });
+
+      if (user) {
+        try {
+          await updateProfile(user.id, { onboarding_completed: true });
+        } catch (profileError) {
+          console.error('Failed to persist onboarding skip profile:', profileError);
+        }
+      }
+
+      onComplete?.();
+      if (inline) navigate('/modules');
+    } catch (error) {
+      console.error('Failed to skip onboarding:', error);
+      setErrorMessage('Onboarding skip completed locally, but the remote update failed.');
+      onComplete?.();
+      if (inline) navigate('/modules');
+    } finally {
+      setSkipping(false);
+    }
+  };
 
   const handleComplete = async () => {
     if (!selectedGradeId || saving) return;
@@ -613,12 +645,17 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
           {errorMessage && <p role="alert" className="mt-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">{errorMessage}</p>}
 
           {step > 0 && <div className="mt-auto flex items-center justify-between gap-3 border-t border-surface-mid pt-4">
-            {step > 0 ? (
+            <div className="flex items-center gap-2">
               <button type="button" onClick={() => setStep((current) => Math.max(current - 1, 0))} className="ls-button-ghost">
                 <ArrowLeft className="h-4 w-4" />
                 Back
               </button>
-            ) : <span />}
+              {isAdmin && (
+                <button type="button" disabled={skipping} onClick={handleSkip} className="ls-button-ghost">
+                  {skipping ? 'Skipping...' : 'Skip for now'}
+                </button>
+              )}
+            </div>
 
             {step < totalSteps ? (
               <button type="button" disabled={isContinueDisabled} onClick={() => setStep((current) => Math.min(current + 1, totalSteps))} className="ls-button-primary px-4 py-2.5">
@@ -659,6 +696,16 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                 Create your space now
                 <ArrowRight className="h-4 w-4" />
               </button>
+              {isAdmin && (
+                <button
+                  type="button"
+                  disabled={skipping}
+                  onClick={handleSkip}
+                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-surface-mid bg-transparent px-4 py-3 text-sm font-bold text-ink transition hover:bg-surface-low disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {skipping ? 'Skipping...' : 'Skip for now'}
+                </button>
+              )}
             </div>
           </motion.div>
         )}

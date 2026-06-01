@@ -37,8 +37,14 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(event.request.url);
 
-  // Avoid caching third-party APIs (Supabase, Gemini, etc.) in the SW
-  if (url.origin.includes('supabase.co') || url.origin.includes('googleapis.com') || url.pathname.startsWith('/api')) {
+  // Avoid caching third-party APIs (Supabase, Gemini, etc.) and local HMR / Dev assets
+  if (
+    url.origin.includes('supabase.co') || 
+    url.origin.includes('googleapis.com') || 
+    url.pathname.startsWith('/api') ||
+    url.hostname === 'localhost' || 
+    url.hostname === '127.0.0.1'
+  ) {
     return;
   }
 

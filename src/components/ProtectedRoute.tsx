@@ -26,7 +26,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requir
   if (requireAdmin && !isAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background px-6">
-        <div className="max-w-md w-full rounded-3xl border border-ink/10 bg-paper p-8 text-center shadow-md shadow-ink/5">
+        <div className="max-w-md w-full rounded-xl border border-ink/10 bg-paper p-8 text-center shadow-md shadow-ink/5">
           <div className="text-[11px] font-mono font-bold uppercase tracking-[0.25em] text-destructive/70">
             403 Forbidden
           </div>

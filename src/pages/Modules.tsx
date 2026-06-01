@@ -666,10 +666,10 @@ export const Modules: React.FC = () => {
       <SEO title={t('curriculum_classrooms_title') || 'Syllabus & Academic Classrooms'} />
       <div className="h-full w-full bg-background flex flex-col overflow-hidden p-4">
         {/* 3-Column Layout */}
-        <div className="flex-grow min-h-0 w-full flex flex-col xl:flex-row gap-4 overflow-hidden">
+        <div className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-3 overflow-hidden">
         
           {/* Column 2: Main Content */}
-          <div className="flex-grow min-w-0 flex flex-col min-h-0 w-full overflow-hidden bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 p-6">
+          <div className="flex-grow min-w-0 flex flex-col min-h-0 w-full overflow-hidden bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 p-6">
             <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6">
               {/* Page Header */}
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-white/5 pb-5">
@@ -795,7 +795,7 @@ export const Modules: React.FC = () => {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: i * 0.05, duration: 0.4 }}
                       onClick={() => navigate(`/classroom/${module.id}`)}
-                      className="bg-white border border-slate-200 rounded-3xl overflow-hidden flex flex-col group hover:border-accent/30 hover:shadow-lg transition-all dark:bg-paper dark:border-white/8 shadow-sm cursor-pointer"
+                      className="bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col group hover:border-accent/30 hover:shadow-lg transition-all dark:bg-paper dark:border-white/8 shadow-sm cursor-pointer"
                       style={{ width: '300px', minWidth: '300px' }}
                     >
                       <div className={`bg-gradient-to-r ${moduleColorOverrides[module.id] || getCardGradient(module.id)} px-5 py-3.5 flex items-center justify-between text-white shrink-0`}>
@@ -889,7 +889,7 @@ export const Modules: React.FC = () => {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.95 }}
                     transition={{ delay: i * 0.05, duration: 0.6 }}
-                    onClick={() => lessonCount > 0 && navigate(`/classroom/${module.id}`)}
+                    onClick={() => navigate(`/classroom/${module.id}`)}
                     className="bg-white border border-slate-200 rounded-2xl overflow-hidden flex flex-col group hover:border-accent/30 hover:shadow-lg transition-all dark:bg-paper dark:border-white/8 shadow-sm"
                   >
                     {/* Consistent illustration banner with compact title overlay */}
@@ -958,15 +958,13 @@ export const Modules: React.FC = () => {
                       </div>
 
                       <div className="pt-3 mt-auto flex items-center gap-2 border-t border-slate-100 dark:border-white/6">
-                        {lessonCount > 0 && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); navigate(`/classroom/${module.id}`); }}
-                            className="h-9 flex items-center justify-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 px-3.5 text-xs font-bold text-white transition-colors shadow-sm"
-                          >
-                            <Play className="w-3 h-3 fill-current text-white" />
-                            Open Classroom
-                          </button>
-                        )}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); navigate(`/classroom/${module.id}`); }}
+                          className="h-9 flex items-center justify-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 px-3.5 text-xs font-bold text-white transition-colors shadow-sm"
+                        >
+                          <Play className="w-3 h-3 fill-current text-white" />
+                          Open Classroom
+                        </button>
                         <button
                           onClick={(e) => { e.stopPropagation(); toggleModule(module.id); }}
                           className="h-9 flex items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3.5 text-xs font-bold text-slate-700 transition-colors dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:bg-surface-low"
@@ -977,7 +975,7 @@ export const Modules: React.FC = () => {
                         {lessonCount === 0 && (
                           <span className="ms-auto inline-flex items-center gap-1.5 text-[11px] font-semibold text-amber-700 dark:text-amber-400">
                             <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                            No lessons yet
+                            Empty
                           </span>
                         )}
                       </div>
@@ -1059,7 +1057,7 @@ export const Modules: React.FC = () => {
           </div>
 
           {/* Column 3: Right Sidebar — Focus & Tools */}
-          <div className="hidden xl:flex xl:w-[260px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-5">
+          <div className="flex lg:w-[234px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-5">
             <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6 pr-1">
 
               {/* Deep Focus Pomodoro - Premium Calmer Box */}

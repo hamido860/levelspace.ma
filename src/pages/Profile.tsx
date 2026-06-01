@@ -91,13 +91,13 @@ export const Profile: React.FC = () => {
         <div className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-4 overflow-hidden">
 
           {/* Column 2: Main Content */}
-          <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 p-6">
+          <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 p-6">
             <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6">        {/* Profile Header */}
               <div className="relative p-8 bg-paper border border-ink/5 rounded-[2rem] overflow-hidden shadow-sm">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-accent/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
                 
                 <div className="relative flex flex-col md:flex-row items-center gap-8">
-                  <div className="w-32 h-32 rounded-3xl bg-accent/10 flex items-center justify-center border-2 border-accent/20 overflow-hidden shadow-md">
+                  <div className="w-32 h-32 rounded-xl bg-accent/10 flex items-center justify-center border-2 border-accent/20 overflow-hidden shadow-md">
                     {profile?.avatar_url ? (
                       <img 
                         src={profile.avatar_url} 
@@ -230,7 +230,7 @@ export const Profile: React.FC = () => {
           </div>
 
           {/* Column 3: Right Sidebar */}
-          <div className="hidden lg:flex lg:w-[260px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-5">
+          <div className="hidden lg:flex lg:w-[260px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-5">
             <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6 pr-1">
 
               {/* Deep Focus Timer */}

@@ -33,7 +33,7 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson }) => {
   return (
     <div className="space-y-8">
       {/* Lesson Header */}
-      <div className="bg-paper p-8 rounded-3xl border border-surface-mid shadow-sm space-y-4">
+      <div className="bg-paper p-8 rounded-xl border border-surface-mid shadow-sm space-y-4">
         <div className="flex items-center gap-3 text-accent">
           <BookOpen size={20} />
           <span className="text-xs font-bold uppercase tracking-[0.2em]">{lesson.subject} • {lesson.grade}</span>
@@ -75,7 +75,7 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson }) => {
       {/* Content Area */}
       <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
         {activeTab === 'content' && (
-          <div className="bg-paper p-8 rounded-3xl border border-surface-mid shadow-sm prose prose-slate max-w-none">
+          <div className="bg-paper p-8 rounded-xl border border-surface-mid shadow-sm prose prose-slate max-w-none">
             <div className="markdown-body">
               <ReactMarkdown 
                 remarkPlugins={[remarkMath]} 
@@ -119,7 +119,7 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson }) => {
                 </div>
               ))
             ) : (
-              <div className="p-12 text-center bg-paper rounded-3xl border border-solid border-surface-mid opacity-50">
+              <div className="p-12 text-center bg-paper rounded-xl border border-solid border-surface-mid opacity-50">
                 <p className="text-xs font-bold text-ink-muted uppercase tracking-normal">No quizzes defined for this lesson</p>
               </div>
             )}
@@ -180,7 +180,7 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson }) => {
                 </div>
               ))
             ) : (
-              <div className="p-12 text-center bg-paper rounded-3xl border border-solid border-surface-mid opacity-50">
+              <div className="p-12 text-center bg-paper rounded-xl border border-solid border-surface-mid opacity-50">
                 <p className="text-xs font-bold text-ink-muted uppercase tracking-normal">No exercises defined for this lesson</p>
               </div>
             )}

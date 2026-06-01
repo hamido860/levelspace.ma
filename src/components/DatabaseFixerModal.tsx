@@ -46,7 +46,7 @@ CREATE POLICY "Allow authenticated delete" ON public.bac_track_subjects FOR DELE
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-ink/60 ">
-      <div className="bg-paper w-full max-w-3xl rounded-3xl shadow-md overflow-hidden flex flex-col border border-surface-mid">
+      <div className="bg-paper w-full max-w-3xl rounded-xl shadow-md overflow-hidden flex flex-col border border-surface-mid">
         <div className="px-6 py-4 border-b border-surface-mid flex items-center justify-between bg-surface-low/50">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-xl bg-accent/10 flex items-center justify-center text-accent">

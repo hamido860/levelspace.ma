@@ -21,9 +21,7 @@ import {
   AlertCircle,
   Cloud,
   Activity,
-  Play,
-  ChevronDown,
-  ChevronUp
+  Play
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
@@ -139,6 +137,18 @@ export const Dashboard: React.FC = () => {
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [showMetrics, setShowMetrics] = useState(false);
+  const [sidebarCollapsedSections, setSidebarCollapsedSections] = useState({
+    pomodoro: false,
+    support: false,
+    stats: false,
+  });
+
+  const toggleSidebarSection = (section: 'pomodoro' | 'support' | 'stats') => {
+    setSidebarCollapsedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
 
   React.useEffect(() => {
     const hasCompleted = localStorage.getItem('has_completed_onboarding');
@@ -347,10 +357,10 @@ export const Dashboard: React.FC = () => {
       <div className="h-full w-full bg-background flex flex-col overflow-hidden p-4">
         
         {/* Symmetrical Layout Container */}
-        <div className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-4 overflow-hidden">
+        <div className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-3 overflow-hidden">
           
           {/* Column 2: Main Dashboard Content (Middle Column, flex-grow) */}
-          <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 p-6">
+          <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 p-6">
             <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6">
               {/* Page Header */}
               <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/5 pb-5">
@@ -368,7 +378,6 @@ export const Dashboard: React.FC = () => {
                 </button>
               </div>
 
-              {/* Progress & Stats Overview */}
               {showMetrics && <section className="mt-2">
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                   {[
@@ -385,33 +394,19 @@ export const Dashboard: React.FC = () => {
                       viewport={{ once: true }}
                       className="bg-slate-50/50 dark:bg-surface-low/30 p-5 rounded-2xl border border-slate-100 dark:border-white/5 space-y-3 shadow-sm hover:border-accent/30 transition-all cursor-default"
                     >
-                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 pt-1 pb-2">
-                        {[
-                          { label: 'Focus Quotient', value: '8.4', unit: '/10', icon: <Brain />, trend: '+12%' },
-                          { label: 'Deep Work Total', value: '24.5', unit: 'hrs', icon: <Timer />, trend: '+4.2h' },
-                          { label: 'Mastery Delta', value: '+18', unit: '%', icon: <Zap />, trend: 'Optimal' },
-                          { label: 'Lessons to Review', value: '2', unit: '', icon: <AlertCircle />, trend: '-1 this week' }
-                        ].map((stat, i) => (
-                          <div 
-                            key={i}
-                            className="bg-slate-50/50 dark:bg-surface-low/30 p-5 rounded-2xl border border-slate-100 dark:border-white/5 space-y-3 shadow-sm hover:border-accent/30 transition-all cursor-default"
-                          >
-                            <div className="flex items-center justify-between">
-                              <div className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-surface-low flex items-center justify-center text-slate-400 dark:text-ink-muted">
-                                {React.cloneElement(stat.icon as React.ReactElement<any>, { size: 16 })}
-                              </div>
-                              <span className="text-[9px] font-bold text-emerald-500 uppercase tracking-normal">{stat.trend}</span>
-                            </div>
-                            
-                            <div className="space-y-1">
-                              <p className="text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-normal">{stat.label}</p>
-                              <div className="flex items-baseline gap-1">
-                                <span className="text-2xl font-bold text-slate-800 dark:text-ink">{stat.value}</span>
-                                <span className="text-[10px] font-medium text-slate-400 dark:text-ink-muted">{stat.unit}</span>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
+                      <div className="flex items-center justify-between">
+                        <div className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-surface-low flex items-center justify-center text-slate-400 dark:text-ink-muted">
+                          {React.cloneElement(stat.icon as React.ReactElement<any>, { size: 16 })}
+                        </div>
+                        <span className="text-[9px] font-bold text-emerald-500 uppercase tracking-normal">{stat.trend}</span>
+                      </div>
+                      
+                      <div className="space-y-1">
+                        <p className="text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-normal">{stat.label}</p>
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-2xl font-bold text-slate-800 dark:text-ink">{stat.value}</span>
+                          <span className="text-[10px] font-medium text-slate-400 dark:text-ink-muted">{stat.unit}</span>
+                        </div>
                       </div>
                     </motion.div>
                   ))}
@@ -497,7 +492,7 @@ export const Dashboard: React.FC = () => {
           </div>
 
           {/* Column 3: Dashboard Widgets Sidebar (Right Column, 260px width) */}
-          <div className="hidden lg:flex lg:w-[260px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-5">
+          <div className="flex lg:w-[234px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-5">
             <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6 pr-1">
               
               {/* Deep Focus Pomodoro - Premium Calmer Box */}

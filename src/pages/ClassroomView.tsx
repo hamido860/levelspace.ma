@@ -301,6 +301,41 @@ export const ClassroomView: React.FC = () => {
   const [layoutMode, setLayoutMode] = useState<'grid' | 'carousel'>('grid');
   const [navigationCurriculumIds, setNavigationCurriculumIds] = useState<{ gradeId?: string; subjectId?: string }>({});
 
+  const [lessonColorOverrides, setLessonColorOverrides] = useState<Record<string, string>>({});
+  const [lessonBannerOverrides, setLessonBannerOverrides] = useState<Record<string, string>>({});
+
+  const handleRandomizeAllBanners = () => {
+    const newColors: Record<string, string> = {};
+    const newBanners: Record<string, string> = {};
+    const allItems = [...(allLessons || []), ...(curriculumTopicRows || []), ...(topicFallbackRows || [])];
+    allItems.forEach(item => {
+      if (item.id) {
+        newColors[item.id] = randomCardGradient();
+        newBanners[item.id] = randomBanner();
+      }
+    });
+    setLessonColorOverrides(newColors);
+    setLessonBannerOverrides(newBanners);
+  };
+
+  const [sidebarCollapsedSections, setSidebarCollapsedSections] = useState<Record<string, boolean>>({
+    telemetry: false,
+    pomodoro: false,
+    support: false,
+    activityLog: false
+  });
+
+  const toggleSidebarSection = (section: string) => {
+    setSidebarCollapsedSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
+
+  const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
+
+  const toggleCardExpansion = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpandedCards(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
   // ── Pinned lessons state (module-scoped, shared with LessonReader) ──
   const pinStorageKey = `levelspace_pinned_lessons_${id || 'global'}`;
   const [pinnedLessonIds, setPinnedLessonIds] = useState<string[]>(() => {
@@ -1519,10 +1554,10 @@ export const ClassroomView: React.FC = () => {
       <div className="h-full w-full bg-background flex flex-col overflow-hidden p-4">
         
         {/* Symmetrical Layout Container */}
-        <div className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-4 overflow-hidden">
+        <div className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-3 overflow-hidden">
           
           {/* Column 2: Main Classroom Content (Middle Column, flex-grow) */}
-          <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 p-6">
+          <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 p-6">
             <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6">
               
               {/* Page Header */}
@@ -1595,14 +1630,14 @@ export const ClassroomView: React.FC = () => {
               </div>
 
               {isHydratingSupabase && !hasLessons && !hasTopicFallback && (
-                <div className="bg-slate-50/50 border border-slate-200 rounded-3xl p-6 flex items-center gap-3 ls-body-text shrink-0">
+                <div className="bg-slate-50/50 border border-slate-200 rounded-xl p-6 flex items-center gap-3 ls-body-text shrink-0">
                   <Loader2 className="h-4 w-4 animate-spin text-accent" />
                   Checking Supabase for existing lessons, topics, and outlines...
                 </div>
               )}
 
               {showSetupState ? (
-                <div className="bg-slate-50/50 border border-solid border-slate-200 rounded-3xl p-10 md:p-14 flex flex-col items-center justify-center text-center space-y-6">
+                <div className="bg-slate-50/50 border border-solid border-slate-200 rounded-xl p-10 md:p-14 flex flex-col items-center justify-center text-center space-y-6">
                   <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm">
                     <BookOpen size={24} className="text-accent" />
                   </div>
@@ -1667,7 +1702,7 @@ export const ClassroomView: React.FC = () => {
                   {activeTab === 'lessons' && (
                     <div className="space-y-4">
                       {showValidationWarningBanner && (
-                        <div className="rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4 text-amber-900 shrink-0">
+                        <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-amber-900 shrink-0">
                           <div className="flex items-start gap-3">
                             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
                             <div>
@@ -1679,7 +1714,7 @@ export const ClassroomView: React.FC = () => {
                       )}
 
                       {!isAdmin && hasLessons && studentVisibleLessons.length === 0 && (
-                        <div className="rounded-3xl border border-blue-200 bg-blue-50 px-5 py-4 text-blue-900 shadow-sm shrink-0">
+                        <div className="rounded-xl border border-blue-200 bg-blue-50 px-5 py-4 text-blue-900 shadow-sm shrink-0">
                           <div className="flex items-start gap-3">
                             <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" />
                             <div>
@@ -1755,7 +1790,7 @@ export const ClassroomView: React.FC = () => {
                                       animate={{ opacity: 1, y: 0 }}
                                       transition={{ delay: i * 0.05 }}
                                       onClick={() => { if (isClickable) navigate(`/lesson/${lesson.id}`); }}
-                                      className={`bg-white border border-slate-200 rounded-3xl overflow-hidden flex flex-col group transition-all dark:bg-paper dark:border-white/8 shadow-sm ${
+                                      className={`bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col group transition-all dark:bg-paper dark:border-white/8 shadow-sm ${
                                         isClickable
                                           ? 'cursor-pointer hover:border-accent/30 hover:shadow-lg'
                                           : 'opacity-85 cursor-not-allowed'
@@ -1838,7 +1873,7 @@ export const ClassroomView: React.FC = () => {
                                   animate={{ opacity: 1, y: 0 }}
                                   transition={{ delay: i * 0.03 }}
                                   onClick={() => handleGenerateLesson(topic.title, true)}
-                                  className="bg-white border border-slate-200 rounded-3xl overflow-hidden flex flex-col group hover:border-accent/30 hover:shadow-lg transition-all dark:bg-paper dark:border-white/8 shadow-sm cursor-pointer"
+                                  className="bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col group hover:border-accent/30 hover:shadow-lg transition-all dark:bg-paper dark:border-white/8 shadow-sm cursor-pointer"
                                   style={{ width: '240px', minWidth: '240px' }}
                                 >
                                   <div className={`bg-gradient-to-r ${lessonColorOverrides[topic.id] || getCardGradient(topic.id)} px-4 py-3 flex items-center gap-2 text-white shrink-0`}>
@@ -1902,7 +1937,7 @@ export const ClassroomView: React.FC = () => {
                                   if (target.closest('.card-footer-actions') || target.closest('button')) return;
                                   if (isClickable) navigate(`/lesson/${lesson.id}`, { state: lessonNavigationState() });
                                 }}
-                                className={`bg-white border border-slate-200 rounded-3xl overflow-hidden flex flex-col group transition-all dark:bg-paper dark:border-white/8 shadow-sm ${
+                                className={`bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col group transition-all dark:bg-paper dark:border-white/8 shadow-sm ${
                                   isClickable 
                                     ? 'cursor-pointer hover:border-accent/30 hover:shadow-lg' 
                                     : 'opacity-85 bg-slate-50/50 dark:bg-surface-low/50 cursor-not-allowed'
@@ -2077,7 +2112,7 @@ export const ClassroomView: React.FC = () => {
                                 if (target.closest('.card-footer-actions') || target.closest('button')) return;
                                 handleGenerateLesson(topic.title, true);
                               }}
-                              className="bg-white border border-slate-200 rounded-3xl overflow-hidden flex flex-col group hover:border-accent/30 hover:shadow-lg transition-all dark:bg-paper dark:border-white/8 shadow-sm cursor-pointer"
+                              className="bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col group hover:border-accent/30 hover:shadow-lg transition-all dark:bg-paper dark:border-white/8 shadow-sm cursor-pointer"
                               style={{ boxShadow: 'var(--ls-shadow)' }}
                             >
                               <div className={`bg-gradient-to-r ${lessonColorOverrides[topic.id] || getCardGradient(topic.id)} px-5 py-3.5 flex items-center justify-between text-white shrink-0`}>
@@ -2217,7 +2252,7 @@ export const ClassroomView: React.FC = () => {
                       ))}
                     </div>
                   ) : (
-                    <div className="bg-slate-50/50 border border-solid border-slate-200 rounded-3xl p-16 text-center dark:bg-surface-low/10 dark:border-white/5">
+                    <div className="bg-slate-50/50 border border-solid border-slate-200 rounded-xl p-16 text-center dark:bg-surface-low/10 dark:border-white/5">
                       <p className="text-slate-500 dark:text-ink-muted">{t('no_quizzes_for_lessons')}</p>
                     </div>
                   )}
@@ -2251,7 +2286,7 @@ export const ClassroomView: React.FC = () => {
                       ))}
                     </div>
                   ) : (
-                    <div className="bg-slate-50/50 border border-solid border-slate-200 rounded-3xl p-16 text-center dark:bg-surface-low/10 dark:border-white/5">
+                    <div className="bg-slate-50/50 border border-solid border-slate-200 rounded-xl p-16 text-center dark:bg-surface-low/10 dark:border-white/5">
                       <p className="text-slate-500 dark:text-ink-muted">{t('no_exercises_for_lessons')}</p>
                     </div>
                   )}
@@ -2371,7 +2406,7 @@ export const ClassroomView: React.FC = () => {
           </div>
 
           {/* Column 3: Classroom Widgets Sidebar (Right Column, 260px width) */}
-          <div className="hidden lg:flex lg:w-[260px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-3xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-5">
+          <div className="flex lg:w-[234px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-5">
             <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6 pr-1">
               
               {/* Subject Telemetry Card - Collapsible */}

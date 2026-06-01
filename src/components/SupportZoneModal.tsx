@@ -297,7 +297,7 @@ export const SupportZoneModal: React.FC<SupportZoneModalProps> = ({
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="relative w-full max-w-4xl max-h-[90vh] bg-paper rounded-3xl shadow-2xl overflow-hidden flex flex-col"
+          className="relative w-full max-w-4xl max-h-[90vh] bg-paper rounded-xl shadow-2xl overflow-hidden flex flex-col"
         >
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-ink/5 bg-white/50 dark:bg-paper shrink-0">
@@ -327,7 +327,7 @@ export const SupportZoneModal: React.FC<SupportZoneModalProps> = ({
             {phase === 'subject-select' && (
               <div className="max-w-2xl mx-auto space-y-8">
                 <div className="text-center space-y-3">
-                  <div className="w-20 h-20 mx-auto bg-accent/10 rounded-3xl flex items-center justify-center text-accent mb-4">
+                  <div className="w-20 h-20 mx-auto bg-accent/10 rounded-xl flex items-center justify-center text-accent mb-4">
                     <Target size={40} />
                   </div>
                   <h1 className="text-3xl font-bold text-ink">Find your real level.</h1>
@@ -563,7 +563,7 @@ export const SupportZoneModal: React.FC<SupportZoneModalProps> = ({
                     {/* Left: Score + Insights */}
                     <div className="lg:col-span-4 space-y-5">
                       {/* Score card */}
-                      <div className="p-7 bg-ink rounded-3xl text-white text-center space-y-3">
+                      <div className="p-7 bg-ink rounded-xl text-white text-center space-y-3">
                         <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">Weighted Score</span>
                         <div className="text-6xl font-black tracking-tighter text-accent">
                           {finalScore}<span className="text-2xl text-white/30">/100</span>
@@ -582,7 +582,7 @@ export const SupportZoneModal: React.FC<SupportZoneModalProps> = ({
                       </div>
 
                       {/* Insights */}
-                      <div className="p-6 bg-accent/8 rounded-3xl border border-accent/15">
+                      <div className="p-6 bg-accent/8 rounded-xl border border-accent/15">
                         <h4 className="font-bold text-accent mb-4 flex items-center gap-2 text-sm">
                           <Brain size={16} /> Performance Insights
                         </h4>
@@ -599,7 +599,7 @@ export const SupportZoneModal: React.FC<SupportZoneModalProps> = ({
 
                     {/* Right: Roadmap */}
                     <div className="lg:col-span-8">
-                      <div className="bg-paper rounded-3xl border border-ink/5 p-7 h-full flex flex-col">
+                      <div className="bg-paper rounded-xl border border-ink/5 p-7 h-full flex flex-col">
                         <h3 className="text-xl font-bold text-ink mb-6">Your 2-Week LevelUp Roadmap</h3>
 
                         {roadmap && (

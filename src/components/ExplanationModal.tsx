@@ -96,7 +96,7 @@ export const ExplanationModal: React.FC<ExplanationModalProps> = ({
       ) : data ? (
         <div className="space-y-6">
           {/* Main word display */}
-          <div className="bg-slate-50 dark:bg-surface-low p-6 rounded-3xl border border-slate-200/50 dark:border-white/5 space-y-3 relative overflow-hidden">
+          <div className="bg-slate-50 dark:bg-surface-low p-6 rounded-xl border border-slate-200/50 dark:border-white/5 space-y-3 relative overflow-hidden">
             <div className="absolute right-0 top-0 w-24 h-24 bg-accent/5 rounded-full blur-2xl pointer-events-none" />
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="space-y-1">

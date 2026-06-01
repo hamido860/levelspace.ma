@@ -533,7 +533,7 @@ export const Settings: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             className="grid grid-cols-1 md:grid-cols-2 gap-4"
           >
-            <section className="p-6 bg-paper border border-ink/5 rounded-3xl space-y-5 shadow-sm md:col-span-2">
+            <section className="p-6 bg-paper border border-ink/5 rounded-xl space-y-5 shadow-sm md:col-span-2">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-accent/5 rounded-2xl flex items-center justify-center text-accent shrink-0">
@@ -750,7 +750,7 @@ export const Settings: React.FC = () => {
               )}
             </section>
 
-            <section className="p-5 bg-paper border border-ink/5 rounded-3xl space-y-5 shadow-sm">
+            <section className="p-5 bg-paper border border-ink/5 rounded-xl space-y-5 shadow-sm">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 bg-accent/5 rounded-lg flex items-center justify-center text-accent">
                   <Target className="w-4 h-4" />
@@ -834,7 +834,7 @@ export const Settings: React.FC = () => {
               </div>
             </section>
 
-            <section className="p-5 bg-paper border border-ink/5 rounded-3xl space-y-5 shadow-sm">
+            <section className="p-5 bg-paper border border-ink/5 rounded-xl space-y-5 shadow-sm">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 bg-accent/5 rounded-lg flex items-center justify-center text-accent">
                   <Brain className="w-4 h-4" />
@@ -946,7 +946,7 @@ export const Settings: React.FC = () => {
               </div>
             </section>
 
-            <section className="p-5 bg-paper border border-ink/5 rounded-3xl space-y-5 shadow-sm md:col-span-2">
+            <section className="p-5 bg-paper border border-ink/5 rounded-xl space-y-5 shadow-sm md:col-span-2">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 bg-accent/5 rounded-lg flex items-center justify-center text-accent">
                   <Cloud className="w-4 h-4" />
@@ -1011,7 +1011,7 @@ export const Settings: React.FC = () => {
 
 
             {/* AI Provider Configuration (Cognitive Core Controller) */}
-            <section className="p-6 bg-paper border border-ink/5 rounded-3xl space-y-6 shadow-sm md:col-span-2 relative overflow-hidden">
+            <section className="p-6 bg-paper border border-ink/5 rounded-xl space-y-6 shadow-sm md:col-span-2 relative overflow-hidden">
               {/* Decorative subtle ambient core grid network background */}
               <div className="absolute inset-0 bg-[radial-gradient(#1246ff03_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none" />
 
@@ -1660,7 +1660,7 @@ export const Settings: React.FC = () => {
               </div>
             </section>
             {/* Supabase Connection Status */}
-            <section className="p-5 bg-paper border border-ink/5 rounded-3xl space-y-5 shadow-sm flex flex-col md:col-span-2">
+            <section className="p-5 bg-paper border border-ink/5 rounded-xl space-y-5 shadow-sm flex flex-col md:col-span-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 bg-accent/5 rounded-lg flex items-center justify-center text-accent">
@@ -1727,7 +1727,7 @@ export const Settings: React.FC = () => {
 
         {/* Action Bar */}
         <div className="sticky bottom-8 z-40">
-          <div className="p-6 bg-ink text-paper rounded-3xl flex flex-col md:flex-row items-center justify-between gap-6 shadow-md border border-paper/10">
+          <div className="p-6 bg-ink text-paper rounded-xl flex flex-col md:flex-row items-center justify-between gap-6 shadow-md border border-paper/10">
             <div className="flex items-center gap-6">
               <div className="flex flex-col">
                 <span className="text-[9px] font-mono uppercase tracking-normal text-paper/40 mb-1">{t('status')}</span>
