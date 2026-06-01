@@ -39,7 +39,7 @@ export const Login: React.FC = () => {
         if (error) throw error;
         navigate(from || '/dashboard');
       } else {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -49,7 +49,12 @@ export const Login: React.FC = () => {
           }
         });
         if (error) throw error;
-        alert('Check your email for the confirmation link!');
+
+        if (data.session) {
+          navigate(from || '/dashboard');
+        } else {
+          alert('Check your email for the confirmation link!');
+        }
       }
     } catch (err: any) {
       setError(err.message);

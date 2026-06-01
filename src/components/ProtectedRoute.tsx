@@ -8,7 +8,7 @@ interface ProtectedRouteProps {
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requireAdmin = false }) => {
-  const { user, isAdmin, loading } = useAuth();
+  const { user, profile, isAdmin, loading } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -21,6 +21,12 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requir
 
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  const hasCompletedOnboarding = profile?.onboarding_completed === true || localStorage.getItem('has_completed_onboarding') === 'true';
+
+  if (!hasCompletedOnboarding && location.pathname !== '/onboarding') {
+    return <Navigate to="/onboarding" state={{ from: location }} replace />;
   }
 
   if (requireAdmin && !isAdmin) {

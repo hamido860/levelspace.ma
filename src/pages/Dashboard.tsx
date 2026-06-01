@@ -151,11 +151,11 @@ export const Dashboard: React.FC = () => {
   };
 
   React.useEffect(() => {
-    const hasCompleted = localStorage.getItem('has_completed_onboarding');
-    if (hasCompleted !== 'true') {
+    const hasCompleted = localStorage.getItem('has_completed_onboarding') === 'true' || profile?.onboarding_completed === true;
+    if (!hasCompleted) {
       setIsOnboardingOpen(true);
     }
-  }, []);
+  }, [profile?.onboarding_completed]);
 
   const allModulesVal = useLiveQuery(() => db.modules.toArray());
   const allLessonsVal = useLiveQuery(() => db.lessons.toArray());
