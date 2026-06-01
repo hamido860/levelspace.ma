@@ -2055,77 +2055,8 @@ export const ClassroomView: React.FC = () => {
                                       )}
                                     </div>
                                   </div>
-
-                                  <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-ink-muted">
-                                    <Clock className="w-4 h-4 text-slate-400 shrink-0" />
-                                    <span>
-                                      Last Active: {lesson.createdAt ? relativeTime(lesson.createdAt) : 'No activity yet'}
-                                    </span>
-                                  </div>
-
-                                  <div className="pt-2 flex items-center justify-between border-t border-slate-100 dark:border-white/6">
-                                    {isClickable ? (
-                                      <div className="flex items-center gap-2 card-footer-actions">
-                                        <button
-                                          type="button"
-                                          onClick={(e) => { e.stopPropagation(); navigate(`/lesson/${lesson.id}`, { state: lessonNavigationState() }); }}
-                                          className="flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 text-xs font-bold text-white transition-colors shadow-sm"
-                                        >
-                                          <Play className="w-3 h-3 fill-current text-white" />
-                                          {lesson.status === 'done' ? 'Review' : 'Start Lesson'}
-                                        </button>
-                                        {(() => {
-                                          const quizzes = (lesson.blocks || []).filter((b: any) => b.purpose === 'quiz' || b.type === 'quiz');
-                                          const exercises = (lesson.blocks || []).filter((b: any) => b.purpose === 'practice' || b.purpose === 'exam' || b.type === 'practice' || b.type === 'exam');
-                                          const hasTests = quizzes.length > 0 || exercises.length > 0;
-                                          if (hasTests) {
-                                            return (
-                                              <button
-                                                type="button"
-                                                onClick={(e) => { e.stopPropagation(); navigate(`/lesson/${lesson.id}`, { state: lessonNavigationState({ startAtTest: true }) }); }}
-                                                className="rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-700 transition-colors dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:bg-surface-low flex items-center gap-1.5 shadow-sm"
-                                              >
-                                                <Target size={12} className="text-accent shrink-0" />
-                                                Take Test
-                                              </button>
-                                            );
-                                          }
-                                          return (
-                                            <button
-                                              type="button"
-                                              onClick={(e) => { e.stopPropagation(); navigate(`/lesson/${lesson.id}`, { state: lessonNavigationState() }); }}
-                                              className="rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-700 transition-colors dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:bg-surface-low"
-                                            >
-                                              View Plan
-                                            </button>
-                                          );
-                                        })()}
-                                      </div>
-                                    ) : (
-                                      <div className="flex-1 text-[11px] text-slate-500 dark:text-ink-muted font-medium pr-2 leading-relaxed">
-                                        {availabilityState === 'needs_review' 
-                                          ? 'Lesson exists but is waiting for review' 
-                                          : 'Starter lesson available for admin review'}
-                                      </div>
-                                    )}
-
-                                    {isClickable ? (
-                                      <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
-                                        lesson.status === 'done' ? 'text-emerald-700 dark:text-emerald-400' : 'text-accent'
-                                      }`}>
-                                        <span className={`h-1.5 w-1.5 rounded-full ${lesson.status === 'done' ? 'bg-emerald-500 animate-pulse' : 'bg-accent'}`} />
-                                        {lesson.status === 'done' ? 'Completed' : 'Available'}
-                                      </span>
-                                    ) : (
-                                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                                        <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
-                                        {availabilityState === 'needs_review' ? 'Under Review' : 'Draft'}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              </motion.div>
-                            );
+                                </motion.div>
+                              );
                           }) : (
                             <div className="col-span-full rounded-2xl border border-solid border-slate-200 bg-white p-5 dark:border-white/8 dark:bg-paper">
                               <p className="text-sm font-semibold text-slate-950 dark:text-ink">No lessons in this domain yet.</p>
