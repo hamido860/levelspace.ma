@@ -178,7 +178,9 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
       <div className="fixed bottom-6 right-6 z-50 group">
         <button
           disabled
-          className="w-14 h-14 bg-surface-mid text-muted rounded-full shadow-md flex items-center justify-center cursor-not-allowed opacity-60"
+          aria-label="AI help requires API key"
+          title="AI help requires API key"
+          className="w-14 h-14 bg-surface-mid text-muted rounded-full shadow-md flex items-center justify-center cursor-not-allowed opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
         >
           <MessageCircle size={24} />
         </button>
@@ -199,7 +201,9 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0, opacity: 0 }}
             onClick={() => setIsOpen(true)}
-            className="fixed bottom-6 right-6 w-14 h-14 bg-accent text-white rounded-full shadow-md flex items-center justify-center hover:bg-accent-hover hover:scale-105 transition-all z-50 group"
+            aria-label="Open AI Assistant"
+            title="Open AI Assistant"
+            className="fixed bottom-6 right-6 w-14 h-14 bg-accent text-white rounded-full shadow-md flex items-center justify-center hover:bg-accent-hover hover:scale-105 transition-all z-50 group focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
           >
             <MessageCircle size={24} className="group-hover:animate-pulse" />
             <div className="absolute -top-2 -right-2 w-4 h-4 bg-error rounded-full border-2 border-background" />
@@ -228,7 +232,9 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
               </div>
               <button 
                 onClick={() => setIsOpen(false)}
-                className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                aria-label="Close AI Assistant"
+                title="Close AI Assistant"
+                className="p-2 hover:bg-white/10 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
               >
                 <X size={18} />
               </button>
@@ -268,8 +274,9 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
                         {msg.role === 'model' && (
                           <button
                             onClick={() => handleCopy(msg.parts[0].text, i)}
-                            className="absolute right-2 top-2 p-1.5 rounded-lg bg-surface-low text-ink-muted opacity-80 hover:opacity-100 hover:text-accent transition-colors"
+                            aria-label={copiedId === i ? "Copied" : "Copy message"}
                             title="Copy message"
+                            className="absolute right-2 top-2 p-1.5 rounded-lg bg-surface-low text-ink-muted opacity-80 hover:opacity-100 hover:text-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
                           >
                             {copiedId === i ? <Check size={14} /> : <Copy size={14} />}
                           </button>
@@ -323,8 +330,9 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
                   <button
                     key={i}
                     onClick={() => handleSend(action.prompt)}
-                    className="w-8 h-8 rounded-lg bg-surface-low border border-ink/5 flex items-center justify-center text-ink-muted hover:text-accent hover:border-accent/30 hover:bg-accent-soft transition-all hover:scale-110 active:scale-95"
+                    aria-label={action.label}
                     title={action.label}
+                    className="w-8 h-8 rounded-lg bg-surface-low border border-ink/5 flex items-center justify-center text-ink-muted hover:text-accent hover:border-accent/30 hover:bg-accent-soft transition-all hover:scale-110 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
                   >
                     {action.icon}
                   </button>
@@ -392,7 +400,9 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
                   <button
                     type="submit"
                     disabled={!input.trim() || isLoading}
-                    className="w-11 h-11 shrink-0 bg-accent text-white rounded-2xl flex items-center justify-center disabled:opacity-50 disabled:hover:scale-100 hover:scale-105 transition-all"
+                    aria-label="Send message"
+                    title="Send message"
+                    className="w-11 h-11 shrink-0 bg-accent text-white rounded-2xl flex items-center justify-center disabled:opacity-50 disabled:hover:scale-100 hover:scale-105 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
                   >
                     <Send size={18} />
                   </button>
