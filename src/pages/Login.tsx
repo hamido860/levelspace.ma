@@ -185,14 +185,16 @@ export const Login: React.FC = () => {
               >
                 Sign Up
               </button>
-              <button
-                type="button"
-                onClick={handleDemoAdminLogin}
-                className="flex-1 py-2 rounded-lg text-xs font-semibold text-accent hover:bg-accent/5 transition-all flex items-center justify-center gap-1 cursor-pointer"
-              >
-                <Sparkles size={11} />
-                Demo Admin
-              </button>
+              {import.meta.env.DEV && (
+                <button
+                  type="button"
+                  onClick={handleDemoAdminLogin}
+                  className="flex-1 py-2 rounded-lg text-xs font-semibold text-accent hover:bg-accent/5 transition-all flex items-center justify-center gap-1 cursor-pointer"
+                >
+                  <Sparkles size={11} />
+                  Demo Admin
+                </button>
+              )}
             </div>
 
             {error && (
@@ -264,16 +266,18 @@ export const Login: React.FC = () => {
               </button>
             </form>
 
-            <button
-              type="button"
-              disabled={loading}
-              onClick={handleDemoAdminLogin}
-              className="w-full h-11 border border-accent/20 bg-accent/5 text-accent rounded-xl flex items-center justify-center gap-2 text-xs font-medium hover:bg-accent/10 transition-all disabled:opacity-50 cursor-pointer"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              Continue as Demo Admin
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
+            {import.meta.env.DEV && (
+              <button
+                type="button"
+                disabled={loading}
+                onClick={handleDemoAdminLogin}
+                className="w-full h-11 border border-accent/20 bg-accent/5 text-accent rounded-xl flex items-center justify-center gap-2 text-xs font-medium hover:bg-accent/10 transition-all disabled:opacity-50 cursor-pointer"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                Continue as Demo Admin
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            )}
 
             <div className="relative py-1">
               <div className="absolute inset-0 flex items-center">
