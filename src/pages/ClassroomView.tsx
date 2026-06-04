@@ -276,6 +276,8 @@ type ClassroomSupabaseLesson = {
   is_ai_generated?: boolean | null;
 };
 
+const EMPTY_ARRAY: any[] = [];
+
 export const ClassroomView: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -358,7 +360,7 @@ export const ClassroomView: React.FC = () => {
   };
 
   const module = useLiveQuery(() => id ? db.modules.get(id) : undefined, [id]);
-  const allLessons = useLiveQuery(() => id ? db.lessons.where('moduleId').equals(id).sortBy('createdAt') : [], [id]);
+  const allLessons = useLiveQuery(() => id ? db.lessons.where('moduleId').equals(id).sortBy('createdAt') : EMPTY_ARRAY, [id]);
   const lessonNavigationState = (extra: Record<string, unknown> = {}) => ({
     from: `/classroom/${id}`,
     classroomId: id,
@@ -380,7 +382,7 @@ export const ClassroomView: React.FC = () => {
 
   // Fetch all reminders/tasks to capture completed classroom checkmarks
   const remindersVal = useLiveQuery(() => db.tasks.toArray());
-  const reminders = remindersVal || [];
+  const reminders = remindersVal || EMPTY_ARRAY;
 
   // Local state to log Pomodoro focus timer starts dynamically
   const [pomodoroLogs, setPomodoroLogs] = useState<Array<{
@@ -486,7 +488,7 @@ export const ClassroomView: React.FC = () => {
       setPinnedLessonIds([]);
     }
   }, [pinStorageKey, allLessons?.length]);
-  const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
+  const dbSettings = useLiveQuery(() => db.settings.toArray()) || EMPTY_ARRAY;
   const settingsMap = useMemo(() => Object.fromEntries(dbSettings.map(s => [s.key, s.value])), [dbSettings]);
 
   const defaultDuration = Number(settingsMap['default_session_duration'] || localStorage.getItem('default_session_duration') || 25);
