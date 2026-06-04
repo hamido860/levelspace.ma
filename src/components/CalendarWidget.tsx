@@ -92,6 +92,8 @@ function EventIcon({ type }: { type: string }) {
 
 type EventEntry = { type: string; label: string; id?: string };
 
+const EMPTY_ARRAY: any[] = [];
+
 export const CalendarWidget: React.FC = () => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<Date>(new Date());
@@ -105,8 +107,8 @@ export const CalendarWidget: React.FC = () => {
 
   const isLoading = scheduleEventsVal === undefined || tasksVal === undefined;
 
-  const scheduleEvents = scheduleEventsVal ?? [];
-  const tasks = tasksVal ?? [];
+  const scheduleEvents = scheduleEventsVal ?? EMPTY_ARRAY;
+  const tasks = tasksVal ?? EMPTY_ARRAY;
 
   // Fetch current weather for Rabat, Morocco dynamically
   useEffect(() => {
