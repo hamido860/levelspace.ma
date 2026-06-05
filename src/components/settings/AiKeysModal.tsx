@@ -512,8 +512,9 @@ export const AiKeysModal: React.FC<AiKeysModalProps> = ({ isOpen, onClose, mode 
                 <button
                   type="button"
                   onClick={() => setShowKey(!showKey)}
-                  className="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-ink/5 transition-all"
+                  className="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-ink/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 transition-all"
                   title={showKey ? 'Hide key' : 'Show key'}
+                  aria-label={showKey ? 'Hide key' : 'Show key'}
                 >
                   {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>

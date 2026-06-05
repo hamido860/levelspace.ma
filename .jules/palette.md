@@ -1,3 +1,6 @@
 ## 2026-05-22 - [Added ARIA labels to Sidebar and BottomNav]
 **Learning:** Found that when `Sidebar` is collapsed, navigation items become icon-only without `aria-label`s, making them unreadable for screen readers. Toggle buttons need dynamic `aria-expanded` and `aria-label` to provide context.
 **Action:** Always check components with collapsed/icon-only visual states to ensure they have an explicit `aria-label` or `title` so screen readers still get context.
+## $(date +%Y-%m-%d) - Dynamic aria-labels on toggle state buttons
+**Learning:** Added accessibility improvements to icon-only buttons. When adding aria-labels to buttons that toggle state (like showing/hiding an API key or opening/closing a tip), it's highly effective to make the aria-label dynamic based on the state variable (e.g. \`aria-label={showKey ? 'Hide key' : 'Show key'}\`) so screen readers announce the action that *will* happen. Additionally, when using Tailwind utility classes like \`opacity-0 group-hover:opacity-100\` to hide elements until hover, one must always add \`focus:opacity-100\` alongside focus rings so they become visible when receiving keyboard focus.
+**Action:** Consistently use ternary operators for aria-labels on stateful toggle icons. Always remember to add \`focus:opacity-100\` to elements that are hidden by default and rely on hover to show.
