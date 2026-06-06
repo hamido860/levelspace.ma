@@ -43,6 +43,8 @@ import { CalendarWidget } from '../components/CalendarWidget';
 import { PlanSessionModal } from '../components/PlanSessionModal';
 import { SupportZoneModal } from '../components/SupportZoneModal';
 
+const EMPTY_ARRAY: any[] = [];
+
 const getLessonIllustration = (title: string | null | undefined, category?: string | null | undefined) => {
   const t = String(title || '').toLowerCase();
   const c = String(category || '').toLowerCase();
@@ -160,8 +162,8 @@ export const Dashboard: React.FC = () => {
   const allModulesVal = useLiveQuery(() => db.modules.toArray());
   const allLessonsVal = useLiveQuery(() => db.lessons.toArray());
   
-  const allModules = allModulesVal || [];
-  const allLessons = allLessonsVal || [];
+  const allModules = allModulesVal || EMPTY_ARRAY;
+  const allLessons = allLessonsVal || EMPTY_ARRAY;
 
   const lessonCountByModuleId = useMemo(
     () => allLessons.reduce<Record<string, number>>((acc, l) => {
@@ -202,9 +204,9 @@ export const Dashboard: React.FC = () => {
 
   const isLoading = allModulesVal === undefined || allLessonsVal === undefined || remindersVal === undefined || scheduleVal === undefined || dbSettingsVal === undefined;
   
-  const reminders = remindersVal || [];
-  const schedule = scheduleVal || [];
-  const dbSettings = dbSettingsVal || [];
+  const reminders = remindersVal || EMPTY_ARRAY;
+  const schedule = scheduleVal || EMPTY_ARRAY;
+  const dbSettings = dbSettingsVal || EMPTY_ARRAY;
   const settingsMap = useMemo(() => Object.fromEntries(dbSettings.map(s => [s.key, s.value])), [dbSettings]);
 
   const selectedGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
