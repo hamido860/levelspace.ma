@@ -674,20 +674,22 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
                   <button
                     type="button"
                     onClick={() => toggleSpeak(getBlockReadText(currentBlock))}
-                    className={`w-7 h-7 rounded-full flex items-center justify-center border transition-all ${
+                    className={`w-7 h-7 rounded-full flex items-center justify-center border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 ${
                       isSpeaking 
                         ? 'bg-accent/15 border-accent text-accent animate-pulse' 
                         : 'border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:border-white/10 dark:hover:bg-surface-mid'
                     }`}
-                    title="Read Aloud"
+                    title={isSpeaking ? "Stop reading aloud" : "Read aloud"}
+                    aria-label={isSpeaking ? "Stop reading aloud" : "Read aloud"}
                   >
                     <Volume2 size={13} />
                   </button>
                   <button
                     type="button"
                     onClick={() => handleAskAITutor(currentBlock)}
-                    className="w-7 h-7 rounded-full flex items-center justify-center border border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:border-white/10 dark:hover:bg-surface-mid"
+                    className="w-7 h-7 rounded-full flex items-center justify-center border border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:border-white/10 dark:hover:bg-surface-mid focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
                     title="Ask AI Assistant"
+                    aria-label="Ask AI Assistant"
                   >
                     <Bot size={13} />
                   </button>
@@ -885,7 +887,9 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
               </button>
               <button
                 onClick={onTimerReset}
-                className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-700 transition-all dark:bg-surface-mid dark:text-ink-muted"
+                className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-700 transition-all dark:bg-surface-mid dark:text-ink-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
+                aria-label="Reset Timer"
+                title="Reset Timer"
               >
                 <RefreshCw size={14} />
               </button>
