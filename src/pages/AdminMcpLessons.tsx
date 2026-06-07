@@ -111,8 +111,10 @@ const getCurriculumPath = (row: ReviewRow, trackByTopic: Map<string, TrackRow>) 
   return [level, track, subject].filter(Boolean).join(" > ");
 };
 
+const EMPTY_ARRAY: any[] = []; // Optimization: Stable array reference to prevent cascading React re-renders
+
 export const AdminMcpLessons: React.FC = () => {
-  const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
+  const dbSettings = useLiveQuery(() => db.settings.toArray()) || EMPTY_ARRAY;
   const settingsMap = useMemo(() => Object.fromEntries(dbSettings.map((setting) => [setting.key, setting.value])), [dbSettings]);
   const activeGrade = String(settingsMap.selected_grade || localStorage.getItem("selected_grade") || "");
   const activeTrackId = String(settingsMap.selected_bac_track || localStorage.getItem("selected_bac_track") || "");
