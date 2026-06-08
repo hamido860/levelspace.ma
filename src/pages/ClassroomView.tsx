@@ -276,6 +276,8 @@ type ClassroomSupabaseLesson = {
   is_ai_generated?: boolean | null;
 };
 
+const EMPTY_ARRAY: any[] = [];
+
 export const ClassroomView: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -307,7 +309,7 @@ export const ClassroomView: React.FC = () => {
   const handleRandomizeAllBanners = () => {
     const newColors: Record<string, string> = {};
     const newBanners: Record<string, string> = {};
-    const allItems = [...(allLessons || []), ...(curriculumTopicRows || []), ...(topicFallbackRows || [])];
+    const allItems = [...(allLessons || EMPTY_ARRAY), ...(curriculumTopicRows || []), ...(topicFallbackRows || [])];
     allItems.forEach(item => {
       if (item.id) {
         newColors[item.id] = randomCardGradient();
@@ -358,7 +360,7 @@ export const ClassroomView: React.FC = () => {
   };
 
   const module = useLiveQuery(() => id ? db.modules.get(id) : undefined, [id]);
-  const allLessons = useLiveQuery(() => id ? db.lessons.where('moduleId').equals(id).sortBy('createdAt') : [], [id]);
+  const allLessons = useLiveQuery(() => id ? db.lessons.where('moduleId').equals(id).sortBy('createdAt') : EMPTY_ARRAY, [id]);
   const lessonNavigationState = (extra: Record<string, unknown> = {}) => ({
     from: `/classroom/${id}`,
     classroomId: id,
@@ -369,7 +371,7 @@ export const ClassroomView: React.FC = () => {
   });
 
   // Fetch notes for all lessons in this classroom
-  const lessonIds = useMemo(() => (allLessons || []).map(l => l.id), [allLessons]);
+  const lessonIds = useMemo(() => (allLessons || EMPTY_ARRAY).map(l => l.id), [allLessons]);
   const classroomNotes = useLiveQuery(
     async () => {
       if (lessonIds.length === 0) return [];
@@ -380,7 +382,7 @@ export const ClassroomView: React.FC = () => {
 
   // Fetch all reminders/tasks to capture completed classroom checkmarks
   const remindersVal = useLiveQuery(() => db.tasks.toArray());
-  const reminders = remindersVal || [];
+  const reminders = remindersVal || EMPTY_ARRAY;
 
   // Local state to log Pomodoro focus timer starts dynamically
   const [pomodoroLogs, setPomodoroLogs] = useState<Array<{
@@ -403,7 +405,7 @@ export const ClassroomView: React.FC = () => {
     }> = [];
 
     // 1. Completed & Pending Lessons
-    (allLessons || []).forEach(lesson => {
+    (allLessons || EMPTY_ARRAY).forEach(lesson => {
       if (lesson.status === 'done') {
         logs.push({
           id: `completed-${lesson.id}`,
@@ -486,7 +488,7 @@ export const ClassroomView: React.FC = () => {
       setPinnedLessonIds([]);
     }
   }, [pinStorageKey, allLessons?.length]);
-  const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
+  const dbSettings = useLiveQuery(() => db.settings.toArray()) || EMPTY_ARRAY;
   const settingsMap = useMemo(() => Object.fromEntries(dbSettings.map(s => [s.key, s.value])), [dbSettings]);
 
   const defaultDuration = Number(settingsMap['default_session_duration'] || localStorage.getItem('default_session_duration') || 25);
@@ -562,7 +564,7 @@ export const ClassroomView: React.FC = () => {
   const normalizedCurrentCountry = String(currentCountry || '').trim().toLocaleLowerCase();
   const filteredScopeLessons = useMemo(
     () =>
-      (allLessons || []).filter((lesson) => {
+      (allLessons || EMPTY_ARRAY).filter((lesson) => {
         if (lesson.status === 'suggested') return false;
 
         const lessonGrade = String(lesson.grade || '').trim().toLocaleLowerCase();
@@ -1160,7 +1162,7 @@ export const ClassroomView: React.FC = () => {
       }
 
       // Check database first
-      const existingSuggestions = (allLessons || []).filter((lesson) => {
+      const existingSuggestions = (allLessons || EMPTY_ARRAY).filter((lesson) => {
         if (lesson.status !== 'suggested') return false;
 
         const lessonGrade = String(lesson.grade || '').trim().toLocaleLowerCase();
