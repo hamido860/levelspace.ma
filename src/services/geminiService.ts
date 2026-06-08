@@ -1,6 +1,5 @@
 import { Type } from "@google/genai";
 import { jsonrepair } from "jsonrepair";
-import { moroccanAcademicDb } from "../data/moroccan_academic_db";
 import { toast } from "sonner";
 import { db } from "../db/db";
 import { supabase } from "../db/supabase";
@@ -1102,7 +1101,7 @@ export const getLessonPrompt = (
     1. Be precise, academic, and engaging.
     2. Use Markdown for formatting within the "content" fields.
     3. Provide 2-3 exercises, 2-3 quizzes, and 1 exam-style question.
-    4. Keep the total content length under 8000 characters to ensure complete JSON generation.
+    4. Write a complete teaching lesson with enough depth for classroom use. Target 12,000-16,000 characters total, while keeping the JSON valid.
     5. ILLUSTRATIONS: You MUST include 1-2 relevant illustrations in the lesson content using Markdown image syntax. Use the format: ![Alt text](https://picsum.photos/seed/{keyword}/800/400) where {keyword} is a single, highly relevant English word (e.g., physics, biology, history, geography).
     6. MATH FORMATTING: Use clean LaTeX formatting for all math equations (e.g., $x^2$ for inline, $$x^2$$ for block). Do NOT output raw text like "lim x->x0".
     7. PEDAGOGY & STRUCTURE: The lesson content MUST follow a strict pedagogical structure:
@@ -1247,7 +1246,7 @@ export const generateFullLesson = async (
 
     const config: any = {
       responseMimeType: "application/json",
-      maxOutputTokens: 5000,
+      maxOutputTokens: 8192,
       responseSchema: {
         type: Type.OBJECT,
         properties: {
@@ -1433,7 +1432,7 @@ export const generateCurriculum = async (
 
     let extraContext = "";
     if (country === "MA" || country === "Morocco") {
-      extraContext = `\n\nUse the following Moroccan academic structure as a reference for the curriculum:\n${JSON.stringify(moroccanAcademicDb, null, 2)}\n
+      extraContext = `\n\nUse the connected Supabase curriculum data as the source of truth for Moroccan academic structure.\n
       CRITICAL HIERARCHY RULES FOR MOROCCO:
       1. Primary Education (1ère - 6ème année primaire) is for children aged 6-12. Subjects are basic.
       2. Lower Secondary (Collège) is for ages 12-15.
@@ -1540,6 +1539,7 @@ export const generateSeedLesson = async (
     // 1. Check Cache
     const cacheKey = getCacheKey(
       "generateSeedLesson",
+      "v3-depth",
       moduleName,
       grade,
       country,
@@ -1558,12 +1558,13 @@ export const generateSeedLesson = async (
         ? `\nUse this existing curriculum as chaining context to stay consistent:\n<CONTEXT>\n${existingContext}\n</CONTEXT>`
         : "";
 
-    const basePrompt = `Generate a concise introductory seed lesson for the classroom "${moduleName}" for a student in ${country} at the ${grade} level.
-The lesson must be engaging and structured into blocks: definition, rules, worked examples, a multiple-choice quiz, a practice exercise, and a national exam style question.
+    const basePrompt = `Generate a complete classroom seed lesson for "${moduleName}" for a student in ${country} at the ${grade} level.
+The lesson must be substantial enough for a real study session and structured into blocks: definition, rules, worked examples, a multiple-choice quiz, a practice exercise, and a national exam style question.
 ${ragInstruction}
 
 CONSTRAINTS:
-- Keep total content under 3000 characters.
+- Target 8,000-12,000 characters total while keeping the JSON valid.
+- Include enough explanation, examples, and step-by-step reasoning that the lesson does not feel like a summary.
 - Use Markdown inside "content" and "question" fields.
 - No walls of text: use bullet points, bold key terms, short paragraphs.
 - Write entirely in the official language of instruction for "${moduleName}" in ${country} for ${grade} (e.g. Arabic for Philosophy/History in Morocco, French for Sciences/Math).
@@ -1585,7 +1586,7 @@ Return ONLY valid JSON (no markdown fences) matching this exact structure:
     // ── Primary: NVIDIA (free tier, no Gemini quota consumed) ─────────────────
     if (getNvidiaApiKey()) {
       try {
-        const nvidiaText = await callNvidiaAPI({ prompt: basePrompt, isJson: true, maxTokens: 4096 });
+        const nvidiaText = await callNvidiaAPI({ prompt: basePrompt, isJson: true, maxTokens: 7000 });
         if (nvidiaText) {
           const parsed = safeJsonParse(nvidiaText) as AILesson;
           if (parsed?.title && Array.isArray(parsed.blocks)) {
@@ -1602,15 +1603,15 @@ Return ONLY valid JSON (no markdown fences) matching this exact structure:
     const response = await generateContentWithFallback(
       {
         model: modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]),
-        contents: `Generate a concise introductory seed lesson for the classroom "${moduleName}" for a student in ${country} at the ${grade} level.
-      The lesson should be engaging and structured into specific blocks: definition, rules, worked examples, a multiple-choice quiz, a practice exercise, and a national exam style question.
+        contents: `Generate a complete classroom seed lesson for "${moduleName}" for a student in ${country} at the ${grade} level.
+      The lesson should be substantial enough for a real study session and structured into specific blocks: definition, rules, worked examples, a multiple-choice quiz, a practice exercise, and a national exam style question.
       ${ragInstruction}
       
       CRITICAL CONSTRAINTS:
-      1. Keep the total content length under 3000 characters to ensure complete JSON generation.
+      1. Target 8,000-12,000 characters total while keeping the JSON valid.
       2. Be precise and academic.
       3. Use Markdown for formatting within the "content" and "question" fields.
-      4. Ensure each block is concise. For example, the "content" should be no more than 800 characters.
+      4. Ensure each block has real teaching depth: explanations, examples, common mistakes, and step-by-step reasoning where useful.
       5. FORMATTING & READABILITY: You MUST avoid "walls of text". 
          - **Never** write a dense wall of text. Break concepts into bullet points.
          - **Definitions** must be clear and concise.

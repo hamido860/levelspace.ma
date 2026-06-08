@@ -1,4 +1,8 @@
 import { supabase } from '../db/supabase';
+import {
+  isSupportedCycleName,
+  isSupportedGrade,
+} from '../config/supportedGrades';
 
 export type CurriculumCycle = {
   id: string;
@@ -27,7 +31,7 @@ export type CurriculumTopic = {
   subject_id: string;
 };
 
-const isDev = () => import.meta.env.DEV;
+const isDev = () => Boolean(import.meta.env?.DEV);
 
 const first = <T,>(value: T | T[] | null | undefined): T | null =>
   Array.isArray(value) ? value[0] ?? null : value ?? null;
@@ -72,16 +76,60 @@ const normalizeSubject = (row: any): CurriculumSubject | null => {
   };
 };
 
+const getSupportedCycles = async (): Promise<CurriculumCycle[]> => {
+  const { data, error } = await supabase
+    .from('cycles')
+    .select('id, name, curricula(country)');
+
+  if (error) throw error;
+
+  return (data || [])
+    .map((row: any) => {
+      const curriculum = first(row?.curricula);
+      return {
+        id: clean(row?.id),
+        name: clean(row?.name),
+        country: clean(curriculum?.country) || null,
+      };
+    })
+    .filter((cycle): cycle is CurriculumCycle => Boolean(cycle.id) && isSupportedCycleName(cycle.name));
+};
+
 export const getGrades = async (): Promise<CurriculumGrade[]> => {
+  const supportedCycles = await getSupportedCycles();
+  const supportedCycleById = new Map(supportedCycles.map((cycle) => [cycle.id, cycle]));
+  const supportedCycleIds = supportedCycles.map((cycle) => cycle.id);
+
+  if (supportedCycleIds.length === 0) {
+    if (isDev()) {
+      console.warn('[onboarding curriculum] No supported Collège/Lycée cycles returned from Supabase.');
+    }
+    return [];
+  }
+
   const { data, error } = await supabase
     .from('grades')
-    .select('id, name, cycle_id, cycles(id, name, curricula(country))');
+    .select('id, name, cycle_id, cycles(id, name, curricula(country))')
+    .in('cycle_id', supportedCycleIds);
 
   if (error) throw error;
 
   const grades = (data || [])
-    .map(normalizeGrade)
+    .map((row) => {
+      const normalized = normalizeGrade(row);
+      const supportedCycle = normalized?.cycle_id ? supportedCycleById.get(normalized.cycle_id) : null;
+      if (!normalized || !supportedCycle) return null;
+      return {
+        ...normalized,
+        cycle: {
+          id: supportedCycle.id,
+          name: supportedCycle.name,
+          country: supportedCycle.country,
+        },
+      };
+    })
     .filter((grade): grade is CurriculumGrade => Boolean(grade))
+    .filter((grade) => isSupportedGrade(grade.name, grade.cycle?.name))
     .sort(byName);
 
   if (isDev() && grades.length === 0) {
@@ -94,6 +142,16 @@ export const getGrades = async (): Promise<CurriculumGrade[]> => {
 export const getSubjectsForGrade = async (gradeId: string): Promise<CurriculumSubject[]> => {
   const safeGradeId = clean(gradeId);
   if (!safeGradeId) return [];
+
+  const supportedGrades = await getGrades();
+  if (!supportedGrades.some((grade) => grade.id === safeGradeId)) {
+    if (isDev()) {
+      console.warn('[onboarding curriculum] Rejected subjects request for unsupported grade.', {
+        gradeId: safeGradeId,
+      });
+    }
+    return [];
+  }
 
   const { data, error } = await supabase
     .from('grade_subjects')
@@ -120,6 +178,11 @@ export const getTopicsForGradeSubject = async (
   gradeId: string,
   subjectId: string,
 ): Promise<CurriculumTopic[]> => {
+  const supportedGrades = await getGrades();
+  if (!supportedGrades.some((grade) => grade.id === clean(gradeId))) {
+    return [];
+  }
+
   const { data, error } = await supabase
     .from('topics')
     .select('id, title, grade_id, subject_id')
@@ -140,6 +203,11 @@ export const getTopicsForGradeSubject = async (
 };
 
 export const validateGradeSubjectPair = async (gradeId: string, subjectId: string) => {
+  const supportedGrades = await getGrades();
+  if (!supportedGrades.some((grade) => grade.id === clean(gradeId))) {
+    return false;
+  }
+
   const { data, error } = await supabase
     .from('grade_subjects')
     .select('grade_id, subject_id')
