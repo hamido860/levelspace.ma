@@ -187,6 +187,8 @@ const PendingLessonView: React.FC<{ title: string; lessonId: string; onReady: ()
   );
 };
 
+const EMPTY_ARRAY: any[] = [];
+
 export const LessonView: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -464,7 +466,7 @@ export const LessonView: React.FC = () => {
   // Use moduleId from effective lesson, falling back to subject_id from curriculum or the lesson's own module
   const targetModuleId = effectiveLesson?.moduleId || curriculumContext?.subject_id || lesson?.moduleId;
   const lessonsInModule = useLiveQuery(
-    () => (targetModuleId ? db.lessons.where('moduleId').equals(targetModuleId).sortBy('createdAt') : Promise.resolve([])),
+    () => (targetModuleId ? db.lessons.where('moduleId').equals(targetModuleId).sortBy('createdAt') : Promise.resolve(EMPTY_ARRAY)),
     [targetModuleId]
   );
 
@@ -479,7 +481,7 @@ export const LessonView: React.FC = () => {
   const orderedLessons = curriculumOrderedLessons.length > 0 ? curriculumOrderedLessons : localOrderedLessons;
 
   // Fetch notes for all lessons in this classroom/module
-  const lessonIdsForNotes = useMemo(() => (orderedLessons || []).map(l => l.id), [orderedLessons]);
+  const lessonIdsForNotes = useMemo(() => (orderedLessons || EMPTY_ARRAY).map(l => l.id), [orderedLessons]);
   const classroomNotes = useLiveQuery(
     async () => {
       if (lessonIdsForNotes.length === 0) return [];
@@ -490,7 +492,7 @@ export const LessonView: React.FC = () => {
 
   // Fetch all reminders/tasks to capture completed classroom checkmarks
   const remindersVal = useLiveQuery(() => db.tasks.toArray());
-  const reminders = remindersVal || [];
+  const reminders = remindersVal || EMPTY_ARRAY;
 
   // Local state to log Pomodoro focus timer starts dynamically
   const [pomodoroLogs, setPomodoroLogs] = useState<Array<{
@@ -503,7 +505,7 @@ export const LessonView: React.FC = () => {
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
 
-  const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
+  const dbSettings = useLiveQuery(() => db.settings.toArray()) || EMPTY_ARRAY;
   const settingsMap = useMemo(() => Object.fromEntries(dbSettings.map(s => [s.key, s.value])), [dbSettings]);
   const defaultDuration = Number(settingsMap['default_session_duration'] || localStorage.getItem('default_session_duration') || 25);
   const currentGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
@@ -549,7 +551,7 @@ export const LessonView: React.FC = () => {
     }> = [];
 
     // 1. Completed & Pending Lessons
-    (orderedLessons || []).forEach(lesson => {
+    (orderedLessons || EMPTY_ARRAY).forEach(lesson => {
       if (lesson.status === 'done') {
         logs.push({
           id: `completed-${lesson.id}`,
