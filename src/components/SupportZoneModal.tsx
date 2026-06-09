@@ -314,6 +314,7 @@ export const SupportZoneModal: React.FC<SupportZoneModalProps> = ({
             </div>
             <button
               onClick={onClose}
+              aria-label="Close modal"
               className="w-9 h-9 rounded-full hover:bg-ink/5 flex items-center justify-center text-muted transition-colors"
             >
               <X size={18} />

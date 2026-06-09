@@ -178,6 +178,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
       <div className="fixed bottom-6 right-6 z-50 group">
         <button
           disabled
+          aria-label="Open AI Assistant"
           className="w-14 h-14 bg-surface-mid text-muted rounded-full shadow-md flex items-center justify-center cursor-not-allowed opacity-60"
         >
           <MessageCircle size={24} />
@@ -199,6 +200,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0, opacity: 0 }}
             onClick={() => setIsOpen(true)}
+            aria-label="Open AI Assistant"
             className="fixed bottom-6 right-6 w-14 h-14 bg-accent text-white rounded-full shadow-md flex items-center justify-center hover:bg-accent-hover hover:scale-105 transition-all z-50 group"
           >
             <MessageCircle size={24} className="group-hover:animate-pulse" />
@@ -228,6 +230,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
               </div>
               <button 
                 onClick={() => setIsOpen(false)}
+                aria-label="Close Assistant"
                 className="p-2 hover:bg-white/10 rounded-full transition-colors"
               >
                 <X size={18} />
@@ -270,6 +273,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
                             onClick={() => handleCopy(msg.parts[0].text, i)}
                             className="absolute right-2 top-2 p-1.5 rounded-lg bg-surface-low text-ink-muted opacity-80 hover:opacity-100 hover:text-accent transition-colors"
                             title="Copy message"
+                            aria-label="Copy message"
                           >
                             {copiedId === i ? <Check size={14} /> : <Copy size={14} />}
                           </button>
