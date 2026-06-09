@@ -59,6 +59,7 @@ CREATE POLICY "Allow authenticated delete" ON public.bac_track_subjects FOR DELE
           </div>
           <button
             onClick={onClose}
+            aria-label="Close modal"
             className="p-2 hover:bg-surface-mid rounded-xl transition-colors text-ink-muted"
           >
             <X size={20} />
