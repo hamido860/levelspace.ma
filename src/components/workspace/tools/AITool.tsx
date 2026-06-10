@@ -126,8 +126,9 @@ export const AITool: React.FC<AIToolProps> = ({ tool, state, onChange, lessonCon
         {response && (
           <button
             onClick={handleCopy}
-            className="p-2 bg-paper border border-ink/5 rounded-lg text-muted hover:text-accent transition-colors"
+            className="p-2 bg-paper border border-ink/5 rounded-lg text-muted hover:text-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
             title="Copy Response"
+            aria-label="Copy Response"
           >
             {copied ? <Check size={16} /> : <Copy size={16} />}
           </button>
@@ -147,7 +148,8 @@ export const AITool: React.FC<AIToolProps> = ({ tool, state, onChange, lessonCon
             <button
               onClick={generateAIResponse}
               disabled={isGenerating || !input.trim()}
-              className="absolute right-3 bottom-3 p-2 bg-accent text-white rounded-lg hover:bg-ink transition-all disabled:opacity-50"
+              className="absolute right-3 bottom-3 p-2 bg-accent text-white rounded-lg hover:bg-ink transition-all disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
+              aria-label="Send Query"
             >
               {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             </button>
@@ -180,7 +182,7 @@ export const AITool: React.FC<AIToolProps> = ({ tool, state, onChange, lessonCon
               {tool.id === 'notes-generator' && (
                 <button
                   onClick={generateAIResponse}
-                  className="px-6 py-3 bg-accent text-white rounded-xl text-xs font-bold uppercase tracking-normal hover:bg-ink transition-all shadow-sm shadow-accent/20"
+                  className="px-6 py-3 bg-accent text-white rounded-xl text-xs font-bold uppercase tracking-normal hover:bg-ink transition-all shadow-sm shadow-accent/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
                 >
                   Generate Summary
                 </button>
