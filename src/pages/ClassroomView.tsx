@@ -1904,7 +1904,7 @@ export const ClassroomView: React.FC = () => {
                         </div>
                       ) : (
                         // GRID MODE
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-6">
                         {Array.isArray(lessons) && lessons.length > 0 ? (
                           visibleLessons.length > 0 ? visibleLessons.map((lesson, i) => {
                             const isClickable = isAdmin || isStudentVisibleLesson(lesson);
@@ -2235,7 +2235,7 @@ export const ClassroomView: React.FC = () => {
                   {isLoadingExtra ? (
                     <div className="flex justify-center p-8"><Loader2 className="animate-spin text-accent" /></div>
                   ) : quizzes.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {quizzes.map((quiz) => (
                         <div 
                           key={quiz.id} 
@@ -2270,7 +2270,7 @@ export const ClassroomView: React.FC = () => {
                   {isLoadingExtra ? (
                     <div className="flex justify-center p-8"><Loader2 className="animate-spin text-accent" /></div>
                   ) : exercises.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {exercises.map((exercise) => (
                         <div 
                           key={exercise.id} 
@@ -2335,7 +2335,7 @@ export const ClassroomView: React.FC = () => {
                         </button>
                       </div>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-6">
                       {Array.isArray(suggestions) && suggestions.map((suggestion, i) => {
                         const isSelected = selectedSuggestions.includes(suggestion.title);
                         const isThisGenerating = generatingTitle === suggestion.title;
