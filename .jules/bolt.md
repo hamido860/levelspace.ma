@@ -4,3 +4,6 @@
 ## 2026-05-22 - Dexie array derivations
 **Learning:** The same pattern from the 2024-05-09 entry (Dexie live queries returning raw arrays that get transformed into derived objects causing cascading re-renders) also affects array filtering and mapping operations like `.filter()` and `.map()`.
 **Action:** Wrap all complex array derivations off of `useLiveQuery` arrays in `useMemo`.
+## 2024-05-14 - [Memoizing Dashboard Reminders] Learning:
+**Learning:** Found an inline array derivation (`.filter().sort()`) inside the render cycle of `src/pages/Dashboard.tsx` that was running every second because of a ticking Pomodoro timer. Extracting this out using `useMemo` stops the re-evaluations.
+**Action:** Always scan components with frequent timer or interval updates (like countdowns) to ensure they aren't needlessly performing expensive array or object derivations on every tick.
