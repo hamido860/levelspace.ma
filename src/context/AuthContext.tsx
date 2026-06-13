@@ -42,6 +42,25 @@ const createDemoAdminProfile = () => ({
   onboarding_completed: true,
 });
 
+const syncAcademicSettingsFromProfile = async (profile: any) => {
+  const academicSettings = [
+    ['selected_grade_id', profile?.selected_grade_id || profile?.grade_id],
+    ['selected_grade', profile?.selected_grade],
+    ['selected_bac_track', profile?.selected_bac_track || profile?.track_id],
+    ['selected_option', profile?.selected_option || profile?.instruction_option_id],
+  ].filter(([, value]) => typeof value === 'string' && value.trim());
+
+  if (academicSettings.length === 0) return;
+
+  await db.settings.bulkPut(
+    academicSettings.map(([key, value]) => ({
+      key,
+      value,
+    })),
+  );
+  academicSettings.forEach(([key, value]) => localStorage.setItem(key, value));
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -95,12 +114,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const cachedProfile = await db.settings.get(`profile_${currentSession.user.id}`);
         if (cachedProfile) {
           setProfile(cachedProfile.value);
+          await syncAcademicSettingsFromProfile(cachedProfile.value);
         }
 
         const userProfile = await getProfile(currentSession.user.id);
         if (userProfile) {
           setProfile(userProfile);
           await db.settings.put({ key: `profile_${currentSession.user.id}`, value: userProfile });
+          await syncAcademicSettingsFromProfile(userProfile);
         }
       } else if (localStorage.getItem(DEMO_ADMIN_STORAGE_KEY) === 'true') {
         await applyDemoAdminAuth();

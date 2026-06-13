@@ -1,7 +1,10 @@
 import React from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { UserProfile } from './UserProfile';
 import { SearchBar } from './SearchBar';
 import { ActionIcons } from './ActionIcons';
+import { useAuth } from '../../context/AuthContext';
+import { db } from '../../db/db';
 
 interface TopbarProps {
   isCollapsed?: boolean;
@@ -9,7 +12,20 @@ interface TopbarProps {
 }
 
 export const Topbar: React.FC<TopbarProps> = ({ isCollapsed = false, gradeOverride }) => {
-  const currentGrade = gradeOverride || localStorage.getItem('selected_grade') || 'Grade 12';
+  const { profile, loading } = useAuth();
+  const dbSettings = useLiveQuery(() => db.settings.toArray(), []);
+  const settingsMap = React.useMemo(
+    () => Object.fromEntries((dbSettings || []).map((setting) => [setting.key, setting.value])),
+    [dbSettings],
+  );
+  const browserGrade = localStorage.getItem('selected_grade') || '';
+  const hasPersistedAcademicGrade = Boolean(profile?.selected_grade || settingsMap.selected_grade);
+  const currentGrade =
+    gradeOverride ||
+    profile?.selected_grade ||
+    settingsMap.selected_grade ||
+    (browserGrade === 'Grade 12' && !hasPersistedAcademicGrade ? '' : browserGrade) ||
+    (loading || dbSettings === undefined ? 'Loading...' : 'Set grade');
 
   return (
     <header

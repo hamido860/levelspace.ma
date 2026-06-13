@@ -287,6 +287,10 @@ export const ClassroomView: React.FC = () => {
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
   const { t } = useLanguage();
+  const label = (key: string, fallback: string) => {
+    const translated = t(key);
+    return translated && translated !== key ? translated : fallback;
+  };
   const [generatingTitle, setGeneratingTitle] = useState<string | null>(null);
   const [isFetchingGallery, setIsFetchingGallery] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
@@ -534,7 +538,7 @@ export const ClassroomView: React.FC = () => {
     }
   }, [isTimerRunning]);
 
-  const currentGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
+  const currentGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || '';
   const currentCountry = settingsMap['selected_country'] || localStorage.getItem('selected_country') || '';
   const selectedBacTrack = settingsMap['selected_bac_track'] || localStorage.getItem('selected_bac_track') || '';
   const selectedInstructionOptionId = String(settingsMap['selected_bac_int_option'] || localStorage.getItem('selected_bac_int_option') || '');
@@ -1572,14 +1576,14 @@ export const ClassroomView: React.FC = () => {
   return (
     <Layout fullWidth>
       <SEO title={module.name || "Classroom"} />
-      <div className="min-h-full w-full bg-background flex flex-col overflow-visible p-3 sm:p-4 md:h-full md:overflow-hidden">
+      <div className="min-h-full w-full bg-background flex flex-col overflow-visible p-3 pb-24 pt-5 sm:p-4 sm:pb-24 md:h-full md:overflow-hidden md:pb-4 md:pt-6">
         
         {/* Symmetrical Layout Container */}
         <div className="flex-1 min-h-0 w-full flex flex-col md:flex-row gap-3 overflow-visible md:overflow-hidden">
           
           {/* Column 2: Main Classroom Content (Middle Column, flex-grow) */}
           <div className="flex-1 min-w-0 flex flex-col min-h-0 w-full overflow-visible bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 p-4 sm:p-6 md:overflow-hidden">
-            <div className="flex-1 overflow-visible md:overflow-y-auto no-scrollbar flex flex-col gap-6">
+            <div className="flex-1 overflow-visible pb-8 md:overflow-y-auto md:pb-16 no-scrollbar flex flex-col gap-6">
               
               {/* Page Header */}
               <div className="border-b border-slate-100 dark:border-white/5 pb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between shrink-0">
@@ -1658,17 +1662,17 @@ export const ClassroomView: React.FC = () => {
               )}
 
               {showSetupState ? (
-                <div className="bg-slate-50/50 border border-solid border-slate-200 rounded-xl p-10 md:p-14 flex flex-col items-center justify-center text-center space-y-6">
+                <div className="bg-slate-50/50 border border-solid border-slate-200 dark:border-white/8 dark:bg-surface-low/40 rounded-xl p-8 sm:p-10 md:p-14 flex flex-col items-center justify-center text-center space-y-6">
                   <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm">
                     <BookOpen size={24} className="text-accent" />
                   </div>
                   <div className="space-y-2 max-w-md">
-                    <p className="text-2xl font-bold text-slate-950">{t('start_here') || 'Set up this classroom'}</p>
-                    <p className="ls-body-text">{t('start_here_desc') || 'Generate draft AI content, or load officially validated module titles.'}</p>
+                    <p className="text-2xl font-bold text-slate-950 dark:text-ink">{label('start_here', 'Set up this classroom')}</p>
+                    <p className="ls-body-text">{label('start_here_desc', 'Generate draft AI content, or load officially validated module titles.')}</p>
                   </div>
                   {!aiAvailable && (
                     <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 w-full max-w-md">
-                      <p className="text-xs text-amber-800 font-medium">{t('ai_key_needed') || 'AI features need an API key, but you can still load certified module titles right now.'}</p>
+                      <p className="text-xs text-amber-800 font-medium">{label('ai_key_needed', 'AI features need an API key, but you can still load certified module titles right now.')}</p>
                     </div>
                   )}
                   <div className="flex flex-col sm:flex-row gap-3 w-full max-w-md mt-4">
@@ -1679,7 +1683,7 @@ export const ClassroomView: React.FC = () => {
                         className="flex-1 flex items-center justify-center gap-2 bg-accent text-white px-4 py-3.5 rounded-xl text-sm font-bold shadow-sm shadow-accent/20 hover:bg-accent/90 transition-all disabled:opacity-50"
                       >
                         {generatingTitle === module.name ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-                        {t('generate_first_lesson') || 'Generate First Lesson'}
+                        {label('generate_first_lesson', 'Generate First Lesson')}
                       </button>
                     )}
                     <button
@@ -1688,7 +1692,7 @@ export const ClassroomView: React.FC = () => {
                       className="flex-1 flex items-center justify-center gap-2 bg-white text-slate-950 px-4 py-3.5 rounded-xl text-sm font-bold border border-slate-200 hover:border-accent/30 hover:text-accent transition-all disabled:opacity-50"
                     >
                       {isSeeding ? <Loader2 size={16} className="animate-spin" /> : <Database size={16} />}
-                      {isSeeding ? t('loading') || 'Loading...' : t('load_from_supabase') || 'Load from Supabase'}
+                      {isSeeding ? label('loading', 'Loading...') : label('load_from_supabase', 'Load from Supabase')}
                     </button>
                   </div>
                 </div>

@@ -132,7 +132,7 @@ export const Settings: React.FC = () => {
 
   const [selectedCountry, setSelectedCountry] = useState('');
   const [selectedGradeId, setSelectedGradeId] = useState<string>('');
-  const [selectedGrade, setSelectedGrade] = useState<string>('Grade 12');
+  const [selectedGrade, setSelectedGrade] = useState<string>('');
   
   // Baccalaureate Options State
   const [bacSection, setBacSection] = useState("");

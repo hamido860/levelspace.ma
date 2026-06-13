@@ -522,7 +522,7 @@ export const LessonView: React.FC = () => {
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
 
   const defaultDuration = Number(settingsMap['default_session_duration'] || localStorage.getItem('default_session_duration') || 25);
-  const currentGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
+  const currentGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || '';
 
   useEffect(() => {
     if (defaultDuration) {

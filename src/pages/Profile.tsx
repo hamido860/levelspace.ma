@@ -19,15 +19,20 @@ import { Layout } from '../components/Layout';
 import { SEO } from '../components/SEO';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
-import { useAppSettings } from '../context/AppSettingsContext';
 import { supabase } from '../db/supabase';
 import { AiKeysModal } from '../components/settings/AiKeysModal';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../db/db';
 
 export const Profile: React.FC = () => {
   const navigate = useNavigate();
-  const { user, profile } = useAuth();
+  const { user, profile, loading } = useAuth();
   const { t } = useLanguage();
-  const { settings } = useAppSettings();
+  const dbSettings = useLiveQuery(() => db.settings.toArray(), []);
+  const settings = React.useMemo(
+    () => Object.fromEntries((dbSettings || []).map((setting) => [setting.key, setting.value])),
+    [dbSettings],
+  );
   const [isAiKeysOpen, setIsAiKeysOpen] = React.useState(false);
   const [timerSeconds, setTimerSeconds] = React.useState(25 * 60);
   const [isTimerRunning, setIsTimerRunning] = React.useState(false);
@@ -43,9 +48,16 @@ export const Profile: React.FC = () => {
   }, [isTimerRunning]);
   const formatTime = (s: number) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
-  const selectedGrade = settings['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
-  const selectedCountry = settings['selected_country'] || localStorage.getItem('selected_country') || '';
-  const selectedBacTrackId = settings['selected_bac_track'] || localStorage.getItem('selected_bac_track') || '';
+  const isAcademicLoading = loading || dbSettings === undefined;
+  const browserGrade = localStorage.getItem('selected_grade') || '';
+  const hasPersistedAcademicGrade = Boolean(profile?.selected_grade || settings.selected_grade);
+  const selectedGrade =
+    profile?.selected_grade ||
+    settings.selected_grade ||
+    (browserGrade === 'Grade 12' && !hasPersistedAcademicGrade ? '' : browserGrade) ||
+    (isAcademicLoading ? 'Loading...' : '');
+  const selectedCountry = settings.selected_country || localStorage.getItem('selected_country') || '';
+  const selectedBacTrackId = profile?.selected_bac_track || settings.selected_bac_track || localStorage.getItem('selected_bac_track') || '';
 
   const [bacTrackName, setBacTrackName] = React.useState<string>('');
 
@@ -109,7 +121,7 @@ export const Profile: React.FC = () => {
                         {profile?.full_name || user?.email?.split('@')[0] || 'Scholar'}
                       </h1>
                       <span className="inline-flex max-w-full self-center truncate rounded-full bg-ink px-3 py-1 text-[10px] font-bold uppercase tracking-normal text-paper md:self-auto">
-                        Academic Level: {selectedGrade}
+                        Academic Level: {selectedGrade || 'Not set'}
                       </span>
                       {bacTrackName && (
                         <span className="inline-flex max-w-full self-center truncate rounded-full border border-accent/20 bg-accent/10 px-3 py-1 text-[10px] font-bold uppercase tracking-normal text-accent md:self-auto">
@@ -124,7 +136,7 @@ export const Profile: React.FC = () => {
                     <div className="flex flex-wrap justify-center md:justify-start gap-4 pt-2">
                       <div className="flex items-center gap-2 text-xs font-medium text-muted">
                         <Globe className="w-3.5 h-3.5" />
-                        {selectedCountry}
+                        {selectedCountry || 'Not set'}
                       </div>
                     </div>
                   </div>
@@ -165,7 +177,7 @@ export const Profile: React.FC = () => {
                   <div className="space-y-3">
                     <div className="flex items-center gap-3 p-4 bg-background rounded-2xl border border-ink/5">
                       <div className="w-9 h-9 rounded-xl bg-accent/5 flex items-center justify-center text-accent"><GraduationCap className="w-5 h-5" /></div>
-                      <div><p className="text-[10px] font-bold text-muted uppercase tracking-normal">Grade Level</p><p className="text-sm font-medium text-ink">{selectedGrade}</p></div>
+                      <div><p className="text-[10px] font-bold text-muted uppercase tracking-normal">Grade Level</p><p className="text-sm font-medium text-ink">{selectedGrade || 'Not set'}</p></div>
                     </div>
                     {bacTrackName && (
                       <div className="flex items-center gap-3 p-4 bg-background rounded-2xl border border-ink/5">
@@ -175,7 +187,7 @@ export const Profile: React.FC = () => {
                     )}
                     <div className="flex items-center gap-3 p-4 bg-background rounded-2xl border border-ink/5">
                       <div className="w-9 h-9 rounded-xl bg-accent/5 flex items-center justify-center text-accent"><Globe className="w-5 h-5" /></div>
-                      <div><p className="text-[10px] font-bold text-muted uppercase tracking-normal">Region</p><p className="text-sm font-medium text-ink">{selectedCountry}</p></div>
+                      <div><p className="text-[10px] font-bold text-muted uppercase tracking-normal">Region</p><p className="text-sm font-medium text-ink">{selectedCountry || 'Not set'}</p></div>
                     </div>
                   </div>
                 </div>

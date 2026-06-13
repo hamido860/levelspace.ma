@@ -350,7 +350,7 @@ export const Modules: React.FC = () => {
   const settingsMap = useMemo(() => Object.fromEntries(dbSettings.map(s => [s.key, s.value])), [dbSettings]);
 
   const country = settingsMap['selected_country'] || localStorage.getItem('selected_country') || '';
-  const grade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
+  const grade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || '';
   const selectedBacTrackId = settingsMap['selected_bac_track'] || localStorage.getItem('selected_bac_track') || '';
   const selectedBacIntOptionId = settingsMap['selected_bac_int_option'] || localStorage.getItem('selected_bac_int_option') || '';
   const classroomScopeKey = [

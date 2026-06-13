@@ -207,7 +207,7 @@ export const Dashboard: React.FC = () => {
   const dbSettings = dbSettingsVal || [];
   const settingsMap = useMemo(() => Object.fromEntries(dbSettings.map(s => [s.key, s.value])), [dbSettings]);
 
-  const selectedGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
+  const selectedGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || '';
   const selectedCountry = settingsMap['selected_country'] || localStorage.getItem('selected_country') || '';
   const currentSession = settingsMap['current_session'] || localStorage.getItem('current_session') || 'Fall 2024';
   const defaultDuration = Number(settingsMap['default_session_duration'] || localStorage.getItem('default_session_duration') || 25);
