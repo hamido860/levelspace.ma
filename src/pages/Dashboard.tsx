@@ -203,6 +203,17 @@ export const Dashboard: React.FC = () => {
   const isLoading = allModulesVal === undefined || allLessonsVal === undefined || remindersVal === undefined || scheduleVal === undefined || dbSettingsVal === undefined;
   
   const reminders = remindersVal || [];
+
+  // ⚡ Bolt: Memoize filtered and sorted active reminders.
+  // Before: Filtered and sorted inside JSX, causing NlogN operations on every tick of the Pomodoro timer.
+  // After: Prevents unnecessary operations by memoizing derived array until reminders change.
+  const activeReminders = useMemo(() => {
+    return reminders
+      .filter(r => !r.completed)
+      .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
+      .slice(0, 5);
+  }, [reminders]);
+
   const schedule = scheduleVal || [];
   const dbSettings = dbSettingsVal || [];
   const settingsMap = useMemo(() => Object.fromEntries(dbSettings.map(s => [s.key, s.value])), [dbSettings]);
@@ -441,11 +452,8 @@ export const Dashboard: React.FC = () => {
                       <div className="py-12 flex justify-center items-center">
                         <Loader2 className="w-5 h-5 text-accent animate-spin" />
                       </div>
-                    ) : reminders.filter(r => !r.completed).length > 0 ? (
-                      reminders
-                        .filter(r => !r.completed)
-                        .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
-                        .slice(0, 5)
+                    ) : activeReminders.length > 0 ? (
+                      activeReminders
                         .map((reminder, i) => (
                           <motion.div 
                             key={reminder.id}

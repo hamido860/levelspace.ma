@@ -4,3 +4,6 @@
 ## 2026-05-22 - Dexie array derivations
 **Learning:** The same pattern from the 2024-05-09 entry (Dexie live queries returning raw arrays that get transformed into derived objects causing cascading re-renders) also affects array filtering and mapping operations like `.filter()` and `.map()`.
 **Action:** Wrap all complex array derivations off of `useLiveQuery` arrays in `useMemo`.
+## 2024-05-30 - Memoize filtering when combined with high-frequency state updates
+**Learning:** In components with high-frequency state updates (like a Pomodoro timer ticking every second using `setInterval`), performing array filtering, sorting, or slicing directly inside JSX is a performance anti-pattern. Even if the array elements don't change, the derivation itself (`.filter()`, `.sort()`, `.slice()`) creates a new array reference and forces a costly O(N log N) recalculation on every single tick, unnecessarily blocking the main thread and wasting CPU cycles.
+**Action:** Extract expensive array derivations from the render cycle into a `useMemo` hook that depends solely on the underlying array data (`[reminders]`). This ensures the sorting and filtering only runs when the actual source array changes, completely bypassing the operation during timer ticks.
