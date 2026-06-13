@@ -11,12 +11,12 @@ import {
   CheckCircle2,
   Search,
   ChevronDown,
+  ChevronRight,
   X,
   FlaskConical,
   BookOpen,
   Library,
   Brain,
-  Check,
   ArrowRight,
   Languages,
   Target,
@@ -55,28 +55,37 @@ const parseStoredArray = (value: unknown): string[] => {
   }
 };
 
-const CAREER_GOALS = [
-  'Doctor',
-  'Engineer',
-  'Scientist',
-  'Teacher',
-  'Designer',
-  'Entrepreneur',
-  'Lawyer',
-  'Still exploring',
-] as const;
-
-const TONE_OPTIONS = ['Encouraging', 'Calm', 'Direct', 'Coach-like'] as const;
-const EXPLANATION_STYLES = ['Step by step', 'Simple', 'Exam-focused', 'Real-world'] as const;
-const MOTIVATION_FOCUS_OPTIONS = ['Confidence', 'Career', 'Grades', 'Discipline'] as const;
-
 const ACADEMIC_SETTING_KEYS = [
   'selected_country',
+  'selected_grade_id',
   'selected_grade',
   'selected_bac_section',
   'selected_bac_track',
   'selected_bac_int_option',
 ] as const;
+
+const resolveSelectedGradeId = async (selectedGrade: string) => {
+  const rawGrade = selectedGrade.trim();
+  if (!rawGrade) return null;
+
+  const { data: gradeId, error } = await supabase.rpc('resolve_grade_id', {
+    raw_grade: rawGrade,
+  });
+
+  if (error) {
+    console.warn('Failed to resolve grade id:', error.message);
+    return null;
+  }
+
+  return typeof gradeId === 'string' && gradeId.trim() ? gradeId : null;
+};
+
+type GradeOption = {
+  id: string;
+  cycle_id: string;
+  name: string;
+  grade_order: number | null;
+};
 
 const PROVIDER_LABELS: Record<string, string> = {
   gemini: 'Gemini',
@@ -122,6 +131,7 @@ export const Settings: React.FC = () => {
   const [isAiKeysOpen, setIsAiKeysOpen] = useState(false);
 
   const [selectedCountry, setSelectedCountry] = useState('');
+  const [selectedGradeId, setSelectedGradeId] = useState<string>('');
   const [selectedGrade, setSelectedGrade] = useState<string>('Grade 12');
   
   // Baccalaureate Options State
@@ -134,15 +144,6 @@ export const Settings: React.FC = () => {
   const [dbBacIntOptions, setDbBacIntOptions] = useState<any[]>([]);
   const [dbBacTrackIntOptions, setDbBacTrackIntOptions] = useState<any[]>([]);
 
-  const [careerGoal, setCareerGoal] = useState<string>('Still exploring');
-  const [careerGoalCustom, setCareerGoalCustom] = useState('');
-  const [hobbies, setHobbies] = useState<string[]>([]);
-  const [targetSkills, setTargetSkills] = useState<string[]>([]);
-  const [hobbyInput, setHobbyInput] = useState('');
-  const [targetSkillInput, setTargetSkillInput] = useState('');
-  const [preferredTone, setPreferredTone] = useState<string>('Encouraging');
-  const [preferredExplanationStyle, setPreferredExplanationStyle] = useState<string>('Step by step');
-  const [motivationFocus, setMotivationFocus] = useState<string>('Confidence');
   const [currentSession, setCurrentSession] = useState<string>('Fall 2024');
   const [defaultDuration, setDefaultDuration] = useState<number>(60);
   const [aiProvider, setAiProvider] = useState<'gemini' | 'nvidia' | 'openrouter' | 'openai'>('gemini');
@@ -188,37 +189,25 @@ export const Settings: React.FC = () => {
     const getStoredValue = (key: string) => localStorage.getItem(key) ?? settingsMap[key];
 
     const country = getStoredValue('selected_country');
+    const gradeId = getStoredValue('selected_grade_id');
     const grade = getStoredValue('selected_grade');
     const session = getStoredValue('current_session');
     const duration = getStoredValue('default_session_duration');
     const section = getStoredValue('selected_bac_section');
     const track = getStoredValue('selected_bac_track');
     const option = getStoredValue('selected_bac_int_option');
-    const storedCareerGoal = getStoredValue('career_goal');
-    const storedCareerGoalCustom = getStoredValue('career_goal_custom');
-    const storedHobbies = getStoredValue('hobbies');
-    const storedTargetSkills = getStoredValue('target_skills');
-    const storedTone = getStoredValue('preferred_tone');
-    const storedExplanationStyle = getStoredValue('preferred_explanation_style');
-    const storedMotivationFocus = getStoredValue('motivation_focus');
     const storedAiProvider = getStoredValue('ai_provider');
     const storedAiModel = getStoredValue('ai_model');
     const storedAiFallbackEnabled = getStoredValue('ai_fallback_enabled');
 
     if (country) setSelectedCountry(String(country));
+    if (gradeId) setSelectedGradeId(String(gradeId));
     if (grade) setSelectedGrade(String(grade));
     if (session) setCurrentSession(String(session));
     if (duration) setDefaultDuration(Number(duration));
     if (section) setBacSection(String(section));
     if (track) setBacTrack(String(track));
     if (option) setBacIntOption(String(option));
-    if (storedCareerGoal) setCareerGoal(String(storedCareerGoal));
-    if (storedCareerGoalCustom) setCareerGoalCustom(String(storedCareerGoalCustom));
-    if (storedHobbies) setHobbies(parseStoredArray(storedHobbies));
-    if (storedTargetSkills) setTargetSkills(parseStoredArray(storedTargetSkills));
-    if (storedTone) setPreferredTone(String(storedTone));
-    if (storedExplanationStyle) setPreferredExplanationStyle(String(storedExplanationStyle));
-    if (storedMotivationFocus) setMotivationFocus(String(storedMotivationFocus));
     if (storedAiProvider === 'gemini' || storedAiProvider === 'nvidia') setAiProvider(storedAiProvider);
     if (storedAiModel) setAiModel(String(storedAiModel));
     if (storedAiFallbackEnabled !== undefined && storedAiFallbackEnabled !== null) setAiFallbackEnabled(String(storedAiFallbackEnabled) !== 'false');
@@ -252,15 +241,9 @@ export const Settings: React.FC = () => {
     { id: 'interest_tech', label: t('tech'), icon: <Brain className="w-4 h-4" /> },
   ];
 
-  const goals = [
-    { id: 'goal_exam_prep', label: t('exam_prep') },
-    { id: 'goal_skill_dev', label: t('skill_dev') },
-    { id: 'goal_general_learning', label: t('general_learning') },
-    { id: 'goal_career_transition', label: t('career_transition') },
-  ];
-
   const [dbCountries, setDbCountries] = useState<{code: string, name: string}[]>([]);
   const [dbGrades, setDbGrades] = useState<Record<string, string[]>>({});
+  const [dbGradeOptions, setDbGradeOptions] = useState<Record<string, GradeOption[]>>({});
 
   useEffect(() => {
     const fetchMetadata = async () => {
@@ -276,13 +259,30 @@ export const Settings: React.FC = () => {
         });
         
         const gradesMap: Record<string, string[]> = {};
+        const gradeOptionsMap: Record<string, GradeOption[]> = {};
         const { data: cyclesData } = await supabase.from('cycles').select('id, curriculum_id');
-        const { data: gradesData } = await supabase.from('grades').select('id, cycle_id, name');
+        const { data: gradesData } = await supabase
+          .from('grades')
+          .select('id, cycle_id, name, grade_order')
+          .order('grade_order', { ascending: true })
+          .order('name', { ascending: true });
           
         if (cyclesData && gradesData) {
           curriculaData.forEach(curriculum => {
             const countryCycles = cyclesData.filter(c => c.curriculum_id === curriculum.id);
-            const countryGrades = gradesData.filter(g => countryCycles.some(c => c.id === g.cycle_id));
+            const countryGrades = gradesData
+              .filter((grade): grade is GradeOption => (
+                typeof grade.id === 'string' &&
+                typeof grade.cycle_id === 'string' &&
+                typeof grade.name === 'string' &&
+                countryCycles.some(c => c.id === grade.cycle_id)
+              ))
+              .sort((a, b) => {
+                const orderA = typeof a.grade_order === 'number' ? a.grade_order : Number.MAX_SAFE_INTEGER;
+                const orderB = typeof b.grade_order === 'number' ? b.grade_order : Number.MAX_SAFE_INTEGER;
+                return orderA - orderB || a.name.localeCompare(b.name);
+              });
+            gradeOptionsMap[curriculum.country] = countryGrades;
             gradesMap[curriculum.country] = countryGrades.map(g => g.name);
           });
         }
@@ -292,6 +292,7 @@ export const Settings: React.FC = () => {
           setSelectedCountry(prev => prev || countries[0].code);
         }
         if (Object.keys(gradesMap).length > 0) setDbGrades(gradesMap);
+        if (Object.keys(gradeOptionsMap).length > 0) setDbGradeOptions(gradeOptionsMap);
 
         // Fetch Baccalaureate data
         const { data: sectionsData } = await supabase.from('bac_sections').select('*');
@@ -313,14 +314,26 @@ export const Settings: React.FC = () => {
   }, []);
 
   const availableCountries = dbCountries;
+  const currentGradeOptions = dbGradeOptions[selectedCountry] || [];
   const currentGrades = dbGrades[selectedCountry] || [];
 
   // Sync grade when country changes if current grade is not in the new system
   useEffect(() => {
-    if (currentGrades && currentGrades.length > 0 && !currentGrades.includes(selectedGrade)) {
-      setSelectedGrade(currentGrades[0]);
+    if (currentGradeOptions.length === 0) return;
+
+    const selectedOption = currentGradeOptions.find((grade) => (
+      grade.id === selectedGradeId || grade.name === selectedGrade
+    ));
+
+    if (selectedOption) {
+      if (selectedOption.id !== selectedGradeId) setSelectedGradeId(selectedOption.id);
+      if (selectedOption.name !== selectedGrade) setSelectedGrade(selectedOption.name);
+      return;
     }
-  }, [selectedCountry, currentGrades, selectedGrade]);
+
+    setSelectedGradeId(currentGradeOptions[0].id);
+    setSelectedGrade(currentGradeOptions[0].name);
+  }, [currentGradeOptions, selectedGrade, selectedGradeId]);
 
   const filteredCountries = availableCountries.filter(c => 
     c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -330,9 +343,12 @@ export const Settings: React.FC = () => {
   const currentCountryName = availableCountries.find(c => c.code === selectedCountry)?.name || selectedCountry;
   const selectedSectionName = dbBacSections.find((section) => section.id === bacSection)?.name || '';
   const selectedTrackName = dbBacTracks.find((track) => track.id === bacTrack)?.name || '';
-  const selectedOptionName = dbBacIntOptions.find((option) => option.id === bacIntOption)?.name || '';
+  const selectedInstructionOption = dbBacIntOptions.find((option) => option.id === bacIntOption);
+  const selectedOptionName = selectedInstructionOption?.name || '';
+  const selectedOptionCode = selectedInstructionOption?.code || selectedInstructionOption?.name || '';
   const lockedAcademicValues = useMemo(() => ({
     selected_country: String(settingsMap.selected_country || 'Morocco'),
+    selected_grade_id: String(profile?.selected_grade_id || settingsMap.selected_grade_id || selectedGradeId || ''),
     selected_grade: String(profile?.selected_grade || settingsMap.selected_grade || selectedGrade),
     selected_bac_section: String(settingsMap.selected_bac_section || ''),
     selected_bac_track: String(profile?.selected_bac_track || settingsMap.selected_bac_track || ''),
@@ -340,9 +356,12 @@ export const Settings: React.FC = () => {
   }), [
     profile?.selected_bac_track,
     profile?.selected_grade,
+    profile?.selected_grade_id,
+    selectedGradeId,
     selectedGrade,
     settingsMap.selected_bac_int_option,
     settingsMap.selected_bac_section,
+    settingsMap.selected_grade_id,
     settingsMap.selected_bac_track,
     settingsMap.selected_country,
     settingsMap.selected_grade,
@@ -385,10 +404,15 @@ export const Settings: React.FC = () => {
   }, [isAdmin, isLocked, lockedAcademicValues]);
 
   const handleSave = async () => {
+    const resolvedGradeId = isLocked && !isAdmin
+      ? lockedAcademicValues.selected_grade_id
+      : selectedGradeId || await resolveSelectedGradeId(selectedGrade);
+
     const academicValues = isLocked && !isAdmin
       ? lockedAcademicValues
       : {
         selected_country: selectedCountry,
+        selected_grade_id: resolvedGradeId || '',
         selected_grade: selectedGrade,
         selected_bac_section: bacSection,
         selected_bac_track: bacTrack,
@@ -396,19 +420,13 @@ export const Settings: React.FC = () => {
       };
 
     localStorage.setItem('selected_country', academicValues.selected_country);
+    localStorage.setItem('selected_grade_id', academicValues.selected_grade_id);
     localStorage.setItem('selected_grade', academicValues.selected_grade);
     localStorage.setItem('current_session', currentSession);
     localStorage.setItem('default_session_duration', defaultDuration.toString());
     localStorage.setItem('selected_bac_section', academicValues.selected_bac_section);
     localStorage.setItem('selected_bac_track', academicValues.selected_bac_track);
     localStorage.setItem('selected_bac_int_option', academicValues.selected_bac_int_option);
-    localStorage.setItem('career_goal', careerGoal);
-    localStorage.setItem('career_goal_custom', careerGoalCustom);
-    localStorage.setItem('hobbies', JSON.stringify(hobbies));
-    localStorage.setItem('target_skills', JSON.stringify(targetSkills));
-    localStorage.setItem('preferred_tone', preferredTone);
-    localStorage.setItem('preferred_explanation_style', preferredExplanationStyle);
-    localStorage.setItem('motivation_focus', motivationFocus);
     localStorage.setItem('ai_provider', aiProvider);
     localStorage.setItem('ai_model', aiModel);
     localStorage.setItem('ai_fallback_enabled', String(aiFallbackEnabled));
@@ -421,19 +439,13 @@ export const Settings: React.FC = () => {
 
     await db.settings.bulkPut([
       { key: 'selected_country', value: academicValues.selected_country },
+      { key: 'selected_grade_id', value: academicValues.selected_grade_id },
       { key: 'selected_grade', value: academicValues.selected_grade },
       { key: 'current_session', value: currentSession },
       { key: 'default_session_duration', value: defaultDuration },
       { key: 'selected_bac_section', value: academicValues.selected_bac_section },
       { key: 'selected_bac_track', value: academicValues.selected_bac_track },
       { key: 'selected_bac_int_option', value: academicValues.selected_bac_int_option },
-      { key: 'career_goal', value: careerGoal },
-      { key: 'career_goal_custom', value: careerGoalCustom },
-      { key: 'hobbies', value: hobbies },
-      { key: 'target_skills', value: targetSkills },
-      { key: 'preferred_tone', value: preferredTone },
-      { key: 'preferred_explanation_style', value: preferredExplanationStyle },
-      { key: 'motivation_focus', value: motivationFocus },
       { key: 'ai_provider', value: aiProvider },
       { key: 'ai_model', value: aiModel },
       { key: 'ai_fallback_enabled', value: aiFallbackEnabled },
@@ -448,8 +460,14 @@ export const Settings: React.FC = () => {
     if (user && (!isLocked || isAdmin)) {
       try {
         await updateProfile(user.id, {
+          grade_id: academicValues.selected_grade_id || null,
+          instruction_option_id: academicValues.selected_bac_int_option || null,
+          track_id: null,
           selected_grade: academicValues.selected_grade,
-          selected_bac_track: academicValues.selected_bac_track || null,
+          selected_grade_id: academicValues.selected_grade_id || null,
+          selected_option: selectedOptionCode || null,
+          selected_bac_track: null,
+          onboarding_completed: true,
         });
       } catch (err: any) {
         console.error('Failed to save academic profile:', err.message);
@@ -461,40 +479,20 @@ export const Settings: React.FC = () => {
     setTimeout(() => setIsSaved(false), 3000);
   };
 
-  const addToken = (
-    value: string,
-    setter: React.Dispatch<React.SetStateAction<string[]>>,
-    reset: () => void
-  ) => {
-    const trimmed = value.trim();
-    if (!trimmed) return;
-
-    setter((prev) => {
-      if (prev.some((item) => item.toLowerCase() === trimmed.toLowerCase())) {
-        return prev;
-      }
-      return [...prev, trimmed];
-    });
-    reset();
-  };
-
-  const removeToken = (value: string, setter: React.Dispatch<React.SetStateAction<string[]>>) => {
-    setter((prev) => prev.filter((item) => item !== value));
-  };
-
   const setupProgress = [
     { label: t('region'), completed: !!selectedCountry },
     { label: t('grade'), completed: !!selectedGrade },
-    { label: 'Future goal', completed: !!careerGoal },
-    { label: 'Target skills', completed: targetSkills.length > 0 },
   ].filter(s => s.completed).length;
 
-  const progressPercentage = (setupProgress / 4) * 100;
+  const progressPercentage = (setupProgress / 2) * 100;
 
   return (
-    <Layout>
+    <Layout fullWidth>
       <SEO title="Settings" />
-      <div className="max-w-4xl mx-auto space-y-12 py-8 px-4 pb-32">
+      <div className="h-full w-full bg-background flex flex-col overflow-hidden p-4">
+        <div className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-4 overflow-hidden">
+          <main className="flex-grow flex flex-col min-h-0 w-full overflow-hidden rounded-xl border border-slate-200 bg-white p-5 shadow-lg dark:border-white/8 dark:bg-paper md:p-6">
+            <div className="flex-grow overflow-y-auto pr-1 no-scrollbar">
         {/* Page Header */}
         <div className="border-b border-slate-100 dark:border-white/5 pb-5 mb-6">
           <h1 className="ls-page-title text-slate-950 dark:text-ink">
@@ -531,38 +529,38 @@ export const Settings: React.FC = () => {
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="grid grid-cols-1 md:grid-cols-2 gap-4"
+            className="grid grid-cols-1 gap-4 xl:grid-cols-3 xl:items-start"
           >
-            <section className="p-6 bg-paper border border-ink/5 rounded-xl space-y-5 shadow-sm md:col-span-2">
-              <div className="flex items-start justify-between gap-4">
+            <section className="bg-paper border border-ink/5 rounded-xl space-y-5 p-5 shadow-sm xl:col-span-3">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-accent/5 rounded-2xl flex items-center justify-center text-accent shrink-0">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/5 text-accent">
                     <GraduationCap className="w-5 h-5" />
                   </div>
                   <div className="space-y-1">
                     <h2 className="text-lg font-medium text-ink">{t('academic_identity')}</h2>
                     <p className="text-xs text-muted leading-relaxed">
-                      {t('academic_identity_desc')}
+                      Keep the official curriculum tied to the selected country, grade, track, and instruction option.
                     </p>
                   </div>
                 </div>
-                <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${isLocked ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-700 border border-amber-500/20'}`}>
+                <div className={`w-fit shrink-0 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-normal ${isLocked ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-700 border border-amber-500/20'}`}>
                   {isLocked ? t('locked_after_onboarding') : t('editable_for_setup')}
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div className="p-4 rounded-2xl border border-ink/5 bg-surface-low space-y-1">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div className="min-w-0 space-y-1 rounded-xl border border-ink/5 bg-surface-low p-4">
                   <span className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('country')}</span>
                   <p className="text-sm font-semibold text-ink">{currentCountryName || t('not_set')}</p>
                 </div>
-                <div className="p-4 rounded-2xl border border-ink/5 bg-surface-low space-y-1">
+                <div className="min-w-0 space-y-1 rounded-xl border border-ink/5 bg-surface-low p-4">
                   <span className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('grade')}</span>
-                  <p className="text-sm font-semibold text-ink">{selectedGrade || t('not_set')}</p>
+                  <p className="truncate text-sm font-semibold text-ink">{selectedGrade || t('not_set')}</p>
                 </div>
-                <div className="p-4 rounded-2xl border border-ink/5 bg-surface-low space-y-1">
+                <div className="min-w-0 space-y-1 rounded-xl border border-ink/5 bg-surface-low p-4">
                   <span className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('track')}</span>
-                  <p className="text-sm font-semibold text-ink">{selectedTrackName || selectedSectionName || t('not_set')}</p>
+                  <p className="truncate text-sm font-semibold text-ink">{selectedTrackName || selectedSectionName || t('not_set')}</p>
                   {selectedOptionName && <p className="text-[11px] text-muted">{selectedOptionName}</p>}
                 </div>
               </div>
@@ -572,7 +570,7 @@ export const Settings: React.FC = () => {
                   {t('locked_academic_desc')}
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
                   <div className="space-y-4">
                     <div className="space-y-2">
                       <label className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('country')}</label>
@@ -635,12 +633,45 @@ export const Settings: React.FC = () => {
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('grade')}</label>
-                      <div key={selectedCountry} className="grid grid-cols-1 gap-2 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
-                        {currentGrades.map((grade, index) => (
+                      <label className="text-[10px] font-bold uppercase tracking-normal text-muted">Current stage</label>
+                      <div key={selectedCountry} className="grid max-h-[340px] grid-cols-1 gap-2 overflow-y-auto pr-2 custom-scrollbar">
+                        {currentGradeOptions.length > 0 ? currentGradeOptions.map((grade) => (
+                          <button
+                            key={grade.id}
+                            onClick={() => {
+                              setSelectedGradeId(grade.id);
+                              setSelectedGrade(grade.name);
+                            }}
+                            className={`flex min-h-[70px] items-center justify-between gap-3 rounded-xl border p-3 text-left transition-all ${
+                              selectedGradeId === grade.id
+                                ? 'bg-accent border-accent text-paper shadow-sm shadow-accent/20'
+                                : 'bg-background border-ink/5 text-ink hover:border-accent/30'
+                            }`}
+                          >
+                            <span className="flex min-w-0 items-center gap-3">
+                              <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-bold ${
+                                selectedGradeId === grade.id ? 'bg-paper/15 text-paper' : 'bg-accent/8 text-accent'
+                              }`}>
+                                {typeof grade.grade_order === 'number' ? grade.grade_order : '-'}
+                              </span>
+                              <span className="min-w-0">
+                                <span className="block truncate text-sm font-semibold leading-tight">{grade.name}</span>
+                                <span className={`mt-1 block text-[10px] font-medium uppercase tracking-normal ${
+                                  selectedGradeId === grade.id ? 'text-paper/70' : 'text-muted'
+                                }`}>
+                                  {selectedGradeId === grade.id ? 'Selected stage' : 'Available stage'}
+                                </span>
+                              </span>
+                            </span>
+                            {selectedGradeId === grade.id && <CheckCircle2 className="w-3.5 h-3.5 text-paper shrink-0" />}
+                          </button>
+                        )) : currentGrades.map((grade, index) => (
                           <button
                             key={`${grade}-${index}`}
-                            onClick={() => setSelectedGrade(grade)}
+                            onClick={() => {
+                              setSelectedGradeId('');
+                              setSelectedGrade(grade);
+                            }}
                             className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
                               selectedGrade === grade
                                 ? 'bg-accent border-accent text-paper shadow-sm shadow-accent/20'
@@ -652,6 +683,23 @@ export const Settings: React.FC = () => {
                           </button>
                         ))}
                       </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 rounded-xl border border-ink/5 bg-surface-low/40 p-4">
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('session')}</p>
+                      <p className="text-sm font-semibold text-ink">{currentSession}</p>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-background">
+                      <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${progressPercentage}%` }} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-[10px] text-muted">
+                      <span>{setupProgress}/2 setup items</span>
+                      <span className="text-right">{defaultDuration} min default</span>
+                    </div>
+                    <div className="rounded-xl border border-ink/5 bg-background p-3 text-[10px] leading-relaxed text-muted">
+                      {isSaved ? t('settings_saved') : t('pending_changes')}
                     </div>
                   </div>
 
@@ -750,203 +798,7 @@ export const Settings: React.FC = () => {
               )}
             </section>
 
-            <section className="p-5 bg-paper border border-ink/5 rounded-xl space-y-5 shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-accent/5 rounded-lg flex items-center justify-center text-accent">
-                  <Target className="w-4 h-4" />
-                </div>
-                <div className="space-y-0.5">
-                  <h2 className="text-base font-medium text-ink leading-tight">{t('future_goals')}</h2>
-                  <p className="text-[10px] text-muted/60 leading-tight">{t('future_goals_desc')}</p>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('career_direction')}</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {CAREER_GOALS.map((goal) => (
-                      <button
-                        key={goal}
-                        onClick={() => setCareerGoal(goal)}
-                        className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
-                          careerGoal === goal
-                            ? 'bg-ink border-ink text-paper shadow-sm shadow-ink/20'
-                            : 'bg-background border-ink/5 text-ink hover:border-accent/30'
-                        }`}
-                      >
-                        <span className="text-xs font-medium">{goal}</span>
-                        {careerGoal === goal && <Check className="w-3.5 h-3.5 text-accent" />}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('custom_goal')}</label>
-                  <input
-                    type="text"
-                    value={careerGoalCustom}
-                    onChange={(e) => setCareerGoalCustom(e.target.value)}
-                    placeholder={t('custom_goal_placeholder')}
-                    className="w-full p-3 bg-background border border-ink/5 rounded-xl text-sm outline-none focus:ring-1 focus:ring-accent/20"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('hobbies_interests')}</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={hobbyInput}
-                      onChange={(e) => setHobbyInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          addToken(hobbyInput, setHobbies, () => setHobbyInput(''));
-                        }
-                      }}
-                      placeholder={t('hobbies_placeholder')}
-                      className="flex-1 p-3 bg-background border border-ink/5 rounded-xl text-sm outline-none focus:ring-1 focus:ring-accent/20"
-                    />
-                    <button
-                      onClick={() => addToken(hobbyInput, setHobbies, () => setHobbyInput(''))}
-                      className="px-4 py-3 rounded-xl bg-ink text-paper text-[10px] font-bold uppercase tracking-normal"
-                    >
-                      {t('add')}
-                    </button>
-                  </div>
-                  {hobbies.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {hobbies.map((item) => (
-                        <button
-                          key={item}
-                          onClick={() => removeToken(item, setHobbies)}
-                          className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-accent/8 text-accent text-xs font-semibold"
-                        >
-                          {item}
-                          <X className="w-3 h-3" />
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </section>
-
-            <section className="p-5 bg-paper border border-ink/5 rounded-xl space-y-5 shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-accent/5 rounded-lg flex items-center justify-center text-accent">
-                  <Brain className="w-4 h-4" />
-                </div>
-                <div className="space-y-0.5">
-                  <h2 className="text-base font-medium text-ink leading-tight">{t('learning_style')}</h2>
-                  <p className="text-[10px] text-muted/60 leading-tight">{t('learning_style_desc')}</p>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('target_skills')}</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={targetSkillInput}
-                      onChange={(e) => setTargetSkillInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          addToken(targetSkillInput, setTargetSkills, () => setTargetSkillInput(''));
-                        }
-                      }}
-                      placeholder={t('target_skills_placeholder')}
-                      className="flex-1 p-3 bg-background border border-ink/5 rounded-xl text-sm outline-none focus:ring-1 focus:ring-accent/20"
-                    />
-                    <button
-                      onClick={() => addToken(targetSkillInput, setTargetSkills, () => setTargetSkillInput(''))}
-                      className="px-4 py-3 rounded-xl bg-ink text-paper text-[10px] font-bold uppercase tracking-normal"
-                    >
-                      {t('add')}
-                    </button>
-                  </div>
-                  {targetSkills.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {targetSkills.map((item) => (
-                        <button
-                          key={item}
-                          onClick={() => removeToken(item, setTargetSkills)}
-                          className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-ink text-paper text-xs font-semibold"
-                        >
-                          {item}
-                          <X className="w-3 h-3 text-accent" />
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 gap-3">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('preferred_tone')}</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {TONE_OPTIONS.map((option) => (
-                        <button
-                          key={option}
-                          onClick={() => setPreferredTone(option)}
-                          className={`p-3 rounded-xl border text-xs font-medium transition-all ${
-                            preferredTone === option
-                              ? 'bg-accent border-accent text-paper'
-                              : 'bg-background border-ink/5 text-ink hover:border-accent/30'
-                          }`}
-                        >
-                          {option}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('explanation_style')}</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {EXPLANATION_STYLES.map((option) => (
-                        <button
-                          key={option}
-                          onClick={() => setPreferredExplanationStyle(option)}
-                          className={`p-3 rounded-xl border text-xs font-medium transition-all ${
-                            preferredExplanationStyle === option
-                              ? 'bg-accent border-accent text-paper'
-                              : 'bg-background border-ink/5 text-ink hover:border-accent/30'
-                          }`}
-                        >
-                          {option}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('motivation_focus')}</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {MOTIVATION_FOCUS_OPTIONS.map((option) => (
-                        <button
-                          key={option}
-                          onClick={() => setMotivationFocus(option)}
-                          className={`p-3 rounded-xl border text-xs font-medium transition-all ${
-                            motivationFocus === option
-                              ? 'bg-ink border-ink text-paper'
-                              : 'bg-background border-ink/5 text-ink hover:border-accent/30'
-                          }`}
-                        >
-                          {option}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            <section className="p-5 bg-paper border border-ink/5 rounded-xl space-y-5 shadow-sm md:col-span-2">
+            <section className="p-5 bg-paper border border-ink/5 rounded-xl space-y-5 shadow-sm md:col-span-2 xl:col-span-1">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 bg-accent/5 rounded-lg flex items-center justify-center text-accent">
                   <Cloud className="w-4 h-4" />
@@ -957,7 +809,7 @@ export const Settings: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4 items-center">
+              <div className="grid grid-cols-1 gap-4">
                 <div className="p-4 bg-surface-low rounded-2xl border border-ink/5 flex items-center justify-between gap-4">
                   <div className="space-y-1">
                     <p className="text-xs font-bold text-ink uppercase tracking-normal">{t('supabase_connection')}</p>
@@ -991,7 +843,7 @@ export const Settings: React.FC = () => {
                     }
                   }}
                   disabled={isSyncing || !dbConnected}
-                  className="w-full md:w-auto flex items-center justify-center gap-3 px-6 py-4 bg-accent text-paper rounded-2xl font-bold text-xs uppercase tracking-normal hover:bg-accent-hover transition-all shadow-sm shadow-accent/20 disabled:opacity-50"
+                  className="flex w-full items-center justify-center gap-3 rounded-xl bg-accent px-5 py-4 text-xs font-bold uppercase tracking-normal text-paper shadow-sm shadow-accent/20 transition-all hover:bg-accent-hover disabled:opacity-50"
                 >
                   {isSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Cloud className="w-4 h-4" />}
                   {isSyncing ? t('synchronizing') : t('sync_all_data')}
@@ -1725,47 +1577,119 @@ export const Settings: React.FC = () => {
           </motion.div>
         )}
 
-        {/* Action Bar */}
-        <div className="sticky bottom-8 z-40">
-          <div className="p-6 bg-ink text-paper rounded-xl flex flex-col md:flex-row items-center justify-between gap-6 shadow-md border border-paper/10">
-            <div className="flex items-center gap-6">
-              <div className="flex flex-col">
-                <span className="text-[9px] font-mono uppercase tracking-normal text-paper/40 mb-1">{t('status')}</span>
-                <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${isSaved ? 'bg-emerald-400 animate-pulse' : 'bg-accent'}`} />
-                  <span className="text-xs font-bold">{isSaved ? t('settings_saved') : t('pending_changes')}</span>
+            </div>
+          </main>
+
+          <aside className="flex lg:w-[234px] w-full shrink-0 h-full overflow-hidden rounded-xl border border-slate-200 bg-white p-5 shadow-lg dark:border-white/8 dark:bg-paper flex-col">
+            <div className="flex-grow space-y-5 overflow-y-auto pr-1 no-scrollbar">
+              <section className="rounded-2xl bg-slate-950 p-5 text-white">
+                <p className="mb-2 text-[10px] font-bold uppercase tracking-normal text-slate-400">{t('session')}</p>
+                <p className="text-2xl font-bold leading-tight">{currentSession}</p>
+                <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
+                  <div className="h-full rounded-full bg-accent" style={{ width: `${progressPercentage}%` }} />
                 </div>
-              </div>
-              {isSaved && (
-                <motion.button
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  onClick={() => navigate('/modules')}
-                  className="flex items-center gap-2 text-accent text-[10px] font-bold uppercase tracking-normal hover:underline"
+                <div className="mt-3 flex items-center justify-between text-[10px] text-slate-400">
+                  <span>{setupProgress}/2</span>
+                  <span>{defaultDuration} min</span>
+                </div>
+              </section>
+
+              <section className="space-y-3 rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-white/5 dark:bg-surface-low/30">
+                <p className="text-[9px] font-bold uppercase tracking-normal text-muted">{t('status')}</p>
+                <div className="flex items-center gap-2">
+                  <div className={`h-2 w-2 rounded-full ${isSaved ? 'bg-emerald-500' : 'bg-accent'}`} />
+                  <span className="text-xs font-bold text-ink">{isSaved ? t('settings_saved') : t('pending_changes')}</span>
+                </div>
+                <button
+                  onClick={handleSave}
+                  className={`flex w-full items-center justify-center gap-2 rounded-xl py-3 text-xs font-bold uppercase tracking-normal transition-all ${
+                    isSaved ? 'bg-emerald-500 text-paper' : 'bg-ink text-paper hover:bg-accent'
+                  }`}
                 >
-                  {t('continue_to_classrooms')} <ArrowRight className="w-3 h-3" />
-                </motion.button>
-              )}
+                  {isSaved ? <CheckCircle2 className="h-4 w-4" /> : <Save className="h-4 w-4" />}
+                  {isSaved ? t('profile_updated') : t('save_profile')}
+                </button>
+                {isSaved && (
+                  <button
+                    onClick={() => navigate('/modules')}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-ink/10 py-2.5 text-[10px] font-bold uppercase tracking-normal text-accent hover:bg-accent/5"
+                  >
+                    {t('continue_to_classrooms')} <ArrowRight className="h-3 w-3" />
+                  </button>
+                )}
+              </section>
+
+              <section className="space-y-3 rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-white/5 dark:bg-surface-low/30">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent/10 text-accent">
+                    <KeyRound className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-ink">AI Keys</h3>
+                    <p className="text-xs text-muted">Private provider credentials.</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsAiKeysOpen(true)}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-ink py-2.5 text-xs font-bold text-paper transition-all hover:bg-accent"
+                >
+                  <KeyRound size={13} />
+                  Manage API Keys
+                </button>
+              </section>
+
+              <section className="space-y-3 rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-white/5 dark:bg-surface-low/30">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className={`h-2.5 w-2.5 rounded-full ${dbConnected ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                    <div>
+                      <p className="text-sm font-bold text-ink">{t('cloud_and_data')}</p>
+                      <p className="text-xs text-muted">{dbConnected ? t('connected') : t('disconnected')}</p>
+                    </div>
+                  </div>
+                  <button onClick={refreshDbConnection} className="rounded-xl p-2 text-muted transition hover:bg-ink/5">
+                    <RefreshCw className={`h-4 w-4 ${dbConnected === null ? 'animate-spin' : ''}`} />
+                  </button>
+                </div>
+                <button
+                  onClick={async () => {
+                    setIsSyncing(true);
+                    try {
+                      await syncData();
+                    } finally {
+                      setIsSyncing(false);
+                    }
+                  }}
+                  disabled={isSyncing || !dbConnected}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-2.5 text-xs font-bold text-paper transition-all hover:bg-accent-hover disabled:opacity-50"
+                >
+                  {isSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Cloud className="h-4 w-4" />}
+                  {isSyncing ? t('synchronizing') : t('sync_all_data')}
+                </button>
+              </section>
+
+              <section className="space-y-3">
+                <p className="text-[9px] font-bold uppercase tracking-normal text-slate-400 dark:text-ink-muted">Quick Links</p>
+                {[
+                  { label: 'Dashboard', path: '/dashboard', icon: <BookOpen size={13} /> },
+                  { label: 'Classrooms', path: '/modules', icon: <GraduationCap size={13} /> },
+                  { label: 'LevelUp', path: '/levelup', icon: <Target size={13} /> },
+                ].map((link) => (
+                  <button
+                    key={link.path}
+                    onClick={() => navigate(link.path)}
+                    className="flex w-full items-center justify-between rounded-xl border border-slate-100 bg-slate-50 p-3 transition-all hover:border-accent/30 dark:border-white/5 dark:bg-surface-low/30"
+                  >
+                    <span className="flex items-center gap-2">
+                      <span className="text-accent">{link.icon}</span>
+                      <span className="text-[11px] font-semibold text-slate-700 dark:text-ink">{link.label}</span>
+                    </span>
+                    <ChevronRight className="h-3 w-3 text-muted" />
+                  </button>
+                ))}
+              </section>
             </div>
-            
-            <div className="flex items-center gap-4">
-              <button 
-                onClick={() => navigate('/dashboard')}
-                className="px-6 py-3 text-[10px] font-bold uppercase tracking-normal text-paper/40 hover:text-paper transition-colors"
-              >
-                {t('cancel')}
-              </button>
-              <button 
-                onClick={handleSave}
-                className={`px-10 py-4 rounded-full text-xs font-bold uppercase tracking-normal transition-all shadow-md shadow-ink/20 flex items-center gap-3 ${
-                  isSaved ? 'bg-emerald-500 text-paper' : 'bg-paper text-ink hover:bg-accent hover:text-paper'
-                }`}
-              >
-                {isSaved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-                {isSaved ? t('profile_updated') : t('save_profile')}
-              </button>
-            </div>
-          </div>
+          </aside>
         </div>
       </div>
       <AiKeysModal

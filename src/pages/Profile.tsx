@@ -6,18 +6,12 @@ import {
   Mail, 
   Globe, 
   GraduationCap, 
-  Brain, 
-  Target, 
   Settings, 
   ChevronRight,
-  Award,
-  Zap,
-  Clock,
   BookOpen,
   KeyRound,
   Timer,
   RefreshCw,
-  LayoutGrid,
   TrendingUp,
   Activity
 } from 'lucide-react';
@@ -51,7 +45,6 @@ export const Profile: React.FC = () => {
 
   const selectedGrade = settings['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
   const selectedCountry = settings['selected_country'] || localStorage.getItem('selected_country') || '';
-  const selectedGoal = settings['selected_goal'] || localStorage.getItem('selected_goal') || 'mastery';
   const selectedBacTrackId = settings['selected_bac_track'] || localStorage.getItem('selected_bac_track') || '';
 
   const [bacTrackName, setBacTrackName] = React.useState<string>('');
@@ -77,10 +70,10 @@ export const Profile: React.FC = () => {
   }, [selectedBacTrackId]);
 
   const stats = [
-    { label: 'Modules Active', value: '12', icon: <BookOpen className="w-4 h-4" />, color: 'text-blue-500' },
-    { label: 'Deep Work', value: '24.5h', icon: <Clock className="w-4 h-4" />, color: 'text-emerald-500' },
-    { label: 'Mastery', value: '88%', icon: <Zap className="w-4 h-4" />, color: 'text-accent' },
-    { label: 'Achievements', value: '15', icon: <Award className="w-4 h-4" />, color: 'text-amber-500' },
+    { label: 'Grade Level', value: selectedGrade || 'Not set', icon: <GraduationCap className="w-4 h-4" />, color: 'text-blue-500' },
+    { label: 'Region', value: selectedCountry || 'Not set', icon: <Globe className="w-4 h-4" />, color: 'text-emerald-500' },
+    { label: 'Track', value: bacTrackName || 'Not set', icon: <BookOpen className="w-4 h-4" />, color: 'text-accent' },
+    { label: 'Account', value: profile?.plan || 'Free', icon: <User className="w-4 h-4" />, color: 'text-amber-500' },
   ];
 
   return (
@@ -88,16 +81,16 @@ export const Profile: React.FC = () => {
       <SEO title="Profile" />
       <div className="h-full w-full bg-background flex flex-col overflow-hidden p-4">
         {/* 3-Column Layout */}
-        <div className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-4 overflow-hidden">
+        <div className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-3 overflow-hidden">
 
           {/* Column 2: Main Content */}
-          <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 p-6">
-            <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6">        {/* Profile Header */}
-              <div className="relative p-8 bg-paper border border-ink/5 rounded-[2rem] overflow-hidden shadow-sm">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-accent/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
+          <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden rounded-xl border border-slate-200 bg-white p-6 shadow-lg dark:border-white/8 dark:bg-paper">
+            <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-5">
+              {/* Profile Header */}
+              <div className="relative rounded-2xl border border-ink/5 bg-paper p-5 shadow-sm sm:p-6">
                 
-                <div className="relative flex flex-col md:flex-row items-center gap-8">
-                  <div className="w-32 h-32 rounded-xl bg-accent/10 flex items-center justify-center border-2 border-accent/20 overflow-hidden shadow-md">
+                <div className="relative flex flex-col items-center gap-5 md:flex-row md:items-start">
+                  <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border-2 border-accent/20 bg-accent/10 shadow-md sm:h-24 sm:w-24">
                     {profile?.avatar_url ? (
                       <img 
                         src={profile.avatar_url} 
@@ -106,36 +99,32 @@ export const Profile: React.FC = () => {
                         referrerPolicy="no-referrer"
                       />
                     ) : (
-                      <User className="w-16 h-16 text-accent" />
+                      <User className="h-10 w-10 text-accent sm:h-12 sm:w-12" />
                     )}
                   </div>
 
-                  <div className="flex-grow text-center md:text-left space-y-2">
-                    <div className="flex flex-col md:flex-row md:items-center gap-3 flex-wrap">
-                      <h1 className="text-3xl font-serif font-medium text-ink">
+                  <div className="min-w-0 flex-1 space-y-2 text-center md:text-left">
+                    <div className="flex min-w-0 flex-col gap-3 md:flex-row md:flex-wrap md:items-center">
+                      <h1 className="min-w-0 break-words text-2xl font-serif font-medium text-ink sm:text-3xl">
                         {profile?.full_name || user?.email?.split('@')[0] || 'Scholar'}
                       </h1>
-                      <span className="inline-flex px-3 py-1 bg-ink text-paper text-[10px] font-bold uppercase tracking-normal rounded-full self-center md:self-auto whitespace-nowrap">
+                      <span className="inline-flex max-w-full self-center truncate rounded-full bg-ink px-3 py-1 text-[10px] font-bold uppercase tracking-normal text-paper md:self-auto">
                         Academic Level: {selectedGrade}
                       </span>
                       {bacTrackName && (
-                        <span className="inline-flex px-3 py-1 bg-accent/10 text-accent border border-accent/20 text-[10px] font-bold uppercase tracking-normal rounded-full self-center md:self-auto whitespace-nowrap">
+                        <span className="inline-flex max-w-full self-center truncate rounded-full border border-accent/20 bg-accent/10 px-3 py-1 text-[10px] font-bold uppercase tracking-normal text-accent md:self-auto">
                           Track: {bacTrackName}
                         </span>
                       )}
                     </div>
-                    <p className="text-muted flex items-center justify-center md:justify-start gap-2">
+                    <p className="flex min-w-0 items-center justify-center gap-2 text-muted md:justify-start">
                       <Mail className="w-4 h-4" />
-                      {user?.email}
+                      <span className="truncate">{user?.email}</span>
                     </p>
                     <div className="flex flex-wrap justify-center md:justify-start gap-4 pt-2">
                       <div className="flex items-center gap-2 text-xs font-medium text-muted">
                         <Globe className="w-3.5 h-3.5" />
                         {selectedCountry}
-                      </div>
-                      <div className="flex items-center gap-2 text-xs font-medium text-muted">
-                        <Target className="w-3.5 h-3.5" />
-                        Goal: {selectedGoal}
                       </div>
                     </div>
                   </div>
@@ -143,28 +132,28 @@ export const Profile: React.FC = () => {
               </div>
 
               {/* Stats Grid */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 {stats.map((stat, i) => (
                   <motion.div
                     key={i}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: i * 0.1 }}
-                    className="p-5 bg-slate-50/50 dark:bg-surface-low/20 border border-slate-100 dark:border-white/5 rounded-2xl space-y-3"
+                    className="min-w-0 space-y-3 rounded-2xl border border-slate-100 bg-slate-50/50 p-5 dark:border-white/5 dark:bg-surface-low/20"
                   >
                     <div className={`w-9 h-9 rounded-xl bg-background flex items-center justify-center ${stat.color}`}>
                       {stat.icon}
                     </div>
                     <div className="space-y-1">
                       <p className="text-[10px] font-bold text-muted uppercase tracking-normal">{stat.label}</p>
-                      <p className="text-2xl font-bold text-ink">{stat.value}</p>
+                      <p className="truncate text-xl font-bold text-ink">{stat.value}</p>
                     </div>
                   </motion.div>
                 ))}
               </div>
 
               {/* Academic Context */}
-              <div className="p-6 bg-slate-50/50 dark:bg-surface-low/20 border border-slate-100 dark:border-white/5 rounded-[2rem] space-y-5">
+              <div className="space-y-5 rounded-2xl border border-slate-100 bg-slate-50/50 p-5 dark:border-white/5 dark:bg-surface-low/20 sm:p-6">
                 <div className="flex items-center justify-between">
                   <h2 className="text-lg font-serif font-medium text-ink">Academic Context</h2>
                   <button onClick={() => navigate('/settings')}
@@ -189,48 +178,14 @@ export const Profile: React.FC = () => {
                       <div><p className="text-[10px] font-bold text-muted uppercase tracking-normal">Region</p><p className="text-sm font-medium text-ink">{selectedCountry}</p></div>
                     </div>
                   </div>
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-3 p-4 bg-background rounded-2xl border border-ink/5">
-                      <div className="w-9 h-9 rounded-xl bg-accent/5 flex items-center justify-center text-accent"><Brain className="w-5 h-5" /></div>
-                      <div><p className="text-[10px] font-bold text-muted uppercase tracking-normal">Primary Interest</p><p className="text-sm font-medium text-ink">Neuroscience</p></div>
-                    </div>
-                    <div className="flex items-center gap-3 p-4 bg-background rounded-2xl border border-ink/5">
-                      <div className="w-9 h-9 rounded-xl bg-accent/5 flex items-center justify-center text-accent"><Target className="w-5 h-5" /></div>
-                      <div><p className="text-[10px] font-bold text-muted uppercase tracking-normal">Current Goal</p><p className="text-sm font-medium text-ink">{selectedGoal}</p></div>
-                    </div>
-                  </div>
                 </div>
               </div>
 
-              {/* Recent Achievements */}
-              <div className="p-6 bg-slate-50/50 dark:bg-surface-low/20 border border-slate-100 dark:border-white/5 rounded-[2rem] space-y-4">
-                <h2 className="text-lg font-serif font-medium text-ink">Recent Achievements</h2>
-                <div className="space-y-3">
-                  {[
-                    { title: 'Deep Work Streak', desc: '5 days of focused study', date: '2 hours ago' },
-                    { title: 'Mastery Milestone', desc: 'Reached 90% in Calculus', date: 'Yesterday' },
-                    { title: 'Quiz Champion', desc: 'Perfect score on Biology quiz', date: '3 days ago' },
-                  ].map((item, i) => (
-                    <div key={i} className="flex items-center justify-between p-4 bg-background rounded-2xl border border-ink/5">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-500">
-                          <Award className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-bold text-ink">{item.title}</p>
-                          <p className="text-xs text-muted">{item.desc}</p>
-                        </div>
-                      </div>
-                      <span className="text-[10px] font-medium text-muted/60">{item.date}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
             </div>
           </div>
 
           {/* Column 3: Right Sidebar */}
-          <div className="hidden lg:flex lg:w-[260px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-5">
+          <div className="flex lg:w-[234px] w-full shrink-0 h-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white p-5 shadow-lg dark:border-white/8 dark:bg-paper">
             <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6 pr-1">
 
               {/* Deep Focus Timer */}
