@@ -40,6 +40,12 @@ import { getCardGradient, randomBanner, randomCardGradient } from '../utils/card
 const normalizeLessonTitle = (title: string | null | undefined) =>
   String(title || '').trim().toLocaleLowerCase();
 
+const applyInstructionOptionTopicFilter = (query: any, optionId: string) => {
+  const normalizedOptionId = String(optionId || '').trim();
+  if (!normalizedOptionId) return query.is('instruction_option_id', null);
+  return query.or(`instruction_option_id.eq.${normalizedOptionId},instruction_option_id.is.null`);
+};
+
 const getLessonIllustration = (title: string | null | undefined, subject?: string | null | undefined) => {
   const t = String(title || '').toLowerCase();
   const s = String(subject || '').toLowerCase();
@@ -531,6 +537,7 @@ export const ClassroomView: React.FC = () => {
   const currentGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
   const currentCountry = settingsMap['selected_country'] || localStorage.getItem('selected_country') || '';
   const selectedBacTrack = settingsMap['selected_bac_track'] || localStorage.getItem('selected_bac_track') || '';
+  const selectedInstructionOptionId = String(settingsMap['selected_bac_int_option'] || localStorage.getItem('selected_bac_int_option') || '');
   useEffect(() => {
     if (!module) {
       setNavigationCurriculumIds({});
@@ -731,7 +738,7 @@ export const ClassroomView: React.FC = () => {
   const showSetupState = !hasLessons && !hasTopicFallback && !isHydratingSupabase && suggestions.length === 0;
   const showValidationWarningBanner = !isAdmin && lessons.length > 0 && !studentLessonSelection.hasPreferred;
   const cloudHydrationKeyRef = useRef<string | null>(null);
-  const classroomScopeKey = `${id || ''}:${module?.name || ''}:${module?.category || ''}:${currentGrade}:${currentCountry}:${selectedBacTrack}`;
+  const classroomScopeKey = `${id || ''}:${module?.name || ''}:${module?.category || ''}:${currentGrade}:${currentCountry}:${selectedBacTrack}:${selectedInstructionOptionId}`;
 
   useEffect(() => {
     if (!id) return;
@@ -774,11 +781,17 @@ export const ClassroomView: React.FC = () => {
       const selectColumns = getLessonSelectColumns({ includeValidation, includeTags: true });
 
       if (gradeId && (subjectIds.length > 0 || subjectId)) {
-        const { data: topicRows, error: topicsError } = await supabase
-          .from('topics')
-          .select('id, title')
-          .eq('grade_id', gradeId)
-          .in('subject_id', subjectIds.length > 0 ? subjectIds : [subjectId]);
+          const topicQuery = supabase
+            .from('topics')
+            .select('id, title, topic_order, grade_id, subject_id, instruction_option_id')
+            .eq('grade_id', gradeId)
+            .in('subject_id', subjectIds.length > 0 ? subjectIds : [subjectId])
+            .order('topic_order', { ascending: true });
+
+          const { data: topicRows, error: topicsError } = await applyInstructionOptionTopicFilter(
+            topicQuery,
+            selectedInstructionOptionId,
+          );
 
         if (topicsError) throw topicsError;
 
@@ -868,12 +881,18 @@ export const ClassroomView: React.FC = () => {
     const { gradeId, subjectId, subjectIds } = await resolveCurriculumIds(currentGrade, module.name, module.category);
     if (!gradeId || (!subjectId && subjectIds.length === 0)) return [] as SupabaseTopicRow[];
 
-    const fetchTopics = async (includeDomains: boolean) => supabase
-      .from('topics')
-      .select(includeDomains ? 'id, title, domain_id, subject_domains(code, name, domain_order)' : 'id, title')
-      .eq('grade_id', gradeId)
-      .in('subject_id', subjectIds.length > 0 ? subjectIds : [subjectId])
-      .order('title', { ascending: true });
+    const fetchTopics = async (includeDomains: boolean) => {
+      const query = supabase
+        .from('topics')
+        .select(includeDomains
+          ? 'id, title, topic_order, grade_id, subject_id, instruction_option_id, domain_id, subject_domains(code, name, domain_order)'
+          : 'id, title, topic_order, grade_id, subject_id, instruction_option_id')
+        .eq('grade_id', gradeId)
+        .in('subject_id', subjectIds.length > 0 ? subjectIds : [subjectId])
+        .order('topic_order', { ascending: true });
+
+      return applyInstructionOptionTopicFilter(query, selectedInstructionOptionId);
+    };
 
     let { data, error } = await fetchTopics(true);
     if (error) {
@@ -1146,11 +1165,13 @@ export const ClassroomView: React.FC = () => {
         const { gradeId, subjectId, subjectIds } = await resolveCurriculumIds(currentGrade, module.name, module.category);
 
         if (gradeId && (subjectIds.length > 0 || subjectId)) {
-          const { data: topics } = await supabase
+          const query = supabase
             .from('topics')
-            .select('title')
+            .select('title, topic_order, grade_id, subject_id, instruction_option_id')
             .eq('grade_id', gradeId)
-            .in('subject_id', subjectIds.length > 0 ? subjectIds : [subjectId]);
+            .in('subject_id', subjectIds.length > 0 ? subjectIds : [subjectId])
+            .order('topic_order', { ascending: true });
+          const { data: topics } = await applyInstructionOptionTopicFilter(query, selectedInstructionOptionId);
           if (topics) {
             existingTopics = topics.map(t => t.title);
           }
@@ -1551,18 +1572,18 @@ export const ClassroomView: React.FC = () => {
   return (
     <Layout fullWidth>
       <SEO title={module.name || "Classroom"} />
-      <div className="h-full w-full bg-background flex flex-col overflow-hidden p-4">
+      <div className="min-h-full w-full bg-background flex flex-col overflow-visible p-3 sm:p-4 md:h-full md:overflow-hidden">
         
         {/* Symmetrical Layout Container */}
-        <div className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-3 overflow-hidden">
+        <div className="flex-1 min-h-0 w-full flex flex-col md:flex-row gap-3 overflow-visible md:overflow-hidden">
           
           {/* Column 2: Main Classroom Content (Middle Column, flex-grow) */}
-          <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 p-6">
-            <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6">
+          <div className="flex-1 min-w-0 flex flex-col min-h-0 w-full overflow-visible bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 p-4 sm:p-6 md:overflow-hidden">
+            <div className="flex-1 overflow-visible md:overflow-y-auto no-scrollbar flex flex-col gap-6">
               
               {/* Page Header */}
-              <div className="border-b border-slate-100 dark:border-white/5 pb-5 flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-3">
+              <div className="border-b border-slate-100 dark:border-white/5 pb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between shrink-0">
+                <div className="flex min-w-0 items-center gap-3">
                   <button
                     type="button"
                     onClick={() => navigate('/modules')}
@@ -1571,14 +1592,14 @@ export const ClassroomView: React.FC = () => {
                   >
                     <ArrowLeft size={16} className="stroke-[2.5]" />
                   </button>
-                  <div>
-                    <h1 className="ls-page-title text-slate-950 dark:text-ink">{module.name}</h1>
+                  <div className="min-w-0">
+                    <h1 className="ls-page-title text-slate-950 dark:text-ink break-words">{module.name}</h1>
                     {module.category && (
                       <p className="text-xs font-bold text-slate-400 dark:text-ink-muted uppercase tracking-normal mt-0.5">{module.category}</p>
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   {/* Layout Mode Toggle */}
                   <div className="flex items-center gap-1 bg-slate-100 dark:bg-surface-low rounded-xl p-1">
                     <button
@@ -2406,8 +2427,8 @@ export const ClassroomView: React.FC = () => {
           </div>
 
           {/* Column 3: Classroom Widgets Sidebar (Right Column, 260px width) */}
-          <div className="flex lg:w-[234px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-5">
-            <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6 pr-1">
+          <div className="flex md:w-[234px] w-full shrink-0 md:h-full bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 overflow-visible md:overflow-hidden flex-col p-4 sm:p-5">
+            <div className="flex-1 overflow-visible md:overflow-y-auto no-scrollbar flex flex-col gap-6 md:pr-1">
               
               {/* Subject Telemetry Card - Collapsible */}
               <section className="bg-slate-900 text-white rounded-2xl p-5 relative overflow-hidden dark:bg-surface-low shrink-0">

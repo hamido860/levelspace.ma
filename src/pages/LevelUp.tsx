@@ -36,6 +36,7 @@ import {
 } from 'lucide-react';
 import { Layout } from '../components/Layout';
 import { SEO } from '../components/SEO';
+import { AIAssistant } from '../components/AIAssistant';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -383,6 +384,10 @@ export const LevelUp: React.FC = () => {
   const activeGapsCount = gaps.filter(g => !g.solved).length;
   const completedGapsCount = gaps.filter(g => g.solved).length;
   const masteryPercentage = Math.round((completedGapsCount / gaps.length) * 100);
+  const levelUpAiContext = [
+    ...gaps.map((gap) => `${gap.concept}\n${gap.subject}\n${gap.explanationSnippet}\nVerification: ${gap.solutionQuestion}`),
+    ...resources.map((resource) => `${resource.title}\n${resource.category}\n${resource.description}\n${resource.content || ''}`),
+  ].join('\n\n---\n\n');
 
   if (!isPro) {
     return (
@@ -1406,6 +1411,13 @@ export const LevelUp: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
+
+      <AIAssistant
+        title={selectedGap?.concept || "LevelUp AI Support"}
+        subject={selectedGap?.subject || "LevelUp"}
+        lessonContent={levelUpAiContext}
+        strictRAG={true}
+      />
 
     </Layout>
   );

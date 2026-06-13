@@ -61,7 +61,7 @@ export const SelectionActions = () => {
           setResult(null);
 
           const wordCount = text.split(/\s+/).filter(Boolean).length;
-          if (wordCount === 1) {
+          if (wordCount <= 4) {
             setState('loading');
             getQuickDefinition(text, context)
               .then((def) => {
@@ -181,7 +181,7 @@ export const SelectionActions = () => {
             {state === 'loading' && (
               <div className="flex items-center gap-3 px-4 py-2">
                 <Loader2 size={16} className="animate-spin text-accent" />
-                <span className="text-xs font-medium text-white/80">Analyzing word...</span>
+                <span className="text-xs font-medium text-white/80">Preparing inline explanation...</span>
               </div>
             )}
 
@@ -189,7 +189,7 @@ export const SelectionActions = () => {
               <div className="p-3 space-y-3 w-full animate-in fade-in zoom-in-95 duration-200">
                 <div className="space-y-1">
                   <div className="flex items-center justify-between gap-2 border-b border-white/5 pb-1">
-                    <span className="text-[10px] font-black uppercase text-accent tracking-wider">Definition</span>
+                    <span className="text-[10px] font-black uppercase text-accent tracking-wider">AI inline explanation</span>
                     <div className="flex items-center gap-1 text-[9px] font-bold text-white/60">
                       <span>{result.languages.en || selection.text}</span>
                       <span>➔</span>
@@ -204,20 +204,22 @@ export const SelectionActions = () => {
                 <div className="flex gap-2 pt-1.5 border-t border-white/10">
                   <button
                     type="button"
-                    onClick={() => setIsExplanationModalOpen(true)}
+                    onClick={handleAskAI}
                     className="flex-1 flex justify-center items-center gap-1.5 py-1.5 rounded-xl text-[10px] font-extrabold tracking-wide uppercase bg-accent text-white hover:bg-accent/90 transition-colors shadow-sm"
                   >
                     <Sparkles size={11} />
-                    See More
+                    Open tutor
                   </button>
-                  <button
-                    type="button"
-                    onClick={handleAskAI}
-                    className="flex-1 flex justify-center items-center gap-1.5 py-1.5 rounded-xl text-[10px] font-bold tracking-wide uppercase hover:bg-white/10 transition-colors text-white/60 hover:text-white border border-white/10"
-                  >
-                    <MessageCircle size={11} />
-                    Ask AI
-                  </button>
+                  {wordCount === 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setIsExplanationModalOpen(true)}
+                      className="flex-1 flex justify-center items-center gap-1.5 py-1.5 rounded-xl text-[10px] font-bold tracking-wide uppercase hover:bg-white/10 transition-colors text-white/60 hover:text-white border border-white/10"
+                    >
+                      <MessageCircle size={11} />
+                      Details
+                    </button>
+                  )}
                 </div>
               </div>
             )}

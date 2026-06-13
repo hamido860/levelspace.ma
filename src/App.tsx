@@ -27,6 +27,7 @@ import { Pricing } from './pages/Pricing';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AICrewStatus } from './components/AICrewStatus';
+import { SelectionActions } from './components/SelectionActions';
 
 export default function App() {
   return (
@@ -63,6 +64,7 @@ export default function App() {
                 <Route path="/admin/ai-recovery/logs" element={<ProtectedRoute requireAdmin><AdminAiRecovery /></ProtectedRoute>} />
               </Routes>
             </Router>
+            <SelectionActions />
             <Toaster position="bottom-right" richColors />
             <AICrewStatus />
           </SearchProvider>

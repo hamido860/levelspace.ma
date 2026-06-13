@@ -98,6 +98,12 @@ const stripMarkdown = (text: string) =>
 const truncateText = (text: string, max = 155) =>
   text.length <= max ? text : `${text.slice(0, max).trim()}...`;
 
+const applyInstructionOptionTopicFilter = (query: any, optionId: string) => {
+  const normalizedOptionId = String(optionId || '').trim();
+  if (!normalizedOptionId) return query.is('instruction_option_id', null);
+  return query.or(`instruction_option_id.eq.${normalizedOptionId},instruction_option_id.is.null`);
+};
+
 const isRTL = (text: string) => /[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(text);
 
 const normalizeSearchText = (value: string) =>
@@ -194,6 +200,12 @@ export const LessonView: React.FC = () => {
   const { t, language } = useLanguage();
   const { isAdmin } = useAuth();
   const lesson = useLiveQuery(() => (id ? db.lessons.get(id) : undefined), [id]);
+  const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
+  const settingsMap = useMemo(() => {
+    if (!Array.isArray(dbSettings)) return {};
+    return Object.fromEntries(dbSettings.map((setting) => [setting.key, setting.value]));
+  }, [dbSettings]);
+  const selectedInstructionOptionId = String(settingsMap.selected_bac_int_option || localStorage.getItem('selected_bac_int_option') || '');
   const navigationState = (location.state || {}) as LessonNavigationState;
 
   const startAtTest = navigationState.startAtTest || false;
@@ -382,12 +394,18 @@ export const LessonView: React.FC = () => {
     let isCancelled = false;
     const fetchCurriculumLessons = async () => {
       try {
-        const fetchTopics = async (includeDomains: boolean) => supabase
-          .from('topics')
-          .select(includeDomains ? 'id, title, subject_domains(domain_order)' : 'id, title')
-          .eq('grade_id', gradeId)
-          .eq('subject_id', subjectId)
-          .order('title', { ascending: true });
+        const fetchTopics = async (includeDomains: boolean) => {
+          const query = supabase
+            .from('topics')
+            .select(includeDomains
+              ? 'id, title, topic_order, grade_id, subject_id, instruction_option_id, subject_domains(domain_order)'
+              : 'id, title, topic_order, grade_id, subject_id, instruction_option_id')
+            .eq('grade_id', gradeId)
+            .eq('subject_id', subjectId)
+            .order('topic_order', { ascending: true });
+
+          return applyInstructionOptionTopicFilter(query, selectedInstructionOptionId);
+        };
 
         let { data: topics, error: topicsError } = await fetchTopics(true);
         if (topicsError) {
@@ -459,7 +477,7 @@ export const LessonView: React.FC = () => {
     return () => {
       isCancelled = true;
     };
-  }, [curriculumContext, isAdmin, lesson?.moduleId, navigationState.classroomId, navigationState.gradeId, navigationState.moduleId, navigationState.subjectId]);
+  }, [curriculumContext, isAdmin, lesson?.moduleId, navigationState.classroomId, navigationState.gradeId, navigationState.moduleId, navigationState.subjectId, selectedInstructionOptionId]);
 
   // Use moduleId from effective lesson, falling back to subject_id from curriculum or the lesson's own module
   const targetModuleId = effectiveLesson?.moduleId || curriculumContext?.subject_id || lesson?.moduleId;
@@ -503,8 +521,6 @@ export const LessonView: React.FC = () => {
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
 
-  const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
-  const settingsMap = useMemo(() => Object.fromEntries(dbSettings.map(s => [s.key, s.value])), [dbSettings]);
   const defaultDuration = Number(settingsMap['default_session_duration'] || localStorage.getItem('default_session_duration') || 25);
   const currentGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
 
@@ -957,6 +973,7 @@ export const LessonView: React.FC = () => {
         />
 
         <AIAssistant
+          title={effectiveLesson.title}
           lessonContent={readerSourceBlocks.map((block: any) => getBlockText(block)).join('\n')}
           subject={effectiveLesson.subject}
           grade={effectiveLesson.grade}

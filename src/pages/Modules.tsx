@@ -664,13 +664,13 @@ export const Modules: React.FC = () => {
   return (
     <Layout fullWidth>
       <SEO title={t('curriculum_classrooms_title') || 'Syllabus & Academic Classrooms'} />
-      <div className="h-full w-full bg-background flex flex-col overflow-hidden p-4">
+      <div className="min-h-full w-full bg-background flex flex-col overflow-visible p-3 sm:p-4 md:h-full md:overflow-hidden">
         {/* 3-Column Layout */}
-        <div className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-3 overflow-hidden">
+        <div className="flex-1 min-h-0 w-full flex flex-col md:flex-row gap-3 overflow-visible md:overflow-hidden">
         
           {/* Column 2: Main Content */}
-          <div className="flex-grow min-w-0 flex flex-col min-h-0 w-full overflow-hidden bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 p-6">
-            <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6">
+          <div className="flex-1 min-w-0 flex flex-col min-h-0 w-full overflow-visible bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 p-4 sm:p-6 md:overflow-hidden">
+            <div className="flex-1 overflow-visible md:overflow-y-auto no-scrollbar flex flex-col gap-6">
               {/* Page Header */}
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-white/5 pb-5">
                 <div className="flex items-center gap-3">
@@ -1022,9 +1022,9 @@ export const Modules: React.FC = () => {
               <motion.div 
                 initial={{ y: 50, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
-                className="bg-slate-950 text-white py-6 px-8 rounded-2xl shadow-md flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden"
+                className="bg-slate-950 text-white py-5 px-4 sm:px-8 rounded-2xl shadow-md flex flex-col md:flex-row items-stretch md:items-center justify-between gap-5 md:gap-6 relative overflow-hidden"
               >
-                <div className="flex items-center gap-8">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-8">
                   <div className="flex flex-col">
                     <span className="text-[9px] font-mono text-white/40 mb-1">Current Selection</span>
                     <div className="flex items-baseline gap-2">
@@ -1046,7 +1046,7 @@ export const Modules: React.FC = () => {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => navigate('/dashboard')}
-                    className="bg-white text-slate-950 px-8 py-3 rounded-full text-xs font-mono uppercase tracking-[0.2em] font-bold flex items-center gap-3 hover:bg-accent hover:text-white transition-all duration-500 shadow-sm"
+                    className="w-full justify-center bg-white text-slate-950 px-6 sm:px-8 py-3 rounded-full text-xs font-mono uppercase tracking-normal font-bold flex items-center gap-3 hover:bg-accent hover:text-white transition-all duration-500 shadow-sm sm:w-auto"
                   >
                     {t('dashboard_continue')}
                     <ArrowRight className="w-4 h-4" />
@@ -1057,8 +1057,8 @@ export const Modules: React.FC = () => {
           </div>
 
           {/* Column 3: Right Sidebar — Focus & Tools */}
-          <div className="flex lg:w-[234px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-5">
-            <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6 pr-1">
+          <div className="flex md:w-[234px] w-full shrink-0 md:h-full bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 overflow-visible md:overflow-hidden flex-col p-4 sm:p-5">
+            <div className="flex-1 overflow-visible md:overflow-y-auto no-scrollbar flex flex-col gap-6 md:pr-1">
 
               {/* Deep Focus Pomodoro - Premium Calmer Box */}
               <section className="bg-slate-900 text-white rounded-2xl p-5 relative dark:bg-surface-low">

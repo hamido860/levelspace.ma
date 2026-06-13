@@ -284,6 +284,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
     try {
       localStorage.setItem('selected_country', 'Morocco');
       localStorage.setItem('selected_cycle', selectedCycle?.name || '');
+      localStorage.setItem('selected_grade_id', selectedGradeId);
       localStorage.setItem('selected_grade', selectedGrade?.name || '');
       localStorage.setItem('has_completed_onboarding', 'true');
       if (selectedTrack) localStorage.setItem('selected_bac_track', selectedTrack.id);
@@ -292,6 +293,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
       await db.settings.bulkPut([
         { key: 'selected_country', value: 'Morocco' },
         { key: 'selected_cycle', value: selectedCycle?.name || '' },
+        { key: 'selected_grade_id', value: selectedGradeId },
         { key: 'selected_grade', value: selectedGrade?.name || '' },
         { key: 'has_completed_onboarding', value: 'true' },
         ...(selectedTrack ? [{ key: 'selected_bac_track', value: selectedTrack.id }] : []),
@@ -301,9 +303,14 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
       if (user) {
         try {
           await updateProfile(user.id, {
-            onboarding_completed: true,
+            grade_id: selectedGradeId,
+            instruction_option_id: selectedOptionId || null,
+            track_id: null,
             selected_grade: selectedGrade?.name || '',
-            selected_bac_track: selectedTrackId || null,
+            selected_grade_id: selectedGradeId,
+            selected_option: selectedOption?.code || selectedOption?.name || null,
+            selected_bac_track: null,
+            onboarding_completed: true,
           });
         } catch (profileError) {
           console.error('Failed to persist onboarding profile:', profileError);
