@@ -331,15 +331,15 @@
 }
 
 .lesson-reader-block {
-  @apply py-2;
+  @apply py-1 sm:py-2;
 }
 
 .lesson-reader-block__header {
-  @apply mb-5 flex items-start gap-4;
+  @apply mb-4 flex items-start gap-3 sm:mb-5 sm:gap-4;
 }
 
 .lesson-reader-block__icon {
-  @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-mid text-ink-secondary  ;
+  @apply flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-surface-mid text-ink-secondary sm:h-10 sm:w-10;
 }
 
 .lesson-reader-eyebrow {
@@ -347,7 +347,8 @@
 }
 
 .lesson-reader-block__title {
-  @apply mt-1 text-xl font-bold leading-snug text-ink md:text-2xl;
+  @apply mt-1 text-lg font-bold leading-snug text-ink sm:text-xl md:text-2xl;
+  overflow-wrap: anywhere;
 }
 
 .lesson-reader-block__status {
@@ -367,11 +368,110 @@
 }
 
 .lesson-reader-markdown {
-  @apply prose prose-sm max-w-none text-ink prose-p:leading-8 prose-li:leading-8 prose-headings:text-ink prose-strong:text-ink;
+  @apply prose prose-sm text-ink prose-headings:text-ink prose-strong:text-ink;
+  max-width: 68ch;
+  font-size: 1rem;
+  line-height: 1.75;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.lesson-reader-markdown > *:first-child {
+  margin-top: 0;
+}
+
+.lesson-reader-markdown > *:last-child {
+  margin-bottom: 0;
+}
+
+.lesson-reader-markdown p {
+  margin-top: 0.85rem;
+  margin-bottom: 0.85rem;
+  line-height: 1.8;
+}
+
+.lesson-reader-markdown h1,
+.lesson-reader-markdown h2,
+.lesson-reader-markdown h3 {
+  margin-top: 1.25rem;
+  margin-bottom: 0.65rem;
+  line-height: 1.25;
+}
+
+.lesson-reader-markdown h1 {
+  font-size: 1.35rem;
+}
+
+.lesson-reader-markdown h2 {
+  font-size: 1.2rem;
+}
+
+.lesson-reader-markdown h3 {
+  font-size: 1.08rem;
+}
+
+.lesson-reader-markdown ul,
+.lesson-reader-markdown ol {
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+  padding-inline-start: 1.35rem;
+}
+
+.lesson-reader-markdown li {
+  margin-top: 0.35rem;
+  margin-bottom: 0.35rem;
+  line-height: 1.75;
+}
+
+.lesson-reader-markdown blockquote {
+  border-inline-start: 3px solid rgb(59 130 246 / 0.75);
+  color: rgb(71 85 105);
+  font-style: normal;
+  padding-inline-start: 1rem;
+}
+
+.lesson-reader-markdown code {
+  border-radius: 0.45rem;
+  background: rgb(15 23 42 / 0.07);
+  padding: 0.12rem 0.35rem;
+  font-size: 0.9em;
+  font-weight: 650;
+}
+
+.lesson-reader-markdown pre {
+  max-width: 100%;
+  overflow-x: auto;
+  border-radius: 0.9rem;
+  padding: 1rem;
+}
+
+.lesson-reader-markdown table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.lesson-reader-markdown *,
+.lesson-reader-block,
+.lesson-reader-block * {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.lesson-reader-block button,
+.lesson-reader-block button *,
+.lesson-tools-menu,
+.lesson-tools-menu *,
+.lesson-reader-option,
+.lesson-reader-option * {
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .lesson-reader-list {
   @apply mt-3 space-y-3 pl-5;
+  max-width: 68ch;
 }
 
 .lesson-reader-list li {
@@ -387,6 +487,7 @@
 .lesson-answer-panel,
 .lesson-hint {
   @apply rounded-2xl bg-surface-low p-4;
+  max-width: 68ch;
 }
 
 .lesson-reader-check--exam {
@@ -402,7 +503,7 @@
 }
 
 .lesson-reader-option {
-  @apply flex w-full items-center justify-between gap-3 rounded-2xl border border-surface-mid bg-paper px-4 py-3 text-left text-sm font-medium text-ink transition-colors hover:border-ink/15 disabled:cursor-default    ;
+  @apply flex w-full items-center justify-between gap-3 rounded-2xl border border-surface-mid bg-paper px-4 py-3 text-left text-sm font-medium text-ink transition-colors hover:border-ink/15 disabled:cursor-default;
 }
 
 .lesson-reader-option--correct {
@@ -990,7 +1091,8 @@
 }
 
 .katex-mathml {
-  user-select: none;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .prose .katex {

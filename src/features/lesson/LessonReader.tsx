@@ -19,7 +19,6 @@ import {
   ListChecks,
   Volume2,
   Bot,
-  Info,
   Camera,
   Award,
   AlertTriangle,
@@ -97,6 +96,13 @@ const getBlockReadText = (item: DisplayedLessonBlock) =>
     ...(Array.isArray(item.block?.points) ? item.block.points : []),
     ...(Array.isArray(item.block?.rules) ? item.block.rules : []),
   ].filter(Boolean).join('\n');
+
+const cleanLessonTitle = (value: string) =>
+  value
+    .replace(/\.(pdf|docx?|pptx?)$/i, '')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 
 const getLessonIllustration = (title: string | null | undefined, subject?: string | null | undefined) => {
   const t = String(title || '').toLowerCase();
@@ -252,6 +258,8 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
 }) => {
   const { t } = useLanguage();
   const [showImagePicker, setShowImagePicker] = useState(false);
+  const displayTitle = cleanLessonTitle(title);
+  const contentScrollRef = React.useRef<HTMLDivElement | null>(null);
   
   const otherLessons = useMemo(() => {
     return (allLessonsInModule || []).filter((l: any) => l.title !== title);
@@ -349,6 +357,10 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
 
   const currentBlock = displayedBlocks[currentBlockIndex] || displayedBlocks[0];
   const hasNextDestination = currentBlockIndex < displayedBlocks.length - 1 || !!nextLesson;
+
+  useEffect(() => {
+    contentScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentBlock?.id, title]);
 
   const handleContinue = () => {
     if (displayedBlocks.length === 0) return;
@@ -559,31 +571,31 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
   };
 
   return (
-    <div className="w-full h-full flex flex-col overflow-hidden bg-slate-50/50 dark:bg-background select-none">
+    <div className="w-full min-h-full lg:h-full flex flex-col overflow-visible lg:overflow-hidden bg-slate-50/50 dark:bg-background">
       
 
       {/* Responsive Grid/Single Column Layout Container */}
-      <main className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-4 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <main className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-4 overflow-visible lg:overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
         
         {/* Main Content Column */}
-        <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden">
+        <div className="flex-grow flex flex-col min-h-0 w-full overflow-visible lg:overflow-hidden">
         
         {/* Redesigned Card Container */}
-        <div className="w-full h-full bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex flex-col">
+        <div className="w-full min-h-full lg:h-full bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 overflow-visible lg:overflow-hidden flex flex-col">
           
           {/* Top Full-bleed Image Banner */}
-          <div className="h-28 w-full relative bg-slate-100 dark:bg-surface-low shrink-0 overflow-hidden border-b border-slate-100 dark:border-white/5 group">
+          <div className="h-20 sm:h-24 lg:h-28 w-full relative bg-slate-100 dark:bg-surface-low shrink-0 overflow-hidden border-b border-slate-100 dark:border-white/5 group">
             <img 
               src={bannerImage || getLessonIllustration(title, subject)}
-              alt={title}
+              alt={displayTitle}
               className="w-full h-full object-cover transition-transform duration-700 hover:scale-[1.02]"
             />
             {/* Tint Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/20 to-black/35 flex items-center justify-center px-4" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/25 to-black/35 flex items-center justify-center px-4" />
             
             {/* Center Lesson Title */}
-            <h2 className="absolute inset-0 flex items-center justify-center text-center font-display font-black text-xl tracking-wide text-white drop-shadow-md uppercase px-8 select-none">
-              {title}
+            <h2 className="absolute inset-x-12 top-1/2 -translate-y-1/2 text-center font-display text-base font-black leading-tight text-white drop-shadow-md line-clamp-2 sm:text-lg lg:text-xl">
+              {displayTitle}
             </h2>
 
             {/* Custom Banner Edit Button */}
@@ -611,11 +623,11 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
           </div>
 
           {/* Compact Progress, Filters & Tools Ribbon */}
-          <div className="bg-slate-50 border-b border-slate-100 dark:bg-surface-low dark:border-white/5 flex items-center justify-between px-6 py-2 shrink-0 gap-4">
+          <div className="bg-slate-50 border-b border-slate-100 dark:bg-surface-low dark:border-white/5 flex flex-col items-stretch justify-between px-3 py-2 shrink-0 gap-2 sm:flex-row sm:items-center sm:px-5">
             
-            <div className="flex items-center gap-4 overflow-x-auto no-scrollbar flex-grow">
+            <div className="flex items-center gap-3 overflow-x-auto no-scrollbar flex-grow">
               {/* Thin Progress Bar */}
-              <div className="w-[120px] shrink-0 flex items-center gap-3" title={`Progress: ${progressPercent}%`}>
+              <div className="w-[96px] shrink-0 flex items-center gap-3 sm:w-[120px]" title={`Progress: ${progressPercent}%`}>
                 <div className="w-full bg-slate-200 dark:bg-surface-mid h-1.5 rounded-full overflow-hidden">
                   <div 
                     className="h-full bg-blue-600 rounded-full transition-all duration-500"
@@ -624,7 +636,7 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
                 </div>
               </div>
 
-              <span className="shrink-0 text-[9px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-ink-muted">
+              <span className="shrink-0 text-[9px] font-extrabold uppercase tracking-normal text-slate-500 dark:text-ink-muted">
                 {[grade, subject, totalBlocks > 0 ? `${currentBlockIndex + 1}/${totalBlocks}` : null].filter(Boolean).join(' · ')}
               </span>
 
@@ -637,7 +649,7 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
               
               {/* Domain filtering */}
               {showDomainFilters && allBlocks.length > 0 && (
-                <div className="flex gap-2 items-center select-none shrink-0 border-l border-slate-200 dark:border-white/10 pl-4">
+                <div className="flex gap-2 items-center select-none shrink-0 border-l border-slate-200 dark:border-white/10 pl-3">
                   <button
                     type="button"
                     onClick={() => onDomainChange('all')}
@@ -668,7 +680,7 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
             </div>
 
             {/* Right: Tools (Speaker & AI) */}
-            <div className="flex items-center gap-2 shrink-0 border-l border-slate-200 dark:border-white/10 pl-4">
+            <div className="flex items-center gap-2 shrink-0 sm:border-l sm:border-slate-200 sm:dark:border-white/10 sm:pl-4">
               {currentBlock && (
                 <>
                   <button
@@ -697,14 +709,14 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
           </div>
 
           {/* Single Horizontal Content Block Player */}
-          <div className="flex-grow min-h-[400px] flex flex-row relative overflow-hidden h-full">
+          <div className="flex-grow min-h-0 flex flex-row relative overflow-hidden">
             
             {/* Left Nav */}
-            <div className="w-12 sm:w-16 shrink-0 flex flex-col items-center justify-center relative z-10">
+            <div className="pointer-events-none absolute left-2 top-1/2 z-20 -translate-y-1/2 sm:pointer-events-auto sm:relative sm:left-auto sm:top-auto sm:w-16 sm:translate-y-0 sm:flex sm:shrink-0 sm:flex-col sm:items-center sm:justify-center">
               <button
                 type="button"
                 onClick={handleBackSection}
-                className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 shadow-sm transition-all dark:bg-paper dark:border-white/10 dark:text-ink-secondary dark:hover:bg-surface-low cursor-pointer hover:scale-110 group"
+                className="pointer-events-auto flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/95 hover:bg-slate-50 border border-slate-200 text-slate-700 shadow-sm transition-all dark:bg-paper/95 dark:border-white/10 dark:text-ink-secondary dark:hover:bg-surface-low cursor-pointer hover:scale-105 group"
                 title={currentBlockIndex > 0 ? 'Previous Section' : prevLesson ? 'Previous Lesson' : 'Back'}
               >
                 {currentBlockIndex > 0 ? <ChevronLeft size={20} /> : <ArrowLeft size={16} />}
@@ -712,7 +724,7 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
             </div>
 
             {/* Main Content Area */}
-            <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col justify-start space-y-4 pt-4 pb-12 min-w-0 px-2 h-full">
+            <div ref={contentScrollRef} className="flex-1 basis-0 min-h-0 overflow-y-auto flex flex-col justify-start space-y-4 pt-3 pb-12 min-w-0 px-4 sm:px-2 overscroll-contain custom-scrollbar">
               
               {/* Speech Boundary Karaoke visualizer panel */}
               {isSpeaking && speakingState && speakingState.activeSentence && (
@@ -739,16 +751,16 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
               )}
 
               {/* Display blocks — Slide animation via AnimatePresence */}
-              <div className="flex-grow px-2 overflow-hidden">
+              <div className="mx-auto w-full max-w-[760px] px-0 sm:px-2">
                 {displayedBlocks.length > 0 ? (() => {
                   const currentBlock = displayedBlocks[currentBlockIndex];
                   if (!currentBlock) return null;
                   const isViewed = viewedBlockIds.has(currentBlock.id);
 
                   const slideVariants = {
-                    enter: (dir: number) => ({ x: dir > 0 ? '100%' : '-100%', opacity: 0 }),
-                    center: { x: 0, opacity: 1 },
-                    exit: (dir: number) => ({ x: dir > 0 ? '-100%' : '100%', opacity: 0 }),
+                    enter: (dir: number) => ({ x: dir > 0 ? 28 : -28, y: 8, opacity: 0 }),
+                    center: { x: 0, y: 0, opacity: 1 },
+                    exit: (dir: number) => ({ x: dir > 0 ? -28 : 28, y: -8, opacity: 0 }),
                   };
 
                   return (
@@ -760,10 +772,10 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
                         initial="enter"
                         animate="center"
                         exit="exit"
-                        transition={{ type: 'spring', stiffness: 300, damping: 30, mass: 0.8 }}
+                        transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
                         className="w-full flex flex-col space-y-4"
                       >
-                        <div className="pt-2 text-slate-700 leading-relaxed dark:text-ink-secondary">
+                        <div className="pt-2 text-slate-700 leading-relaxed dark:text-ink-secondary select-text">
                           <LessonBlock
                             item={currentBlock}
                             isViewed={isViewed}
@@ -829,23 +841,18 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
             </div>
 
             {/* Right Nav */}
-            <div className="w-12 sm:w-16 shrink-0 flex flex-col items-center justify-center relative z-10">
+            <div className="pointer-events-none absolute right-2 top-1/2 z-20 -translate-y-1/2 sm:pointer-events-auto sm:relative sm:right-auto sm:top-auto sm:w-16 sm:translate-y-0 sm:flex sm:shrink-0 sm:flex-col sm:items-center sm:justify-center">
                <button 
                   type="button"
                   onClick={handleContinue}
                   disabled={!hasNextDestination}
-                  className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-600/20 transition-all cursor-pointer hover:scale-110 group disabled:cursor-default disabled:opacity-40 disabled:hover:scale-100"
+                  className="pointer-events-auto flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-600/20 transition-all cursor-pointer hover:scale-105 group disabled:cursor-default disabled:opacity-40 disabled:hover:scale-100"
                   title={currentBlockIndex === displayedBlocks.length - 1 ? (nextLesson ? 'Next Lesson' : t('complete')) : t('continue')}
                 >
                   <ChevronRight size={20} className="stroke-[3]" />
                 </button>
             </div>
 
-          </div>
-
-          <div className="px-6 pb-4 bg-white dark:bg-paper flex justify-center items-center gap-1.5 text-[10px] text-slate-400 dark:text-ink-muted border-t border-slate-50 dark:border-white/5 pt-3">
-            <Info size={11} className="shrink-0" />
-            <span>Highlight any word in the content card for automatic vocabulary assistance.</span>
           </div>
 
         </div>

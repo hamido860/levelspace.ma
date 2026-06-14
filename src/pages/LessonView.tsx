@@ -149,6 +149,16 @@ const isFrenchLesson = (values: Array<string | null | undefined>) =>
     return normalized === 'francais' || normalized === 'langue francaise' || normalized.includes('francais');
   });
 
+const isRealGradeValue = (value: string) => {
+  const normalized = normalizeSearchText(value);
+  return Boolean(
+    normalized &&
+    normalized !== 'set grade' &&
+    normalized !== 'not set' &&
+    normalized !== 'loading',
+  );
+};
+
 const getExpectedAnswer = (block: any) =>
   String(
     block?.exercise?.answer ||
@@ -198,14 +208,25 @@ export const LessonView: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { t, language } = useLanguage();
-  const { isAdmin } = useAuth();
+  const { isAdmin, loading: authLoading, profile } = useAuth();
   const lesson = useLiveQuery(() => (id ? db.lessons.get(id) : undefined), [id]);
-  const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
+  const dbSettings = useLiveQuery(() => db.settings.toArray());
   const settingsMap = useMemo(() => {
     if (!Array.isArray(dbSettings)) return {};
     return Object.fromEntries(dbSettings.map((setting) => [setting.key, setting.value]));
   }, [dbSettings]);
   const selectedInstructionOptionId = String(settingsMap.selected_bac_int_option || localStorage.getItem('selected_bac_int_option') || '');
+  const browserGrade = localStorage.getItem('selected_grade') || '';
+  const hasPersistedAcademicGrade = Boolean(profile?.selected_grade || settingsMap.selected_grade);
+  const selectedAcademicGradeId = String(profile?.selected_grade_id || settingsMap.selected_grade_id || localStorage.getItem('selected_grade_id') || '').trim();
+  const selectedAcademicGrade = String(
+    profile?.selected_grade ||
+    settingsMap.selected_grade ||
+    (browserGrade === 'Grade 12' && !hasPersistedAcademicGrade ? '' : browserGrade) ||
+    '',
+  ).trim();
+  const isAcademicSettingsLoading = authLoading || dbSettings === undefined;
+  const hasAcademicGrade = Boolean(selectedAcademicGradeId || isRealGradeValue(selectedAcademicGrade));
   const navigationState = (location.state || {}) as LessonNavigationState;
 
   const startAtTest = navigationState.startAtTest || false;
@@ -248,6 +269,7 @@ export const LessonView: React.FC = () => {
 
   useEffect(() => {
     if (!id) return;
+    if (isAcademicSettingsLoading || !hasAcademicGrade) return;
     let isCancelled = false;
 
     const fetchLesson = async () => {
@@ -323,7 +345,7 @@ export const LessonView: React.FC = () => {
     return () => {
       isCancelled = true;
     };
-  }, [id]);
+  }, [hasAcademicGrade, id, isAcademicSettingsLoading]);
 
   const effectiveLesson = useMemo(() => {
     if (supabaseLesson) {
@@ -522,7 +544,7 @@ export const LessonView: React.FC = () => {
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
 
   const defaultDuration = Number(settingsMap['default_session_duration'] || localStorage.getItem('default_session_duration') || 25);
-  const currentGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || '';
+  const currentGrade = selectedAcademicGrade;
 
   useEffect(() => {
     if (defaultDuration) {
@@ -836,6 +858,51 @@ export const LessonView: React.FC = () => {
     setSupabaseLesson(prev => prev ? { ...prev, bannerImage: url } : null);
   };
 
+  if (isAcademicSettingsLoading) {
+    return (
+      <Layout fullWidth>
+        <div className="flex min-h-[50vh] items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-accent" />
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!hasAcademicGrade) {
+    return (
+      <Layout fullWidth>
+        <SEO title="Set grade" />
+        <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-background px-5 py-10">
+          <div className="w-full max-w-md rounded-2xl border border-ink/10 bg-paper p-6 text-center shadow-lg">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-accent/10 text-accent">
+              <AlertCircle className="h-6 w-6" />
+            </div>
+            <h1 className="text-xl font-bold text-ink">Set your grade first</h1>
+            <p className="mt-2 text-sm leading-relaxed text-muted">
+              Choose your academic grade before opening lessons so Levelspace loads the right curriculum.
+            </p>
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => navigate('/settings')}
+                className="flex-1 rounded-xl bg-accent px-4 py-3 text-sm font-bold text-paper transition-colors hover:bg-accent-hover"
+              >
+                Open Settings
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/dashboard')}
+                className="flex-1 rounded-xl border border-ink/10 px-4 py-3 text-sm font-bold text-ink transition-colors hover:bg-ink/5"
+              >
+                Back
+              </button>
+            </div>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
   if (isLoading || lessonsInModule === undefined) {
     return (
       <Layout fullWidth>
@@ -890,7 +957,7 @@ export const LessonView: React.FC = () => {
         type="article"
       />
 
-      <div dir={contentDir} className="h-full w-full bg-background flex flex-col overflow-hidden p-4">
+      <div dir={contentDir} className="min-h-full w-full bg-background flex flex-col overflow-y-auto p-4 md:h-full md:overflow-hidden">
         <LessonReader
           title={effectiveLesson.title}
           subtitle={effectiveLesson.subtitle || `${displayedBlocks.length} sections`}

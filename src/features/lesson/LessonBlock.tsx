@@ -51,9 +51,48 @@ const getContentText = (block: any) =>
     block?.exam?.question,
   ].filter(Boolean).join('\n\n');
 
-const MarkdownText: React.FC<{ children?: string }> = ({ children }) => (
+const cleanDisplayTitle = (value: string) =>
+  value
+    .replace(/\.(pdf|docx?|pptx?)$/i, '')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const normalizeTitle = (value: string) =>
+  cleanDisplayTitle(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9\u0600-\u06FF]+/g, ' ')
+    .toLowerCase()
+    .trim();
+
+const isFileNameTitle = (value: string) => /\.(pdf|docx?|pptx?)$/i.test(value.trim());
+
+const stripDuplicateLeadingHeadings = (markdown: string, title: string) => {
+  const titleKey = normalizeTitle(title);
+  const lines = markdown.split(/\r?\n/);
+
+  while (lines.length > 0) {
+    const firstMeaningfulIndex = lines.findIndex((line) => line.trim());
+    if (firstMeaningfulIndex === -1) return '';
+    const headingMatch = lines[firstMeaningfulIndex].trim().match(/^#{1,3}\s+(.+)$/);
+    if (!headingMatch) break;
+
+    const headingText = headingMatch[1].trim();
+    const headingKey = normalizeTitle(headingText);
+    if (headingKey === titleKey || isFileNameTitle(headingText)) {
+      lines.splice(0, firstMeaningfulIndex + 1);
+      continue;
+    }
+    break;
+  }
+
+  return lines.join('\n').trim();
+};
+
+const MarkdownText: React.FC<{ children?: string; titleContext?: string }> = ({ children, titleContext = '' }) => (
   <div className="lesson-reader-markdown">
-    <Markdown {...markdownPlugins}>{children || ''}</Markdown>
+    <Markdown {...markdownPlugins}>{stripDuplicateLeadingHeadings(children || '', titleContext)}</Markdown>
   </div>
 );
 
@@ -94,6 +133,8 @@ export const LessonBlock: React.FC<LessonBlockProps> = ({
   const sourceIndex = item.sourceIndex;
   const Icon = PURPOSE_ICONS[item.purpose];
   const contentText = getContentText(block);
+  const displayTitle = cleanDisplayTitle(item.title);
+  const shouldShowTitle = Boolean(displayTitle) && !isFileNameTitle(item.title);
   const quiz = block.quiz || (block.type === 'quiz' && block.question ? {
     question: block.question,
     options: block.options,
@@ -120,7 +161,7 @@ export const LessonBlock: React.FC<LessonBlockProps> = ({
         </div>
         <div className="min-w-0 flex-1">
           <p className="lesson-reader-eyebrow">{item.label}</p>
-          <h2 className="lesson-reader-block__title">{item.title}</h2>
+          {shouldShowTitle && <h2 className="lesson-reader-block__title">{displayTitle}</h2>}
         </div>
         <span className={`lesson-reader-block__status ${isViewed ? 'lesson-reader-block__status--viewed' : ''}`}>
           {isViewed ? 'Viewed' : 'New'}
@@ -133,7 +174,7 @@ export const LessonBlock: React.FC<LessonBlockProps> = ({
         </div>
       )}
 
-      {contentText && !quiz && !exercise && !exam && <MarkdownText>{contentText}</MarkdownText>}
+      {contentText && !quiz && !exercise && !exam && <MarkdownText titleContext={item.title}>{contentText}</MarkdownText>}
 
       {Array.isArray(block.points) && block.points.length > 0 && (
         <ul className="lesson-reader-list">
