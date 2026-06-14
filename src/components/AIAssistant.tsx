@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { MessageCircle, X, Send, Bot, User, Loader2, Sparkles, HelpCircle, BookOpen, Globe, Calculator, Type, Info, PenTool, Zap, Copy, Check } from 'lucide-react';
+import { MessageCircle, X, Send, Bot, User, Loader2, Sparkles, HelpCircle, BookOpen, Globe, Calculator, Type, Info, PenTool, Zap, Copy, Check, Brain } from 'lucide-react';
 import { chatWithTutor, ChatMessage, generateProactiveGreeting, generateFullLesson } from '../services/geminiService';
 import { searchLessons, saveLesson } from '../services/ragService';
 import Markdown from 'react-markdown';
@@ -211,40 +211,42 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            className="fixed inset-x-2 bottom-16 h-[min(720px,calc(100vh-5rem))] bg-[#171c23] rounded-t-2xl shadow-2xl flex flex-col z-50 border border-white/10 overflow-hidden sm:inset-x-auto sm:bottom-6 sm:right-6 sm:w-[430px] sm:max-w-[calc(100vw-3rem)] sm:h-[680px] sm:max-h-[86vh] sm:rounded-2xl"
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', damping: 30, stiffness: 240 }}
+            className="fixed inset-y-0 right-0 z-50 flex h-full w-full max-w-[720px] flex-col overflow-hidden border-l border-white/10 bg-[#171c23] text-slate-100 shadow-2xl"
           >
             {/* Header */}
-            <div className="p-5 bg-[#020617] text-white flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-blue-500/15 flex items-center justify-center text-blue-400">
-                  <Bot size={18} />
+            <div className="flex shrink-0 items-center justify-between bg-[#000417] px-8 py-8 text-white">
+              <div className="flex min-w-0 items-center gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-500/10 text-blue-400 ring-1 ring-blue-500/20">
+                  <Brain className="h-6 w-6 shrink-0" />
                 </div>
-                <div className="min-w-0">
-                  <h3 className="font-bold text-lg truncate max-w-[280px]">{title || "AI Tutor"}</h3>
+                <div className="min-w-0 text-left">
+                  <h3 className="truncate text-xl font-bold tracking-tight text-white">{title || "AI Tutor"}</h3>
                   <p className="text-[11px] text-white/45 uppercase tracking-[0.18em] font-mono">{subject || "Lesson"} • AI SUPPORT ACTIVE</p>
                 </div>
               </div>
               <button 
+                type="button"
                 onClick={() => setIsOpen(false)}
-                className="p-3 bg-white/8 hover:bg-white/12 rounded-2xl transition-colors text-white/70 hover:text-white"
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/5 text-white/55 transition-all hover:bg-white/10 hover:text-white"
               >
-                <X size={22} />
+                <X size={24} />
               </button>
             </div>
 
             {/* Messages */}
-            <div className="min-h-0 flex-1 overflow-y-auto p-5 space-y-5 bg-[#171c23] custom-scrollbar text-slate-200">
+            <div className="min-h-0 flex-1 overflow-y-auto bg-[#171c23] px-8 py-8 text-slate-200 custom-scrollbar">
               {messages.length === 0 && isLoading ? (
-                <div className="min-h-[260px] h-full flex flex-col items-center justify-center text-center space-y-5">
-                  <div className="w-20 h-20 bg-blue-500/10 rounded-full flex items-center justify-center text-blue-400">
+                <div className="flex h-full min-h-[360px] flex-col items-center justify-center space-y-5 text-center">
+                  <div className="flex h-20 w-20 items-center justify-center rounded-full bg-blue-500/10 text-blue-400">
                     <Loader2 size={36} className="animate-spin" />
                   </div>
                   <div className="space-y-2">
                     <h4 className="font-bold text-white text-xl">Analyzing Lesson...</h4>
-                    <p className="text-sm text-slate-400 max-w-[280px] leading-relaxed">
+                    <p className="max-w-[320px] text-sm leading-relaxed text-slate-400">
                       I'm reading the material to see how I can best help you.
                     </p>
                   </div>
@@ -252,18 +254,18 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
               ) : messages.length === 0 ? null : (
                 <>
                   {messages.map((msg, i) => (
-                    <div 
+                    <div
                       key={i} 
-                      className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
+                      className={`flex gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
                     >
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                        msg.role === 'user' ? 'bg-blue-600 text-white' : 'bg-blue-500/10 text-blue-400'
+                      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${
+                        msg.role === 'user' ? 'border border-blue-400/20 bg-[#20262e] text-blue-300' : 'bg-blue-500/10 text-blue-400'
                       }`}>
                         {msg.role === 'user' ? <User size={14} /> : <Bot size={14} />}
                       </div>
-                      <div className={`p-3 rounded-2xl max-w-[80%] text-sm relative group ${
+                      <div className={`group relative max-w-[86%] rounded-2xl p-4 text-sm ${
                         msg.role === 'user' 
-                          ? 'bg-blue-600 text-white rounded-tr-sm' 
+                          ? 'border border-blue-400/20 bg-[#20262e] text-slate-100 rounded-tr-sm shadow-sm'
                           : 'bg-[#20262e] border border-white/8 text-slate-100 rounded-tl-sm shadow-sm pr-10'
                       }`}>
                         {msg.role === 'model' && (
@@ -278,7 +280,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
                         {msg.role === 'user' ? (
                           msg.parts[0].text
                         ) : (
-                          <div className="prose prose-sm prose-invert prose-p:leading-relaxed prose-pre:bg-slate-950 prose-pre:text-slate-100 max-w-none">
+                          <div className="prose prose-invert max-w-none text-[0.98rem] text-slate-100 prose-p:leading-7 prose-li:leading-7 prose-strong:text-white prose-pre:bg-slate-950 prose-pre:text-slate-100">
                             <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{msg.parts[0].text}</Markdown>
                           </div>
                         )}
@@ -302,11 +304,11 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
                   )}
 
                   {isLoading && messages.length > 1 && (
-                    <div className="flex gap-3">
-                      <div className="w-8 h-8 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center shrink-0">
+                    <div className="flex gap-4">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-blue-500/10 text-blue-400">
                         <Bot size={14} />
                       </div>
-                      <div className="p-4 bg-[#20262e] border border-white/8 rounded-2xl rounded-tl-sm shadow-sm flex items-center gap-2">
+                      <div className="flex items-center gap-2 rounded-2xl rounded-tl-sm border border-white/8 bg-[#20262e] p-4 shadow-sm">
                         <Loader2 size={14} className="animate-spin text-blue-300" />
                         <span className="text-xs text-slate-400">Thinking...</span>
                       </div>
@@ -318,13 +320,13 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
             </div>
 
             {/* Input */}
-            <div className="p-3 sm:p-4 bg-[#111820] border-t border-white/8 shrink-0">
-              <div className="flex items-center justify-center gap-2 mb-3 pb-3 border-b border-white/8">
+            <div className="shrink-0 border-t border-white/10 bg-[#111820] px-6 py-5">
+              <div className="mb-4 flex items-center justify-center gap-2 border-b border-white/10 pb-4">
                 {quickActions.map((action, i) => (
                   <button
                     key={i}
                     onClick={() => handleSend(action.prompt)}
-                    className="w-10 h-10 rounded-xl bg-white/5 border border-white/8 flex items-center justify-center text-slate-400 hover:text-blue-300 hover:border-blue-400/40 hover:bg-blue-400/10 transition-all hover:scale-105 active:scale-95"
+                    className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-400 transition-all hover:scale-105 hover:border-blue-400/40 hover:bg-blue-400/10 hover:text-blue-300 active:scale-95"
                     title={action.label}
                   >
                     {action.icon}
@@ -340,7 +342,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
                     <button
                       type="button"
                       onClick={() => setIsMathMode(!isMathMode)}
-                      className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-colors ${
+                      className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors ${
                         isMathMode 
                           ? 'bg-blue-500/10 text-blue-300' 
                           : 'text-slate-400 hover:bg-white/5 hover:text-white'
@@ -362,7 +364,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
                 </div>
                 <div className="flex items-end gap-2">
                   {isMathMode ? (
-                    <div className="flex-1 min-h-[44px] bg-[#1c232c] border border-white/10 rounded-2xl overflow-hidden focus-within:border-blue-400/50 transition-colors flex items-center px-3 py-2 text-white">
+                    <div className="flex min-h-[52px] flex-1 items-center overflow-hidden rounded-2xl border border-white/10 bg-[#1c232c] px-4 py-3 text-white transition-colors focus-within:border-blue-400/50">
                       {React.createElement('math-field', {
                         ref: mathFieldRef,
                         onInput: (e: any) => setInput(e.target.value),
@@ -386,14 +388,14 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
                         }
                       }}
                       placeholder="Ask about this lesson..."
-                      className="min-w-0 flex-1 max-h-28 min-h-[44px] p-3 bg-[#1c232c] border border-white/10 rounded-2xl text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-blue-400/50 resize-none custom-scrollbar"
+                      className="min-h-[52px] min-w-0 flex-1 max-h-32 resize-none rounded-2xl border border-white/10 bg-[#1c232c] p-4 text-sm text-slate-100 placeholder:text-slate-500 focus:border-blue-400/50 focus:outline-none custom-scrollbar"
                       rows={1}
                     />
                   )}
                   <button
                     type="submit"
                     disabled={!input.trim() || isLoading}
-                    className="w-11 h-11 shrink-0 bg-blue-600 text-white rounded-2xl flex items-center justify-center disabled:opacity-50 disabled:hover:scale-100 hover:scale-105 transition-all"
+                    className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-2xl border border-blue-400/20 bg-[#20262e] text-blue-300 transition-all hover:scale-105 hover:border-blue-300/40 hover:bg-[#263241] disabled:opacity-50 disabled:hover:scale-100"
                   >
                     <Send size={18} />
                   </button>

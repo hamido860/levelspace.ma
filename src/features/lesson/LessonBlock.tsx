@@ -68,6 +68,15 @@ const normalizeTitle = (value: string) =>
 
 const isFileNameTitle = (value: string) => /\.(pdf|docx?|pptx?)$/i.test(value.trim());
 
+const getFirstMarkdownHeading = (markdown: string) => {
+  const headingLine = markdown
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find((line) => /^#{1,3}\s+/.test(line));
+
+  return headingLine ? cleanDisplayTitle(headingLine.replace(/^#{1,3}\s+/, '')) : '';
+};
+
 const stripDuplicateLeadingHeadings = (markdown: string, title: string) => {
   const titleKey = normalizeTitle(title);
   const lines = markdown.split(/\r?\n/);
@@ -135,6 +144,9 @@ export const LessonBlock: React.FC<LessonBlockProps> = ({
   const contentText = getContentText(block);
   const displayTitle = cleanDisplayTitle(item.title);
   const shouldShowTitle = Boolean(displayTitle) && !isFileNameTitle(item.title);
+  const contentHeading = getFirstMarkdownHeading(contentText);
+  const isGenericExplanationLabel = item.label.toLowerCase() === 'explanation';
+  const headingLabel = shouldShowTitle ? displayTitle : contentHeading || (isGenericExplanationLabel ? '' : item.label);
   const quiz = block.quiz || (block.type === 'quiz' && block.question ? {
     question: block.question,
     options: block.options,
@@ -160,8 +172,7 @@ export const LessonBlock: React.FC<LessonBlockProps> = ({
           <Icon size={18} />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="lesson-reader-eyebrow">{item.label}</p>
-          {shouldShowTitle && <h2 className="lesson-reader-block__title">{displayTitle}</h2>}
+          {headingLabel && <p className="lesson-reader-eyebrow">{headingLabel}</p>}
         </div>
         <span className={`lesson-reader-block__status ${isViewed ? 'lesson-reader-block__status--viewed' : ''}`}>
           {isViewed ? 'Viewed' : 'New'}
@@ -174,7 +185,7 @@ export const LessonBlock: React.FC<LessonBlockProps> = ({
         </div>
       )}
 
-      {contentText && !quiz && !exercise && !exam && <MarkdownText titleContext={item.title}>{contentText}</MarkdownText>}
+      {contentText && !quiz && !exercise && !exam && <MarkdownText titleContext={headingLabel || item.title}>{contentText}</MarkdownText>}
 
       {Array.isArray(block.points) && block.points.length > 0 && (
         <ul className="lesson-reader-list">

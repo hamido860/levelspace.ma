@@ -571,7 +571,7 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
   };
 
   return (
-    <div className="w-full min-h-full lg:h-full flex flex-col overflow-visible lg:overflow-hidden bg-slate-50/50 dark:bg-background">
+    <div className="w-full min-h-full lg:h-full flex flex-col overflow-hidden bg-slate-50/50 dark:bg-background">
       
 
       {/* Responsive Grid/Single Column Layout Container */}
@@ -581,7 +581,7 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
         <div className="flex-grow flex flex-col min-h-0 w-full overflow-visible lg:overflow-hidden">
         
         {/* Redesigned Card Container */}
-        <div className="w-full min-h-full lg:h-full bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 overflow-visible lg:overflow-hidden flex flex-col">
+        <div className="w-full h-[calc(100dvh-9.5rem)] min-h-[520px] lg:h-full lg:min-h-0 bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex flex-col">
           
           {/* Top Full-bleed Image Banner */}
           <div className="h-20 sm:h-24 lg:h-28 w-full relative bg-slate-100 dark:bg-surface-low shrink-0 overflow-hidden border-b border-slate-100 dark:border-white/5 group">
@@ -724,7 +724,7 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
             </div>
 
             {/* Main Content Area */}
-            <div ref={contentScrollRef} className="flex-1 basis-0 min-h-0 overflow-y-auto flex flex-col justify-start space-y-4 pt-3 pb-12 min-w-0 px-4 sm:px-2 overscroll-contain custom-scrollbar">
+            <div ref={contentScrollRef} className="flex-1 basis-0 min-h-0 overflow-y-auto flex flex-col justify-start space-y-4 pt-3 pb-20 min-w-0 px-4 sm:px-2 overscroll-contain custom-scrollbar">
               
               {/* Speech Boundary Karaoke visualizer panel */}
               {isSpeaking && speakingState && speakingState.activeSentence && (
