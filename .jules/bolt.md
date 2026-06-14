@@ -4,3 +4,6 @@
 ## 2026-05-22 - Dexie array derivations
 **Learning:** The same pattern from the 2024-05-09 entry (Dexie live queries returning raw arrays that get transformed into derived objects causing cascading re-renders) also affects array filtering and mapping operations like `.filter()` and `.map()`.
 **Action:** Wrap all complex array derivations off of `useLiveQuery` arrays in `useMemo`.
+## 2024-05-23 - Memoize Array Transformations in JSX
+**Learning:** Found a component (`Dashboard.tsx`) that was repeatedly filtering and sorting a `useLiveQuery` array (`reminders`) directly inside the JSX loop. This caused expensive O(n log n) sorting operations and array object creations on every render, which is particularly bad when components have fast-ticking states (like the interval timer on the dashboard).
+**Action:** Extract inline `.filter()` and `.sort()` operations applied to dynamically queried arrays into `useMemo` hooks, using the raw query array as the dependency. This prevents cascading re-renders and CPU waste.
