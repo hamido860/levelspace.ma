@@ -203,6 +203,10 @@ export const Dashboard: React.FC = () => {
   const isLoading = allModulesVal === undefined || allLessonsVal === undefined || remindersVal === undefined || scheduleVal === undefined || dbSettingsVal === undefined;
   
   const reminders = remindersVal || [];
+  const pendingReminders = useMemo(
+    () => reminders.filter(r => !r.completed).sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || '')),
+    [reminders]
+  );
   const schedule = scheduleVal || [];
   const dbSettings = dbSettingsVal || [];
   const settingsMap = useMemo(() => Object.fromEntries(dbSettings.map(s => [s.key, s.value])), [dbSettings]);
@@ -441,10 +445,8 @@ export const Dashboard: React.FC = () => {
                       <div className="py-12 flex justify-center items-center">
                         <Loader2 className="w-5 h-5 text-accent animate-spin" />
                       </div>
-                    ) : reminders.filter(r => !r.completed).length > 0 ? (
-                      reminders
-                        .filter(r => !r.completed)
-                        .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
+                    ) : pendingReminders.length > 0 ? (
+                      pendingReminders
                         .slice(0, 5)
                         .map((reminder, i) => (
                           <motion.div 
