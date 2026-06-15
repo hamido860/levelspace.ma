@@ -256,7 +256,7 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
   activityLogs,
   defaultDuration,
 }) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [showImagePicker, setShowImagePicker] = useState(false);
   const displayTitle = cleanLessonTitle(title);
   const contentScrollRef = React.useRef<HTMLDivElement | null>(null);
@@ -465,7 +465,26 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
 
   const handleAskAITutor = (item: DisplayedLessonBlock) => {
     const text = getBlockReadText(item);
-    const prompt = `I'm currently reading this section of my lesson on "${title}". Can you explain it to me in simple terms and help me understand its core concept? Section: "${item.title}" - Content: "${text.substring(0, 1000)}"`;
+    const lessonName = cleanLessonTitle(title);
+    const rawTitle = cleanLessonTitle(String(item.title || ''));
+    const firstContentHeading = text
+      .split('\n')
+      .map(line => cleanLessonTitle(line.replace(/^#+\s*/, '')))
+      .find(line => line && line !== lessonName && !/\.(pdf|docx?|pptx?)$/i.test(line));
+    const sectionTitle = firstContentHeading || rawTitle || lessonName;
+    const lowerContext = `${subject || ''} ${lessonName} ${sectionTitle} ${text.slice(0, 500)}`.toLowerCase();
+    const shouldUseFrench =
+      language === 'fr' ||
+      lowerContext.includes('français') ||
+      lowerContext.includes('francais') ||
+      /\b(le|la|les|un|une|des|verbe|phrase|sujet|cours)\b/.test(lowerContext) ||
+      /[àâçéèêëîïôùûüÿœ]/i.test(lowerContext);
+    let prompt = shouldUseFrench
+      ? `J'ai besoin d'aide sur cette section : "${sectionTitle}".`
+      : `I need help with this section: "${sectionTitle}". Help me find exactly what is difficult.`;
+    if (shouldUseFrench) {
+      prompt = `J'ai besoin d'aide sur cette section : "${sectionTitle}". Aide-moi a trouver exactement ce qui est difficile.`;
+    }
 
     window.dispatchEvent(
       new CustomEvent('open-ai-assistant', {

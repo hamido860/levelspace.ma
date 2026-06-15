@@ -4,6 +4,7 @@ import { Bot, Loader2, Languages, MessageCircle, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { getQuickDefinition } from '../services/geminiService';
 import { ExplanationModal } from './ExplanationModal';
+import { useLanguage } from '../context/LanguageContext';
 
 type QuickDefResult = {
   definition: string;
@@ -13,6 +14,7 @@ type QuickDefResult = {
 type SelectionState = 'idle' | 'loading' | 'result';
 
 export const SelectionActions = () => {
+  const { language } = useLanguage();
   const [selection, setSelection] = useState<{
     text: string;
     context: string;
@@ -121,9 +123,17 @@ export const SelectionActions = () => {
 
   const handleAskAI = () => {
     if (selection) {
+      const context = `${selection.text} ${selection.context}`.toLowerCase();
+      const shouldUseFrench =
+        language === 'fr' ||
+        /\b(le|la|les|un|une|des|verbe|phrase|sujet|cours|texte)\b/.test(context) ||
+        /[àâçéèêëîïôùûüÿœ]/i.test(context);
+      const initialInput = shouldUseFrench
+        ? `Aide-moi a comprendre ce qui est difficile dans "${selection.text}".`
+        : `Help me understand what is difficult about "${selection.text}".`;
       window.dispatchEvent(
         new CustomEvent('open-ai-assistant', {
-          detail: { initialInput: `Can you explain the highlighted concept "${selection.text}" in this context: "${selection.context}"?` }
+          detail: { initialInput }
         })
       );
       setSelection(null);

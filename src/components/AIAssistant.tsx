@@ -1,7 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useReducer } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { MessageCircle, X, Send, Bot, User, Loader2, Sparkles, HelpCircle, BookOpen, Globe, Calculator, Type, Info, PenTool, Zap, Copy, Check, Brain } from 'lucide-react';
+import { MessageCircle, X, Send, Bot, User, Loader2, Copy, Check, Brain } from 'lucide-react';
 import { chatWithTutor, ChatMessage, generateProactiveGreeting, generateFullLesson } from '../services/geminiService';
 import { searchLessons, saveLesson } from '../services/ragService';
 import Markdown from 'react-markdown';
@@ -12,6 +12,11 @@ import { useAuth } from '../context/AuthContext';
 import { useAppSettings } from '../context/AppSettingsContext';
 import { toast } from 'sonner';
 import 'mathlive';
+import { detectLanguage, resolveExpectedLanguage, type LangCode } from '../mcp/languagePolicy';
+import { TutorModeRenderer } from '../features/tutor/TutorModeRenderer';
+import { buildExampleText, createFallbackQuizQuestion, createInitialTutorContext, tutorReducer } from '../features/tutor/tutorMachine';
+import { extractTutorInstruction, mapStudentIntentToTutorEvent } from '../features/tutor/tutorIntent';
+import type { TutorEvent, TutorUIInstruction } from '../features/tutor/types';
 
 declare global {
   namespace JSX {
@@ -27,11 +32,129 @@ interface AIAssistantProps {
   subject?: string;
   grade?: string;
   title?: string;
+  country?: string;
   aiAvailable?: boolean;
 }
 
-export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictRAG, subject, grade, title, aiAvailable = true }) => {
+type AssistantLang = LangCode | 'unknown';
+
+const assistantCopy: Record<string, any> = {
+  en: {
+    fallbackGreeting: "How can I help you with this lesson? I can answer questions, explain concepts, or test your knowledge.",
+    copied: "Copied to clipboard",
+    generating: "I'm generating a comprehensive lesson for you. This might take a minute...",
+    saved: (lessonTitle: string) => `I've generated and saved a new lesson titled **${lessonTitle}**. You can now ask questions about it!`,
+    saveError: (lessonTitle: string) => `I generated the lesson **${lessonTitle}**, but there was an error saving it to the database.`,
+    generateError: "Sorry, I failed to generate the lesson. Please try again.",
+    error: "I'm sorry, I encountered an error. Please try again.",
+    unavailable: "AI help requires API key",
+    active: "AI SUPPORT ACTIVE",
+    analyzingTitle: "Analyzing Lesson...",
+    analyzingBody: "I'm reading the material to see how I can best help you.",
+    thinking: "Thinking...",
+    placeholder: "Ask about this lesson...",
+    copyMessage: "Copy message",
+    diagnosticTitle: "What is difficult?",
+    diagnosticSubtitle: "Choose one. I will adapt the help from there.",
+    diagnosticOptions: [
+      ["Words", "The difficult part is the meaning of some words."],
+      ["Sentence", "The difficult part is understanding the sentence."],
+      ["Main idea", "The difficult part is the main idea of this section."],
+      ["Example", "I need an example to understand this part."],
+      ["Steps", "The difficult part is knowing the steps."],
+      ["Not sure", "I am not sure what is difficult. Help me find it step by step."],
+    ],
+    actions: [
+      ["Generate lesson content", "Can you generate more detailed content for this lesson, including examples and deeper explanations?"],
+      ["Explain a concept", "Can you explain the main concept of this lesson in simpler terms?"],
+      ["Extend an idea", "Can you extend on the ideas presented here and give me a real-world application?"],
+      ["Generate a question", "Can you generate a practice question based on this lesson to test my understanding?"],
+      ["Explain in another language", "Can you explain the main concepts of this lesson in another language to help me understand better?"],
+    ],
+  },
+  fr: {
+    fallbackGreeting: "Comment puis-je t'aider avec ce cours ? Je peux répondre à tes questions, expliquer des notions ou tester ta compréhension.",
+    copied: "Copié dans le presse-papiers",
+    generating: "Je génère un cours complet pour toi. Cela peut prendre une minute...",
+    saved: (lessonTitle: string) => `J'ai généré et enregistré un nouveau cours intitulé **${lessonTitle}**. Tu peux maintenant poser des questions dessus !`,
+    saveError: (lessonTitle: string) => `J'ai généré le cours **${lessonTitle}**, mais une erreur est survenue pendant l'enregistrement.`,
+    generateError: "Désolé, je n'ai pas réussi à générer le cours. Réessaie.",
+    error: "Désolé, une erreur est survenue. Réessaie.",
+    unavailable: "L'aide IA nécessite une clé API",
+    active: "SUPPORT IA ACTIF",
+    analyzingTitle: "Analyse du cours...",
+    analyzingBody: "Je lis le contenu pour voir comment t'aider au mieux.",
+    thinking: "Réflexion...",
+    placeholder: "Pose une question sur ce cours...",
+    copyMessage: "Copier le message",
+    diagnosticTitle: "Qu'est-ce qui bloque ?",
+    diagnosticSubtitle: "Choisis une option. J'adapte l'aide ensuite.",
+    diagnosticOptions: [
+      ["Mots", "La difficulte vient du sens de certains mots."],
+      ["Phrase", "La difficulte vient du sens de la phrase."],
+      ["Idee", "La difficulte vient de l'idee principale de cette section."],
+      ["Exemple", "J'ai besoin d'un exemple pour comprendre cette partie."],
+      ["Etapes", "La difficulte vient des etapes a suivre."],
+      ["Pas sur", "Je ne sais pas exactement ce qui bloque. Aide-moi a le trouver etape par etape."],
+    ],
+    actions: [
+      ["Générer le cours", "Peux-tu générer un contenu plus détaillé pour ce cours, avec des exemples et des explications plus approfondies ?"],
+      ["Expliquer une notion", "Peux-tu expliquer la notion principale de ce cours avec des mots plus simples ?"],
+      ["Prolonger une idée", "Peux-tu développer les idées présentées ici et donner une application réelle ?"],
+      ["Générer une question", "Peux-tu générer une question d'entraînement basée sur ce cours pour tester ma compréhension ?"],
+      ["Expliquer autrement", "Peux-tu expliquer les notions principales de ce cours dans une autre langue pour m'aider à mieux comprendre ?"],
+    ],
+  },
+  ar: {
+    fallbackGreeting: "كيف يمكنني مساعدتك في هذا الدرس؟ يمكنني الإجابة عن الأسئلة أو شرح المفاهيم أو اختبار فهمك.",
+    copied: "تم النسخ",
+    generating: "أقوم بإنشاء درس كامل لك. قد يستغرق ذلك دقيقة...",
+    saved: (lessonTitle: string) => `أنشأت درسا جديدا بعنوان **${lessonTitle}** وحفظته. يمكنك الآن طرح أسئلة عنه!`,
+    saveError: (lessonTitle: string) => `أنشأت الدرس **${lessonTitle}**، لكن حدث خطأ أثناء الحفظ.`,
+    generateError: "عذرا، لم أتمكن من إنشاء الدرس. حاول مرة أخرى.",
+    error: "عذرا، حدث خطأ. حاول مرة أخرى.",
+    unavailable: "تحتاج مساعدة الذكاء الاصطناعي إلى مفتاح API",
+    active: "دعم الذكاء الاصطناعي نشط",
+    analyzingTitle: "جار تحليل الدرس...",
+    analyzingBody: "أقرأ المحتوى لأعرف كيف أساعدك بأفضل طريقة.",
+    thinking: "جار التفكير...",
+    placeholder: "اسأل عن هذا الدرس...",
+    copyMessage: "نسخ الرسالة",
+    diagnosticTitle: "ما الجزء الصعب؟",
+    diagnosticSubtitle: "اختر خيارا واحدا، وسأكيف المساعدة بعد ذلك.",
+    diagnosticOptions: [
+      ["الكلمات", "الجزء الصعب هو معنى بعض الكلمات."],
+      ["الجملة", "الجزء الصعب هو فهم الجملة."],
+      ["الفكرة", "الجزء الصعب هو الفكرة الرئيسية في هذا الجزء."],
+      ["مثال", "أحتاج إلى مثال كي أفهم هذا الجزء."],
+      ["الخطوات", "الجزء الصعب هو معرفة الخطوات."],
+      ["لست متأكدا", "لست متأكدا مما هو صعب. ساعدني على إيجاده خطوة بخطوة."],
+    ],
+    actions: [
+      ["إنشاء محتوى الدرس", "هل يمكنك إنشاء محتوى أكثر تفصيلا لهذا الدرس مع أمثلة وشروحات أعمق؟"],
+      ["شرح مفهوم", "هل يمكنك شرح المفهوم الرئيسي في هذا الدرس بطريقة أبسط؟"],
+      ["توسيع فكرة", "هل يمكنك توسيع الأفكار المعروضة هنا وإعطاء تطبيق واقعي؟"],
+      ["إنشاء سؤال", "هل يمكنك إنشاء سؤال تدريبي من هذا الدرس لاختبار فهمي؟"],
+      ["شرح بلغة أخرى", "هل يمكنك شرح المفاهيم الرئيسية لهذا الدرس بلغة أخرى لمساعدتي على الفهم؟"],
+    ],
+  },
+};
+
+const resolveAssistantUiLanguage = (country?: string, subject?: string, lessonContent?: string, interfaceLanguage?: string): AssistantLang => {
+  const policyLanguage = country && subject ? resolveExpectedLanguage(country, subject) : null;
+  if (policyLanguage) return policyLanguage;
+  const detected = lessonContent ? detectLanguage(lessonContent).dominant : 'unknown';
+  if (detected !== 'unknown') return detected;
+  return (interfaceLanguage as AssistantLang) || 'en';
+};
+
+export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictRAG, subject, grade, title, country, aiAvailable = true }) => {
   const { language } = useLanguage();
+  const assistantLanguage = useMemo(
+    () => resolveAssistantUiLanguage(country, subject, lessonContent, language),
+    [country, subject, lessonContent, language]
+  );
+  const copy = assistantCopy[assistantLanguage] || assistantCopy.en;
   const { user, isAdmin } = useAuth();
   const { settings } = useAppSettings();
   const askAiAccess = settings.ask_ai_access || 'admin';
@@ -42,20 +165,53 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isMathMode, setIsMathMode] = useState(false);
   const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [tutorContext, dispatchTutor] = useReducer(tutorReducer, createInitialTutorContext({
+    currentSectionTitle: title,
+    currentSectionText: lessonContent,
+  }));
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const handleCopy = (text: string, id: number) => {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
-    toast.success("Copied to clipboard");
+    toast.success(copy.copied);
     setTimeout(() => setCopiedId(null), 2000);
   };
 
   const [pendingInitialInput, setPendingInitialInput] = useState<string | null>(null);
-  const mathFieldRef = useRef<any>(null);
   const [mounted, setMounted] = useState(false);
+
+  const dispatchTutorEvent = (event: TutorEvent) => {
+    dispatchTutor(event);
+  };
+
+  const applyAssistantInstruction = (instruction: TutorUIInstruction) => {
+    switch (instruction.ui_mode) {
+      case 'diagnostic_mode':
+        dispatchTutor({ type: 'ASK_HELP' });
+        break;
+      case 'explanation_mode':
+        dispatchTutor({ type: 'REQUEST_EXPLANATION' });
+        break;
+      case 'example_mode':
+        dispatchTutor({ type: 'REQUEST_EXAMPLE' });
+        break;
+      case 'quiz_mode':
+        dispatchTutor({ type: 'START_QUIZ', question: instruction.question || createFallbackQuizQuestion(title) });
+        break;
+      case 'repair_mode':
+        dispatchTutor({ type: 'NEED_REPAIR', feedback: instruction.assistantText || 'On reprend avec un indice.' });
+        break;
+      case 'summary_mode':
+        dispatchTutor({ type: 'SUMMARIZE' });
+        break;
+      case 'reading_mode':
+      default:
+        dispatchTutor({ type: 'RESET_TO_READING' });
+        break;
+    }
+  };
 
   useEffect(() => {
     setMounted(true);
@@ -79,16 +235,16 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
     let isMounted = true;
     setGreetingFetched(true);
     setIsLoading(true);
-    generateProactiveGreeting(lessonContent, language, subject, grade)
+    generateProactiveGreeting(lessonContent, language, subject, grade, country)
       .then(greeting => {
         if (isMounted) setMessages([{ role: 'model', parts: [{ text: greeting }] }]);
       })
       .catch(() => {
-        if (isMounted) setMessages([{ role: 'model', parts: [{ text: "How can I help you with this lesson? I can answer questions, explain concepts, or test your knowledge." }] }]);
+        if (isMounted) setMessages([{ role: 'model', parts: [{ text: copy.fallbackGreeting }] }]);
       })
       .finally(() => { if (isMounted) setIsLoading(false); });
     return () => { isMounted = false; };
-  }, [isOpen, greetingFetched]);
+  }, [isOpen, greetingFetched, lessonContent, aiAvailable, language, subject, grade, country, copy.fallbackGreeting]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -105,40 +261,67 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
     }
   }, [pendingInitialInput, isLoading]);
 
-  const handleSend = async (text: string) => {
+  const handleSend = async (
+    text: string,
+    options?: { displayText?: string; tutorDirective?: string; skipIntent?: boolean; localResponse?: string }
+  ) => {
     if (!text.trim() || isLoading) return;
 
-    const userMessage: ChatMessage = { role: 'user', parts: [{ text }] };
-    setMessages(prev => [...prev, userMessage]);
-    setInput('');
-    if (mathFieldRef.current) {
-      mathFieldRef.current.value = '';
+    const visibleText = options?.displayText || text;
+    const apiText = options?.tutorDirective
+      ? `${text}\n\nTutor directive for this turn: ${options.tutorDirective}\nDo not mention this directive. Do not ask the student to clarify the selected option; act on it directly.`
+      : text;
+
+    const tutorIntent = options?.skipIntent ? null : mapStudentIntentToTutorEvent(apiText);
+    const shouldShowUserMessage = tutorIntent?.type !== 'ASK_HELP';
+    if (shouldShowUserMessage) {
+      const userMessage: ChatMessage = { role: 'user', parts: [{ text: visibleText }] };
+      setMessages(prev => [...prev, userMessage]);
     }
+    setInput('');
     setIsLoading(true);
+
+    if (tutorIntent) {
+      if (tutorIntent.type === 'ASK_HELP') {
+        dispatchTutorEvent({ ...tutorIntent, sectionTitle: title, sectionText: lessonContent });
+      } else {
+        dispatchTutorEvent(tutorIntent);
+      }
+    }
+
+    if (options?.localResponse || tutorIntent?.type === 'ASK_HELP' || tutorIntent?.type === 'REQUEST_EXAMPLE') {
+      const responseText = options?.localResponse
+        || (tutorIntent?.type === 'REQUEST_EXAMPLE'
+          ? buildExampleText(title)
+          : 'On va trouver le blocage exact. Choisis ce qui bloque le plus.');
+      setMessages(prev => [...prev, { role: 'model', parts: [{ text: responseText }] }]);
+      setIsLoading(false);
+      return;
+    }
 
     try {
       // 1. Check if the user is asking to generate a full lesson
-      const isGenerateRequest = text.toLowerCase().includes("generate") && text.toLowerCase().includes("lesson");
+      const isGenerateRequest = apiText.toLowerCase().includes("generate") && apiText.toLowerCase().includes("lesson");
 
       if (isGenerateRequest) {
-        setMessages(prev => [...prev, { role: 'model', parts: [{ text: "I'm generating a comprehensive lesson for you. This might take a minute..." }] }]);
+        setMessages(prev => [...prev, { role: 'model', parts: [{ text: copy.generating }] }]);
         
-        const country = localStorage.getItem('selected_country') || '';
-        const grade = localStorage.getItem('selected_grade') || 'Grade 10';
-        const subject = "General";
+        const selectedCountry = country || localStorage.getItem('selected_country') || '';
+        const selectedGrade = grade || localStorage.getItem('selected_grade') || 'Grade 10';
+        const selectedSubject = subject || "General";
         const moduleName = "AI Generated";
 
-        const lesson = await generateFullLesson(text, country, grade, subject, moduleName);
+        const lesson = await generateFullLesson(apiText, selectedCountry, selectedGrade, selectedSubject, moduleName);
         
         if (lesson) {
           const saved = await saveLesson(lesson, user?.id, true);
           if (saved) {
-             setMessages(prev => [...prev, { role: 'model', parts: [{ text: `I've generated and saved a new lesson titled **${lesson.lesson_title}**. You can now ask questions about it!` }] }]);
+             setMessages(prev => [...prev, { role: 'model', parts: [{ text: copy.saved(lesson.lesson_title) }] }]);
           } else {
-             setMessages(prev => [...prev, { role: 'model', parts: [{ text: `I generated the lesson **${lesson.lesson_title}**, but there was an error saving it to the database.` }] }]);
+             setMessages(prev => [...prev, { role: 'model', parts: [{ text: copy.saveError(lesson.lesson_title) }] }]);
           }
         } else {
-           setMessages(prev => [...prev, { role: 'model', parts: [{ text: "Sorry, I failed to generate the lesson. Please try again." }] }]);
+           setMessages(prev => [...prev, { role: 'model', parts: [{ text: copy.generateError }] }]);
         }
       } else {
         // 2. Normal RAG flow
@@ -149,14 +332,19 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
            context += "\n\nAdditional Context from Database:\n" + results.map(r => `Title: ${r.lesson_title}\nContent: ${r.content}`).join('\n\n');
         }
 
-        const responseText = await chatWithTutor(text, context, messages, language, user?.id, !!strictRAG, subject, grade);
-        const modelMessage: ChatMessage = { role: 'model', parts: [{ text: responseText }] };
+        const responseText = await chatWithTutor(apiText, context, messages, language, user?.id, !!strictRAG, subject, grade, country);
+        const { instruction, displayText } = extractTutorInstruction(responseText);
+        if (instruction) {
+          applyAssistantInstruction(instruction);
+        }
+        const safeDisplayText = displayText.trim() || responseText;
+        const modelMessage: ChatMessage = { role: 'model', parts: [{ text: safeDisplayText }] };
         setMessages(prev => [...prev, modelMessage]);
       }
     } catch (error) {
       const errorMessage: ChatMessage = { 
         role: 'model', 
-        parts: [{ text: "I'm sorry, I encountered an error. Please try again." }] 
+        parts: [{ text: copy.error }] 
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
@@ -164,13 +352,15 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
     }
   };
 
-  const quickActions = [
-    { label: "Generate lesson content", icon: <PenTool size={14} />, prompt: "Can you generate more detailed content for this lesson, including examples and deeper explanations?" },
-    { label: "Explain a concept", icon: <HelpCircle size={14} />, prompt: "Can you explain the main concept of this lesson in simpler terms?" },
-    { label: "Extend an idea", icon: <Sparkles size={14} />, prompt: "Can you extend on the ideas presented here and give me a real-world application?" },
-    { label: "Generate a question", icon: <BookOpen size={14} />, prompt: "Can you generate a practice question based on this lesson to test my understanding?" },
-    { label: "Explain in another language", icon: <Globe size={14} />, prompt: `Can you explain the main concepts of this lesson in another language (like French, Arabic, or Spanish) to help me understand better? My preferred interface language is ${language}.` }
-  ];
+  const renderTutorMode = (compact = false) => (
+    <TutorModeRenderer
+      context={tutorContext}
+      compact={compact}
+      isLoading={isLoading}
+      onEvent={dispatchTutorEvent}
+      onSendPrompt={handleSend}
+    />
+  );
 
   if (!mounted || !hasAccess) return null;
 
@@ -184,7 +374,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
           <MessageCircle size={24} />
         </button>
         <div className="absolute bottom-16 right-0 bg-ink text-paper text-xs px-3 py-2 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-sm">
-          AI help requires API key
+          {copy.unavailable}
         </div>
       </div>,
       document.body
@@ -225,7 +415,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
                 </div>
                 <div className="min-w-0 text-left">
                   <h3 className="truncate text-xl font-bold tracking-tight text-white">{title || "AI Tutor"}</h3>
-                  <p className="text-[11px] text-white/45 uppercase tracking-[0.18em] font-mono">{subject || "Lesson"} • AI SUPPORT ACTIVE</p>
+                  <p className="text-[11px] text-white/45 uppercase tracking-[0.18em] font-mono">{subject || "Lesson"} - {copy.active}</p>
                 </div>
               </div>
               <button 
@@ -245,13 +435,22 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
                     <Loader2 size={36} className="animate-spin" />
                   </div>
                   <div className="space-y-2">
-                    <h4 className="font-bold text-white text-xl">Analyzing Lesson...</h4>
+                    <h4 className="font-bold text-white text-xl">{copy.analyzingTitle}</h4>
                     <p className="max-w-[320px] text-sm leading-relaxed text-slate-400">
-                      I'm reading the material to see how I can best help you.
+                      {copy.analyzingBody}
                     </p>
                   </div>
                 </div>
-              ) : messages.length === 0 ? null : (
+              ) : messages.length === 0 ? (
+                <div className="mx-auto flex h-full min-h-[360px] max-w-[520px] flex-col justify-center">
+                  <TutorModeRenderer
+                    context={tutorContext}
+                    isLoading={isLoading}
+                    onEvent={dispatchTutorEvent}
+                    onSendPrompt={handleSend}
+                  />
+                </div>
+              ) : (
                 <>
                   {messages.map((msg, i) => (
                     <div
@@ -272,7 +471,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
                           <button
                             onClick={() => handleCopy(msg.parts[0].text, i)}
                             className="absolute right-2 top-2 p-1.5 rounded-lg bg-white/5 text-slate-400 opacity-80 hover:opacity-100 hover:text-blue-300 transition-colors"
-                            title="Copy message"
+                            title={copy.copyMessage}
                           >
                             {copiedId === i ? <Check size={14} /> : <Copy size={14} />}
                           </button>
@@ -288,21 +487,6 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
                     </div>
                   ))}
 
-                  {messages.length === 1 && messages[0].role === 'model' && (
-                    <div className="flex flex-col gap-2 w-full mt-2 pl-11">
-                      {quickActions.map((action, i) => (
-                        <button
-                          key={i}
-                          onClick={() => handleSend(action.prompt)}
-                          className="flex items-center gap-3 p-2 bg-[#20262e] border border-white/8 rounded-xl text-xs font-medium text-slate-300 hover:border-blue-400/40 hover:text-blue-300 transition-colors text-left max-w-[280px]"
-                        >
-                          <div className="text-blue-300 shrink-0">{action.icon}</div>
-                          {action.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
                   {isLoading && messages.length > 1 && (
                     <div className="flex gap-4">
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-blue-500/10 text-blue-400">
@@ -310,7 +494,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
                       </div>
                       <div className="flex items-center gap-2 rounded-2xl rounded-tl-sm border border-white/8 bg-[#20262e] p-4 shadow-sm">
                         <Loader2 size={14} className="animate-spin text-blue-300" />
-                        <span className="text-xs text-slate-400">Thinking...</span>
+                        <span className="text-xs text-slate-400">{copy.thinking}</span>
                       </div>
                     </div>
                   )}
@@ -321,77 +505,29 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
 
             {/* Input */}
             <div className="shrink-0 border-t border-white/10 bg-[#111820] px-6 py-5">
-              <div className="mb-4 flex items-center justify-center gap-2 border-b border-white/10 pb-4">
-                {quickActions.map((action, i) => (
-                  <button
-                    key={i}
-                    onClick={() => handleSend(action.prompt)}
-                    className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-400 transition-all hover:scale-105 hover:border-blue-400/40 hover:bg-blue-400/10 hover:text-blue-300 active:scale-95"
-                    title={action.label}
-                  >
-                    {action.icon}
-                  </button>
-                ))}
-              </div>
+              {messages.length > 0 && tutorContext.currentMode !== 'reading_mode' && (
+                <div className="mb-4 border-b border-white/10 pb-4">
+                  {renderTutorMode(true)}
+                </div>
+              )}
               <form 
                 onSubmit={(e) => { e.preventDefault(); handleSend(input); }}
                 className="flex flex-col gap-2"
               >
-                <div className="flex items-center justify-between px-1">
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setIsMathMode(!isMathMode)}
-                      className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors ${
-                        isMathMode 
-                          ? 'bg-blue-500/10 text-blue-300' 
-                          : 'text-slate-400 hover:bg-white/5 hover:text-white'
-                      }`}
-                    >
-                      {isMathMode ? <Calculator size={12} /> : <Type size={12} />}
-                      {isMathMode ? 'Math Mode' : 'Text Mode'}
-                    </button>
-                    {isMathMode && (
-                      <div className="relative group flex items-center">
-                        <Info size={14} className="text-slate-500 hover:text-white transition-colors cursor-help" />
-                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2.5 bg-slate-950 text-white text-[10px] leading-relaxed rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 shadow-md">
-                          Type standard math notation (e.g., 1/2 for fractions, ^ for exponents) or use the virtual keyboard that appears when you click the input.
-                          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-ink"></div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
                 <div className="flex items-end gap-2">
-                  {isMathMode ? (
-                    <div className="flex min-h-[52px] flex-1 items-center overflow-hidden rounded-2xl border border-white/10 bg-[#1c232c] px-4 py-3 text-white transition-colors focus-within:border-blue-400/50">
-                      {React.createElement('math-field', {
-                        ref: mathFieldRef,
-                        onInput: (e: any) => setInput(e.target.value),
-                        style: {
-                          width: '100%',
-                          fontSize: '1rem',
-                          border: 'none',
-                          outline: 'none',
-                          background: 'transparent'
-                        }
-                      })}
-                    </div>
-                  ) : (
-                    <textarea
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault();
-                          handleSend(input);
-                        }
-                      }}
-                      placeholder="Ask about this lesson..."
-                      className="min-h-[52px] min-w-0 flex-1 max-h-32 resize-none rounded-2xl border border-white/10 bg-[#1c232c] p-4 text-sm text-slate-100 placeholder:text-slate-500 focus:border-blue-400/50 focus:outline-none custom-scrollbar"
-                      rows={1}
-                    />
-                  )}
+                  <textarea
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSend(input);
+                      }
+                    }}
+                    placeholder={copy.placeholder}
+                    className="min-h-[52px] min-w-0 flex-1 max-h-32 resize-none rounded-2xl border border-white/10 bg-[#1c232c] p-4 text-sm text-slate-100 placeholder:text-slate-500 focus:border-blue-400/50 focus:outline-none custom-scrollbar"
+                    rows={1}
+                  />
                   <button
                     type="submit"
                     disabled={!input.trim() || isLoading}

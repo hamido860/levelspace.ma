@@ -7,6 +7,7 @@ import { supabase } from "../db/supabase";
 import { searchContextForGeneration } from "./ragService";
 import { transformersService } from "./transformersService";
 import { mcpClient } from "./mcpClient";
+import { detectLanguage, LANG_LABELS, resolveExpectedLanguage, type LangCode } from "../mcp/languagePolicy";
 
 export const getCustomApiKey = () => "";
 
@@ -379,16 +380,88 @@ const SIMPLE_THANKS = new Set([
   "حسنا",
 ]);
 
-export function handleSimpleTask(message: string): string | null {
+const SUPPORTED_CHAT_LANGS = new Set<LangCode>(["ar", "fr", "en", "de", "es", "ja"]);
+
+function resolveAssistantLanguage(input: {
+  country?: string;
+  subject?: string;
+  lessonContent?: string;
+  userLanguage?: string;
+}): { code: LangCode; label: string; source: string } {
+  const policyLanguage = input.country && input.subject
+    ? resolveExpectedLanguage(input.country, input.subject)
+    : null;
+  if (policyLanguage) {
+    return { code: policyLanguage, label: LANG_LABELS[policyLanguage] || policyLanguage, source: "curriculum policy" };
+  }
+
+  const detected = input.lessonContent ? detectLanguage(input.lessonContent) : null;
+  if (detected?.dominant && detected.dominant !== "unknown") {
+    return { code: detected.dominant, label: LANG_LABELS[detected.dominant] || detected.dominant, source: "lesson content" };
+  }
+
+  const requested = input.userLanguage as LangCode | undefined;
+  if (requested && SUPPORTED_CHAT_LANGS.has(requested)) {
+    return { code: requested, label: LANG_LABELS[requested] || requested, source: "interface preference" };
+  }
+
+  return { code: "en", label: LANG_LABELS.en, source: "default" };
+}
+
+function localizedSimpleResponse(kind: "greeting" | "thanks", language: LangCode): string {
+  const messages: Record<LangCode, Record<"greeting" | "thanks", string>> = {
+    ar: {
+      greeting: "مرحبا! كيف يمكنني مساعدتك في هذا الدرس اليوم؟",
+      thanks: "على الرحب والسعة! أخبرني إذا كان لديك أي سؤال آخر.",
+    },
+    fr: {
+      greeting: "Bonjour ! Comment puis-je t'aider avec ce cours aujourd'hui ?",
+      thanks: "Avec plaisir ! Dis-moi si tu as une autre question.",
+    },
+    en: {
+      greeting: "Hello! How can I help you with your lesson today?",
+      thanks: "You're welcome! Let me know if you have any other questions.",
+    },
+    de: {
+      greeting: "Hallo! Wie kann ich dir heute bei dieser Lektion helfen?",
+      thanks: "Gern geschehen! Sag mir Bescheid, wenn du noch Fragen hast.",
+    },
+    es: {
+      greeting: "Hola! Como puedo ayudarte con esta leccion hoy?",
+      thanks: "De nada! Dime si tienes otra pregunta.",
+    },
+    ja: {
+      greeting: "こんにちは。このレッスンについて、今日はどう手伝いましょうか。",
+      thanks: "どういたしまして。他にも質問があれば教えてください。",
+    },
+  };
+
+  return messages[language]?.[kind] || messages.en[kind];
+}
+
+function fallbackTutorMessage(language: LangCode): string {
+  const messages: Record<LangCode, string> = {
+    ar: "كيف يمكنني مساعدتك في هذا الدرس؟ يمكنني الإجابة عن الأسئلة أو شرح المفاهيم أو اختبار فهمك.",
+    fr: "Comment puis-je t'aider avec ce cours ? Je peux répondre à tes questions, expliquer des notions ou tester ta compréhension.",
+    en: "How can I help you with this lesson? I can answer questions, explain concepts, or test your knowledge.",
+    de: "Wie kann ich dir bei dieser Lektion helfen? Ich kann Fragen beantworten, Konzepte erklaeren oder dein Verstaendnis testen.",
+    es: "Como puedo ayudarte con esta leccion? Puedo responder preguntas, explicar conceptos o poner a prueba tu comprension.",
+    ja: "このレッスンについて、どう手伝いましょうか。質問への回答、概念の説明、理解度チェックができます。",
+  };
+
+  return messages[language] || messages.en;
+}
+
+export function handleSimpleTask(message: string, language: LangCode = "en"): string | null {
   const cleanMsg = message
     .trim()
     .toLowerCase()
     .replace(/[^\w\sأ-ي]/g, "");
   if (SIMPLE_GREETINGS.has(cleanMsg)) {
-    return "Hello! How can I help you with your lesson today?";
+    return localizedSimpleResponse("greeting", language);
   }
   if (SIMPLE_THANKS.has(cleanMsg)) {
-    return "You're welcome! Let me know if you have any other questions.";
+    return localizedSimpleResponse("thanks", language);
   }
   return null;
 }
@@ -2722,8 +2795,10 @@ export const generateProactiveGreeting = async (
   userLanguage?: string,
   subject?: string,
   grade?: string,
+  country?: string,
 ): Promise<string> => {
   try {
+    const assistantLanguage = resolveAssistantLanguage({ country, subject, lessonContent, userLanguage });
     // 1. Check Cache
     const cacheKey = getCacheKey(
       "generateProactiveGreeting",
@@ -2731,6 +2806,9 @@ export const generateProactiveGreeting = async (
       userLanguage,
       subject,
       grade,
+      country,
+      assistantLanguage.code,
+      "socratic-diagnostic-ui-v1",
     );
     const cachedResponse = await responseCache.get(cacheKey);
     if (cachedResponse) {
@@ -2747,9 +2825,12 @@ export const generateProactiveGreeting = async (
     const response = await generateContentWithFallback(
       {
         model: modelToUse,
-        contents: `Analyze the following lesson content. If the concepts appear particularly complex, advanced, or dense, generate a friendly, proactive message offering to break down the complex parts step-by-step or provide simpler examples. If the content is straightforward, offer to help with any questions, summarize it, or quiz the student on the material. Keep the message brief (1-3 sentences), encouraging, and conversational. Respond in the same language as the lesson content, unless the user's preferred language (${userLanguage || "unknown"}) is different and you think it would help them understand better.
+        contents: `Analyze the following lesson content. If the concepts appear particularly complex, advanced, or dense, generate a friendly, proactive message offering to break down the complex parts step-by-step or provide simpler examples. If the content is straightforward, offer to help with any questions, summarize it, or quiz the student on the material. Keep the message brief (1-3 sentences), encouraging, and conversational.
+
+MANDATORY LANGUAGE: Respond entirely in ${assistantLanguage.label}. This language was selected from ${assistantLanguage.source}. Do not default to English unless the mandatory language is English.
 ${subject ? `SUBJECT: ${subject}` : ""}
 ${grade ? `STUDENT LEVEL: ${grade}` : ""}
+${country ? `COUNTRY: ${country}` : ""}
 
 LESSON CONTENT:
 ${lessonContent.substring(0, 4000)}`,
@@ -2761,7 +2842,7 @@ ${lessonContent.substring(0, 4000)}`,
 
     const responseText =
       response.text ||
-      "How can I help you with this lesson? I can answer questions, explain concepts, or test your knowledge.";
+      fallbackTutorMessage(assistantLanguage.code);
 
     // Save to cache
     await responseCache.set(cacheKey, responseText);
@@ -2769,7 +2850,8 @@ ${lessonContent.substring(0, 4000)}`,
     return responseText;
   } catch (error) {
     handleApiError(error, "generateProactiveGreeting");
-    return "How can I help you with this lesson? I can answer questions, explain concepts, or test your knowledge.";
+    const assistantLanguage = resolveAssistantLanguage({ country, subject, lessonContent, userLanguage });
+    return fallbackTutorMessage(assistantLanguage.code);
   }
 };
 
@@ -2787,8 +2869,10 @@ export const chatWithTutor = async (
   strictRAG?: boolean,
   subject?: string,
   grade?: string,
+  country?: string,
 ): Promise<string> => {
   try {
+    const assistantLanguage = resolveAssistantLanguage({ country, subject, lessonContent: lessonContext, userLanguage });
     // 1. Check Cache
     const cacheKey = getCacheKey(
       "chatWithTutor",
@@ -2800,6 +2884,9 @@ export const chatWithTutor = async (
       strictRAG,
       subject,
       grade,
+      country,
+      assistantLanguage.code,
+      "socratic-diagnostic-v1",
     );
     const cachedResponse = await responseCache.get(cacheKey);
     if (cachedResponse) {
@@ -2808,7 +2895,7 @@ export const chatWithTutor = async (
     }
 
     // 2. Check Simple Task
-    const simpleResponse = handleSimpleTask(message);
+    const simpleResponse = handleSimpleTask(message, assistantLanguage.code);
     if (simpleResponse) {
       console.log("Pipeline: Simple task matched");
       return simpleResponse;
@@ -2836,13 +2923,78 @@ export const chatWithTutor = async (
       }
     }
 
-    const strictRagInstruction = strictRAG ? `\nSTRICT RAG MODE IS ENABLED: You MUST ONLY answer based on the provided LESSON CONTENT and ADDITIONAL RELEVANT CONTEXT. Do NOT generate content outside this context. Do NOT suggest ideas that are not mathematically or logically derivable strictly from the provided text.` : `SECONDARY RULE: If the user asks a question or requests information that is NOT covered in the provided contexts, answer carefully and briefly mention when you are bringing in outside knowledge to supplement the lesson.`;
-    const systemInstruction = `You are an AI tutor helping a student understand a specific lesson.
-PRIMARY RULE: You should first try to answer questions, explain concepts, extend ideas, or generate practice questions using ONLY the provided LESSON CONTENT and ADDITIONAL RELEVANT CONTEXT.
+    const strictRagInstruction = strictRAG ? `\nSTRICT LESSON-CONTEXT MODE: You MUST ONLY answer based on the provided LESSON CONTENT and ADDITIONAL LESSON CONTEXT. Do NOT generate content outside this context. Do NOT suggest ideas that are not mathematically or logically derivable strictly from the provided text.` : `SECONDARY RULE: If the student asks about something not covered in the provided contexts, answer carefully and briefly say that the lesson text does not show that part clearly.`;
+    const socraticDiagnosticInstruction = `You are the Levelspace Socratic Diagnostic Adaptive Tutor.
+Your job is not to lecture.
+Your job is to find the student's exact blockage and guide one step at a time.
+
+For each turn, choose exactly one action:
+1. diagnose
+2. explain one small point
+3. give one example
+4. ask one mini-check
+5. repair a misconception
+6. start one quiz question
+
+Never do more than one major action in the same turn.
+
+If the student asks for help finding what is difficult, trigger diagnostic_mode.
+If the student says words are difficult, trigger vocabulary_diagnostic_mode.
+If the student asks for an example and the section is known, give an example immediately.
+If the student answers incorrectly, give a hint before the final answer.
+If the student repeats the same request, continue from state instead of restarting.
+
+Avoid:
+- polite filler
+- "Bien sur" as a repeated opener
+- "Je suis la pour t'aider"
+- long introductions
+- broad generic questions
+- repeated greetings
+- full lectures
+- fake curriculum content
+- internal system details
+
+Keep student-facing answers short. Every explanation must end with one mini-check question.
+Never mention RAG, embeddings, chunks, Supabase, metadata, vector search, generation pipelines, source tables, confidence, tool calls, or admin validation.`;
+    const tutorUiInstruction = `OPTIONAL UI INSTRUCTION:
+When the conversation clearly enters a tutoring UI state, you may append ONE machine-readable block after the student-facing answer.
+Use this exact wrapper and valid JSON only:
+<tutor-ui>{"ui_mode":"diagnostic_mode","event":"ASK_HELP","studentText":"...","assistantText":"On va trouver le blocage exact. Choisis ce qui bloque le plus.","card":"diagnostic_selector"}</tutor-ui>
+
+Allowed ui_mode values:
+- diagnostic_mode: student asks for help finding what is difficult.
+- vocabulary_diagnostic_mode: student says words are difficult.
+- sentence_diagnostic_mode: student says a sentence is difficult.
+- example_mode: student asks for an example and the section is known.
+- explanation_mode: student asks for a small explanation.
+- quiz_mode: student asks for a quiz. Include exactly one question.
+- repair_mode: student answer is wrong, partial, or blocked.
+- summary_mode: student asks for a summary.
+- reading_mode: use only when there is a clear reason to return to normal reading.
+
+For quiz_mode, use this shape:
+<tutor-ui>{"ui_mode":"quiz_mode","event":"START_QUIZ","studentText":"...","assistantText":"Essaie cette question.","card":"quiz_card","question":{"question_text":"...","question_type":"mcq_single","options":["...","...","...","..."],"correct_answer":"...","hint":"...","explanation":"...","difficulty":1,"skill_code":"...","misconception_tag":"..."}}</tutor-ui>
+
+Rules:
+- Never show or explain the UI JSON to the student.
+- Do not include a UI instruction unless a clear tutoring state transition is useful.
+- Ask only one quiz question at a time.
+- Do not ask "Quel exemple veux-tu ?" if the lesson concept is known.
+- Do not ask broad open questions when diagnostic_mode or a diagnostic card is appropriate.
+- Keep all visible text in ${assistantLanguage.label}.`;
+    const systemInstruction = `You are a calm Levelspace tutor helping a student understand a specific lesson.
+PRIMARY RULE: First help the student locate the exact difficulty, then adapt the explanation. Use ONLY the provided LESSON CONTENT and ADDITIONAL LESSON CONTEXT.
+${socraticDiagnosticInstruction}
+${tutorUiInstruction}
 ${strictRagInstruction}
 ${subject ? `SUBJECT: ${subject}` : ""}
 ${grade ? `STUDENT LEVEL: ${grade}` : ""}
-${userLanguage ? `\nThe user's preferred interface language is '${userLanguage}'. If they ask for explanations in another language, or if it helps them understand better, feel free to use their preferred language or any other language they request.` : ""}
+${country ? `COUNTRY: ${country}` : ""}
+
+MANDATORY LANGUAGE: Answer entirely in ${assistantLanguage.label}. This language was selected from ${assistantLanguage.source}. Do not default to English unless the mandatory language is English.
+If the student explicitly asks to translate or explain in another language, honor that request, but otherwise keep the answer in ${assistantLanguage.label}.
+${userLanguage ? `The user's interface language is '${userLanguage}', but lesson/curriculum language takes priority for tutoring answers.` : ""}
 
 LESSON CONTENT:
 ${augmentedContext}`;
@@ -2860,7 +3012,7 @@ ${augmentedContext}`;
     }, "chatWithTutor");
 
     const responseText =
-      response.text || "I'm sorry, I couldn't generate a response.";
+      response.text || fallbackTutorMessage(assistantLanguage.code);
 
     // Save to cache
     await responseCache.set(cacheKey, responseText);
