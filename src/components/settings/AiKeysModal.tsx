@@ -512,8 +512,9 @@ export const AiKeysModal: React.FC<AiKeysModalProps> = ({ isOpen, onClose, mode 
                 <button
                   type="button"
                   onClick={() => setShowKey(!showKey)}
-                  className="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-ink/5 transition-all"
+                  className="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-ink/5 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
                   title={showKey ? 'Hide key' : 'Show key'}
+                  aria-label={showKey ? 'Hide key' : 'Show key'}
                 >
                   {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -656,8 +657,9 @@ export const AiKeysModal: React.FC<AiKeysModalProps> = ({ isOpen, onClose, mode 
                       <button
                         onClick={() => handleDeleteKey(key)}
                         disabled={!!busy}
-                        className="p-1.5 rounded-lg border border-ink/5 text-muted hover:text-error hover:bg-error/5 hover:border-error/15 transition-all cursor-pointer disabled:opacity-40"
+                        className="p-1.5 rounded-lg border border-ink/5 text-muted hover:text-error hover:bg-error/5 hover:border-error/15 transition-all cursor-pointer disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
                         title="Delete from browser vault"
+                        aria-label="Delete API key"
                       >
                         {busy === `${key.id}:delete` ? (
                           <Loader2 size={12} className="animate-spin" />
