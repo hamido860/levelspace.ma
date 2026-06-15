@@ -375,7 +375,8 @@ const CauseEffect: React.FC<{ lessonId: string }> = ({ lessonId }) => {
             <div className="grid grid-cols-1 gap-2 p-4 bg-background rounded-2xl border border-ink/5 shadow-sm group/item relative">
               <button 
                 onClick={() => removePair(i)}
-                className="absolute top-2 right-2 p-1 text-muted/40 hover:text-destructive opacity-0 group-hover/item:opacity-100 transition-all"
+                aria-label="Remove relationship"
+                className="absolute top-2 right-2 p-1 text-muted/40 hover:text-destructive opacity-0 group-hover/item:opacity-100 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 transition-all"
               >
                 <X size={12} />
               </button>
@@ -624,7 +625,8 @@ export const PedagogicalTools: React.FC<ToolProps> = ({ category, lessonId }) =>
         <div className="relative group">
           <button 
             onClick={() => setInfoToolId(infoToolId === 'tip' ? null : 'tip')}
-            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+            aria-label={infoToolId === 'tip' ? 'Close tip' : 'Show tip'}
+            className={`w-10 h-10 rounded-full flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 transition-all ${
               infoToolId === 'tip' ? 'bg-accent text-white' : 'bg-surface-low text-muted hover:text-[#f1681c] hover:bg-accent/10'
             }`}
           >
@@ -700,7 +702,8 @@ export const PedagogicalTools: React.FC<ToolProps> = ({ category, lessonId }) =>
                   </div>
                   <button 
                     onClick={() => setActiveTool(null)}
-                    className="p-3 hover:bg-background rounded-2xl transition-all hover:rotate-90 text-muted"
+                    aria-label="Close modal"
+                    className="p-3 hover:bg-background rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 transition-all hover:rotate-90 text-muted"
                   >
                     <X size={24} />
                   </button>
