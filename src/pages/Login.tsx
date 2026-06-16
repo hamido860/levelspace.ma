@@ -96,7 +96,7 @@ export const Login: React.FC = () => {
   return (
     <Layout hideSidebar>
       <SEO title={mode === 'login' ? "Login" : "Sign Up"} />
-      <div className="relative flex min-h-[100dvh] w-full items-center justify-center overflow-y-auto bg-[#f7f7f6] p-3 font-sans sm:p-5">
+      <div className="relative flex min-h-[100dvh] w-full items-center justify-center overflow-y-auto bg-slate-950 p-2 font-sans sm:p-4">
         {/* Background Accents with Animation */}
         <motion.div 
           animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
@@ -113,17 +113,17 @@ export const Login: React.FC = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: "easeOut" }}
-          className="relative z-10 grid w-full max-w-6xl overflow-hidden rounded-[2rem] border border-black/5 bg-white shadow-2xl shadow-black/5 md:min-h-[min(700px,calc(100dvh-2.5rem))] md:grid-cols-[0.75fr_1.25fr]"
+          className="relative z-10 grid w-full max-w-[58rem] overflow-hidden rounded-[1.5rem] border border-white/10 bg-slate-950 shadow-2xl shadow-black/30 md:min-h-[min(560px,calc(100dvh-2rem))] md:grid-cols-[0.92fr_1.08fr]"
         >
           {/* Left Panel: Premium Branding & Info showcase (Hidden on narrow mobile) */}
-          <aside className="relative hidden overflow-hidden bg-slate-950 p-9 text-white md:flex md:flex-col md:justify-between">
+          <aside className="relative hidden overflow-hidden bg-slate-950 p-7 text-white md:flex md:flex-col md:justify-center">
             <div className="absolute -right-20 -top-16 h-64 w-64 rounded-full bg-accent/30 blur-3xl pointer-events-none" />
             <div className="absolute -bottom-20 -left-14 h-56 w-56 rounded-full bg-blue-400/20 blur-3xl pointer-events-none" />
             
             <div className="relative">
-              <div className="mb-8 flex items-center gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent text-white shadow-lg shadow-accent/30">
-                  <Sparkles className="h-6 w-6" />
+              <div className="mb-7 flex items-center gap-4">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-accent text-white shadow-lg shadow-accent/30">
+                  <Sparkles className="h-5 w-5" />
                 </div>
                 <span className="font-display text-2xl font-bold tracking-tight">Levelspace</span>
               </div>
@@ -134,7 +134,7 @@ export const Login: React.FC = () => {
               </p>
             </div>
 
-            <div className="relative mt-7 space-y-2.5">
+            <div className="relative mt-7 hidden space-y-2.5 xl:block">
               {[
                 ['01', 'Curriculum-aware classrooms'],
                 ['02', 'AI-guided modular lessons'],
@@ -149,38 +149,38 @@ export const Login: React.FC = () => {
           </aside>
 
           {/* Right Panel: Clean form selection & inputs */}
-          <div className="flex flex-col justify-center bg-slate-50/80 p-5 text-slate-950 sm:p-8 md:p-10">
-            <div className="mx-auto w-full max-w-[31rem] rounded-[1.75rem] border border-slate-200/80 bg-white p-5 shadow-xl shadow-slate-900/5 sm:p-7">
-            <div className="flex flex-col gap-5">
+          <div className="flex flex-col justify-center bg-slate-950 p-5 text-white sm:p-7 md:p-8">
+            <div className="mx-auto w-full max-w-[25rem]">
+            <div className="flex flex-col gap-3.5">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-accent text-white shadow-lg shadow-accent/25">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent text-white shadow-lg shadow-accent/25">
                   <Sparkles className="h-5 w-5" />
                 </div>
-                <span className="font-display text-xl font-bold tracking-tight text-slate-950">Levelspace</span>
+                <span className="font-display text-lg font-bold tracking-tight text-white">Levelspace</span>
               </div>
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+              <span className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-300">
                 Secure
               </span>
             </div>
-            <div className="space-y-2.5">
-              <h2 className="text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
+            <div className="space-y-1.5">
+              <h2 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
                 {mode === 'login' ? 'Welcome back' : 'Create your space'}
               </h2>
-              <p className="text-base font-medium text-slate-500">
+              <p className="text-sm font-medium text-slate-400">
                 {mode === 'login' ? 'Please enter your details to sign in.' : 'Find your level. Build your skills. Level up with confidence.'}
               </p>
             </div>
 
             {/* Tab Selector */}
-            <div className="flex shrink-0 rounded-2xl bg-slate-100 p-1">
+            <div className="flex shrink-0 rounded-xl bg-white/10 p-1">
               <button
                 type="button"
                 onClick={() => setMode('login')}
-                className={`flex-1 rounded-xl py-2.5 text-sm font-semibold transition-all cursor-pointer ${
+                className={`flex-1 rounded-lg py-2 text-sm font-semibold transition-all cursor-pointer ${
                   mode === 'login'
                     ? 'bg-white text-slate-950 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700'
+                    : 'text-slate-300 hover:text-white'
                 }`}
               >
                 Sign In
@@ -188,10 +188,10 @@ export const Login: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setMode('signup')}
-                className={`flex-1 rounded-xl py-2.5 text-sm font-semibold transition-all cursor-pointer ${
+                className={`flex-1 rounded-lg py-2 text-sm font-semibold transition-all cursor-pointer ${
                   mode === 'signup'
                     ? 'bg-white text-slate-950 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700'
+                    : 'text-slate-300 hover:text-white'
                 }`}
               >
                 Sign Up
@@ -199,16 +199,16 @@ export const Login: React.FC = () => {
             </div>
 
             {error && (
-              <div className="flex items-center gap-3 rounded-xl border border-destructive/20 bg-destructive/10 p-3 text-xs text-destructive">
+              <div className="flex items-center gap-3 rounded-xl border border-red-400/20 bg-red-400/10 p-2.5 text-xs text-red-200">
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 {error}
               </div>
             )}
 
-            <form className="space-y-4" onSubmit={handleAuth}>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-mono font-bold text-slate-500 uppercase tracking-normal px-1 flex items-center gap-3">
+            <form className="space-y-3" onSubmit={handleAuth}>
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <label className="flex items-center gap-2 px-1 text-xs font-bold uppercase tracking-[0.12em] text-slate-300">
                     <Mail className="w-4 h-4" />
                     Email Address
                   </label>
@@ -218,12 +218,12 @@ export const Login: React.FC = () => {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="name@example.com"
-                    className="h-13 w-full rounded-2xl border border-slate-200 bg-white px-5 text-base font-medium text-slate-950 outline-none transition-all placeholder:text-slate-500 hover:border-slate-300 focus:border-accent/40 focus:ring-2 focus:ring-accent/30"
+                    className="h-11 w-full rounded-xl border border-white/10 bg-white/10 px-4 text-sm font-medium text-white outline-none transition-all placeholder:text-slate-500 hover:border-white/20 focus:border-accent/50 focus:ring-2 focus:ring-accent/25"
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <div className="flex items-center justify-between px-1">
-                    <label className="text-sm font-mono font-bold text-slate-500 uppercase tracking-normal flex items-center gap-3">
+                    <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.12em] text-slate-300">
                       <Lock className="w-4 h-4" />
                       Password
                     </label>
@@ -240,7 +240,7 @@ export const Login: React.FC = () => {
                           });
                           alert("If an account exists, a password reset email has been sent.");
                         }}
-                        className="text-sm font-semibold text-accent hover:underline"
+                        className="text-xs font-semibold text-accent hover:underline"
                       >
                         Forgot password?
                       </button>
@@ -252,7 +252,7 @@ export const Login: React.FC = () => {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="h-13 w-full rounded-2xl border border-slate-200 bg-white px-5 text-base font-medium text-slate-950 outline-none transition-all placeholder:text-slate-500 hover:border-slate-300 focus:border-accent/40 focus:ring-2 focus:ring-accent/30"
+                    className="h-11 w-full rounded-xl border border-white/10 bg-white/10 px-4 text-sm font-medium text-white outline-none transition-all placeholder:text-slate-500 hover:border-white/20 focus:border-accent/50 focus:ring-2 focus:ring-accent/25"
                   />
                 </div>
               </div>
@@ -260,7 +260,7 @@ export const Login: React.FC = () => {
               <button 
                 type="submit"
                 disabled={loading}
-                className="group flex h-13 w-full cursor-pointer items-center justify-center gap-3 rounded-2xl bg-slate-950 text-base font-semibold text-white shadow-md shadow-slate-950/15 transition-all hover:-translate-y-0.5 hover:shadow-lg hover:shadow-slate-950/25 active:scale-[0.98] disabled:opacity-50 disabled:hover:translate-y-0"
+                className="group flex h-11 w-full cursor-pointer items-center justify-center gap-3 rounded-xl bg-white text-sm font-bold text-slate-950 shadow-md shadow-black/20 transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.98] disabled:opacity-50 disabled:hover:translate-y-0"
               >
                 {loading ? 'Processing...' : mode === 'login' ? 'Sign In' : 'Sign Up'}
                 {!loading && <LogIn className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" />}
@@ -271,7 +271,7 @@ export const Login: React.FC = () => {
               type="button"
               disabled={loading}
               onClick={handleDemoAdminLogin}
-              className="flex h-13 w-full cursor-pointer items-center justify-center gap-3 rounded-2xl border border-accent/20 bg-accent/5 text-sm font-semibold text-accent transition-all hover:bg-accent/10 disabled:opacity-50"
+              className="flex h-11 w-full cursor-pointer items-center justify-center gap-3 rounded-xl border border-accent/30 bg-accent/10 text-sm font-semibold text-blue-200 transition-all hover:bg-accent/20 disabled:opacity-50"
             >
               <Sparkles className="w-5 h-5" />
               Continue as Demo Admin
@@ -280,27 +280,27 @@ export const Login: React.FC = () => {
 
             <div className="relative py-0.5">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-ink/5"></div>
+                <div className="w-full border-t border-white/10"></div>
               </div>
-              <div className="relative flex justify-center text-xs font-bold uppercase tracking-[0.22em]">
-                <span className="bg-white px-6 text-slate-400">Or continue with</span>
+              <div className="relative flex justify-center text-[10px] font-bold uppercase tracking-[0.18em]">
+                <span className="bg-slate-950 px-4 text-slate-500">Or continue with</span>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-2.5">
               <button 
                 onClick={() => handleSocialLogin('google')}
-                className="group flex h-12 cursor-pointer items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-md"
+                className="group flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 transition-all hover:-translate-y-0.5 hover:bg-white/10"
               >
                 <img src="https://www.google.com/favicon.ico" alt="Google" className="w-4 h-4 grayscale group-hover:grayscale-0 transition-all" />
-                <span className="text-sm font-bold uppercase tracking-normal text-slate-950">Google</span>
+                <span className="text-xs font-bold uppercase tracking-normal text-white">Google</span>
               </button>
               <button 
                 onClick={() => handleSocialLogin('facebook')}
-                className="group flex h-12 cursor-pointer items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-md"
+                className="group flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 transition-all hover:-translate-y-0.5 hover:bg-white/10"
               >
                 <Facebook className="w-5 h-5 text-[#1877F2]" />
-                <span className="text-sm font-bold uppercase tracking-normal text-slate-950">Facebook</span>
+                <span className="text-xs font-bold uppercase tracking-normal text-white">Facebook</span>
               </button>
             </div>
             </div>
