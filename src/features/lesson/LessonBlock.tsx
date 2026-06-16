@@ -155,8 +155,12 @@ const normalizeLessonMarkdown = (value: string, titleContext: string) => {
   return stripDuplicateLeadingHeadings(normalized, titleContext);
 };
 
-const MarkdownText: React.FC<{ children?: string; titleContext?: string }> = ({ children, titleContext = '' }) => (
-  <div className="lesson-reader-markdown">
+const MarkdownText: React.FC<{ children?: string; titleContext?: string; compact?: boolean }> = ({
+  children,
+  titleContext = '',
+  compact = false,
+}) => (
+  <div className={`lesson-reader-markdown ${compact ? 'lesson-reader-markdown--compact' : ''}`}>
     <Markdown {...markdownPlugins}>{normalizeLessonMarkdown(children || '', titleContext)}</Markdown>
   </div>
 );
@@ -170,7 +174,7 @@ const SolutionPanel: React.FC<{ title?: string; content?: string }> = ({ title =
     <div className="flex items-start gap-3">
       <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-success" />
       <div className="min-w-0">
-        <p className="text-sm font-bold text-ink">{title}</p>
+        <p className="lesson-answer-panel__title">{title}</p>
         <MarkdownText>{content || ''}</MarkdownText>
       </div>
     </div>
@@ -277,7 +281,9 @@ export const LessonBlock: React.FC<LessonBlockProps> = ({
 
       {quiz && Array.isArray(quiz.options) && (
         <div className="lesson-reader-check">
-          <MarkdownText>{quiz.question}</MarkdownText>
+          <div className="lesson-reader-question">
+            <MarkdownText>{quiz.question}</MarkdownText>
+          </div>
           <div className="lesson-reader-options">
             {quiz.options.map((option: string, optionIndex: number) => {
               const answered = quizAnswered[sourceIndex];
@@ -291,7 +297,7 @@ export const LessonBlock: React.FC<LessonBlockProps> = ({
                   onClick={() => onQuizAnswer(sourceIndex, option, quiz.correctAnswer)}
                   className={`lesson-reader-option ${answered && correct ? 'lesson-reader-option--correct' : ''} ${answered && selected && !correct ? 'lesson-reader-option--wrong' : ''}`}
                 >
-                  <span><MarkdownText>{option}</MarkdownText></span>
+                  <span className="lesson-reader-option__text"><MarkdownText compact>{option}</MarkdownText></span>
                   {answered && correct && <CheckCircle2 size={18} />}
                   {answered && selected && !correct && <XCircle size={18} />}
                 </button>
@@ -305,7 +311,7 @@ export const LessonBlock: React.FC<LessonBlockProps> = ({
                 animate={{ opacity: 1, height: 'auto' }}
                 className={`lesson-feedback ${quizCorrect[sourceIndex] ? 'lesson-feedback--good' : 'lesson-feedback--review'}`}
               >
-                <strong>{quizCorrect[sourceIndex] ? 'Correct.' : 'Review this idea.'}</strong>
+                <p className="lesson-feedback__title">{quizCorrect[sourceIndex] ? 'Correct.' : 'Review this idea.'}</p>
                 {quiz.explanation && <MarkdownText>{quiz.explanation}</MarkdownText>}
               </motion.div>
             )}
@@ -315,7 +321,9 @@ export const LessonBlock: React.FC<LessonBlockProps> = ({
 
       {exercise && (
         <div className="lesson-reader-check">
-          <MarkdownText>{exercise.question || exercise.prompt}</MarkdownText>
+          <div className="lesson-reader-question">
+            <MarkdownText>{exercise.question || exercise.prompt}</MarkdownText>
+          </div>
           <div className="lesson-reader-actions">
             {exercise.hint && (
               <button type="button" onClick={() => onShowExerciseHint(sourceIndex)} className="lesson-reader-secondary">
@@ -336,7 +344,9 @@ export const LessonBlock: React.FC<LessonBlockProps> = ({
       {exam && (
         <div className="lesson-reader-check lesson-reader-check--exam">
           {exam.source && <p className="lesson-reader-eyebrow">{exam.source}</p>}
-          <MarkdownText>{exam.question}</MarkdownText>
+          <div className="lesson-reader-question">
+            <MarkdownText>{exam.question}</MarkdownText>
+          </div>
           <div className="lesson-reader-actions">
             {exam.hint && (
               <button type="button" onClick={() => onShowExamHint(sourceIndex)} className="lesson-reader-secondary">

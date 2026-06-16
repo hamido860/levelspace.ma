@@ -556,6 +556,25 @@
   background: color-mix(in srgb, var(--surface-low) 86%, black);
 }
 
+.lesson-reader-markdown--compact {
+  max-width: none;
+  font-size: inherit;
+  line-height: 1.45;
+  color: inherit;
+}
+
+.lesson-reader-markdown--compact p,
+.lesson-reader-markdown--compact ul,
+.lesson-reader-markdown--compact ol {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.lesson-reader-markdown--compact ul,
+.lesson-reader-markdown--compact ol {
+  padding-inline-start: 1.1rem;
+}
+
 .lesson-reader-markdown *,
 .lesson-reader-block,
 .lesson-reader-block * {
@@ -588,14 +607,25 @@
 
 .lesson-reader-example,
 .lesson-reader-check,
-.lesson-answer-panel,
 .lesson-hint {
   @apply rounded-2xl bg-surface-low p-4;
   max-width: 68ch;
 }
 
+.lesson-reader-check {
+  @apply border border-surface-mid/70;
+}
+
 .lesson-reader-check--exam {
   @apply bg-warning-soft/70;
+}
+
+.lesson-reader-question {
+  @apply text-base font-semibold text-ink;
+}
+
+.lesson-reader-question .lesson-reader-markdown {
+  color: var(--ink);
 }
 
 .lesson-reader-example__step {
@@ -607,7 +637,11 @@
 }
 
 .lesson-reader-option {
-  @apply flex w-full items-center justify-between gap-3 rounded-2xl border border-surface-mid bg-paper px-4 py-3 text-left text-sm font-medium text-ink transition-colors hover:border-ink/15 disabled:cursor-default;
+  @apply flex w-full items-start justify-between gap-3 rounded-2xl border border-surface-mid bg-paper px-4 py-3 text-left text-sm font-semibold text-ink transition-colors hover:border-ink/15 hover:bg-surface-low disabled:cursor-default;
+}
+
+.lesson-reader-option__text {
+  @apply min-w-0 flex-1;
 }
 
 .lesson-reader-option--correct {
@@ -620,6 +654,10 @@
 
 .lesson-feedback {
   @apply mt-4 rounded-2xl p-4 text-sm;
+}
+
+.lesson-feedback__title {
+  @apply mb-1 font-extrabold;
 }
 
 .lesson-feedback--good {
@@ -645,6 +683,15 @@
 
 .lesson-reader-secondary {
   @apply bg-paper text-ink hover:bg-surface-mid;
+}
+
+.lesson-answer-panel {
+  @apply rounded-2xl border border-success/20 bg-success-soft/60 p-4;
+  max-width: 68ch;
+}
+
+.lesson-answer-panel__title {
+  @apply mb-2 text-sm font-extrabold text-success;
 }
 
 .lesson-reader-outline {
