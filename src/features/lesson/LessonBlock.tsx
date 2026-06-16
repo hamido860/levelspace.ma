@@ -102,11 +102,19 @@ const stripDuplicateLeadingHeadings = (markdown: string, title: string) => {
 const lessonLabelPattern = String.raw`(?:Ex(?:emple)?|Remarque|Attention|Important|R[eè]gle|Regle|D[eé]finition|Definition|M[eé]thode|Methode|Astuce|A retenir|À retenir|R[eé]ponse|Reponse|Solution|Correction|Conclusion|Pourquoi)`;
 const recapTableLabelPattern = String.raw`(?:AVOIR|ETRE|ÊTRE|Participe\s+pass(?:e|é))`;
 
+const accentFrenchVerbRecap = (markdown: string) =>
+  markdown
+    .replace(/\bETRE\b/g, 'ÊTRE')
+    .replace(/\bParticipe passe\b/gi, 'Participe passé')
+    .replace(/\betre\s*->\s*ete\b/gi, 'être -> été')
+    .replace(/\b(aller\s*->\s*)alle\b/gi, '$1allé')
+    .replace(/\b(manger\s*->\s*)mange\b/gi, '$1mangé');
+
 const formatRecapTable = (markdown: string) => {
   if (!/Tableau\s+r[eé]cap/i.test(markdown)) return markdown;
 
   const recapLabelRegex = new RegExp(`\\b(${recapTableLabelPattern})\\s*:`, 'gi');
-  const normalized = markdown.replace(/\bViewed\b/gi, '').replace(/\s+/g, ' ').trim();
+  const normalized = accentFrenchVerbRecap(markdown).replace(/\bViewed\b/gi, '').replace(/\s+/g, ' ').trim();
   const labels = Array.from(normalized.matchAll(recapLabelRegex));
 
   if (labels.length < 2) return markdown;
@@ -129,7 +137,7 @@ const formatRecapTable = (markdown: string) => {
 };
 
 const normalizeLessonMarkdown = (value: string, titleContext: string) => {
-  const normalized = formatRecapTable(value)
+  const normalized = accentFrenchVerbRecap(formatRecapTable(value))
     .replace(/\\r\\n|\\n|\\r/g, '\n')
     .replace(/\r\n?/g, '\n')
     .replace(/\t/g, '  ')
