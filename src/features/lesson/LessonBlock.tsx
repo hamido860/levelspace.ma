@@ -100,9 +100,36 @@ const stripDuplicateLeadingHeadings = (markdown: string, title: string) => {
 };
 
 const lessonLabelPattern = String.raw`(?:Ex(?:emple)?|Remarque|Attention|Important|R[eè]gle|Regle|D[eé]finition|Definition|M[eé]thode|Methode|Astuce|A retenir|À retenir|R[eé]ponse|Reponse|Solution|Correction|Conclusion|Pourquoi)`;
+const recapTableLabelPattern = String.raw`(?:AVOIR|ETRE|ÊTRE|Participe\s+pass(?:e|é))`;
+
+const formatRecapTable = (markdown: string) => {
+  if (!/Tableau\s+r[eé]cap/i.test(markdown)) return markdown;
+
+  const recapLabelRegex = new RegExp(`\\b(${recapTableLabelPattern})\\s*:`, 'gi');
+  const normalized = markdown.replace(/\bViewed\b/gi, '').replace(/\s+/g, ' ').trim();
+  const labels = Array.from(normalized.matchAll(recapLabelRegex));
+
+  if (labels.length < 2) return markdown;
+
+  const rows = labels.map((match, index) => {
+    const label = match[1].replace(/\s+/g, ' ').trim();
+    const start = (match.index || 0) + match[0].length;
+    const end = labels[index + 1]?.index ?? normalized.length;
+    const summary = normalized.slice(start, end).trim().replace(/\|/g, '\\|');
+    return `| **${label}** | ${summary} |`;
+  });
+
+  return [
+    '### Tableau recap',
+    '',
+    '| Point | Resume |',
+    '| --- | --- |',
+    ...rows,
+  ].join('\n');
+};
 
 const normalizeLessonMarkdown = (value: string, titleContext: string) => {
-  const normalized = value
+  const normalized = formatRecapTable(value)
     .replace(/\\r\\n|\\n|\\r/g, '\n')
     .replace(/\r\n?/g, '\n')
     .replace(/\t/g, '  ')
