@@ -228,7 +228,7 @@ export const LessonBlock: React.FC<LessonBlockProps> = ({
           <Icon size={18} />
         </div>
         <div className="min-w-0 flex-1">
-          {headingLabel && <p className="lesson-reader-eyebrow">{headingLabel}</p>}
+          {headingLabel && <h2 className="lesson-reader-block__title">{headingLabel}</h2>}
         </div>
         <span className={`lesson-reader-block__status ${isViewed ? 'lesson-reader-block__status--viewed' : ''}`}>
           {isViewed ? 'Viewed' : 'New'}
