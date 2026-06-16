@@ -4,3 +4,10 @@
 ## 2026-05-22 - Dexie array derivations
 **Learning:** The same pattern from the 2024-05-09 entry (Dexie live queries returning raw arrays that get transformed into derived objects causing cascading re-renders) also affects array filtering and mapping operations like `.filter()` and `.map()`.
 **Action:** Wrap all complex array derivations off of `useLiveQuery` arrays in `useMemo`.
+## 2026-05-22 - Dexie array derivations
+**Learning:** The same pattern from the 2024-05-09 entry (Dexie live queries returning raw arrays that get transformed into derived objects causing cascading re-renders) also affects array filtering and mapping operations like `.filter()` and `.map()`.
+**Action:** Wrap all complex array derivations off of `useLiveQuery` arrays in `useMemo`.
+
+## 2024-05-23 - Dexie array fallback optimization
+**Learning:** Returning inline `|| []` as a fallback from `useLiveQuery` triggers the same cascading re-render problem during the loading state, as the array reference changes constantly.
+**Action:** Always define a static `const EMPTY_ARRAY = []` outside components and use it as `useLiveQuery` array fallbacks.
