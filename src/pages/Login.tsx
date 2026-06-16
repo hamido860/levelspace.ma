@@ -96,7 +96,7 @@ export const Login: React.FC = () => {
   return (
     <Layout hideSidebar>
       <SEO title={mode === 'login' ? "Login" : "Sign Up"} />
-      <div className="relative flex min-h-[100dvh] w-full items-center justify-center overflow-y-auto bg-slate-950 p-2 font-sans sm:p-4">
+      <div className="relative flex h-[100dvh] w-full items-center justify-center overflow-hidden bg-slate-950 p-2 font-sans sm:p-4">
         {/* Background Accents with Animation */}
         <motion.div 
           animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
@@ -113,7 +113,7 @@ export const Login: React.FC = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: "easeOut" }}
-          className="relative z-10 grid w-full max-w-[46rem] overflow-hidden rounded-[1.25rem] border border-white/10 bg-slate-950 shadow-2xl shadow-black/30 md:min-h-[min(448px,calc(100dvh-2rem))] md:grid-cols-[0.92fr_1.08fr]"
+          className="relative z-10 grid max-h-[calc(100dvh-1rem)] w-full max-w-[46rem] overflow-hidden rounded-[1.25rem] border border-white/10 bg-slate-950 shadow-2xl shadow-black/30 md:h-[min(448px,calc(100dvh-2rem))] md:grid-cols-[0.92fr_1.08fr]"
         >
           {/* Left Panel: Premium Branding & Info showcase (Hidden on narrow mobile) */}
           <aside className="relative hidden overflow-hidden bg-slate-950 p-5 text-white md:flex md:flex-col md:justify-center">
