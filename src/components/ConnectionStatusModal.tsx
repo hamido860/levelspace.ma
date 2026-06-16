@@ -104,6 +104,7 @@ export const ConnectionStatusModal: React.FC<ConnectionStatusModalProps> = ({
             </div>
             <button 
               onClick={onClose}
+              aria-label="Close dialog"
               className="p-2 hover:bg-ink/5 rounded-full transition-colors"
             >
               <X className="w-5 h-5" />
