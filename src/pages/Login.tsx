@@ -10,8 +10,6 @@ import {
   Mail, 
   Lock, 
   Sparkles,
-  BookOpen,
-  CheckCircle2,
   AlertCircle
 } from 'lucide-react';
 import { motion } from 'motion/react';
@@ -98,7 +96,7 @@ export const Login: React.FC = () => {
   return (
     <Layout hideSidebar>
       <SEO title={mode === 'login' ? "Login" : "Sign Up"} />
-      <div className="min-h-[100dvh] w-full flex items-center justify-center bg-[#f7f7f6] p-3 font-sans relative overflow-hidden">
+      <div className="relative flex min-h-[100dvh] w-full items-center justify-center overflow-y-auto bg-[#f7f7f6] p-3 font-sans sm:p-5">
         {/* Background Accents with Animation */}
         <motion.div 
           animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
@@ -115,7 +113,7 @@ export const Login: React.FC = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: "easeOut" }}
-          className="relative z-10 grid w-full max-w-6xl overflow-hidden rounded-[2rem] border border-black/5 bg-white shadow-2xl shadow-black/5 md:min-h-[min(690px,calc(100dvh-1.5rem))] md:grid-cols-[0.78fr_1.22fr]"
+          className="relative z-10 grid w-full max-w-6xl overflow-hidden rounded-[2rem] border border-black/5 bg-white shadow-2xl shadow-black/5 md:min-h-[min(700px,calc(100dvh-2.5rem))] md:grid-cols-[0.75fr_1.25fr]"
         >
           {/* Left Panel: Premium Branding & Info showcase (Hidden on narrow mobile) */}
           <aside className="relative hidden overflow-hidden bg-slate-950 p-9 text-white md:flex md:flex-col md:justify-between">
@@ -130,7 +128,7 @@ export const Login: React.FC = () => {
                 <span className="font-display text-2xl font-bold tracking-tight">Levelspace</span>
               </div>
               <p className="mb-3 text-xs font-bold uppercase tracking-[0.22em] text-blue-300">Authentication Command Center</p>
-              <h2 className="max-w-sm text-3xl font-bold leading-tight">Content is everywhere. Guidance is not.</h2>
+              <h2 className="max-w-sm text-[2rem] font-bold leading-tight">Content is everywhere. Guidance is not.</h2>
               <p className="mt-4 max-w-xs text-sm font-medium leading-relaxed text-white/60">
                 Unlock your personalized learning space. Track focus, master subjects, and level up with AI-guided curriculums.
               </p>
@@ -151,10 +149,22 @@ export const Login: React.FC = () => {
           </aside>
 
           {/* Right Panel: Clean form selection & inputs */}
-          <div className="flex flex-col justify-center bg-white p-6 text-slate-950 sm:p-8 md:p-10">
-            <div className="mx-auto flex w-full max-w-[34rem] flex-col gap-5">
+          <div className="flex flex-col justify-center bg-slate-50/80 p-5 text-slate-950 sm:p-8 md:p-10">
+            <div className="mx-auto w-full max-w-[31rem] rounded-[1.75rem] border border-slate-200/80 bg-white p-5 shadow-xl shadow-slate-900/5 sm:p-7">
+            <div className="flex flex-col gap-5">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-accent text-white shadow-lg shadow-accent/25">
+                  <Sparkles className="h-5 w-5" />
+                </div>
+                <span className="font-display text-xl font-bold tracking-tight text-slate-950">Levelspace</span>
+              </div>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+                Secure
+              </span>
+            </div>
             <div className="space-y-2.5">
-              <h2 className="text-4xl font-bold tracking-tight text-slate-950">
+              <h2 className="text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
                 {mode === 'login' ? 'Welcome back' : 'Create your space'}
               </h2>
               <p className="text-base font-medium text-slate-500">
@@ -185,14 +195,6 @@ export const Login: React.FC = () => {
                 }`}
               >
                 Sign Up
-              </button>
-              <button
-                type="button"
-                onClick={handleDemoAdminLogin}
-                className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-accent transition-all hover:bg-accent/5"
-              >
-                <Sparkles size={17} />
-                Demo Admin
               </button>
             </div>
 
@@ -276,7 +278,7 @@ export const Login: React.FC = () => {
               <ArrowRight className="w-5 h-5" />
             </button>
 
-            <div className="relative py-1">
+            <div className="relative py-0.5">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-ink/5"></div>
               </div>
@@ -300,6 +302,7 @@ export const Login: React.FC = () => {
                 <Facebook className="w-5 h-5 text-[#1877F2]" />
                 <span className="text-sm font-bold uppercase tracking-normal text-slate-950">Facebook</span>
               </button>
+            </div>
             </div>
             </div>
           </div>
