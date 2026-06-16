@@ -823,6 +823,11 @@ export const LessonView: React.FC = () => {
   };
 
   const handleExerciseSubmit = (sourceIndex: number, solution: string) => {
+    if (exerciseResult[sourceIndex]) {
+      setExerciseResult((current) => ({ ...current, [sourceIndex]: null }));
+      return;
+    }
+
     const expected = getExpectedAnswer(readerSourceBlocks[sourceIndex]);
     if (!expected) {
       setExerciseResult((current) => ({ ...current, [sourceIndex]: 'shown' }));
@@ -836,6 +841,13 @@ export const LessonView: React.FC = () => {
       [sourceIndex]: normalizedSolution && (normalizedExpected.includes(normalizedSolution) || normalizedSolution.includes(normalizedExpected))
         ? 'correct'
         : 'wrong',
+    }));
+  };
+
+  const handleExamSubmit = (sourceIndex: number) => {
+    setExamResult((current) => ({
+      ...current,
+      [sourceIndex]: current[sourceIndex] ? null : 'shown',
     }));
   };
 
@@ -985,7 +997,7 @@ export const LessonView: React.FC = () => {
           onQuizAnswer={handleQuizAnswer}
           onExerciseSubmit={handleExerciseSubmit}
           onShowExerciseHint={(sourceIndex) => setExerciseHintShown((current) => ({ ...current, [sourceIndex]: true }))}
-          onExamSubmit={(sourceIndex) => setExamResult((current) => ({ ...current, [sourceIndex]: 'shown' }))}
+          onExamSubmit={handleExamSubmit}
           onShowExamHint={(sourceIndex) => setExamHintShown((current) => ({ ...current, [sourceIndex]: true }))}
           blockRefs={blockRefs}
           prevLesson={prevLesson}

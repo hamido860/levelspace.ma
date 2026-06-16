@@ -331,7 +331,7 @@ export const LessonBlock: React.FC<LessonBlockProps> = ({
               </button>
             )}
             <button type="button" onClick={() => onExerciseSubmit(sourceIndex, exercise.solution || '')} className="lesson-reader-primary">
-              Show solution
+              {exerciseResult[sourceIndex] ? 'Hide solution' : 'Show solution'}
             </button>
           </div>
           {exerciseHintShown[sourceIndex] && exercise.hint && (
@@ -354,7 +354,7 @@ export const LessonBlock: React.FC<LessonBlockProps> = ({
               </button>
             )}
             <button type="button" onClick={() => onExamSubmit(sourceIndex, exam.solution || '')} className="lesson-reader-primary">
-              Show solution
+              {examResult[sourceIndex] ? 'Hide solution' : 'Show solution'}
             </button>
           </div>
           {examHintShown[sourceIndex] && exam.hint && (
