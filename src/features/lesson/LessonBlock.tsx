@@ -99,9 +99,38 @@ const stripDuplicateLeadingHeadings = (markdown: string, title: string) => {
   return lines.join('\n').trim();
 };
 
+const lessonLabelPattern = String.raw`(?:Ex(?:emple)?|Remarque|Attention|Important|R[eè]gle|Regle|D[eé]finition|Definition|M[eé]thode|Methode|Astuce|A retenir|À retenir|R[eé]ponse|Reponse|Solution|Correction|Conclusion|Pourquoi)`;
+
+const normalizeLessonMarkdown = (value: string, titleContext: string) => {
+  const normalized = value
+    .replace(/\\r\\n|\\n|\\r/g, '\n')
+    .replace(/\r\n?/g, '\n')
+    .replace(/\t/g, '  ')
+    .replace(new RegExp(`\\b(${lessonLabelPattern})\\s*[-\u2013\u2014]\\s+`, 'gi'), '$1: ')
+    .replace(/^\s*[\u2022\u25cf\u25aa\u25e6]\s+/gm, '- ')
+    .replace(/^(\s*)[-\u2013\u2014]\s+/gm, '$1- ')
+    .replace(/([^\n])\s+(\d+[.)]\s+)/g, '$1\n$2')
+    .replace(/^(\s*)(\d+)[.)]\s+/gm, '$1$2. ')
+    .replace(/([^\n])\s+([A-H][.)]\s+)/g, '$1\n$2')
+    .replace(/^(\s*)([A-H])[.)]\s+/gm, '$1- **$2.** ')
+    .replace(new RegExp(`([.!?)]?)\\s+(?=(${lessonLabelPattern})\\s*:)`, 'gi'), '$1\n')
+    .replace(new RegExp(`(^|\\n)((${lessonLabelPattern})\\s*:)`, 'gi'), '$1**$2** ')
+    .replace(/;\s+(?=[A-ZÀ-Ýa-zà-ÿ][^;:\n]{1,42}:)/g, '\n- ')
+    .replace(/,\s+(?=[^\n,.;:]+(?:->|→))/g, '\n- ')
+    .replace(/(^|\n)([^\n,.;:]+(?:->|→)[^\n]+)/g, '$1- $2')
+    .replace(/([.!?)]?)\s+(?=(Avec\s+(?:AVOIR|ETRE|ÊTRE)|Sans\s+accord)\s*:)/gi, '$1\n')
+    .replace(/(^|\n)((?:Avec\s+(?:AVOIR|ETRE|ÊTRE)|Sans\s+accord)\s*:[^\n]+)/gi, '$1- **$2**')
+    .replace(/^\s*[•●▪◦]\s+/gm, '- ')
+    .replace(/^(\s*)[-–—]\s+/gm, '$1- ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  return stripDuplicateLeadingHeadings(normalized, titleContext);
+};
+
 const MarkdownText: React.FC<{ children?: string; titleContext?: string }> = ({ children, titleContext = '' }) => (
   <div className="lesson-reader-markdown">
-    <Markdown {...markdownPlugins}>{stripDuplicateLeadingHeadings(children || '', titleContext)}</Markdown>
+    <Markdown {...markdownPlugins}>{normalizeLessonMarkdown(children || '', titleContext)}</Markdown>
   </div>
 );
 

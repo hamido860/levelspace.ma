@@ -19,7 +19,6 @@ import {
   ListChecks,
   Volume2,
   Bot,
-  Camera,
   Award,
   AlertTriangle,
   Timer,
@@ -32,7 +31,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import { LessonBlock } from './LessonBlock';
 import { LessonToolsMenu } from './LessonToolsMenu';
 import type { DisplayedLessonBlock, LessonDomainStat } from './useDisplayedLessonBlocks';
-import { BannerImagePicker } from '../../components/BannerImagePicker';
 
 type LessonReaderProps = {
   title: string;
@@ -243,8 +241,6 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
   onNavigateToLesson,
   onTakeTest,
   hasTests,
-  bannerImage,
-  onUpdateBanner,
   startAtTest,
   allLessonsInModule = [],
   timerSeconds,
@@ -257,8 +253,6 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
   defaultDuration,
 }) => {
   const { t, language } = useLanguage();
-  const [showImagePicker, setShowImagePicker] = useState(false);
-  const displayTitle = cleanLessonTitle(title);
   const contentScrollRef = React.useRef<HTMLDivElement | null>(null);
   
   const otherLessons = useMemo(() => {
@@ -341,7 +335,7 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
       }
       setExpandedBlockId(initialId);
       setActiveBlockId(initialId);
-      setViewedBlockIds(new Set([initialId]));
+      setViewedBlockIds(new Set(displayedBlocks.map((block) => block.id)));
     }
     setSpeakingState(null);
     setIsSpeaking(false);
@@ -353,7 +347,7 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
   const viewedCount = displayedBlocks.filter((item) => viewedBlockIds.has(item.id)).length;
   const totalBlocks = displayedBlocks.length;
   const currentBlockIndex = Math.max(0, displayedBlocks.findIndex((b) => b.id === expandedBlockId));
-  const progressPercent = totalBlocks > 0 ? Math.round(((currentBlockIndex + 1) / totalBlocks) * 100) : 0;
+  const progressPercent = totalBlocks > 0 ? Math.round((viewedCount / totalBlocks) * 100) : 0;
 
   const currentBlock = displayedBlocks[currentBlockIndex] || displayedBlocks[0];
   const hasNextDestination = currentBlockIndex < displayedBlocks.length - 1 || !!nextLesson;
@@ -594,57 +588,28 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
       
 
       {/* Responsive Grid/Single Column Layout Container */}
-      <main className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-4 overflow-visible lg:overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <main className="flex-grow min-h-0 w-full min-w-0 flex flex-col lg:flex-row gap-4 overflow-visible lg:overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
         
         {/* Main Content Column */}
-        <div className="flex-grow flex flex-col min-h-0 w-full overflow-visible lg:overflow-hidden">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-visible lg:overflow-hidden">
         
         {/* Redesigned Card Container */}
-        <div className="w-full h-[calc(100dvh-9.5rem)] min-h-[520px] lg:h-full lg:min-h-0 bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex flex-col">
+        <div className="w-full min-w-0 h-[calc(100dvh-9.5rem)] min-h-[520px] lg:h-full lg:min-h-0 bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex flex-col">
           
-          {/* Top Full-bleed Image Banner */}
-          <div className="h-20 sm:h-24 lg:h-28 w-full relative bg-slate-100 dark:bg-surface-low shrink-0 overflow-hidden border-b border-slate-100 dark:border-white/5 group">
-            <img 
-              src={bannerImage || getLessonIllustration(title, subject)}
-              alt={displayTitle}
-              className="w-full h-full object-cover transition-transform duration-700 hover:scale-[1.02]"
-            />
-            {/* Tint Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/25 to-black/35 flex items-center justify-center px-4" />
-            
-            {/* Center Lesson Title */}
-            <h2 className="absolute inset-x-12 top-1/2 -translate-y-1/2 text-center font-display text-base font-black leading-tight text-white drop-shadow-md line-clamp-2 sm:text-lg lg:text-xl">
-              {displayTitle}
-            </h2>
-
-            {/* Custom Banner Edit Button */}
-            {onUpdateBanner && (
-              <button
-                type="button"
-                onClick={() => setShowImagePicker(true)}
-                className="absolute top-4 left-4 z-10 bg-black/45 hover:bg-black/60 backdrop-blur-md border border-white/20 text-white px-3 py-1.5 rounded-full text-[10px] font-bold tracking-wider uppercase flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 shadow-sm cursor-pointer"
-                title="Customize Banner Image"
-              >
-                <Camera size={12} className="stroke-[2.5]" />
-                <span>Edit Banner</span>
-              </button>
-            )}
-            {/* Exit Lesson Button - always visible top-right */}
-            <button
-              type="button"
-              onClick={onBack}
-              className="absolute top-3 right-3 z-20 flex items-center gap-1.5 bg-black/50 hover:bg-black/70 backdrop-blur-md border border-white/20 text-white px-3 py-1.5 rounded-full text-[10px] font-bold tracking-wider uppercase transition-all duration-200 shadow-md cursor-pointer hover:scale-105 active:scale-95"
-              title="Exit Lesson"
-            >
-              <ArrowLeft size={12} className="stroke-[2.5]" />
-              <span>Exit</span>
-            </button>
-          </div>
-
           {/* Compact Progress, Filters & Tools Ribbon */}
           <div className="bg-slate-50 border-b border-slate-100 dark:bg-surface-low dark:border-white/5 flex flex-col items-stretch justify-between px-3 py-2 shrink-0 gap-2 sm:flex-row sm:items-center sm:px-5">
             
-            <div className="flex items-center gap-3 overflow-x-auto no-scrollbar flex-grow">
+            <div className="flex min-w-0 flex-grow items-center gap-3 overflow-x-auto no-scrollbar">
+              <button
+                type="button"
+                onClick={onBack}
+                className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-100 dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:bg-surface-mid"
+                title="Exit Lesson"
+              >
+                <ArrowLeft size={12} className="stroke-[2.5]" />
+                <span>Exit</span>
+              </button>
+
               {/* Thin Progress Bar */}
               <div className="w-[96px] shrink-0 flex items-center gap-3 sm:w-[120px]" title={`Progress: ${progressPercent}%`}>
                 <div className="w-full bg-slate-200 dark:bg-surface-mid h-1.5 rounded-full overflow-hidden">
@@ -656,7 +621,7 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
               </div>
 
               <span className="shrink-0 text-[9px] font-extrabold uppercase tracking-normal text-slate-500 dark:text-ink-muted">
-                {[grade, subject, totalBlocks > 0 ? `${currentBlockIndex + 1}/${totalBlocks}` : null].filter(Boolean).join(' · ')}
+                {[grade, subject, totalBlocks > 0 ? `${totalBlocks} sections` : null].filter(Boolean).join(' · ')}
               </span>
 
               {/* Draft Pill */}
@@ -731,7 +696,7 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
           <div className="flex-grow min-h-0 flex flex-row relative overflow-hidden">
             
             {/* Left Nav */}
-            <div className="pointer-events-none absolute left-2 top-1/2 z-20 -translate-y-1/2 sm:pointer-events-auto sm:relative sm:left-auto sm:top-auto sm:w-16 sm:translate-y-0 sm:flex sm:shrink-0 sm:flex-col sm:items-center sm:justify-center">
+            <div className="hidden">
               <button
                 type="button"
                 onClick={handleBackSection}
@@ -743,7 +708,7 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
             </div>
 
             {/* Main Content Area */}
-            <div ref={contentScrollRef} className="flex-1 basis-0 min-h-0 overflow-y-auto flex flex-col justify-start space-y-4 pt-3 pb-20 min-w-0 px-4 sm:px-2 overscroll-contain custom-scrollbar">
+            <div ref={contentScrollRef} data-smart-select-scope="true" className="flex-1 basis-0 min-h-0 overflow-y-auto no-scrollbar flex flex-col justify-start space-y-4 pt-3 pb-20 min-w-0 px-4 sm:px-2 overscroll-contain">
               
               {/* Speech Boundary Karaoke visualizer panel */}
               {isSpeaking && speakingState && speakingState.activeSentence && (
@@ -772,6 +737,61 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
               {/* Display blocks — Slide animation via AnimatePresence */}
               <div className="mx-auto w-full max-w-[760px] px-0 sm:px-2">
                 {displayedBlocks.length > 0 ? (() => {
+                  return (
+                    <div className="flex flex-col divide-y divide-slate-100 dark:divide-white/5">
+                      {displayedBlocks.map((block) => (
+                        <div
+                          key={block.id}
+                          className="py-5 first:pt-2 last:pb-2 text-slate-700 leading-relaxed dark:text-ink-secondary select-text"
+                        >
+                          <LessonBlock
+                            item={block}
+                            isViewed={viewedBlockIds.has(block.id)}
+                            reading={isSpeaking && block.id === currentBlock?.id}
+                            quizAnswered={quizAnswered}
+                            quizCorrect={quizCorrect}
+                            quizSelectedOption={quizSelectedOption}
+                            exerciseResult={exerciseResult}
+                            exerciseHintShown={exerciseHintShown}
+                            examResult={examResult}
+                            examHintShown={examHintShown}
+                            onQuizAnswer={onQuizAnswer}
+                            onExerciseSubmit={onExerciseSubmit}
+                            onShowExerciseHint={onShowExerciseHint}
+                            onExamSubmit={onExamSubmit}
+                            onShowExamHint={onShowExamHint}
+                          />
+                        </div>
+                      ))}
+
+                      <div className="flex items-center justify-between pt-5">
+                        <span className="text-[10px] text-slate-400 dark:text-ink-muted italic">Résumé de la leçon completed</span>
+                        {hasTests ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const testBlock = displayedBlocks.find(b => b.purpose === 'quiz' || b.purpose === 'practice' || b.purpose === 'exam');
+                              if (testBlock) {
+                                setExpandedBlockId(testBlock.id);
+                                setActiveBlockId(testBlock.id);
+                                document.getElementById(testBlock.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                              }
+                            }}
+                            className="inline-flex items-center gap-1.5 text-[10px] font-extrabold text-[#1B8354] dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 px-3 py-1.5 rounded-full transition-all cursor-pointer shadow-sm"
+                          >
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                            Take Test
+                          </button>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-slate-400 dark:text-ink-muted">
+                            <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+                            No test available
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+
                   const currentBlock = displayedBlocks[currentBlockIndex];
                   if (!currentBlock) return null;
                   const isViewed = viewedBlockIds.has(currentBlock.id);
@@ -860,7 +880,7 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
             </div>
 
             {/* Right Nav */}
-            <div className="pointer-events-none absolute right-2 top-1/2 z-20 -translate-y-1/2 sm:pointer-events-auto sm:relative sm:right-auto sm:top-auto sm:w-16 sm:translate-y-0 sm:flex sm:shrink-0 sm:flex-col sm:items-center sm:justify-center">
+            <div className="hidden">
                <button 
                   type="button"
                   onClick={handleContinue}
@@ -1067,14 +1087,6 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
       </div>
     </main>
 
-      {onUpdateBanner && (
-        <BannerImagePicker
-          isOpen={showImagePicker}
-          onClose={() => setShowImagePicker(false)}
-          onSelect={onUpdateBanner}
-          currentBannerUrl={bannerImage}
-        />
-      )}
     </div>
   );
 };

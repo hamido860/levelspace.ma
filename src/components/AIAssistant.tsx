@@ -390,6 +390,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0, opacity: 0 }}
             onClick={() => setIsOpen(true)}
+            data-selection-actions-ignore="true"
             className="fixed bottom-6 right-6 w-14 h-14 bg-accent text-white rounded-full shadow-md flex items-center justify-center hover:bg-accent-hover hover:scale-105 transition-all z-50 group"
           >
             <MessageCircle size={24} className="group-hover:animate-pulse" />
@@ -405,6 +406,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 240 }}
+            data-selection-actions-ignore="true"
             className="fixed inset-y-0 right-0 z-50 flex h-full w-full max-w-[720px] flex-col overflow-hidden border-l border-white/10 bg-[#171c23] text-slate-100 shadow-2xl"
           >
             {/* Header */}
