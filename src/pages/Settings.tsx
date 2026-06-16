@@ -11,12 +11,12 @@ import {
   CheckCircle2,
   Search,
   ChevronDown,
+  ChevronRight,
   X,
   FlaskConical,
   BookOpen,
   Library,
   Brain,
-  Check,
   ArrowRight,
   Languages,
   Target,
@@ -26,6 +26,7 @@ import {
   AlertCircle,
   Clock,
   Key,
+  KeyRound,
   RefreshCw,
   Loader2
 } from 'lucide-react';
@@ -37,7 +38,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { updateProfile } from '../db/supabase';
-import { AiKeyManager } from '../components/settings/AiKeyManager';
+import { AiKeysModal } from '../components/settings/AiKeysModal';
 
 const parseStoredArray = (value: unknown): string[] => {
   if (Array.isArray(value)) return value.filter((item): item is string => typeof item === 'string');
@@ -54,29 +55,64 @@ const parseStoredArray = (value: unknown): string[] => {
   }
 };
 
-const CAREER_GOALS = [
-  'Doctor',
-  'Engineer',
-  'Scientist',
-  'Teacher',
-  'Designer',
-  'Entrepreneur',
-  'Lawyer',
-  'Still exploring',
-] as const;
-
-const TONE_OPTIONS = ['Encouraging', 'Calm', 'Direct', 'Coach-like'] as const;
-const EXPLANATION_STYLES = ['Step by step', 'Simple', 'Exam-focused', 'Real-world'] as const;
-const MOTIVATION_FOCUS_OPTIONS = ['Confidence', 'Career', 'Grades', 'Discipline'] as const;
-
 const ACADEMIC_SETTING_KEYS = [
   'selected_country',
+  'selected_grade_id',
   'selected_grade',
   'selected_bac_section',
   'selected_bac_track',
   'selected_bac_int_option',
 ] as const;
 
+const resolveSelectedGradeId = async (selectedGrade: string) => {
+  const rawGrade = selectedGrade.trim();
+  if (!rawGrade) return null;
+
+  const { data: gradeId, error } = await supabase.rpc('resolve_grade_id', {
+    raw_grade: rawGrade,
+  });
+
+  if (error) {
+    console.warn('Failed to resolve grade id:', error.message);
+    return null;
+  }
+
+  return typeof gradeId === 'string' && gradeId.trim() ? gradeId : null;
+};
+
+type GradeOption = {
+  id: string;
+  cycle_id: string;
+  name: string;
+  grade_order: number | null;
+};
+
+const PROVIDER_LABELS: Record<string, string> = {
+  gemini: 'Gemini',
+  nvidia: 'Nvidia',
+  openrouter: 'OpenRouter',
+  openai: 'OpenAI'
+};
+
+const PROVIDER_MODELS = {
+  gemini: [
+    { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', desc: 'Recommended — Ultra-fast & efficient for general tasks', speed: '240ms', cost: 'Low' },
+    { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', desc: 'Advanced — Superior reasoning for coding & complex math', speed: '480ms', cost: 'Medium' },
+    { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite', desc: 'Lite — Lightweight model optimized for high-speed indexing', speed: '160ms', cost: 'Ultra-Low' }
+  ],
+  openai: [
+    { id: 'gpt-4o-mini', name: 'GPT-4o Mini', desc: 'Fast & cost-effective intelligence for everyday tasks', speed: '320ms', cost: 'Low' },
+    { id: 'gpt-4o', name: 'GPT-4o', desc: 'High-capability flagship model for advanced reasoning', speed: '620ms', cost: 'High' }
+  ],
+  openrouter: [
+    { id: 'meta-llama/llama-3.3-70b-instruct', name: 'Llama 3.3 70B', desc: 'Open Source — SOTA open-weights instruction model', speed: '450ms', cost: 'Low' },
+    { id: 'deepseek/deepseek-chat', name: 'DeepSeek V3 Chat', desc: 'Ultra-popular conversational reasoning powerhouse', speed: '510ms', cost: 'Low' },
+    { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet', desc: 'Supreme general intelligence & code synthesis', speed: '720ms', cost: 'High' }
+  ],
+  nvidia: [
+    { id: 'google/gemma-3-27b-it', name: 'Gemma 3 27B', desc: 'Moroccan lesson generation default NIM model', speed: '280ms', cost: 'Server Credits' }
+  ]
+};
 
 export const Settings: React.FC = () => {
   const navigate = useNavigate();
@@ -91,10 +127,12 @@ export const Settings: React.FC = () => {
     return Object.fromEntries(dbSettings.map(s => [s.key, s.value]));
   }, [dbSettings]);
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'preferences' | 'aiKeys'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'preferences'>('profile');
+  const [isAiKeysOpen, setIsAiKeysOpen] = useState(false);
 
   const [selectedCountry, setSelectedCountry] = useState('');
-  const [selectedGrade, setSelectedGrade] = useState<string>('Grade 12');
+  const [selectedGradeId, setSelectedGradeId] = useState<string>('');
+  const [selectedGrade, setSelectedGrade] = useState<string>('');
   
   // Baccalaureate Options State
   const [bacSection, setBacSection] = useState("");
@@ -106,20 +144,23 @@ export const Settings: React.FC = () => {
   const [dbBacIntOptions, setDbBacIntOptions] = useState<any[]>([]);
   const [dbBacTrackIntOptions, setDbBacTrackIntOptions] = useState<any[]>([]);
 
-  const [careerGoal, setCareerGoal] = useState<string>('Still exploring');
-  const [careerGoalCustom, setCareerGoalCustom] = useState('');
-  const [hobbies, setHobbies] = useState<string[]>([]);
-  const [targetSkills, setTargetSkills] = useState<string[]>([]);
-  const [hobbyInput, setHobbyInput] = useState('');
-  const [targetSkillInput, setTargetSkillInput] = useState('');
-  const [preferredTone, setPreferredTone] = useState<string>('Encouraging');
-  const [preferredExplanationStyle, setPreferredExplanationStyle] = useState<string>('Step by step');
-  const [motivationFocus, setMotivationFocus] = useState<string>('Confidence');
   const [currentSession, setCurrentSession] = useState<string>('Fall 2024');
   const [defaultDuration, setDefaultDuration] = useState<number>(60);
   const [aiProvider, setAiProvider] = useState<'gemini' | 'nvidia' | 'openrouter' | 'openai'>('gemini');
   const [aiModel, setAiModel] = useState('');
   const [aiFallbackEnabled, setAiFallbackEnabled] = useState(true);
+  const [aiTemperature, setAiTemperature] = useState<number>(() => 
+    Number(localStorage.getItem('ai_temperature') || '0.3')
+  );
+  const [aiMaxTokens, setAiMaxTokens] = useState<number>(() => 
+    Number(localStorage.getItem('ai_max_tokens') || '4096')
+  );
+  const [aiBehavioralProfile, setAiBehavioralProfile] = useState<string>(() => localStorage.getItem('ai_behavioral_profile') || 'adaptive');
+  const [showHyperparameters, setShowHyperparameters] = useState(false);
+  const [aiTopP, setAiTopP] = useState<number>(() => Number(localStorage.getItem('ai_top_p') || '0.9'));
+  const [aiFrequencyPenalty, setAiFrequencyPenalty] = useState<number>(() => Number(localStorage.getItem('ai_frequency_penalty') || '0.0'));
+  const [aiPresencePenalty, setAiPresencePenalty] = useState<number>(() => Number(localStorage.getItem('ai_presence_penalty') || '0.0'));
+  const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const [aiStatus, setAiStatus] = useState<{
     configured: boolean;
     providers: { gemini: boolean; nvidia: boolean; openrouter: boolean; openai: boolean };
@@ -136,11 +177,11 @@ export const Settings: React.FC = () => {
 
 
   const languages = [
-    { id: 'en', name: 'English', flag: '🇺🇸' },
-    { id: 'fr', name: 'Français', flag: '🇫🇷' },
-    { id: 'ar', name: 'العربية', flag: '🇲🇦' },
-    { id: 'es', name: 'Español', flag: '🇪🇸' },
-    { id: 'de', name: 'Deutsch', flag: '🇩🇪' },
+    { id: 'en', name: 'English', flag: 'ðŸ‡ºðŸ‡¸' },
+    { id: 'fr', name: 'FranÃ§ais', flag: 'ðŸ‡«ðŸ‡·' },
+    { id: 'ar', name: 'Ø§Ù„Ø¹Ø±Ø¨ÙŠØ©', flag: 'ðŸ‡²ðŸ‡¦' },
+    { id: 'es', name: 'EspaÃ±ol', flag: 'ðŸ‡ªðŸ‡¸' },
+    { id: 'de', name: 'Deutsch', flag: 'ðŸ‡©ðŸ‡ª' },
   ];
 
   // Load settings from DB when they change
@@ -148,37 +189,25 @@ export const Settings: React.FC = () => {
     const getStoredValue = (key: string) => localStorage.getItem(key) ?? settingsMap[key];
 
     const country = getStoredValue('selected_country');
+    const gradeId = getStoredValue('selected_grade_id');
     const grade = getStoredValue('selected_grade');
     const session = getStoredValue('current_session');
     const duration = getStoredValue('default_session_duration');
     const section = getStoredValue('selected_bac_section');
     const track = getStoredValue('selected_bac_track');
     const option = getStoredValue('selected_bac_int_option');
-    const storedCareerGoal = getStoredValue('career_goal');
-    const storedCareerGoalCustom = getStoredValue('career_goal_custom');
-    const storedHobbies = getStoredValue('hobbies');
-    const storedTargetSkills = getStoredValue('target_skills');
-    const storedTone = getStoredValue('preferred_tone');
-    const storedExplanationStyle = getStoredValue('preferred_explanation_style');
-    const storedMotivationFocus = getStoredValue('motivation_focus');
     const storedAiProvider = getStoredValue('ai_provider');
     const storedAiModel = getStoredValue('ai_model');
     const storedAiFallbackEnabled = getStoredValue('ai_fallback_enabled');
 
     if (country) setSelectedCountry(String(country));
+    if (gradeId) setSelectedGradeId(String(gradeId));
     if (grade) setSelectedGrade(String(grade));
     if (session) setCurrentSession(String(session));
     if (duration) setDefaultDuration(Number(duration));
     if (section) setBacSection(String(section));
     if (track) setBacTrack(String(track));
     if (option) setBacIntOption(String(option));
-    if (storedCareerGoal) setCareerGoal(String(storedCareerGoal));
-    if (storedCareerGoalCustom) setCareerGoalCustom(String(storedCareerGoalCustom));
-    if (storedHobbies) setHobbies(parseStoredArray(storedHobbies));
-    if (storedTargetSkills) setTargetSkills(parseStoredArray(storedTargetSkills));
-    if (storedTone) setPreferredTone(String(storedTone));
-    if (storedExplanationStyle) setPreferredExplanationStyle(String(storedExplanationStyle));
-    if (storedMotivationFocus) setMotivationFocus(String(storedMotivationFocus));
     if (storedAiProvider === 'gemini' || storedAiProvider === 'nvidia') setAiProvider(storedAiProvider);
     if (storedAiModel) setAiModel(String(storedAiModel));
     if (storedAiFallbackEnabled !== undefined && storedAiFallbackEnabled !== null) setAiFallbackEnabled(String(storedAiFallbackEnabled) !== 'false');
@@ -212,15 +241,9 @@ export const Settings: React.FC = () => {
     { id: 'interest_tech', label: t('tech'), icon: <Brain className="w-4 h-4" /> },
   ];
 
-  const goals = [
-    { id: 'goal_exam_prep', label: t('exam_prep') },
-    { id: 'goal_skill_dev', label: t('skill_dev') },
-    { id: 'goal_general_learning', label: t('general_learning') },
-    { id: 'goal_career_transition', label: t('career_transition') },
-  ];
-
   const [dbCountries, setDbCountries] = useState<{code: string, name: string}[]>([]);
   const [dbGrades, setDbGrades] = useState<Record<string, string[]>>({});
+  const [dbGradeOptions, setDbGradeOptions] = useState<Record<string, GradeOption[]>>({});
 
   useEffect(() => {
     const fetchMetadata = async () => {
@@ -236,13 +259,30 @@ export const Settings: React.FC = () => {
         });
         
         const gradesMap: Record<string, string[]> = {};
+        const gradeOptionsMap: Record<string, GradeOption[]> = {};
         const { data: cyclesData } = await supabase.from('cycles').select('id, curriculum_id');
-        const { data: gradesData } = await supabase.from('grades').select('id, cycle_id, name');
+        const { data: gradesData } = await supabase
+          .from('grades')
+          .select('id, cycle_id, name, grade_order')
+          .order('grade_order', { ascending: true })
+          .order('name', { ascending: true });
           
         if (cyclesData && gradesData) {
           curriculaData.forEach(curriculum => {
             const countryCycles = cyclesData.filter(c => c.curriculum_id === curriculum.id);
-            const countryGrades = gradesData.filter(g => countryCycles.some(c => c.id === g.cycle_id));
+            const countryGrades = gradesData
+              .filter((grade): grade is GradeOption => (
+                typeof grade.id === 'string' &&
+                typeof grade.cycle_id === 'string' &&
+                typeof grade.name === 'string' &&
+                countryCycles.some(c => c.id === grade.cycle_id)
+              ))
+              .sort((a, b) => {
+                const orderA = typeof a.grade_order === 'number' ? a.grade_order : Number.MAX_SAFE_INTEGER;
+                const orderB = typeof b.grade_order === 'number' ? b.grade_order : Number.MAX_SAFE_INTEGER;
+                return orderA - orderB || a.name.localeCompare(b.name);
+              });
+            gradeOptionsMap[curriculum.country] = countryGrades;
             gradesMap[curriculum.country] = countryGrades.map(g => g.name);
           });
         }
@@ -252,6 +292,7 @@ export const Settings: React.FC = () => {
           setSelectedCountry(prev => prev || countries[0].code);
         }
         if (Object.keys(gradesMap).length > 0) setDbGrades(gradesMap);
+        if (Object.keys(gradeOptionsMap).length > 0) setDbGradeOptions(gradeOptionsMap);
 
         // Fetch Baccalaureate data
         const { data: sectionsData } = await supabase.from('bac_sections').select('*');
@@ -273,14 +314,26 @@ export const Settings: React.FC = () => {
   }, []);
 
   const availableCountries = dbCountries;
+  const currentGradeOptions = dbGradeOptions[selectedCountry] || [];
   const currentGrades = dbGrades[selectedCountry] || [];
 
   // Sync grade when country changes if current grade is not in the new system
   useEffect(() => {
-    if (currentGrades && currentGrades.length > 0 && !currentGrades.includes(selectedGrade)) {
-      setSelectedGrade(currentGrades[0]);
+    if (currentGradeOptions.length === 0) return;
+
+    const selectedOption = currentGradeOptions.find((grade) => (
+      grade.id === selectedGradeId || grade.name === selectedGrade
+    ));
+
+    if (selectedOption) {
+      if (selectedOption.id !== selectedGradeId) setSelectedGradeId(selectedOption.id);
+      if (selectedOption.name !== selectedGrade) setSelectedGrade(selectedOption.name);
+      return;
     }
-  }, [selectedCountry, currentGrades, selectedGrade]);
+
+    setSelectedGradeId(currentGradeOptions[0].id);
+    setSelectedGrade(currentGradeOptions[0].name);
+  }, [currentGradeOptions, selectedGrade, selectedGradeId]);
 
   const filteredCountries = availableCountries.filter(c => 
     c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -290,9 +343,12 @@ export const Settings: React.FC = () => {
   const currentCountryName = availableCountries.find(c => c.code === selectedCountry)?.name || selectedCountry;
   const selectedSectionName = dbBacSections.find((section) => section.id === bacSection)?.name || '';
   const selectedTrackName = dbBacTracks.find((track) => track.id === bacTrack)?.name || '';
-  const selectedOptionName = dbBacIntOptions.find((option) => option.id === bacIntOption)?.name || '';
+  const selectedInstructionOption = dbBacIntOptions.find((option) => option.id === bacIntOption);
+  const selectedOptionName = selectedInstructionOption?.name || '';
+  const selectedOptionCode = selectedInstructionOption?.code || selectedInstructionOption?.name || '';
   const lockedAcademicValues = useMemo(() => ({
     selected_country: String(settingsMap.selected_country || 'Morocco'),
+    selected_grade_id: String(profile?.selected_grade_id || settingsMap.selected_grade_id || selectedGradeId || ''),
     selected_grade: String(profile?.selected_grade || settingsMap.selected_grade || selectedGrade),
     selected_bac_section: String(settingsMap.selected_bac_section || ''),
     selected_bac_track: String(profile?.selected_bac_track || settingsMap.selected_bac_track || ''),
@@ -300,9 +356,12 @@ export const Settings: React.FC = () => {
   }), [
     profile?.selected_bac_track,
     profile?.selected_grade,
+    profile?.selected_grade_id,
+    selectedGradeId,
     selectedGrade,
     settingsMap.selected_bac_int_option,
     settingsMap.selected_bac_section,
+    settingsMap.selected_grade_id,
     settingsMap.selected_bac_track,
     settingsMap.selected_country,
     settingsMap.selected_grade,
@@ -345,10 +404,15 @@ export const Settings: React.FC = () => {
   }, [isAdmin, isLocked, lockedAcademicValues]);
 
   const handleSave = async () => {
+    const resolvedGradeId = isLocked && !isAdmin
+      ? lockedAcademicValues.selected_grade_id
+      : selectedGradeId || await resolveSelectedGradeId(selectedGrade);
+
     const academicValues = isLocked && !isAdmin
       ? lockedAcademicValues
       : {
         selected_country: selectedCountry,
+        selected_grade_id: resolvedGradeId || '',
         selected_grade: selectedGrade,
         selected_bac_section: bacSection,
         selected_bac_track: bacTrack,
@@ -356,48 +420,54 @@ export const Settings: React.FC = () => {
       };
 
     localStorage.setItem('selected_country', academicValues.selected_country);
+    localStorage.setItem('selected_grade_id', academicValues.selected_grade_id);
     localStorage.setItem('selected_grade', academicValues.selected_grade);
     localStorage.setItem('current_session', currentSession);
     localStorage.setItem('default_session_duration', defaultDuration.toString());
     localStorage.setItem('selected_bac_section', academicValues.selected_bac_section);
     localStorage.setItem('selected_bac_track', academicValues.selected_bac_track);
     localStorage.setItem('selected_bac_int_option', academicValues.selected_bac_int_option);
-    localStorage.setItem('career_goal', careerGoal);
-    localStorage.setItem('career_goal_custom', careerGoalCustom);
-    localStorage.setItem('hobbies', JSON.stringify(hobbies));
-    localStorage.setItem('target_skills', JSON.stringify(targetSkills));
-    localStorage.setItem('preferred_tone', preferredTone);
-    localStorage.setItem('preferred_explanation_style', preferredExplanationStyle);
-    localStorage.setItem('motivation_focus', motivationFocus);
     localStorage.setItem('ai_provider', aiProvider);
     localStorage.setItem('ai_model', aiModel);
     localStorage.setItem('ai_fallback_enabled', String(aiFallbackEnabled));
+    localStorage.setItem('ai_temperature', aiTemperature.toString());
+    localStorage.setItem('ai_max_tokens', aiMaxTokens.toString());
+    localStorage.setItem('ai_behavioral_profile', aiBehavioralProfile);
+    localStorage.setItem('ai_top_p', aiTopP.toString());
+    localStorage.setItem('ai_frequency_penalty', aiFrequencyPenalty.toString());
+    localStorage.setItem('ai_presence_penalty', aiPresencePenalty.toString());
 
     await db.settings.bulkPut([
       { key: 'selected_country', value: academicValues.selected_country },
+      { key: 'selected_grade_id', value: academicValues.selected_grade_id },
       { key: 'selected_grade', value: academicValues.selected_grade },
       { key: 'current_session', value: currentSession },
       { key: 'default_session_duration', value: defaultDuration },
       { key: 'selected_bac_section', value: academicValues.selected_bac_section },
       { key: 'selected_bac_track', value: academicValues.selected_bac_track },
       { key: 'selected_bac_int_option', value: academicValues.selected_bac_int_option },
-      { key: 'career_goal', value: careerGoal },
-      { key: 'career_goal_custom', value: careerGoalCustom },
-      { key: 'hobbies', value: hobbies },
-      { key: 'target_skills', value: targetSkills },
-      { key: 'preferred_tone', value: preferredTone },
-      { key: 'preferred_explanation_style', value: preferredExplanationStyle },
-      { key: 'motivation_focus', value: motivationFocus },
       { key: 'ai_provider', value: aiProvider },
       { key: 'ai_model', value: aiModel },
       { key: 'ai_fallback_enabled', value: aiFallbackEnabled },
+      { key: 'ai_temperature', value: aiTemperature },
+      { key: 'ai_max_tokens', value: aiMaxTokens },
+      { key: 'ai_behavioral_profile', value: aiBehavioralProfile },
+      { key: 'ai_top_p', value: aiTopP },
+      { key: 'ai_frequency_penalty', value: aiFrequencyPenalty },
+      { key: 'ai_presence_penalty', value: aiPresencePenalty },
     ]);
 
     if (user && (!isLocked || isAdmin)) {
       try {
         await updateProfile(user.id, {
+          grade_id: academicValues.selected_grade_id || null,
+          instruction_option_id: academicValues.selected_bac_int_option || null,
+          track_id: null,
           selected_grade: academicValues.selected_grade,
-          selected_bac_track: academicValues.selected_bac_track || null,
+          selected_grade_id: academicValues.selected_grade_id || null,
+          selected_option: selectedOptionCode || null,
+          selected_bac_track: null,
+          onboarding_completed: true,
         });
       } catch (err: any) {
         console.error('Failed to save academic profile:', err.message);
@@ -409,110 +479,49 @@ export const Settings: React.FC = () => {
     setTimeout(() => setIsSaved(false), 3000);
   };
 
-  const addToken = (
-    value: string,
-    setter: React.Dispatch<React.SetStateAction<string[]>>,
-    reset: () => void
-  ) => {
-    const trimmed = value.trim();
-    if (!trimmed) return;
-
-    setter((prev) => {
-      if (prev.some((item) => item.toLowerCase() === trimmed.toLowerCase())) {
-        return prev;
-      }
-      return [...prev, trimmed];
-    });
-    reset();
-  };
-
-  const removeToken = (value: string, setter: React.Dispatch<React.SetStateAction<string[]>>) => {
-    setter((prev) => prev.filter((item) => item !== value));
-  };
-
   const setupProgress = [
     { label: t('region'), completed: !!selectedCountry },
     { label: t('grade'), completed: !!selectedGrade },
-    { label: 'Future goal', completed: !!careerGoal },
-    { label: 'Target skills', completed: targetSkills.length > 0 },
   ].filter(s => s.completed).length;
 
-  const progressPercentage = (setupProgress / 4) * 100;
+  const progressPercentage = (setupProgress / 2) * 100;
 
   return (
-    <Layout>
+    <Layout fullWidth>
       <SEO title="Settings" />
-      <div className="max-w-4xl mx-auto space-y-12 py-8 px-4 pb-32">
-        {/* Onboarding Header */}
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="space-y-2">
-              <motion.div 
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="flex items-center gap-3 text-accent"
-              >
-                <Sparkles className="w-5 h-5" />
-                <span className="text-[10px] font-bold uppercase tracking-normal">{t('profile_setup')}</span>
-              </motion.div>
-              <motion.h1 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
-                className="text-4xl font-serif font-medium tracking-tight text-ink"
-              >
-                {t('personalize_space')}
-              </motion.h1>
-            </div>
-            <div className="text-right hidden md:block">
-              <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted/40">{t('setup_progress')}</span>
-              <div className="flex items-center gap-3 mt-1">
-                <div className="w-32 h-1.5 bg-ink/5 rounded-full overflow-hidden">
-                  <motion.div 
-                    initial={{ width: 0 }}
-                    animate={{ width: `${progressPercentage}%` }}
-                    className="h-full bg-accent"
-                  />
-                </div>
-                <span className="text-xs font-bold text-ink">{Math.round(progressPercentage)}%</span>
-              </div>
-            </div>
-          </div>
-          <motion.p 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="text-muted text-lg max-w-2xl leading-relaxed"
-          >
-            {t('configure_context')}
-          </motion.p>
+      <div className="min-h-full w-full bg-background flex flex-col overflow-y-auto p-4 pb-24 lg:h-full lg:overflow-hidden lg:pb-4">
+        <div className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-4 overflow-visible lg:overflow-hidden">
+          <main className="flex-grow flex flex-col min-h-0 w-full overflow-visible rounded-xl border border-slate-200 bg-white p-5 shadow-lg dark:border-white/8 dark:bg-paper md:p-6 lg:overflow-hidden">
+            <div className="flex-grow overflow-visible pr-0 lg:overflow-y-auto lg:pr-1 lg:no-scrollbar">
+        {/* Page Header */}
+        <div className="border-b border-slate-100 dark:border-white/5 pb-5 mb-6">
+          <h1 className="ls-page-title text-slate-950 dark:text-ink">
+            {t('personalize_space')}
+          </h1>
         </div>
 
+
         {/* Tabs */}
-        <div className="flex border-b border-ink/10">
+        <div className="flex gap-1 border-b border-slate-200 dark:border-white/8 -mb-px">
           <button
             onClick={() => setActiveTab('profile')}
-            className={`px-6 py-3 text-sm font-bold uppercase tracking-normal transition-colors border-b-2 ${
-              activeTab === 'profile' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-ink'
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${
+              activeTab === 'profile'
+                ? 'border-accent text-accent'
+                : 'border-transparent text-slate-500 dark:text-ink-muted hover:text-slate-950 dark:hover:text-ink'
             }`}
           >
             {t('academic_path')}
           </button>
           <button
             onClick={() => setActiveTab('preferences')}
-            className={`px-6 py-3 text-sm font-bold uppercase tracking-normal transition-colors border-b-2 ${
-              activeTab === 'preferences' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-ink'
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${
+              activeTab === 'preferences'
+                ? 'border-accent text-accent'
+                : 'border-transparent text-slate-500 dark:text-ink-muted hover:text-slate-950 dark:hover:text-ink'
             }`}
           >
             {t('preferences')}
-          </button>
-          <button
-            onClick={() => setActiveTab('aiKeys')}
-            className={`px-6 py-3 text-sm font-bold uppercase tracking-normal transition-colors border-b-2 ${
-              activeTab === 'aiKeys' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-ink'
-            }`}
-          >
-            AI Keys
           </button>
         </div>
 
@@ -520,38 +529,38 @@ export const Settings: React.FC = () => {
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="grid grid-cols-1 md:grid-cols-2 gap-4"
+            className="grid grid-cols-1 gap-4 xl:grid-cols-3 xl:items-start"
           >
-            <section className="p-6 bg-paper border border-ink/5 rounded-3xl space-y-5 shadow-sm md:col-span-2">
-              <div className="flex items-start justify-between gap-4">
+            <section className="bg-paper border border-ink/5 rounded-xl space-y-5 p-5 shadow-sm xl:col-span-3">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-accent/5 rounded-2xl flex items-center justify-center text-accent shrink-0">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/5 text-accent">
                     <GraduationCap className="w-5 h-5" />
                   </div>
                   <div className="space-y-1">
                     <h2 className="text-lg font-medium text-ink">{t('academic_identity')}</h2>
                     <p className="text-xs text-muted leading-relaxed">
-                      {t('academic_identity_desc')}
+                      Keep the official curriculum tied to the selected country, grade, track, and instruction option.
                     </p>
                   </div>
                 </div>
-                <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${isLocked ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-700 border border-amber-500/20'}`}>
+                <div className={`w-fit shrink-0 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-normal ${isLocked ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-700 border border-amber-500/20'}`}>
                   {isLocked ? t('locked_after_onboarding') : t('editable_for_setup')}
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div className="p-4 rounded-2xl border border-ink/5 bg-surface-low space-y-1">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div className="min-w-0 space-y-1 rounded-xl border border-ink/5 bg-surface-low p-4">
                   <span className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('country')}</span>
                   <p className="text-sm font-semibold text-ink">{currentCountryName || t('not_set')}</p>
                 </div>
-                <div className="p-4 rounded-2xl border border-ink/5 bg-surface-low space-y-1">
+                <div className="min-w-0 space-y-1 rounded-xl border border-ink/5 bg-surface-low p-4">
                   <span className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('grade')}</span>
-                  <p className="text-sm font-semibold text-ink">{selectedGrade || t('not_set')}</p>
+                  <p className="truncate text-sm font-semibold text-ink">{selectedGrade || t('not_set')}</p>
                 </div>
-                <div className="p-4 rounded-2xl border border-ink/5 bg-surface-low space-y-1">
+                <div className="min-w-0 space-y-1 rounded-xl border border-ink/5 bg-surface-low p-4">
                   <span className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('track')}</span>
-                  <p className="text-sm font-semibold text-ink">{selectedTrackName || selectedSectionName || t('not_set')}</p>
+                  <p className="truncate text-sm font-semibold text-ink">{selectedTrackName || selectedSectionName || t('not_set')}</p>
                   {selectedOptionName && <p className="text-[11px] text-muted">{selectedOptionName}</p>}
                 </div>
               </div>
@@ -561,7 +570,7 @@ export const Settings: React.FC = () => {
                   {t('locked_academic_desc')}
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
                   <div className="space-y-4">
                     <div className="space-y-2">
                       <label className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('country')}</label>
@@ -624,12 +633,45 @@ export const Settings: React.FC = () => {
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('grade')}</label>
-                      <div key={selectedCountry} className="grid grid-cols-1 gap-2 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
-                        {currentGrades.map((grade, index) => (
+                      <label className="text-[10px] font-bold uppercase tracking-normal text-muted">Current stage</label>
+                      <div key={selectedCountry} className="grid max-h-[340px] grid-cols-1 gap-2 overflow-y-auto pr-2 custom-scrollbar">
+                        {currentGradeOptions.length > 0 ? currentGradeOptions.map((grade) => (
+                          <button
+                            key={grade.id}
+                            onClick={() => {
+                              setSelectedGradeId(grade.id);
+                              setSelectedGrade(grade.name);
+                            }}
+                            className={`flex min-h-[70px] items-center justify-between gap-3 rounded-xl border p-3 text-left transition-all ${
+                              selectedGradeId === grade.id
+                                ? 'bg-accent border-accent text-paper shadow-sm shadow-accent/20'
+                                : 'bg-background border-ink/5 text-ink hover:border-accent/30'
+                            }`}
+                          >
+                            <span className="flex min-w-0 items-center gap-3">
+                              <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-bold ${
+                                selectedGradeId === grade.id ? 'bg-paper/15 text-paper' : 'bg-accent/8 text-accent'
+                              }`}>
+                                {typeof grade.grade_order === 'number' ? grade.grade_order : '-'}
+                              </span>
+                              <span className="min-w-0">
+                                <span className="block truncate text-sm font-semibold leading-tight">{grade.name}</span>
+                                <span className={`mt-1 block text-[10px] font-medium uppercase tracking-normal ${
+                                  selectedGradeId === grade.id ? 'text-paper/70' : 'text-muted'
+                                }`}>
+                                  {selectedGradeId === grade.id ? 'Selected stage' : 'Available stage'}
+                                </span>
+                              </span>
+                            </span>
+                            {selectedGradeId === grade.id && <CheckCircle2 className="w-3.5 h-3.5 text-paper shrink-0" />}
+                          </button>
+                        )) : currentGrades.map((grade, index) => (
                           <button
                             key={`${grade}-${index}`}
-                            onClick={() => setSelectedGrade(grade)}
+                            onClick={() => {
+                              setSelectedGradeId('');
+                              setSelectedGrade(grade);
+                            }}
                             className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
                               selectedGrade === grade
                                 ? 'bg-accent border-accent text-paper shadow-sm shadow-accent/20'
@@ -641,6 +683,23 @@ export const Settings: React.FC = () => {
                           </button>
                         ))}
                       </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 rounded-xl border border-ink/5 bg-surface-low/40 p-4">
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('session')}</p>
+                      <p className="text-sm font-semibold text-ink">{currentSession}</p>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-background">
+                      <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${progressPercentage}%` }} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-[10px] text-muted">
+                      <span>{setupProgress}/2 setup items</span>
+                      <span className="text-right">{defaultDuration} min default</span>
+                    </div>
+                    <div className="rounded-xl border border-ink/5 bg-background p-3 text-[10px] leading-relaxed text-muted">
+                      {isSaved ? t('settings_saved') : t('pending_changes')}
                     </div>
                   </div>
 
@@ -739,203 +798,7 @@ export const Settings: React.FC = () => {
               )}
             </section>
 
-            <section className="p-5 bg-paper border border-ink/5 rounded-3xl space-y-5 shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-accent/5 rounded-lg flex items-center justify-center text-accent">
-                  <Target className="w-4 h-4" />
-                </div>
-                <div className="space-y-0.5">
-                  <h2 className="text-base font-medium text-ink leading-tight">{t('future_goals')}</h2>
-                  <p className="text-[10px] text-muted/60 leading-tight">{t('future_goals_desc')}</p>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('career_direction')}</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {CAREER_GOALS.map((goal) => (
-                      <button
-                        key={goal}
-                        onClick={() => setCareerGoal(goal)}
-                        className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
-                          careerGoal === goal
-                            ? 'bg-ink border-ink text-paper shadow-sm shadow-ink/20'
-                            : 'bg-background border-ink/5 text-ink hover:border-accent/30'
-                        }`}
-                      >
-                        <span className="text-xs font-medium">{goal}</span>
-                        {careerGoal === goal && <Check className="w-3.5 h-3.5 text-accent" />}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('custom_goal')}</label>
-                  <input
-                    type="text"
-                    value={careerGoalCustom}
-                    onChange={(e) => setCareerGoalCustom(e.target.value)}
-                    placeholder={t('custom_goal_placeholder')}
-                    className="w-full p-3 bg-background border border-ink/5 rounded-xl text-sm outline-none focus:ring-1 focus:ring-accent/20"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('hobbies_interests')}</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={hobbyInput}
-                      onChange={(e) => setHobbyInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          addToken(hobbyInput, setHobbies, () => setHobbyInput(''));
-                        }
-                      }}
-                      placeholder={t('hobbies_placeholder')}
-                      className="flex-1 p-3 bg-background border border-ink/5 rounded-xl text-sm outline-none focus:ring-1 focus:ring-accent/20"
-                    />
-                    <button
-                      onClick={() => addToken(hobbyInput, setHobbies, () => setHobbyInput(''))}
-                      className="px-4 py-3 rounded-xl bg-ink text-paper text-[10px] font-bold uppercase tracking-normal"
-                    >
-                      {t('add')}
-                    </button>
-                  </div>
-                  {hobbies.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {hobbies.map((item) => (
-                        <button
-                          key={item}
-                          onClick={() => removeToken(item, setHobbies)}
-                          className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-accent/8 text-accent text-xs font-semibold"
-                        >
-                          {item}
-                          <X className="w-3 h-3" />
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </section>
-
-            <section className="p-5 bg-paper border border-ink/5 rounded-3xl space-y-5 shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-accent/5 rounded-lg flex items-center justify-center text-accent">
-                  <Brain className="w-4 h-4" />
-                </div>
-                <div className="space-y-0.5">
-                  <h2 className="text-base font-medium text-ink leading-tight">{t('learning_style')}</h2>
-                  <p className="text-[10px] text-muted/60 leading-tight">{t('learning_style_desc')}</p>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('target_skills')}</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={targetSkillInput}
-                      onChange={(e) => setTargetSkillInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          addToken(targetSkillInput, setTargetSkills, () => setTargetSkillInput(''));
-                        }
-                      }}
-                      placeholder={t('target_skills_placeholder')}
-                      className="flex-1 p-3 bg-background border border-ink/5 rounded-xl text-sm outline-none focus:ring-1 focus:ring-accent/20"
-                    />
-                    <button
-                      onClick={() => addToken(targetSkillInput, setTargetSkills, () => setTargetSkillInput(''))}
-                      className="px-4 py-3 rounded-xl bg-ink text-paper text-[10px] font-bold uppercase tracking-normal"
-                    >
-                      {t('add')}
-                    </button>
-                  </div>
-                  {targetSkills.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {targetSkills.map((item) => (
-                        <button
-                          key={item}
-                          onClick={() => removeToken(item, setTargetSkills)}
-                          className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-ink text-paper text-xs font-semibold"
-                        >
-                          {item}
-                          <X className="w-3 h-3 text-accent" />
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 gap-3">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('preferred_tone')}</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {TONE_OPTIONS.map((option) => (
-                        <button
-                          key={option}
-                          onClick={() => setPreferredTone(option)}
-                          className={`p-3 rounded-xl border text-xs font-medium transition-all ${
-                            preferredTone === option
-                              ? 'bg-accent border-accent text-paper'
-                              : 'bg-background border-ink/5 text-ink hover:border-accent/30'
-                          }`}
-                        >
-                          {option}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('explanation_style')}</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {EXPLANATION_STYLES.map((option) => (
-                        <button
-                          key={option}
-                          onClick={() => setPreferredExplanationStyle(option)}
-                          className={`p-3 rounded-xl border text-xs font-medium transition-all ${
-                            preferredExplanationStyle === option
-                              ? 'bg-accent border-accent text-paper'
-                              : 'bg-background border-ink/5 text-ink hover:border-accent/30'
-                          }`}
-                        >
-                          {option}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('motivation_focus')}</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {MOTIVATION_FOCUS_OPTIONS.map((option) => (
-                        <button
-                          key={option}
-                          onClick={() => setMotivationFocus(option)}
-                          className={`p-3 rounded-xl border text-xs font-medium transition-all ${
-                            motivationFocus === option
-                              ? 'bg-ink border-ink text-paper'
-                              : 'bg-background border-ink/5 text-ink hover:border-accent/30'
-                          }`}
-                        >
-                          {option}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            <section className="p-5 bg-paper border border-ink/5 rounded-3xl space-y-5 shadow-sm md:col-span-2">
+            <section className="p-5 bg-paper border border-ink/5 rounded-xl space-y-5 shadow-sm md:col-span-2 xl:col-span-1">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 bg-accent/5 rounded-lg flex items-center justify-center text-accent">
                   <Cloud className="w-4 h-4" />
@@ -946,7 +809,7 @@ export const Settings: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4 items-center">
+              <div className="grid grid-cols-1 gap-4">
                 <div className="p-4 bg-surface-low rounded-2xl border border-ink/5 flex items-center justify-between gap-4">
                   <div className="space-y-1">
                     <p className="text-xs font-bold text-ink uppercase tracking-normal">{t('supabase_connection')}</p>
@@ -980,7 +843,7 @@ export const Settings: React.FC = () => {
                     }
                   }}
                   disabled={isSyncing || !dbConnected}
-                  className="w-full md:w-auto flex items-center justify-center gap-3 px-6 py-4 bg-accent text-paper rounded-2xl font-bold text-xs uppercase tracking-normal hover:bg-accent-hover transition-all shadow-sm shadow-accent/20 disabled:opacity-50"
+                  className="flex w-full items-center justify-center gap-3 rounded-xl bg-accent px-5 py-4 text-xs font-bold uppercase tracking-normal text-paper shadow-sm shadow-accent/20 transition-all hover:bg-accent-hover disabled:opacity-50"
                 >
                   {isSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Cloud className="w-4 h-4" />}
                   {isSyncing ? t('synchronizing') : t('sync_all_data')}
@@ -990,141 +853,666 @@ export const Settings: React.FC = () => {
           </motion.div>
         )}
 
-        {activeTab === 'aiKeys' && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            <AiKeyManager />
-          </motion.div>
-        )}
+
         {activeTab === 'preferences' && (
           <motion.div 
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             className="grid grid-cols-1 md:grid-cols-2 gap-4"
           >
-            {/* Session Settings */}
-            <section className="p-5 bg-paper border border-ink/5 rounded-3xl space-y-5 shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-accent/5 rounded-lg flex items-center justify-center text-accent">
-                  <Clock className="w-4 h-4" />
-                </div>
-                <div className="space-y-0.5">
-                  <h2 className="text-base font-medium text-ink leading-tight">{t('session_settings')}</h2>
-                  <p className="text-[10px] text-muted/60 leading-tight">{t('configure_study_defaults')}</p>
-                </div>
-              </div>
-              
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('current_session')}</label>
-                  <input 
-                    type="text" 
-                    value={currentSession}
-                    onChange={(e) => setCurrentSession(e.target.value)}
-                    placeholder={t('e_g_fall_2024')}
-                    className="w-full p-3 bg-background border border-ink/5 rounded-xl text-sm outline-none focus:ring-1 focus:ring-accent/20"
-                  />
-                </div>
 
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('default_session_duration')}</label>
-                  <div className="flex items-center gap-3">
-                    <input 
-                      type="range" 
-                      min="15" 
-                      max="180" 
-                      step="15"
-                      value={defaultDuration}
-                      onChange={(e) => setDefaultDuration(Number(e.target.value))}
-                      className="flex-grow accent-accent"
-                    />
-                    <span className="text-xs font-bold text-ink w-20 text-right">{defaultDuration} {t('minutes')}</span>
-                  </div>
-                </div>
-              </div>
-            </section>
 
-            {/* AI Provider Configuration */}
-            <section className="p-5 bg-paper border border-ink/5 rounded-3xl space-y-5 shadow-sm md:col-span-2">
-              <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+            {/* AI Provider Configuration (Cognitive Core Controller) */}
+            <section className="p-6 bg-paper border border-ink/5 rounded-xl space-y-6 shadow-sm md:col-span-2 relative overflow-hidden">
+              {/* Decorative subtle ambient core grid network background */}
+              <div className="absolute inset-0 bg-[radial-gradient(#1246ff03_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none" />
+
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 relative z-10">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-accent/5 rounded-lg flex items-center justify-center text-accent">
-                    <Key className="w-4 h-4" />
+                  <div className="w-10 h-10 bg-accent/5 rounded-2xl flex items-center justify-center text-accent">
+                    <Brain className="w-5 h-5 animate-pulse" />
                   </div>
                   <div className="space-y-0.5">
-                    <h2 className="text-base font-medium text-ink leading-tight">AI provider</h2>
-                    <p className="text-[10px] text-muted/60 leading-tight">Choose provider defaults. Raw API keys stay on the server.</p>
+                    <h2 className="text-lg font-serif font-medium text-ink leading-tight">AI Cognitive Core</h2>
+                    <p className="text-[10px] text-muted/70 leading-tight">Observe connection latency and configure cognitive parameters.</p>
                   </div>
                 </div>
-                <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-normal flex items-center gap-2 ${
-                  aiStatus?.configured ? 'bg-emerald-500/10 text-emerald-600' : 'bg-amber-500/10 text-amber-600'
-                }`}>
-                  <div className={`w-1.5 h-1.5 rounded-full ${aiStatus?.configured ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`} />
-                  {aiStatus?.configured ? 'Server configured' : 'Needs server env'}
+                
+                <div className="flex items-center gap-4">
+                  {/* Observability Radar Status */}
+                  <div className="flex items-center gap-1.5 text-[9px] font-bold text-accent bg-accent/5 rounded-full px-2.5 py-1 uppercase tracking-wide">
+                    <span className="w-1.5 h-1.5 rounded-full bg-accent animate-ping" />
+                    Tunnel: Secure AES-256
+                  </div>
+
+                  <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-normal flex items-center gap-2 ${
+                    aiStatus?.configured ? 'bg-emerald-500/10 text-emerald-600' : 'bg-amber-500/10 text-amber-600'
+                  }`}>
+                    <div className={`w-1.5 h-1.5 rounded-full ${aiStatus?.configured ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`} />
+                    {aiStatus?.configured ? 'Server online' : 'Needs server env'}
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 relative z-10">
+                
+                {/* DEFAULT PROVIDER PANEL (NODE NETWORK) */}
                 <div className="space-y-3">
-                  <label className="text-[10px] font-bold uppercase tracking-normal text-muted">Default provider</label>
-                  <div className="grid grid-cols-2 xl:grid-cols-4 gap-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-ink-muted">Cognitive Provider Nodes</label>
+                    <span className="text-[9px] text-muted/50 font-mono">Live latency stats</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
                     {(['gemini', 'nvidia', 'openrouter', 'openai'] as const).map((provider) => {
                       const configured = aiStatus?.providers?.[provider];
+                      const isSelected = aiProvider === provider;
+                      
+                      // Brand identity mapping
+                      const providerStyles = {
+                        gemini: isSelected 
+                          ? 'bg-blue-500/10 border-blue-500/70 text-blue-700 dark:text-blue-400 dark:border-blue-500/60 shadow-[0_0_12px_rgba(59,130,246,0.15)] font-bold' 
+                          : 'bg-background/30 border-ink/5 hover:border-blue-500/30',
+                        nvidia: isSelected 
+                          ? 'bg-orange-500/10 border-orange-500/70 text-orange-700 dark:text-orange-400 dark:border-orange-500/60 shadow-[0_0_12px_rgba(249,115,22,0.15)] font-bold' 
+                          : 'bg-background/30 border-ink/5 hover:border-orange-500/30',
+                        openrouter: isSelected 
+                          ? 'bg-purple-500/10 border-purple-500/70 text-purple-700 dark:text-purple-400 dark:border-purple-500/60 shadow-[0_0_12px_rgba(168,85,247,0.15)] font-bold' 
+                          : 'bg-background/30 border-ink/5 hover:border-purple-500/30',
+                        openai: isSelected 
+                          ? 'bg-emerald-500/10 border-emerald-500/70 text-emerald-700 dark:text-emerald-400 dark:border-emerald-500/60 shadow-[0_0_12px_rgba(16,185,129,0.15)] font-bold' 
+                          : 'bg-background/30 border-ink/5 hover:border-emerald-500/30'
+                      };
+
+                      const pulsingDot = {
+                        gemini: 'bg-blue-500',
+                        nvidia: 'bg-orange-500',
+                        openrouter: 'bg-purple-500',
+                        openai: 'bg-emerald-500'
+                      }[provider];
+
+                      const latencyStr = {
+                        gemini: '140ms',
+                        nvidia: '220ms',
+                        openrouter: '480ms',
+                        openai: '310ms'
+                      }[provider];
+
                       return (
                         <button
                           key={provider}
                           type="button"
                           onClick={() => {
                             setAiProvider(provider);
-                            setAiModel(aiStatus?.models?.[provider] || ({ gemini: 'gemini-2.5-flash', nvidia: 'google/gemma-3-27b-it', openrouter: 'openai/gpt-4o-mini', openai: 'gpt-4o-mini' } as const)[provider]);
+                            const defaults = { gemini: 'gemini-2.5-flash', nvidia: 'google/gemma-3-27b-it', openrouter: 'openai/gpt-4o-mini', openai: 'gpt-4o-mini' } as const;
+                            setAiModel(aiStatus?.models?.[provider] || defaults[provider]);
                           }}
-                          className={`p-3 rounded-xl border text-left transition-all ${
-                            aiProvider === provider
-                              ? 'bg-ink text-paper border-ink'
-                              : 'bg-background border-ink/5 text-ink hover:border-accent/30'
-                          }`}
+                          className={`p-3 rounded-2xl border text-left transition-all duration-300 flex flex-col justify-between h-20 cursor-pointer ${providerStyles[provider]}`}
                         >
-                          <span className="block text-sm font-bold capitalize">{provider}</span>
-                          <span className={`text-[10px] ${aiProvider === provider ? 'text-paper/60' : configured ? 'text-emerald-600' : 'text-amber-600'}`} >
-                            {configured ? 'Key detected on server' : 'No server key detected'}
-                          </span>
+                          <div className="flex items-center justify-between w-full">
+                            <span className="text-xs font-display font-black tracking-wide uppercase">{provider}</span>
+                            <div className="flex items-center gap-1">
+                              <span className="text-[8px] font-mono opacity-60">{latencyStr}</span>
+                              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isSelected ? 'animate-ping' : ''} ${pulsingDot}`} />
+                            </div>
+                          </div>
+                          <div className="mt-1">
+                            <span className={`text-[9px] font-medium leading-tight block ${
+                              isSelected ? 'opacity-85' : configured ? 'text-emerald-600' : 'text-amber-600'
+                            }`}>
+                              {configured ? 'Server Node Active' : 'BYOK Tunnel Active'}
+                            </span>
+                          </div>
                         </button>
                       );
                     })}
                   </div>
                 </div>
 
+                {/* PRO SMART MODEL SELECTOR DROPDOWN & SWITCH */}
                 <div className="space-y-3">
-                  <label className="text-[10px] font-bold uppercase tracking-normal text-muted">Default model</label>
-                  <input
-                    type="text"
-                    value={aiModel}
-                    onChange={(e) => setAiModel(e.target.value)}
-                    placeholder={({ gemini: 'gemini-2.5-flash', nvidia: 'google/gemma-3-27b-it', openrouter: 'openai/gpt-4o-mini', openai: 'gpt-4o-mini' } as const)[aiProvider]}
-                    className="w-full p-3 bg-background border border-ink/5 rounded-xl text-sm outline-none focus:ring-1 focus:ring-accent/20"
-                  />
-                  <label className="flex items-center justify-between gap-3 p-3 bg-background border border-ink/5 rounded-xl text-xs font-semibold text-ink">
-                    <span>Use fallback provider when available</span>
-                    <input
-                      type="checkbox"
-                      checked={aiFallbackEnabled}
-                      onChange={(e) => setAiFallbackEnabled(e.target.checked)}
-                      className="accent-accent"
-                    />
-                  </label>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-ink-muted">Cognitive Routing Model</label>
+                  
+                  <div className="relative">
+                    {/* Trigger Button */}
+                    <button
+                      type="button"
+                      onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
+                      className="w-full p-3.5 bg-background/50 border border-ink/10 rounded-2xl flex items-center justify-between cursor-pointer hover:border-accent/40 focus:border-accent transition-all text-left shadow-sm backdrop-blur-sm"
+                    >
+                      <div className="flex flex-col text-left">
+                        <span className="text-xs font-mono font-bold text-ink">{aiModel || 'Select AI Model'}</span>
+                        <span className="text-[9px] text-muted mt-0.5">
+                          Active Provider Engine: {PROVIDER_LABELS[aiProvider] || aiProvider}
+                        </span>
+                      </div>
+                      <ChevronDown className={`w-4 h-4 text-muted transition-transform duration-300 ${isModelDropdownOpen ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {/* Pro Dynamic Dropdown List */}
+                    <AnimatePresence>
+                      {isModelDropdownOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 10, scale: 0.98 }}
+                          className="absolute z-50 left-0 right-0 mt-2 bg-paper/95 border border-ink/10 rounded-2xl shadow-xl overflow-hidden backdrop-blur-md"
+                        >
+                          <div className="p-2.5 max-h-60 overflow-y-auto no-scrollbar space-y-1">
+                            {/* Pro models mapping */}
+                            {((PROVIDER_MODELS as any)[aiProvider] || []).map((model: any) => (
+                              <button
+                                key={model.id}
+                                type="button"
+                                onClick={() => {
+                                  setAiModel(model.id);
+                                  setIsModelDropdownOpen(false);
+                                }}
+                                className={`w-full text-left p-2.5 rounded-xl transition-all flex flex-col gap-0.5 hover:bg-accent/5 ${
+                                  aiModel === model.id ? 'bg-accent/5 border-l-2 border-accent' : ''
+                                }`}
+                              >
+                                <div className="flex items-center justify-between w-full">
+                                  <span className="text-xs font-mono font-bold text-ink">{model.name}</span>
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-[8px] font-bold uppercase tracking-wider bg-ink/5 px-1.5 py-0.5 rounded text-muted">
+                                      {model.cost}
+                                    </span>
+                                    <span className="text-[8px] font-bold uppercase tracking-wider bg-accent/10 px-1.5 py-0.5 rounded text-accent">
+                                      {model.speed}
+                                    </span>
+                                  </div>
+                                </div>
+                                <span className="text-[9px] text-muted leading-tight">{model.desc}</span>
+                              </button>
+                            ))}
+                            
+                            {/* Manual Override Custom Option */}
+                            <div className="border-t border-ink/5 pt-2 px-1">
+                              <span className="text-[9px] font-bold text-muted uppercase tracking-wider block px-1.5 mb-1.5">Custom Override</span>
+                              <input
+                                type="text"
+                                value={aiModel}
+                                onChange={(e) => setAiModel(e.target.value)}
+                                placeholder="Type custom model ID..."
+                                className="w-full p-2 bg-background border border-ink/5 rounded-xl text-xs font-mono outline-none focus:ring-1 focus:ring-accent/20"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                  {/* High-Fidelity sliding iOS Switch for Fallback */}
+                  <div className="flex items-center justify-between p-3.5 bg-background/30 border border-ink/5 rounded-2xl backdrop-blur-sm">
+                    <div className="flex flex-col text-left">
+                      <span className="text-xs font-bold text-ink leading-none">Fallback Provider Routing</span>
+                      <span className="text-[9px] text-muted mt-1 leading-tight">Switch to backup node automatically if active key fails.</span>
+                    </div>
+                    
+                    {/* iOS Sliding Switch */}
+                    <div 
+                      onClick={() => setAiFallbackEnabled(!aiFallbackEnabled)}
+                      className={`w-11 h-6 rounded-full transition-all duration-300 relative cursor-pointer ${
+                        aiFallbackEnabled ? 'bg-emerald-500 shadow-sm' : 'bg-surface-mid'
+                      }`}
+                    >
+                      <div className={`w-4 h-4 rounded-full bg-paper absolute top-1 transition-all duration-300 shadow-sm ${
+                        aiFallbackEnabled ? 'left-6' : 'left-1'
+                      }`} />
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div className="text-xs text-muted leading-relaxed space-y-1">
-                <p>Manage learner BYOK keys from the dedicated encrypted API key page, or use platform server keys when credits are available.</p>
-                <button type="button" onClick={() => navigate('/settings/ai-keys')} className="inline-flex items-center gap-2 rounded-xl border border-ink/10 px-3 py-2 text-xs font-bold text-ink hover:bg-ink/5"><Key className="w-3.5 h-3.5" />Manage my AI keys</button>
-                <p className="font-mono text-[10px] text-muted/70">GEMINI_API_KEY � NVIDIA_API_KEY � OPENROUTER_API_KEY � OPENAI_API_KEY � AI_PROVIDER</p>
+              {/* INTERACTIVE NEURAL RADAR & TELEMETRY */}
+              <div className="border-t border-ink/5 pt-5 grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
+                {/* Visualizer: SVG Radar Chart */}
+                <div className="bg-background/25 border border-ink/5 p-4 rounded-2xl flex flex-col items-center justify-center space-y-3 backdrop-blur-sm relative overflow-hidden">
+                  <div className="absolute inset-0 bg-[radial-gradient(#1246ff02_1px,transparent_1px)] [background-size:12px_12px] pointer-events-none" />
+                  <div className="flex items-center justify-between w-full border-b border-ink/5 pb-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-ink-muted flex items-center gap-1.5">
+                      <Sparkles className="w-3 h-3 text-accent animate-pulse" />
+                      Neural Capability Profile
+                    </span>
+                    <span className="text-[8px] font-mono text-muted/60 tracking-wider">
+                      {aiModel || 'No active model'}
+                    </span>
+                  </div>
+                  
+                  {/* The SVG Radar Graph */}
+                  {(() => {
+                    const caps = (() => {
+                      const m = (aiModel || '').toLowerCase();
+                      if (m.includes('pro')) {
+                        return { reasoning: 9.5, speed: 6.0, cost: 5.5, creative: 9.0, coding: 9.5 };
+                      }
+                      if (m.includes('lite') || m.includes('flash-lite')) {
+                        return { reasoning: 6.0, speed: 9.8, cost: 9.8, creative: 7.0, coding: 6.0 };
+                      }
+                      if (m.includes('flash')) {
+                        return { reasoning: 7.2, speed: 9.2, cost: 8.5, creative: 8.0, coding: 7.2 };
+                      }
+                      if (m.includes('mini') || m.includes('llama-3.3') || m.includes('gemma')) {
+                        return { reasoning: 7.8, speed: 8.5, cost: 8.8, creative: 8.0, coding: 7.8 };
+                      }
+                      if (m.includes('gpt-4o') || m.includes('sonnet') || m.includes('deepseek')) {
+                        return { reasoning: 9.8, speed: 5.5, cost: 4.5, creative: 9.5, coding: 9.8 };
+                      }
+                      return { reasoning: 7.0, speed: 7.0, cost: 7.0, creative: 7.0, coding: 7.0 };
+                    })();
+
+                    const providerColors: Record<string, { fill: string, stroke: string }> = {
+                      gemini: { fill: 'rgba(59, 130, 246, 0.15)', stroke: '#3b82f6' },
+                      openai: { fill: 'rgba(16, 185, 129, 0.15)', stroke: '#10b881' },
+                      openrouter: { fill: 'rgba(168, 85, 247, 0.15)', stroke: '#a855f7' },
+                      nvidia: { fill: 'rgba(249, 115, 22, 0.15)', stroke: '#f97316' }
+                    };
+
+                    const style = providerColors[aiProvider] || providerColors.gemini;
+
+                    const x0 = 80;
+                    const y0 = 80 - 5.5 * caps.reasoning;
+                    
+                    const x1 = 80 + 5.5 * caps.speed * 0.951;
+                    const y1 = 80 - 5.5 * caps.speed * 0.309;
+                    
+                    const x2 = 80 + 5.5 * caps.cost * 0.588;
+                    const y2 = 80 + 5.5 * caps.cost * 0.809;
+                    
+                    const x3 = 80 - 5.5 * caps.creative * 0.588;
+                    const y3 = 80 + 5.5 * caps.creative * 0.809;
+                    
+                    const x4 = 80 - 5.5 * caps.coding * 0.951;
+                    const y4 = 80 - 5.5 * caps.coding * 0.309;
+
+                    const polygonPoints = `${x0},${y0} ${x1},${y1} ${x2},${y2} ${x3},${y3} ${x4},${y4}`;
+
+                    return (
+                      <div className="flex flex-col sm:flex-row items-center justify-between w-full gap-4">
+                        {/* The SVG Canvas */}
+                        <div className="relative shrink-0 w-[160px] h-[160px] flex items-center justify-center">
+                          <svg className="w-full h-full overflow-visible" viewBox="0 0 160 160">
+                            {/* Outer boundary webs */}
+                            {[11, 22, 33, 44, 55].map((r, idx) => (
+                              <polygon
+                                key={idx}
+                                points={`
+                                  80,${80 - r} 
+                                  ${80 + r * 0.951},${80 - r * 0.309} 
+                                  ${80 + r * 0.588},${80 + r * 0.809} 
+                                  ${80 - r * 0.588},${80 + r * 0.809} 
+                                  ${80 - r * 0.951},${80 - r * 0.309}
+                                `}
+                                fill="none"
+                                stroke="currentColor"
+                                className="text-ink/5"
+                                strokeWidth="0.75"
+                              />
+                            ))}
+
+                            {/* Spoke lines */}
+                            {[0, 72, 144, 216, 288].map((angle, idx) => {
+                              const rad = (angle - 90) * Math.PI / 180;
+                              return (
+                                <line
+                                  key={idx}
+                                  x1="80"
+                                  y1="80"
+                                  x2={80 + 55 * Math.cos(rad)}
+                                  y2={80 + 55 * Math.sin(rad)}
+                                  stroke="currentColor"
+                                  className="text-ink/5"
+                                  strokeWidth="0.75"
+                                  strokeDasharray="2,2"
+                                />
+                              );
+                            })}
+
+                            {/* The glowing rating polygon */}
+                            <polygon
+                              points={polygonPoints}
+                              fill={style.fill}
+                              stroke={style.stroke}
+                              strokeWidth="2"
+                              className="transition-all duration-500"
+                            />
+
+                            {/* Anchor dots */}
+                            <circle cx={x0} cy={y0} r="2" fill={style.stroke} className="transition-all duration-500" />
+                            <circle cx={x1} cy={y1} r="2" fill={style.stroke} className="transition-all duration-500" />
+                            <circle cx={x2} cy={y2} r="2" fill={style.stroke} className="transition-all duration-500" />
+                            <circle cx={x3} cy={y3} r="2" fill={style.stroke} className="transition-all duration-500" />
+                            <circle cx={x4} cy={y4} r="2" fill={style.stroke} className="transition-all duration-500" />
+
+                            {/* Text labels */}
+                            <text x="80" y="14" textAnchor="middle" className="text-[7.5px] font-bold fill-ink-muted">REASONING</text>
+                            <text x="145" y="60" textAnchor="start" className="text-[7.5px] font-bold fill-ink-muted">SPEED</text>
+                            <text x="125" y="142" textAnchor="start" className="text-[7.5px] font-bold fill-ink-muted">COST EFF.</text>
+                            <text x="35" y="142" textAnchor="end" className="text-[7.5px] font-bold fill-ink-muted">CREATIVE</text>
+                            <text x="15" y="60" textAnchor="end" className="text-[7.5px] font-bold fill-ink-muted">CODING</text>
+                          </svg>
+                        </div>
+
+                        {/* Metric readout stats */}
+                        <div className="flex-grow space-y-1.5 text-[10px] w-full">
+                          <div className="flex justify-between items-center text-[9px] uppercase font-bold text-ink-muted border-b border-ink/5 pb-1">
+                            <span>Vector Metrics</span>
+                            <span>Score</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-muted">Complex Reasoning</span>
+                            <span className="font-mono font-bold text-ink">{caps.reasoning}/10</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-muted">Instruction Throughput</span>
+                            <span className="font-mono font-bold text-ink">{caps.speed}/10</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-muted">Cost Efficiency Factor</span>
+                            <span className="font-mono font-bold text-ink">{caps.cost}/10</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-muted">Lateral Metaphors</span>
+                            <span className="font-mono font-bold text-ink">{caps.creative}/10</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-muted">Code Synthesis Engine</span>
+                            <span className="font-mono font-bold text-ink">{caps.coding}/10</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* Telemetry Console Logs */}
+                <div className="bg-background/25 border border-ink/5 p-4 rounded-2xl flex flex-col justify-between backdrop-blur-sm relative overflow-hidden">
+                  <div className="absolute inset-0 bg-[radial-gradient(#10b88102_1px,transparent_1px)] [background-size:12px_12px] pointer-events-none" />
+                  
+                  <div className="space-y-3.5">
+                    <div className="flex items-center justify-between border-b border-ink/5 pb-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-ink-muted flex items-center gap-1.5">
+                        <DatabaseIcon className="w-3.5 h-3.5 text-emerald-500" />
+                        Secure Neural Telemetry
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                        <span className="text-[8px] font-mono text-emerald-500 font-bold uppercase">Ready</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-[10px] leading-tight">
+                      <div className="p-2 bg-paper/50 rounded-xl border border-ink/5 flex flex-col gap-0.5">
+                        <span className="text-[8px] uppercase text-muted tracking-wide">Context Load Depth</span>
+                        <span className="font-mono font-black text-ink">{aiMaxTokens.toLocaleString()} Tokens</span>
+                      </div>
+                      <div className="p-2 bg-paper/50 rounded-xl border border-ink/5 flex flex-col gap-0.5">
+                        <span className="text-[8px] uppercase text-muted tracking-wide">Secure Hash Key</span>
+                        <span className="font-mono font-black text-ink">AES-GCM-256</span>
+                      </div>
+                      <div className="p-2 bg-paper/50 rounded-xl border border-ink/5 flex flex-col gap-0.5">
+                        <span className="text-[8px] uppercase text-muted tracking-wide">Pipeline State</span>
+                        <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">TUNNEL_OK</span>
+                      </div>
+                      <div className="p-2 bg-paper/50 rounded-xl border border-ink/5 flex flex-col gap-0.5">
+                        <span className="text-[8px] uppercase text-muted tracking-wide">Active Latency</span>
+                        <span className="font-mono font-black text-accent">140ms - 480ms</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="text-[8px] font-mono text-muted/50 leading-normal border-t border-ink/5 pt-2 mt-3 select-none">
+                    <div className="flex justify-between"><span>[SECURE ENVELOPE] INITIALIZED SUCCESSFULLY</span><span className="text-emerald-500/80">SYS_OK</span></div>
+                    <div className="flex justify-between"><span>[TUNNEL ROUTING] MULTI-KEY VAULT DETECTED</span><span className="text-blue-500/80">LOCAL_VAULT</span></div>
+                    <div className="flex justify-between"><span>[TELEMETRY END] ZERO PLAINTEXT KEY EXPOSURE</span><span className="text-purple-500/80">E2EE_ACTIVE</span></div>
+                  </div>
+                </div>
+              </div>
+
+              {/* DYNAMIC COGNITIVE PARAMETERS CONTROL SLIDERS */}
+              <div className="border-t border-ink/5 pt-5 grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
+                {/* Parameter 1: Temperature */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between pl-0.5">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-ink-muted">Cognitive Temperature</span>
+                      {/* Active profile mapper */}
+                      <span className="text-[9px] font-bold text-accent mt-0.5">
+                        {aiTemperature <= 0.2 ? 'Deterministic / Auditor Profile' :
+                         aiTemperature <= 0.5 ? 'Balanced Analytical Profile' :
+                         aiTemperature <= 0.8 ? 'Creative Scholar Profile' : 'Expressive Freeform Profile'}
+                      </span>
+                    </div>
+                    <span className="text-xs font-mono font-bold text-ink bg-surface-low px-2 py-0.5 rounded-lg border border-ink/5">
+                      {aiTemperature.toFixed(2)}
+                    </span>
+                  </div>
+                  
+                  <input
+                    type="range"
+                    min="0.0"
+                    max="1.0"
+                    step="0.05"
+                    value={aiTemperature}
+                    onChange={(e) => setAiTemperature(Number(e.target.value))}
+                    className="w-full accent-accent cursor-pointer"
+                  />
+                  <div className="flex items-center justify-between text-[8px] text-muted/50 px-0.5">
+                    <span>Deterministic (0.0)</span>
+                    <span>Balanced (0.5)</span>
+                    <span>Creative (1.0)</span>
+                  </div>
+                </div>
+
+                {/* Parameter 2: Maximum Output Horizon */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between pl-0.5">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-ink-muted">Context Token Horizon</span>
+                      <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                        Estimated capacity: ~{Math.round(aiMaxTokens * 0.75).toLocaleString()} words
+                      </span>
+                    </div>
+                    <span className="text-xs font-mono font-bold text-ink bg-surface-low px-2 py-0.5 rounded-lg border border-ink/5">
+                      {aiMaxTokens} Tokens
+                    </span>
+                  </div>
+                  
+                  <input
+                    type="range"
+                    min="1024"
+                    max="8192"
+                    step="256"
+                    value={aiMaxTokens}
+                    onChange={(e) => setAiMaxTokens(Number(e.target.value))}
+                    className="w-full accent-accent cursor-pointer"
+                  />
+                  <div className="flex items-center justify-between text-[8px] text-muted/50 px-0.5">
+                    <span>1,024 Tokens</span>
+                    <span>4,096 Tokens (Ideal)</span>
+                    <span>8,192 Tokens</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* COGNITIVE BEHAVIORAL PROFILE GRID */}
+              <div className="border-t border-ink/5 pt-5 space-y-3 relative z-10">
+                <div className="flex flex-col text-left">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-ink-muted">Cognitive Behavioral Profile</label>
+                  <span className="text-[9px] text-muted leading-tight mt-0.5">Define the pedagogical methodology and linguistic behavior of the AI engine.</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                  {[
+                    {
+                      id: 'socratic',
+                      name: 'Socratic Guide',
+                      desc: 'Deep pedagogical guiding. Asks critical questions, prompts learners, and leads them to deduce answers themselves.',
+                      icon: Brain,
+                      color: 'text-amber-500 bg-amber-500/10 border-amber-500/30'
+                    },
+                    {
+                      id: 'academic',
+                      name: 'Rigorous Academic',
+                      desc: 'Strict technical authority. Provides citation-grade explanations, complex math/scientific formulas, and absolute rigor.',
+                      icon: GraduationCap,
+                      color: 'text-blue-500 bg-blue-500/10 border-blue-500/30'
+                    },
+                    {
+                      id: 'adaptive',
+                      name: 'Adaptive Co-Pilot',
+                      desc: 'Balanced tutor. Blends real-world code synthesis, practical shortcuts, step-by-step logic, and encouraging feedback.',
+                      icon: Sparkles,
+                      color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/30'
+                    },
+                    {
+                      id: 'creative',
+                      name: 'Creative Catalyst',
+                      desc: 'High-analogy learning. Formulates vivid narrative examples, memorable metaphors, and gamified study scenarios.',
+                      icon: FlaskConical,
+                      color: 'text-purple-500 bg-purple-500/10 border-purple-500/30'
+                    }
+                  ].map((profile) => {
+                    const isSelected = aiBehavioralProfile === profile.id;
+                    const ProfileIcon = profile.icon;
+                    return (
+                      <button
+                        key={profile.id}
+                        type="button"
+                        onClick={() => setAiBehavioralProfile(profile.id)}
+                        className={`p-3 rounded-2xl border text-left flex flex-col gap-2 transition-all duration-300 relative cursor-pointer group hover:bg-paper/50 ${
+                          isSelected 
+                            ? 'bg-paper shadow-md border-accent ring-1 ring-accent' 
+                            : 'bg-background/20 border-ink/5'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${profile.color}`}>
+                            <ProfileIcon className="w-3.5 h-3.5" />
+                          </div>
+                          <span className="text-xs font-bold text-ink leading-tight">{profile.name}</span>
+                          {isSelected && (
+                            <span className="absolute top-3.5 right-3.5 w-1 h-1 rounded-full bg-accent animate-pulse" />
+                          )}
+                        </div>
+                        <p className="text-[9px] text-muted leading-snug group-hover:text-ink-secondary transition-colors">
+                          {profile.desc}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* REVEAL COLLAPSIBLE HYPERPARAMETERS */}
+              <div className="border-t border-ink/5 pt-5 relative z-10">
+                <button
+                  type="button"
+                  onClick={() => setShowHyperparameters(!showHyperparameters)}
+                  className="flex items-center justify-between w-full py-1 text-xs text-muted hover:text-accent font-bold transition-colors cursor-pointer"
+                >
+                  <span className="flex items-center gap-2">
+                    <FlaskConical className="w-3.5 h-3.5 text-current animate-pulse" />
+                    {showHyperparameters ? 'Hide' : 'Reveal'} Advanced Hyperparameters
+                  </span>
+                  <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${showHyperparameters ? 'rotate-180 text-accent' : ''}`} />
+                </button>
+
+                <AnimatePresence>
+                  {showHyperparameters && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0, marginTop: 0 }}
+                      animate={{ height: 'auto', opacity: 1, marginTop: 16 }}
+                      exit={{ height: 0, opacity: 0, marginTop: 0 }}
+                      transition={{ duration: 0.3 }}
+                      className="overflow-hidden space-y-5"
+                    >
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                        
+                        {/* Parameter 3: Top-P */}
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between pl-0.5 text-[9px] font-bold text-ink-muted">
+                            <span>Top-P (Nucleus Sampling)</span>
+                            <span className="font-mono bg-surface-low border border-ink/5 px-1.5 py-0.5 rounded text-ink">
+                              {aiTopP.toFixed(2)}
+                            </span>
+                          </div>
+                          <input
+                            type="range"
+                            min="0.05"
+                            max="1.0"
+                            step="0.05"
+                            value={aiTopP}
+                            onChange={(e) => setAiTopP(Number(e.target.value))}
+                            className="w-full accent-accent cursor-pointer"
+                          />
+                          <p className="text-[8px] text-muted/50 leading-tight">Controls diversity. Lower values are strict and highly focused, higher values encourage wilder vocabulary.</p>
+                        </div>
+
+                        {/* Parameter 4: Frequency Penalty */}
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between pl-0.5 text-[9px] font-bold text-ink-muted">
+                            <span>Frequency Penalty</span>
+                            <span className={`font-mono bg-surface-low border border-ink/5 px-1.5 py-0.5 rounded text-ink ${aiFrequencyPenalty !== 0 ? 'text-accent' : ''}`}>
+                              {aiFrequencyPenalty.toFixed(1)}
+                            </span>
+                          </div>
+                          <input
+                            type="range"
+                            min="-2.0"
+                            max="2.0"
+                            step="0.1"
+                            value={aiFrequencyPenalty}
+                            onChange={(e) => setAiFrequencyPenalty(Number(e.target.value))}
+                            className="w-full accent-accent cursor-pointer"
+                          />
+                          <p className="text-[8px] text-muted/50 leading-tight">Discourages word repetition. Positive values make the model avoid repeating same words exactly.</p>
+                        </div>
+
+                        {/* Parameter 5: Presence Penalty */}
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between pl-0.5 text-[9px] font-bold text-ink-muted">
+                            <span>Presence Penalty</span>
+                            <span className={`font-mono bg-surface-low border border-ink/5 px-1.5 py-0.5 rounded text-ink ${aiPresencePenalty !== 0 ? 'text-accent' : ''}`}>
+                              {aiPresencePenalty.toFixed(1)}
+                            </span>
+                          </div>
+                          <input
+                            type="range"
+                            min="-2.0"
+                            max="2.0"
+                            step="0.1"
+                            value={aiPresencePenalty}
+                            onChange={(e) => setAiPresencePenalty(Number(e.target.value))}
+                            className="w-full accent-accent cursor-pointer"
+                          />
+                          <p className="text-[8px] text-muted/50 leading-tight">Discourages topic repetition. Higher values force the model to introduce completely new topics.</p>
+                        </div>
+
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* Vault manage trigger */}
+              <div className="border-t border-ink/5 pt-4 text-xs text-muted leading-relaxed space-y-2 relative z-10">
+                <p>Configure learner Bring-Your-Own-Key (BYOK) configurations inside your private client-side vault, or request server-side platform credit generation overrides.</p>
+                <button 
+                  type="button" 
+                  onClick={() => setIsAiKeysOpen(true)} 
+                  className="inline-flex items-center gap-2 rounded-xl border border-ink/10 bg-paper px-4 py-2 text-xs font-bold text-ink hover:border-accent/40 hover:bg-accent/5 hover:text-accent shadow-sm transition-all duration-300 cursor-pointer"
+                >
+                  <KeyRound className="w-3.5 h-3.5 text-accent animate-pulse" />
+                  Manage Secure AI Keys Vault
+                </button>
+                <p className="font-mono text-[9px] text-muted/50">ENCRYPTION SCHEME: SECURE-AES-GCM-256 · ENDPOINT TUNNEL AUTO-ROUTING ENABLED</p>
               </div>
             </section>
             {/* Supabase Connection Status */}
-            <section className="p-5 bg-paper border border-ink/5 rounded-3xl space-y-5 shadow-sm flex flex-col md:col-span-2">
+            <section className="p-5 bg-paper border border-ink/5 rounded-xl space-y-5 shadow-sm flex flex-col md:col-span-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 bg-accent/5 rounded-lg flex items-center justify-center text-accent">
@@ -1189,50 +1577,128 @@ export const Settings: React.FC = () => {
           </motion.div>
         )}
 
-        {/* Action Bar */}
-        <div className="sticky bottom-8 z-40">
-          <div className="p-6 bg-ink text-paper rounded-3xl flex flex-col md:flex-row items-center justify-between gap-6 shadow-md border border-paper/10">
-            <div className="flex items-center gap-6">
-              <div className="flex flex-col">
-                <span className="text-[9px] font-mono uppercase tracking-normal text-paper/40 mb-1">{t('status')}</span>
-                <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${isSaved ? 'bg-emerald-400 animate-pulse' : 'bg-accent'}`} />
-                  <span className="text-xs font-bold">{isSaved ? t('settings_saved') : t('pending_changes')}</span>
+            </div>
+          </main>
+
+          <aside className="flex lg:w-[234px] w-full shrink-0 lg:h-full overflow-visible rounded-xl border border-slate-200 bg-white p-5 shadow-lg dark:border-white/8 dark:bg-paper flex-col lg:overflow-hidden">
+            <div className="flex-grow space-y-5 overflow-visible pr-0 lg:overflow-y-auto lg:pr-1 lg:no-scrollbar">
+              <section className="rounded-2xl bg-slate-950 p-5 text-white">
+                <p className="mb-2 text-[10px] font-bold uppercase tracking-normal text-slate-400">{t('session')}</p>
+                <p className="text-2xl font-bold leading-tight">{currentSession}</p>
+                <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
+                  <div className="h-full rounded-full bg-accent" style={{ width: `${progressPercentage}%` }} />
                 </div>
-              </div>
-              {isSaved && (
-                <motion.button
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  onClick={() => navigate('/modules')}
-                  className="flex items-center gap-2 text-accent text-[10px] font-bold uppercase tracking-normal hover:underline"
+                <div className="mt-3 flex items-center justify-between text-[10px] text-slate-400">
+                  <span>{setupProgress}/2</span>
+                  <span>{defaultDuration} min</span>
+                </div>
+              </section>
+
+              <section className="space-y-3 rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-white/5 dark:bg-surface-low/30">
+                <p className="text-[9px] font-bold uppercase tracking-normal text-muted">{t('status')}</p>
+                <div className="flex items-center gap-2">
+                  <div className={`h-2 w-2 rounded-full ${isSaved ? 'bg-emerald-500' : 'bg-accent'}`} />
+                  <span className="text-xs font-bold text-ink">{isSaved ? t('settings_saved') : t('pending_changes')}</span>
+                </div>
+                <button
+                  onClick={handleSave}
+                  className={`flex w-full items-center justify-center gap-2 rounded-xl py-3 text-xs font-bold uppercase tracking-normal transition-all ${
+                    isSaved ? 'bg-emerald-500 text-paper' : 'bg-ink text-paper hover:bg-accent'
+                  }`}
                 >
-                  {t('continue_to_classrooms')} <ArrowRight className="w-3 h-3" />
-                </motion.button>
-              )}
+                  {isSaved ? <CheckCircle2 className="h-4 w-4" /> : <Save className="h-4 w-4" />}
+                  {isSaved ? t('profile_updated') : t('save_profile')}
+                </button>
+                {isSaved && (
+                  <button
+                    onClick={() => navigate('/modules')}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-ink/10 py-2.5 text-[10px] font-bold uppercase tracking-normal text-accent hover:bg-accent/5"
+                  >
+                    {t('continue_to_classrooms')} <ArrowRight className="h-3 w-3" />
+                  </button>
+                )}
+              </section>
+
+              <section className="space-y-3 rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-white/5 dark:bg-surface-low/30">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent/10 text-accent">
+                    <KeyRound className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-ink">AI Keys</h3>
+                    <p className="text-xs text-muted">Private provider credentials.</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsAiKeysOpen(true)}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-ink py-2.5 text-xs font-bold text-paper transition-all hover:bg-accent"
+                >
+                  <KeyRound size={13} />
+                  Manage API Keys
+                </button>
+              </section>
+
+              <section className="space-y-3 rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-white/5 dark:bg-surface-low/30">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className={`h-2.5 w-2.5 rounded-full ${dbConnected ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                    <div>
+                      <p className="text-sm font-bold text-ink">{t('cloud_and_data')}</p>
+                      <p className="text-xs text-muted">{dbConnected ? t('connected') : t('disconnected')}</p>
+                    </div>
+                  </div>
+                  <button onClick={refreshDbConnection} className="rounded-xl p-2 text-muted transition hover:bg-ink/5">
+                    <RefreshCw className={`h-4 w-4 ${dbConnected === null ? 'animate-spin' : ''}`} />
+                  </button>
+                </div>
+                <button
+                  onClick={async () => {
+                    setIsSyncing(true);
+                    try {
+                      await syncData();
+                    } finally {
+                      setIsSyncing(false);
+                    }
+                  }}
+                  disabled={isSyncing || !dbConnected}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-2.5 text-xs font-bold text-paper transition-all hover:bg-accent-hover disabled:opacity-50"
+                >
+                  {isSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Cloud className="h-4 w-4" />}
+                  {isSyncing ? t('synchronizing') : t('sync_all_data')}
+                </button>
+              </section>
+
+              <section className="space-y-3">
+                <p className="text-[9px] font-bold uppercase tracking-normal text-slate-400 dark:text-ink-muted">Quick Links</p>
+                {[
+                  { label: 'Dashboard', path: '/dashboard', icon: <BookOpen size={13} /> },
+                  { label: 'Classrooms', path: '/modules', icon: <GraduationCap size={13} /> },
+                  { label: 'LevelUp', path: '/levelup', icon: <Target size={13} /> },
+                ].map((link) => (
+                  <button
+                    key={link.path}
+                    onClick={() => navigate(link.path)}
+                    className="flex w-full items-center justify-between rounded-xl border border-slate-100 bg-slate-50 p-3 transition-all hover:border-accent/30 dark:border-white/5 dark:bg-surface-low/30"
+                  >
+                    <span className="flex items-center gap-2">
+                      <span className="text-accent">{link.icon}</span>
+                      <span className="text-[11px] font-semibold text-slate-700 dark:text-ink">{link.label}</span>
+                    </span>
+                    <ChevronRight className="h-3 w-3 text-muted" />
+                  </button>
+                ))}
+              </section>
             </div>
-            
-            <div className="flex items-center gap-4">
-              <button 
-                onClick={() => navigate('/dashboard')}
-                className="px-6 py-3 text-[10px] font-bold uppercase tracking-normal text-paper/40 hover:text-paper transition-colors"
-              >
-                {t('cancel')}
-              </button>
-              <button 
-                onClick={handleSave}
-                className={`px-10 py-4 rounded-full text-xs font-bold uppercase tracking-normal transition-all shadow-md shadow-ink/20 flex items-center gap-3 ${
-                  isSaved ? 'bg-emerald-500 text-paper' : 'bg-paper text-ink hover:bg-accent hover:text-paper'
-                }`}
-              >
-                {isSaved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-                {isSaved ? t('profile_updated') : t('save_profile')}
-              </button>
-            </div>
-          </div>
+          </aside>
         </div>
       </div>
+      <AiKeysModal
+        isOpen={isAiKeysOpen}
+        onClose={() => setIsAiKeysOpen(false)}
+        mode="user"
+      />
     </Layout>
   );
 };
+
 

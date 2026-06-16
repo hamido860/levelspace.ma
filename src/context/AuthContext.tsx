@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase, getProfile, checkSupabaseConnection } from '../db/supabase';
+import { ensureBrowserSupabaseConfigured } from '../lib/supabase/client';
 import { syncService } from '../services/syncService';
 import { db } from '../db/db';
 
@@ -40,6 +41,25 @@ const createDemoAdminProfile = () => ({
   plan: 'pro',
   onboarding_completed: true,
 });
+
+const syncAcademicSettingsFromProfile = async (profile: any) => {
+  const academicSettings = [
+    ['selected_grade_id', profile?.selected_grade_id || profile?.grade_id],
+    ['selected_grade', profile?.selected_grade],
+    ['selected_bac_track', profile?.selected_bac_track || profile?.track_id],
+    ['selected_option', profile?.selected_option || profile?.instruction_option_id],
+  ].filter(([, value]) => typeof value === 'string' && value.trim());
+
+  if (academicSettings.length === 0) return;
+
+  await db.settings.bulkPut(
+    academicSettings.map(([key, value]) => ({
+      key,
+      value,
+    })),
+  );
+  academicSettings.forEach(([key, value]) => localStorage.setItem(key, value));
+};
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -84,54 +104,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [dbConnected, user?.id]);
 
   useEffect(() => {
-    refreshDbConnection();
-
-    // 1. Listen for Supabase Auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session);
+    const handleSession = async (currentSession: Session | null) => {
+      setSession(currentSession);
       
-      if (session?.user) {
-        setUser(session.user);
+      if (currentSession?.user) {
+        setUser(currentSession.user);
 
         // Try to load from cache first
-        const cachedProfile = await db.settings.get(`profile_${session.user.id}`);
+        const cachedProfile = await db.settings.get(`profile_${currentSession.user.id}`);
         if (cachedProfile) {
           setProfile(cachedProfile.value);
+          await syncAcademicSettingsFromProfile(cachedProfile.value);
         }
 
-        const userProfile = await getProfile(session.user.id);
+        const userProfile = await getProfile(currentSession.user.id);
         if (userProfile) {
           setProfile(userProfile);
-          await db.settings.put({ key: `profile_${session.user.id}`, value: userProfile });
-        }
-      } else if (localStorage.getItem(DEMO_ADMIN_STORAGE_KEY) === 'true') {
-        await applyDemoAdminAuth();
-      } else {
-        localStorage.removeItem(DEMO_ADMIN_STORAGE_KEY);
-        setUser(null);
-        setProfile(null);
-      }
-      setLoading(false);
-    });
-
-    // 2. Initial session check
-    const initAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
-      
-      if (session?.user) {
-        setUser(session.user);
-
-        // Try to load from cache first
-        const cachedProfile = await db.settings.get(`profile_${session.user.id}`);
-        if (cachedProfile) {
-          setProfile(cachedProfile.value);
-        }
-
-        const userProfile = await getProfile(session.user.id);
-        if (userProfile) {
-          setProfile(userProfile);
-          await db.settings.put({ key: `profile_${session.user.id}`, value: userProfile });
+          await db.settings.put({ key: `profile_${currentSession.user.id}`, value: userProfile });
+          await syncAcademicSettingsFromProfile(userProfile);
         }
       } else if (localStorage.getItem(DEMO_ADMIN_STORAGE_KEY) === 'true') {
         await applyDemoAdminAuth();
@@ -143,10 +133,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
     };
 
+    let isCancelled = false;
+    let subscription: { unsubscribe: () => void } | null = null;
+
+    const initAuth = async () => {
+      await ensureBrowserSupabaseConfigured();
+      if (isCancelled) return;
+
+      const { data } = supabase.auth.onAuthStateChange(async (_event: string, session: Session | null) => {
+        await handleSession(session);
+      });
+      subscription = data.subscription;
+
+      void refreshDbConnection();
+      const { data: { session } } = await supabase.auth.getSession();
+      await handleSession(session);
+    };
+
     initAuth();
 
     return () => {
-      subscription.unsubscribe();
+      isCancelled = true;
+      subscription?.unsubscribe();
     };
   }, []);
 

@@ -50,6 +50,11 @@ export const validateMetrics = (metrics: any): ValidationError[] => {
     return [{ field: "root", error: "Metrics must be an object", value: metrics, expected: "object" }];
   }
 
+  const topicTableHealth = Array.isArray(metrics.tableHealth)
+    ? metrics.tableHealth.find((t: any) => t && t.table === "topics")
+    : null;
+  const topicVisibilityUncertain = !!topicTableHealth?.status?.includes("inconsistent");
+
   // Basic type checks
   if (typeof metrics.totalTopics !== "number" || metrics.totalTopics < 0) {
     errors.push({
@@ -123,6 +128,16 @@ export const validateMetrics = (metrics: any): ValidationError[] => {
     });
   }
 
+  // Global lessons generated cannot exceed total topics
+  if (!topicVisibilityUncertain && typeof metrics.lessonsGenerated === "number" && typeof metrics.totalTopics === "number" && metrics.lessonsGenerated > metrics.totalTopics) {
+    errors.push({
+      field: "lessonsGenerated",
+      error: `Cannot exceed totalTopics (${metrics.totalTopics})`,
+      value: metrics.lessonsGenerated,
+      expected: `<= ${metrics.totalTopics}`,
+    });
+  }
+
   // Embedded can't exceed total
   if (metrics.ragChunksEmbedded > metrics.ragChunksTotal) {
     errors.push({
@@ -148,6 +163,20 @@ export const validateMetrics = (metrics: any): ValidationError[] => {
       error: `Cannot exceed ragChunksTotal (${metrics.ragChunksTotal})`,
       value: metrics.ragChunksUsable,
       expected: `<= ${metrics.ragChunksTotal}`,
+    });
+  }
+
+
+  // Lessons cannot exceed topics globally (unless we don't have visibility into topics)
+  const topicsHealth = metrics.tableHealth?.find((t: any) => t.table === "topics");
+  const topicsVisible = topicsHealth && topicsHealth.rows !== null && topicsHealth.rows > 0;
+
+  if (topicsVisible && metrics.lessonsGenerated > metrics.totalTopics) {
+    errors.push({
+      field: "lessonsGenerated",
+      error: `Cannot exceed totalTopics (${metrics.totalTopics})`,
+      value: metrics.lessonsGenerated,
+      expected: `<= ${metrics.totalTopics}`,
     });
   }
 
@@ -191,6 +220,32 @@ export const validateMetrics = (metrics: any): ValidationError[] => {
       }
 
       if (typeof g.lessons !== "number" || g.lessons < 0) {
+        errors.push({
+          field: `${prefix}.lessons`,
+          error: "Must be a non-negative number",
+          value: g.lessons,
+          expected: "number >= 0",
+        });
+      } else if (!topicVisibilityUncertain && typeof g.topics === "number" && g.lessons > g.topics) {
+        errors.push({
+          field: `${prefix}.lessons`,
+          error: `Cannot exceed grade topics (${g.topics})`,
+          value: g.lessons,
+          expected: `<= ${g.topics}`,
+        });
+      }
+
+      // Lessons cannot exceed topics per grade
+      if (g.lessons > g.topics) {
+        errors.push({
+          field: `${prefix}.lessons`,
+          error: `Cannot exceed grade topics (${g.topics})`,
+          value: g.lessons,
+          expected: `<= ${g.topics}`,
+        });
+      }
+
+      if (false) {
         errors.push({
           field: `${prefix}.lessons`,
           error: "Must be a non-negative number",

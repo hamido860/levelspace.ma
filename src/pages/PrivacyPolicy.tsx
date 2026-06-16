@@ -141,7 +141,7 @@ export default function PrivacyPolicy() {
               </h1>
             </div>
 
-            <dl className="grid min-w-48 gap-3 rounded-3xl border border-[#151515]/10 bg-white/70 p-4 text-sm">
+            <dl className="grid min-w-48 gap-3 rounded-xl border border-[#151515]/10 bg-white/70 p-4 text-sm">
               <div>
                 <dt className="text-xs font-bold uppercase tracking-[0.16em] text-[#151515]/45">Effective Date</dt>
                 <dd className="mt-1 font-semibold text-[#151515]">
@@ -156,20 +156,20 @@ export default function PrivacyPolicy() {
           </div>
 
           {loading && (
-            <div className="mt-10 rounded-3xl border border-[#151515]/10 bg-white/60 p-8 text-center text-sm font-medium text-[#151515]/60">
+            <div className="mt-10 rounded-xl border border-[#151515]/10 bg-white/60 p-8 text-center text-sm font-medium text-[#151515]/60">
               Loading privacy policy...
             </div>
           )}
 
           {showUnavailable && (
-            <div className="mt-10 rounded-3xl border border-amber-300 bg-amber-50 p-8 text-center text-sm font-semibold text-amber-900">
+            <div className="mt-10 rounded-xl border border-amber-300 bg-amber-50 p-8 text-center text-sm font-semibold text-amber-900">
               {FALLBACK_MESSAGE}
             </div>
           )}
 
           {!loading && !showUnavailable && (
             <article
-              className="mt-10 space-y-5 rounded-3xl border border-[#151515]/10 bg-white p-6 leading-relaxed text-[#202020] md:p-9"
+              className="mt-10 space-y-5 rounded-xl border border-[#151515]/10 bg-white p-6 leading-relaxed text-[#202020] md:p-9"
               dir={direction}
             >
               <Markdown

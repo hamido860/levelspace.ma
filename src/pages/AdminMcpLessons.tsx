@@ -14,8 +14,6 @@ import {
   Sparkles,
   XCircle,
 } from "lucide-react";
-import { Layout } from "../components/Layout";
-import { SEO } from "../components/SEO";
 import { supabase } from "../db/supabase";
 import { db } from "../db/db";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -341,11 +339,8 @@ export const AdminMcpLessons: React.FC = () => {
   }));
 
   return (
-    <Layout>
-      <SEO title="MCP Lesson Review" description="Admin review surface for MCP lesson orchestration." />
-
       <section className="space-y-6">
-        <div className="rounded-3xl border border-ink/10 bg-paper p-6 shadow-sm">
+        <div className="rounded-xl border border-ink/10 bg-paper p-6 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <div className="text-[11px] font-bold uppercase tracking-[0.24em] text-accent">Review workspace</div>
@@ -380,7 +375,7 @@ export const AdminMcpLessons: React.FC = () => {
           </div>
         </div>
 
-        <div className="rounded-3xl border border-ink/10 bg-paper p-4 shadow-sm">
+        <div className="rounded-xl border border-ink/10 bg-paper p-4 shadow-sm">
           <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-normal text-muted">
             <Filter className="h-4 w-4" />
             Review filters
@@ -447,7 +442,7 @@ export const AdminMcpLessons: React.FC = () => {
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-3xl border border-ink/10 bg-paper shadow-sm">
+        <div className="overflow-hidden rounded-xl border border-ink/10 bg-paper shadow-sm">
           <div className="grid grid-cols-[1.8fr_1.5fr_1fr_0.8fr_0.8fr_1fr] gap-3 border-b border-ink/10 bg-surface-low px-4 py-3 ls-micro-label">
             <span>Curriculum Path</span>
             <span>Topic / Lesson</span>
@@ -549,7 +544,6 @@ export const AdminMcpLessons: React.FC = () => {
           )}
         </div>
       </section>
-    </Layout>
   );
 };
 

@@ -20,7 +20,7 @@ seedDatabase().then(() => {
   );
 });
 
-// Register Service Worker for complete offline capabilities.
+// Register Service Worker for complete offline capabilities
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js')
@@ -32,3 +32,4 @@ if ('serviceWorker' in navigator) {
       });
   });
 }
+

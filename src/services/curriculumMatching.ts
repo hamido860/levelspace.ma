@@ -22,7 +22,7 @@ export const normalizeCurriculumValue = (value: string) =>
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/['`’]/g, "")
-    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/[^a-z0-9\u0600-\u06ff\u0750-\u077f\u08a0-\u08ff\ufb50-\ufdff\ufe70-\ufeff]+/g, " ")
     .trim();
 
 const SUBJECT_EQUIVALENTS: Record<string, string[]> = {
@@ -58,6 +58,45 @@ const SUBJECT_EQUIVALENTS: Record<string, string[]> = {
 };
 
 const GRADE_EQUIVALENTS: Record<string, string[]> = {
+  // Primary school grades
+  "1 primary": ["1ère année primaire", "1ere annee primaire", "1 Primary", "1ère primaire", "1ere primaire", "1 A.P.", "1AP", "Grade 1"],
+  "1ere annee primaire": ["1ère année primaire", "1ere annee primaire", "1 Primary", "1ère primaire", "1ere primaire", "1 A.P.", "1AP", "Grade 1"],
+  "grade 1": ["1ère année primaire", "1ere annee primaire", "1 Primary", "1ère primaire", "1ere primaire", "1 A.P.", "1AP", "Grade 1"],
+  
+  "2 primary": ["2ème année primaire", "2eme annee primaire", "2 Primary", "2ème primaire", "2eme primaire", "2 A.P.", "2AP", "Grade 2"],
+  "2eme annee primaire": ["2ème année primaire", "2eme annee primaire", "2 Primary", "2ème primaire", "2eme primaire", "2 A.P.", "2AP", "Grade 2"],
+  "grade 2": ["2ème année primaire", "2eme annee primaire", "2 Primary", "2ème primaire", "2eme primaire", "2 A.P.", "2AP", "Grade 2"],
+  
+  "3 primary": ["3ème année primaire", "3eme annee primaire", "3 Primary", "3ème primaire", "3eme primaire", "3 A.P.", "3AP", "Grade 3"],
+  "3eme annee primaire": ["3ème année primaire", "3eme annee primaire", "3 Primary", "3ème primaire", "3eme primaire", "3 A.P.", "3AP", "Grade 3"],
+  "grade 3": ["3ème année primaire", "3eme annee primaire", "3 Primary", "3ème primaire", "3eme primaire", "3 A.P.", "3AP", "Grade 3"],
+  
+  "4 primary": ["4ème année primaire", "4eme annee primaire", "4 Primary", "4ème primaire", "4eme primaire", "4 A.P.", "4AP", "Grade 4"],
+  "4eme annee primaire": ["4ème année primaire", "4eme annee primaire", "4 Primary", "4ème primaire", "4eme primaire", "4 A.P.", "4AP", "Grade 4"],
+  "grade 4": ["4ème année primaire", "4eme annee primaire", "4 Primary", "4ème primaire", "4eme primaire", "4 A.P.", "4AP", "Grade 4"],
+  
+  "5 primary": ["5ème année primaire", "5eme annee primaire", "5 Primary", "5ème primaire", "5eme primaire", "5 A.P.", "5AP", "Grade 5"],
+  "5eme annee primaire": ["5ème année primaire", "5eme annee primaire", "5 Primary", "5ème primaire", "5eme primaire", "5 A.P.", "5AP", "Grade 5"],
+  "grade 5": ["5ème année primaire", "5eme annee primaire", "5 Primary", "5ème primaire", "5eme primaire", "5 A.P.", "5AP", "Grade 5"],
+  
+  "6 primary": ["6ème année primaire", "6eme annee primaire", "6 Primary", "6ème primaire", "6eme primaire", "6 A.P.", "6AP", "Grade 6"],
+  "6eme annee primaire": ["6ème année primaire", "6eme annee primaire", "6 Primary", "6ème primaire", "6eme primaire", "6 A.P.", "6AP", "Grade 6"],
+  "grade 6": ["6ème année primaire", "6eme annee primaire", "6 Primary", "6ème primaire", "6eme primaire", "6 A.P.", "6AP", "Grade 6"],
+
+  // Middle school (Collège) grades
+  "1 college": ["1ère année collège", "1ere annee college", "1 College", "1ère collège", "1ere college", "1 A.C.", "1AC", "Grade 7", "7th Grade"],
+  "1ere annee college": ["1ère année collège", "1ere annee college", "1 College", "1ère collège", "1ere college", "1 A.C.", "1AC", "Grade 7", "7th Grade"],
+  "grade 7": ["1ère année collège", "1ere annee college", "1 College", "1ère collège", "1ere college", "1 A.C.", "1AC", "Grade 7", "7th Grade"],
+  
+  "2 college": ["2ème année collège", "2eme annee college", "2 College", "2ème collège", "2eme college", "2 A.C.", "2AC", "Grade 8", "8th Grade"],
+  "2eme annee college": ["2ème année collège", "2eme annee college", "2 College", "2ème collège", "2eme college", "2 A.C.", "2AC", "Grade 8", "8th Grade"],
+  "grade 8": ["2ème année collège", "2eme annee college", "2 College", "2ème collège", "2eme college", "2 A.C.", "2AC", "Grade 8", "8th Grade"],
+  
+  "3 college": ["3ème année collège", "3eme annee college", "3 College", "3ème collège", "3eme college", "3 A.C.", "3AC", "Grade 9", "9th Grade"],
+  "3eme annee college": ["3ème année collège", "3eme annee college", "3 College", "3ème collège", "3eme college", "3 A.C.", "3AC", "Grade 9", "9th Grade"],
+  "grade 9": ["3ème année collège", "3eme annee college", "3 College", "3ème collège", "3eme college", "3 A.C.", "3AC", "Grade 9", "9th Grade"],
+
+  // High school grades
   "grade 12": ["Terminale", "2ème année Bac", "2eme annee Bac", "2ème Bac", "2eme Bac", "Bac 2", "Tle"],
   terminale: ["Terminale", "2ème année Bac", "2eme annee Bac", "2ème Bac", "2eme Bac", "Bac 2", "Tle"],
   "2eme annee bac": ["2ème année Bac", "2eme annee Bac", "Terminale", "2ème Bac", "2eme Bac", "Bac 2"],

@@ -2,8 +2,10 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Layout } from '../components/Layout';
-import { ShieldCheck, AlertTriangle, ArrowLeft, BookOpen, Plus, ChevronRight, CheckCircle2, Clock, Brain, Sparkles, Loader2, Play, Target, Dumbbell, Database, Pin } from 'lucide-react';
+import { SEO } from '../components/SEO';
+import { ShieldCheck, AlertTriangle, ArrowLeft, BookOpen, Plus, ChevronRight, CheckCircle2, Clock, Brain, Sparkles, Loader2, Play, Target, Dumbbell, Database, Pin, Timer, RefreshCw, Activity, FileText, CheckSquare, ChevronDown, ChevronUp } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { SupportZoneModal } from '../components/SupportZoneModal';
 import { db } from '../db/db';
 import { supabase } from '../db/supabase';
 import { TagsManager } from '../components/TagsManager';
@@ -30,9 +32,19 @@ import {
   getCurriculumValidationLabel,
   selectStudentFacingValidatedContent,
 } from '../services/curriculumValidation';
+import { HorizontalSlider } from '../components/HorizontalSlider';
+import { LayoutGrid, Rows3, Shuffle } from 'lucide-react';
+import { getCardGradient, randomBanner, randomCardGradient } from '../utils/cardColors';
+
 
 const normalizeLessonTitle = (title: string | null | undefined) =>
   String(title || '').trim().toLocaleLowerCase();
+
+const applyInstructionOptionTopicFilter = (query: any, optionId: string) => {
+  const normalizedOptionId = String(optionId || '').trim();
+  if (!normalizedOptionId) return query.is('instruction_option_id', null);
+  return query.or(`instruction_option_id.eq.${normalizedOptionId},instruction_option_id.is.null`);
+};
 
 const getLessonIllustration = (title: string | null | undefined, subject?: string | null | undefined) => {
   const t = String(title || '').toLowerCase();
@@ -275,6 +287,10 @@ export const ClassroomView: React.FC = () => {
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
   const { t } = useLanguage();
+  const label = (key: string, fallback: string) => {
+    const translated = t(key);
+    return translated && translated !== key ? translated : fallback;
+  };
   const [generatingTitle, setGeneratingTitle] = useState<string | null>(null);
   const [isFetchingGallery, setIsFetchingGallery] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
@@ -291,6 +307,44 @@ export const ClassroomView: React.FC = () => {
   const [cloudLessonsCount, setCloudLessonsCount] = useState<number | null>(null);
   const aiAvailable = checkAIProvider();
   const [activeDomainKey, setActiveDomainKey] = useState<string>('all');
+  // Layout mode: grid or carousel
+  const [layoutMode, setLayoutMode] = useState<'grid' | 'carousel'>('grid');
+  const [navigationCurriculumIds, setNavigationCurriculumIds] = useState<{ gradeId?: string; subjectId?: string }>({});
+
+  const [lessonColorOverrides, setLessonColorOverrides] = useState<Record<string, string>>({});
+  const [lessonBannerOverrides, setLessonBannerOverrides] = useState<Record<string, string>>({});
+
+  const handleRandomizeAllBanners = () => {
+    const newColors: Record<string, string> = {};
+    const newBanners: Record<string, string> = {};
+    const allItems = [...(allLessons || []), ...(curriculumTopicRows || []), ...(topicFallbackRows || [])];
+    allItems.forEach(item => {
+      if (item.id) {
+        newColors[item.id] = randomCardGradient();
+        newBanners[item.id] = randomBanner();
+      }
+    });
+    setLessonColorOverrides(newColors);
+    setLessonBannerOverrides(newBanners);
+  };
+
+  const [sidebarCollapsedSections, setSidebarCollapsedSections] = useState<Record<string, boolean>>({
+    telemetry: false,
+    pomodoro: false,
+    support: false,
+    activityLog: false
+  });
+
+  const toggleSidebarSection = (section: string) => {
+    setSidebarCollapsedSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
+
+  const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
+
+  const toggleCardExpansion = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpandedCards(prev => ({ ...prev, [id]: !prev[id] }));
+  };
 
   // ── Pinned lessons state (module-scoped, shared with LessonReader) ──
   const pinStorageKey = `levelspace_pinned_lessons_${id || 'global'}`;
@@ -302,14 +356,7 @@ export const ClassroomView: React.FC = () => {
       return [];
     }
   });
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(pinStorageKey);
-      setPinnedLessonIds(saved ? JSON.parse(saved) : []);
-    } catch {
-      setPinnedLessonIds([]);
-    }
-  }, [pinStorageKey]);
+
   const togglePinLesson = (lessonId: string) => {
     setPinnedLessonIds(prev => {
       const next = prev.includes(lessonId)
@@ -322,12 +369,202 @@ export const ClassroomView: React.FC = () => {
 
   const module = useLiveQuery(() => id ? db.modules.get(id) : undefined, [id]);
   const allLessons = useLiveQuery(() => id ? db.lessons.where('moduleId').equals(id).sortBy('createdAt') : [], [id]);
+  const lessonNavigationState = (extra: Record<string, unknown> = {}) => ({
+    from: `/classroom/${id}`,
+    classroomId: id,
+    moduleId: module?.id || id,
+    gradeId: navigationCurriculumIds.gradeId,
+    subjectId: navigationCurriculumIds.subjectId,
+    ...extra,
+  });
+
+  // Fetch notes for all lessons in this classroom
+  const lessonIds = useMemo(() => (allLessons || []).map(l => l.id), [allLessons]);
+  const classroomNotes = useLiveQuery(
+    async () => {
+      if (lessonIds.length === 0) return [];
+      return db.notes.where('lessonId').anyOf(lessonIds).toArray();
+    },
+    [lessonIds]
+  );
+
+  // Fetch all reminders/tasks to capture completed classroom checkmarks
+  const remindersVal = useLiveQuery(() => db.tasks.toArray());
+  const reminders = remindersVal || [];
+
+  // Local state to log Pomodoro focus timer starts dynamically
+  const [pomodoroLogs, setPomodoroLogs] = useState<Array<{
+    id: string;
+    title: string;
+    timestamp: number;
+  }>>([]);
+
+  const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
+  const [timerSeconds, setTimerSeconds] = useState(1500); // 25 minutes
+  const [isTimerRunning, setIsTimerRunning] = useState(false);
+
+  const activityLogs = useMemo(() => {
+    const logs: Array<{
+      id: string;
+      type: 'lesson_completed' | 'lesson_pending' | 'note_added' | 'pomodoro_start' | 'reminder_completed';
+      title: string;
+      subtitle?: string;
+      timestamp: number;
+    }> = [];
+
+    // 1. Completed & Pending Lessons
+    (allLessons || []).forEach(lesson => {
+      if (lesson.status === 'done') {
+        logs.push({
+          id: `completed-${lesson.id}`,
+          type: 'lesson_completed',
+          title: lesson.title,
+          subtitle: 'Marked as completed',
+          timestamp: lesson.createdAt || Date.now()
+        });
+      } else if (lesson.status === 'pending') {
+        logs.push({
+          id: `pending-${lesson.id}`,
+          type: 'lesson_pending',
+          title: lesson.title,
+          subtitle: 'AI curation pending',
+          timestamp: lesson.createdAt || Date.now()
+        });
+      }
+    });
+
+    // 2. Classroom Study Notes
+    if (classroomNotes && allLessons) {
+      const lessonTitleById = new Map(allLessons.map(l => [l.id, l.title]));
+      classroomNotes.forEach(note => {
+        const lessonTitle = lessonTitleById.get(note.lessonId) || 'a lesson';
+        logs.push({
+          id: `note-${note.id}`,
+          type: 'note_added',
+          title: `Note in ${lessonTitle}`,
+          subtitle: note.content.length > 30 ? note.content.substring(0, 30) + '...' : note.content,
+          timestamp: note.createdAt
+        });
+      });
+    }
+
+    // 3. Completed Reminders (matching this subject module / category)
+    if (reminders && module) {
+      reminders.forEach(task => {
+        if (task.completed) {
+          const isRelated = task.title.toLowerCase().includes(module.name.toLowerCase()) || 
+                            (module.category && task.title.toLowerCase().includes(module.category.toLowerCase()));
+          if (isRelated) {
+            logs.push({
+              id: `task-${task.id}`,
+              type: 'reminder_completed',
+              title: task.title,
+              subtitle: 'Checklist reminder completed',
+              timestamp: task.createdAt || Date.now()
+            });
+          }
+        }
+      });
+    }
+
+    // 4. Pomodoro start events
+    pomodoroLogs.forEach(pl => {
+      logs.push({
+        id: pl.id,
+        type: 'pomodoro_start',
+        title: pl.title,
+        subtitle: 'Deep focus session started',
+        timestamp: pl.timestamp
+      });
+    });
+
+    return logs.sort((a, b) => b.timestamp - a.timestamp).slice(0, 5);
+  }, [allLessons, classroomNotes, reminders, module, pomodoroLogs]);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(pinStorageKey);
+      if (saved) {
+        setPinnedLessonIds(JSON.parse(saved));
+      } else if (allLessons && allLessons.length > 0) {
+        // Default to first 3 lessons if no pins are saved yet
+        const defaultPins = allLessons.slice(0, 3).map((l: any) => l.id);
+        setPinnedLessonIds(defaultPins);
+        localStorage.setItem(pinStorageKey, JSON.stringify(defaultPins));
+      }
+    } catch {
+      setPinnedLessonIds([]);
+    }
+  }, [pinStorageKey, allLessons?.length]);
   const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
   const settingsMap = useMemo(() => Object.fromEntries(dbSettings.map(s => [s.key, s.value])), [dbSettings]);
 
-  const currentGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
+  const defaultDuration = Number(settingsMap['default_session_duration'] || localStorage.getItem('default_session_duration') || 25);
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  useEffect(() => {
+    if (defaultDuration) {
+      setTimerSeconds(defaultDuration * 60);
+    }
+  }, [defaultDuration]);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isTimerRunning && timerSeconds > 0) {
+      interval = setInterval(() => {
+        setTimerSeconds(prev => prev - 1);
+      }, 1000);
+    } else if (timerSeconds === 0) {
+      setIsTimerRunning(false);
+    }
+    return () => clearInterval(interval);
+  }, [isTimerRunning, timerSeconds]);
+
+  useEffect(() => {
+    if (isTimerRunning) {
+      setPomodoroLogs(prev => [
+        {
+          id: `pomodoro-${Date.now()}`,
+          title: 'Started Deep Focus',
+          timestamp: Date.now()
+        },
+        ...prev
+      ].slice(0, 5));
+    }
+  }, [isTimerRunning]);
+
+  const currentGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || '';
   const currentCountry = settingsMap['selected_country'] || localStorage.getItem('selected_country') || '';
   const selectedBacTrack = settingsMap['selected_bac_track'] || localStorage.getItem('selected_bac_track') || '';
+  const selectedInstructionOptionId = String(settingsMap['selected_bac_int_option'] || localStorage.getItem('selected_bac_int_option') || '');
+  useEffect(() => {
+    if (!module) {
+      setNavigationCurriculumIds({});
+      return;
+    }
+
+    let isCancelled = false;
+    resolveCurriculumIds(currentGrade, module.name, module.category).then(({ gradeId, subjectId }) => {
+      if (!isCancelled) {
+        setNavigationCurriculumIds({
+          gradeId: gradeId || undefined,
+          subjectId: subjectId || undefined,
+        });
+      }
+    }).catch((error) => {
+      console.warn('[ClassroomView] Failed to resolve lesson navigation curriculum IDs:', error);
+      if (!isCancelled) setNavigationCurriculumIds({});
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [currentGrade, module]);
   const gradeCandidates = useMemo(() => getGradeCandidates(currentGrade), [currentGrade]);
   const normalizedGradeCandidates = useMemo(
     () => new Set(gradeCandidates.map((grade) => String(grade || '').trim().toLocaleLowerCase())),
@@ -501,11 +738,11 @@ export const ClassroomView: React.FC = () => {
   }, [activeDomainKey, showDomainTabs, topicFallbackRows]);
   const hasSupplementalContent = quizzes.length > 0 || exercises.length > 0;
   const showStats = module?.progress > 0 || hasLessons || hasTopicFallback;
-  const showTabs = false;
+  const showTabs = true;
   const showSetupState = !hasLessons && !hasTopicFallback && !isHydratingSupabase && suggestions.length === 0;
   const showValidationWarningBanner = !isAdmin && lessons.length > 0 && !studentLessonSelection.hasPreferred;
   const cloudHydrationKeyRef = useRef<string | null>(null);
-  const classroomScopeKey = `${id || ''}:${module?.name || ''}:${module?.category || ''}:${currentGrade}:${currentCountry}:${selectedBacTrack}`;
+  const classroomScopeKey = `${id || ''}:${module?.name || ''}:${module?.category || ''}:${currentGrade}:${currentCountry}:${selectedBacTrack}:${selectedInstructionOptionId}`;
 
   useEffect(() => {
     if (!id) return;
@@ -548,11 +785,17 @@ export const ClassroomView: React.FC = () => {
       const selectColumns = getLessonSelectColumns({ includeValidation, includeTags: true });
 
       if (gradeId && (subjectIds.length > 0 || subjectId)) {
-        const { data: topicRows, error: topicsError } = await supabase
-          .from('topics')
-          .select('id, title')
-          .eq('grade_id', gradeId)
-          .in('subject_id', subjectIds.length > 0 ? subjectIds : [subjectId]);
+          const topicQuery = supabase
+            .from('topics')
+            .select('id, title, topic_order, grade_id, subject_id, instruction_option_id')
+            .eq('grade_id', gradeId)
+            .in('subject_id', subjectIds.length > 0 ? subjectIds : [subjectId])
+            .order('topic_order', { ascending: true });
+
+          const { data: topicRows, error: topicsError } = await applyInstructionOptionTopicFilter(
+            topicQuery,
+            selectedInstructionOptionId,
+          );
 
         if (topicsError) throw topicsError;
 
@@ -642,12 +885,18 @@ export const ClassroomView: React.FC = () => {
     const { gradeId, subjectId, subjectIds } = await resolveCurriculumIds(currentGrade, module.name, module.category);
     if (!gradeId || (!subjectId && subjectIds.length === 0)) return [] as SupabaseTopicRow[];
 
-    const fetchTopics = async (includeDomains: boolean) => supabase
-      .from('topics')
-      .select(includeDomains ? 'id, title, domain_id, subject_domains(code, name, domain_order)' : 'id, title')
-      .eq('grade_id', gradeId)
-      .in('subject_id', subjectIds.length > 0 ? subjectIds : [subjectId])
-      .order('title', { ascending: true });
+    const fetchTopics = async (includeDomains: boolean) => {
+      const query = supabase
+        .from('topics')
+        .select(includeDomains
+          ? 'id, title, topic_order, grade_id, subject_id, instruction_option_id, domain_id, subject_domains(code, name, domain_order)'
+          : 'id, title, topic_order, grade_id, subject_id, instruction_option_id')
+        .eq('grade_id', gradeId)
+        .in('subject_id', subjectIds.length > 0 ? subjectIds : [subjectId])
+        .order('topic_order', { ascending: true });
+
+      return applyInstructionOptionTopicFilter(query, selectedInstructionOptionId);
+    };
 
     let { data, error } = await fetchTopics(true);
     if (error) {
@@ -756,6 +1005,8 @@ export const ClassroomView: React.FC = () => {
         title: lesson.lesson_title,
         content: lesson.content || existing?.content || '',
         blocks: lesson.blocks ?? existing?.blocks,
+        quizzes: (lesson as any).quizzes ?? (existing as any)?.quizzes,
+        exercises: (lesson as any).exercises ?? (existing as any)?.exercises,
         subtitle: lesson.subtitle ?? existing?.subtitle,
         grade: lesson.grade ?? existing?.grade,
         country: lesson.country ?? existing?.country,
@@ -905,10 +1156,8 @@ export const ClassroomView: React.FC = () => {
       }
     };
     
-    if (activeTab !== 'lessons') {
-      fetchExtraData();
-    }
-  }, [activeTab, lessons]);
+    fetchExtraData();
+  }, [lessons]);
 
   const fetchGallery = async () => {
     if (!module || !aiAvailable) return;
@@ -920,11 +1169,13 @@ export const ClassroomView: React.FC = () => {
         const { gradeId, subjectId, subjectIds } = await resolveCurriculumIds(currentGrade, module.name, module.category);
 
         if (gradeId && (subjectIds.length > 0 || subjectId)) {
-          const { data: topics } = await supabase
+          const query = supabase
             .from('topics')
-            .select('title')
+            .select('title, topic_order, grade_id, subject_id, instruction_option_id')
             .eq('grade_id', gradeId)
-            .in('subject_id', subjectIds.length > 0 ? subjectIds : [subjectId]);
+            .in('subject_id', subjectIds.length > 0 ? subjectIds : [subjectId])
+            .order('topic_order', { ascending: true });
+          const { data: topics } = await applyInstructionOptionTopicFilter(query, selectedInstructionOptionId);
           if (topics) {
             existingTopics = topics.map(t => t.title);
           }
@@ -1065,7 +1316,7 @@ export const ClassroomView: React.FC = () => {
         }
 
         if (autoNavigate) {
-          navigate(`/lesson/${newLessonId}`);
+          navigate(`/lesson/${newLessonId}`, { state: lessonNavigationState() });
         }
       }
     } catch (error) {
@@ -1323,774 +1574,1093 @@ export const ClassroomView: React.FC = () => {
   }
 
   return (
-    <Layout>
-      <div className="max-w-5xl mx-auto space-y-4 pb-20">
-        {/* Header Section */}
-        {/* Unified Header Card */}
-        <div className="bg-white dark:bg-paper rounded-[1.5rem] border border-slate-200 dark:border-white/8 p-5 shadow-sm space-y-4">
-          {/* Top Row: Back Navigation, Badges, Strict RAG Toggle & Actions */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-white/5 pb-3">
-            <div className="flex flex-wrap items-center gap-3">
-              <button 
-                onClick={() => navigate('/dashboard')}
-                className="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-slate-950 transition-colors mr-2"
-              >
-                <ArrowLeft size={13} />
-                {t('back_to_dashboard')}
-              </button>
-              <span className="bg-accent/10 text-accent text-[10px] font-extrabold px-2 py-0.5 rounded uppercase">{module.code}</span>
-              <span className="text-slate-400 dark:text-ink-muted text-[10px] font-bold uppercase">{module.category}</span>
-              {isAdmin && (
-                <div className="flex items-center gap-2 border-l border-slate-200 pl-3 dark:border-white/10">
-                  <span className="text-[10px] text-slate-400 dark:text-ink-muted font-bold uppercase">Strict RAG</span>
+    <Layout fullWidth>
+      <SEO title={module.name || "Classroom"} />
+      <div className="min-h-full w-full bg-background flex flex-col overflow-visible p-3 pb-24 pt-5 sm:p-4 sm:pb-24 md:h-full md:overflow-hidden md:pb-4 md:pt-6">
+        
+        {/* Symmetrical Layout Container */}
+        <div className="flex-1 min-h-0 w-full flex flex-col md:flex-row gap-3 overflow-visible md:overflow-hidden">
+          
+          {/* Column 2: Main Classroom Content (Middle Column, flex-grow) */}
+          <div className="flex-1 min-w-0 flex flex-col min-h-0 w-full overflow-visible bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 p-4 sm:p-6 md:overflow-hidden">
+            <div className="flex-1 overflow-visible pb-8 md:overflow-y-auto md:pb-16 no-scrollbar flex flex-col gap-6">
+              
+              {/* Page Header */}
+              <div className="border-b border-slate-100 dark:border-white/5 pb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between shrink-0">
+                <div className="flex min-w-0 items-center gap-3">
                   <button
-                    onClick={async () => {
-                      await db.modules.update(module.id, { strictRAG: !module.strictRAG });
-                    }}
-                    className={`w-7 h-3.5 rounded-full transition-colors relative ${module.strictRAG ? 'bg-accent' : 'bg-slate-950/20 dark:bg-white/20'}`}
-                    title="Keep this classroom grounded in certified content before using AI."
+                    type="button"
+                    onClick={() => navigate('/modules')}
+                    className="flex items-center justify-center w-8 h-8 rounded-full bg-slate-100 hover:bg-accent hover:text-white dark:bg-surface-low dark:hover:bg-accent text-slate-600 dark:text-ink-secondary transition-all shadow-sm shrink-0 cursor-pointer"
+                    title="Back to Classrooms"
                   >
-                    <div className={`absolute top-0.5 left-0.5 bg-white w-2.5 h-2.5 rounded-full transition-transform ${module.strictRAG ? 'translate-x-3.5' : 'translate-x-0'}`} />
+                    <ArrowLeft size={16} className="stroke-[2.5]" />
+                  </button>
+                  <div className="min-w-0">
+                    <h1 className="ls-page-title text-slate-950 dark:text-ink break-words">{module.name}</h1>
+                    {module.category && (
+                      <p className="text-xs font-bold text-slate-400 dark:text-ink-muted uppercase tracking-normal mt-0.5">{module.category}</p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Layout Mode Toggle */}
+                  <div className="flex items-center gap-1 bg-slate-100 dark:bg-surface-low rounded-xl p-1">
+                    <button
+                      type="button"
+                      onClick={() => setLayoutMode('grid')}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all ${
+                        layoutMode === 'grid'
+                          ? 'bg-white dark:bg-paper text-slate-800 dark:text-ink shadow-sm'
+                          : 'text-slate-500 dark:text-ink-muted hover:text-slate-700 dark:hover:text-ink'
+                      }`}
+                      title="Grid view"
+                    >
+                      <LayoutGrid size={13} />
+                      Grid
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLayoutMode('carousel')}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all ${
+                        layoutMode === 'carousel'
+                          ? 'bg-white dark:bg-paper text-slate-800 dark:text-ink shadow-sm'
+                          : 'text-slate-500 dark:text-ink-muted hover:text-slate-700 dark:hover:text-ink'
+                      }`}
+                      title="Carousel view"
+                    >
+                      <Rows3 size={13} />
+                      Slide
+                    </button>
+                  </div>
+                  {isAdmin && (
+                    <button
+                      onClick={handleAuditClassroom}
+                      className="text-xs font-bold text-accent hover:underline flex items-center gap-1.5 border border-accent/20 px-3 py-1.5 rounded-xl hover:bg-accent/5 transition-all shadow-sm shrink-0"
+                    >
+                      <ShieldCheck size={14} /> Audit Curriculum
+                    </button>
+                  )}
+                  {/* Randomize All */}
+                  <button
+                    type="button"
+                    onClick={handleRandomizeAllBanners}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-slate-100 dark:bg-surface-low text-slate-600 dark:text-ink-muted hover:bg-slate-200 dark:hover:bg-surface-mid transition-all"
+                    title="Randomize all lesson card images & colors"
+                  >
+                    <Shuffle size={13} />
+                    Randomize
                   </button>
                 </div>
-              )}
-            </div>
+              </div>
 
-            {!showSetupState && (
-              <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                {isAdmin && (
-                  <button
-                    onClick={handleSeedFromSupabase}
-                    disabled={isSeeding}
-                    className="flex items-center gap-1.5 bg-slate-50 text-slate-950 px-3 py-2 rounded-lg text-xs font-bold transition-all border border-slate-200 hover:border-accent/30 hover:text-accent disabled:opacity-50 dark:bg-surface-low dark:border-white/5 dark:text-ink cursor-pointer"
-                  >
-                    {isSeeding ? <Loader2 size={12} className="animate-spin" /> : <Database size={12} />}
-                    <span>{isSeeding ? 'Loading...' : 'Load from Supabase'}</span>
-                  </button>
-                )}
-                {isAdmin && hasTopicFallback && (
-                  <button
-                    onClick={handleGenerateStarterLessons}
-                    disabled={isGeneratingStarterLessons}
-                    className="flex items-center gap-1.5 bg-slate-50 text-slate-950 px-3 py-2 rounded-lg text-xs font-bold transition-all border border-slate-200 hover:border-accent/30 hover:text-accent disabled:opacity-50 dark:bg-surface-low dark:border-white/5 dark:text-ink cursor-pointer"
-                  >
-                    {isGeneratingStarterLessons ? <Loader2 size={12} className="animate-spin" /> : <Database size={12} />}
-                    <span>{isGeneratingStarterLessons ? 'Generating...' : 'Generate All Lessons'}</span>
-                  </button>
-                )}
-                {aiAvailable ? (
-                  <>
-                    {isAdmin && hasLessons && (
+              {isHydratingSupabase && !hasLessons && !hasTopicFallback && (
+                <div className="bg-slate-50/50 border border-slate-200 rounded-xl p-6 flex items-center gap-3 ls-body-text shrink-0">
+                  <Loader2 className="h-4 w-4 animate-spin text-accent" />
+                  Checking Supabase for existing lessons, topics, and outlines...
+                </div>
+              )}
+
+              {showSetupState ? (
+                <div className="bg-slate-50/50 border border-solid border-slate-200 dark:border-white/8 dark:bg-surface-low/40 rounded-xl p-8 sm:p-10 md:p-14 flex flex-col items-center justify-center text-center space-y-6">
+                  <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm">
+                    <BookOpen size={24} className="text-accent" />
+                  </div>
+                  <div className="space-y-2 max-w-md">
+                    <p className="text-2xl font-bold text-slate-950 dark:text-ink">{label('start_here', 'Set up this classroom')}</p>
+                    <p className="ls-body-text">{label('start_here_desc', 'Generate draft AI content, or load officially validated module titles.')}</p>
+                  </div>
+                  {!aiAvailable && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 w-full max-w-md">
+                      <p className="text-xs text-amber-800 font-medium">{label('ai_key_needed', 'AI features need an API key, but you can still load certified module titles right now.')}</p>
+                    </div>
+                  )}
+                  <div className="flex flex-col sm:flex-row gap-3 w-full max-w-md mt-4">
+                    {aiAvailable && (
                       <button
-                        onClick={handleAuditClassroom}
-                        className="flex items-center gap-1.5 bg-slate-50 text-slate-500 hover:text-accent px-3 py-2 rounded-lg text-xs font-bold transition-all border border-slate-200 dark:bg-surface-low dark:border-white/5 dark:text-ink-secondary cursor-pointer"
+                        onClick={() => handleGenerateLesson()}
+                        disabled={!!generatingTitle}
+                        className="flex-1 flex items-center justify-center gap-2 bg-accent text-white px-4 py-3.5 rounded-xl text-sm font-bold shadow-sm shadow-accent/20 hover:bg-accent/90 transition-all disabled:opacity-50"
                       >
-                        <ShieldCheck size={12} />
-                        <span>Audit</span>
+                        {generatingTitle === module.name ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+                        {label('generate_first_lesson', 'Generate First Lesson')}
                       </button>
                     )}
                     <button
-                      onClick={() => handleGenerateLesson()}
-                      disabled={!!generatingTitle}
-                      className="flex items-center gap-1.5 bg-slate-950 text-white px-4 py-2 rounded-lg text-xs font-black hover:bg-accent transition-all shadow-sm disabled:opacity-50 cursor-pointer"
+                      onClick={handleSeedFromSupabase}
+                      disabled={isSeeding}
+                      className="flex-1 flex items-center justify-center gap-2 bg-white text-slate-950 px-4 py-3.5 rounded-xl text-sm font-bold border border-slate-200 hover:border-accent/30 hover:text-accent transition-all disabled:opacity-50"
                     >
-                      {generatingTitle === module.name ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-                      <span>{hasLessons ? 'Generate Lesson' : 'Generate First Lesson'}</span>
+                      {isSeeding ? <Loader2 size={16} className="animate-spin" /> : <Database size={16} />}
+                      {isSeeding ? label('loading', 'Loading...') : label('load_from_supabase', 'Load from Supabase')}
                     </button>
-                  </>
-                ) : (
-                  <div className="px-3 py-2 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-[10px] font-bold uppercase">
-                    AI key needed
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Middle Row: Title & Subtitle/Description */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-            <div className="space-y-1">
-              <h1 className="text-3xl font-black font-display tracking-tight text-slate-950 dark:text-ink leading-none">
-                {module.name}
-              </h1>
-              <p className="text-xs text-slate-500 dark:text-ink-muted max-w-3xl leading-relaxed">
-                {module.description}
-              </p>
-            </div>
-          </div>
-
-          {/* Bottom Row: Stats & Diagnostics Dashboard */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-slate-100 dark:border-white/5">
-            {showStats && (
-              <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-ink-muted select-none">
-                <span className="font-bold text-slate-700 dark:text-ink-secondary">
-                  {hasLessons ? `${lessons.length} Module Titles` : `${topicFallbackRows.length} Topics`}
-                </span>
-                <span className="h-1 w-1 rounded-full bg-slate-300 dark:bg-white/10" />
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">{module.progress}% Complete</span>
-                  <div className="w-20 h-1.5 bg-slate-100 dark:bg-surface-mid rounded-full overflow-hidden inline-block align-middle border border-slate-200/50 dark:border-white/5">
-                    <div className="h-full bg-accent" style={{ width: `${module.progress}%` }} />
                   </div>
                 </div>
-              </div>
-            )}
-
-            {isAdmin && adminStats && (
-              <div className="flex flex-wrap gap-1.5 items-center text-[10px] font-extrabold uppercase tracking-wide select-none">
-                <span className="text-slate-400 dark:text-ink-muted mr-1">Diagnostics:</span>
-                <span className="bg-slate-100 text-slate-700 dark:bg-surface-low dark:text-ink px-2 py-0.5 rounded font-bold">Total: {adminStats.total}</span>
-                <span className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400 px-2 py-0.5 rounded font-bold">Pub: {adminStats.published}</span>
-                <span className="bg-amber-50 text-amber-700 dark:bg-amber-950/20 dark:text-amber-400 px-2 py-0.5 rounded font-bold">Review: {adminStats.needsReview}</span>
-                <span className="bg-blue-50 text-blue-700 dark:bg-blue-950/20 dark:text-blue-400 px-2 py-0.5 rounded font-bold">Draft: {adminStats.draft}</span>
-                <span className="bg-rose-50 text-rose-700 dark:bg-rose-950/20 dark:text-rose-400 px-2 py-0.5 rounded font-bold">Hidden: {adminStats.hidden}</span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {isHydratingSupabase && !hasLessons && !hasTopicFallback && (
-          <div className="bg-slate-50/50 border border-slate-200 rounded-3xl p-6 flex items-center gap-3 ls-body-text">
-            <Loader2 className="h-4 w-4 animate-spin text-accent" />
-            Checking Supabase for existing lessons, topics, and outlines...
-          </div>
-        )}
-
-        {showSetupState ? (
-          <div className="bg-slate-50/50 border border-solid border-slate-200 rounded-3xl p-10 md:p-14 flex flex-col items-center justify-center text-center space-y-6">
-            <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm">
-              <BookOpen size={24} className="text-accent" />
-            </div>
-            <div className="space-y-2 max-w-md">
-              <p className="text-2xl font-bold text-slate-950">{t('start_here') || 'Set up this classroom'}</p>
-              <p className="ls-body-text">{t('start_here_desc') || 'Generate draft AI content, or load officially validated module titles.'}</p>
-            </div>
-            {!aiAvailable && (
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 w-full max-w-md">
-                <p className="text-xs text-amber-800 font-medium">{t('ai_key_needed') || 'AI features need an API key, but you can still load certified module titles right now.'}</p>
-              </div>
-            )}
-            <div className="flex flex-col sm:flex-row gap-3 w-full max-w-md mt-4">
-              {aiAvailable && (
-                <button
-                  onClick={() => handleGenerateLesson()}
-                  disabled={!!generatingTitle}
-                  className="flex-1 flex items-center justify-center gap-2 bg-accent text-white px-4 py-3.5 rounded-xl text-sm font-bold shadow-sm shadow-accent/20 hover:bg-accent/90 transition-all disabled:opacity-50"
-                >
-                  {generatingTitle === module.name ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-                  {t('generate_first_lesson') || 'Generate First Lesson'}
-                </button>
-              )}
-              <button
-                onClick={handleSeedFromSupabase}
-                disabled={isSeeding}
-                className="flex-1 flex items-center justify-center gap-2 bg-white text-slate-950 px-4 py-3.5 rounded-xl text-sm font-bold border border-slate-200 hover:border-accent/30 hover:text-accent transition-all disabled:opacity-50"
-              >
-                {isSeeding ? <Loader2 size={16} className="animate-spin" /> : <Database size={16} />}
-                {isSeeding ? t('loading') || 'Loading...' : t('load_from_supabase') || 'Load from Supabase'}
-              </button>
-            </div>
-          </div>
-        ) : (
-          <>
-            {/* Tabs */}
-            {showTabs && (
-              <div className="flex gap-2 border-b border-slate-200 overflow-x-auto pb-2">
-                {(['lessons', 'quizzes', 'exercises'] as const).map((tabKey) => {
-                  const tabConfig = CLASSROOM_TAB_CONFIG[tabKey];
-                  const TabIcon = tabConfig.icon;
-                  const isActive = activeTab === tabKey;
-                  return (
-                    <button
-                      key={tabKey}
-                      onClick={() => setActiveTab(tabKey)}
-                      className={`flex items-center gap-2 rounded-t-2xl px-4 py-3 text-sm font-bold  transition-all border-b-2 whitespace-nowrap ${
-                        isActive
-                          ? tabConfig.activeClass
-                          : 'border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-950'
-                      }`}
-                    >
-                      <TabIcon size={16} className={isActive ? tabConfig.iconClass : 'text-slate-500'} />
-                      {t(tabKey)}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Tab Content */}
-            {activeTab === 'lessons' && (
-              <div className="space-y-4">
-                {showValidationWarningBanner && (
-                  <div className="rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4 text-amber-900">
-                    <div className="flex items-start gap-3">
-                      <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
-                      <div>
-                        <p className="text-sm font-semibold">Draft AI-assisted content is shown because no teacher-reviewed or officially validated lesson is available yet.</p>
-                        <p className="mt-1 text-sm text-amber-800">Use the status badge on each module title before treating it as final Moroccan curriculum truth.</p>
-                      </div>
+              ) : (
+                <>
+                  {/* Tabs */}
+                  {showTabs && (
+                    <div className="flex gap-1 border-b border-slate-200 dark:border-white/8 -mb-px shrink-0">
+                      {(['lessons', 'quizzes', 'exercises'] as const).map((tabKey) => {
+                        const tabConfig = CLASSROOM_TAB_CONFIG[tabKey];
+                        const TabIcon = tabConfig.icon;
+                        const isActive = activeTab === tabKey;
+                        return (
+                          <button
+                            key={tabKey}
+                            onClick={() => setActiveTab(tabKey)}
+                            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${
+                              isActive
+                                ? 'border-accent text-accent'
+                                : 'border-transparent text-slate-500 dark:text-ink-muted hover:text-slate-950 dark:hover:text-ink'
+                            }`}
+                          >
+                            <TabIcon size={14} />
+                            {tabKey.charAt(0).toUpperCase() + tabKey.slice(1)}
+                          </button>
+                        );
+                      })}
                     </div>
-                  </div>
-                )}
-
-                {!isAdmin && hasLessons && studentVisibleLessons.length === 0 && (
-                  <div className="rounded-3xl border border-blue-200 bg-blue-50 px-5 py-4 text-blue-900 shadow-sm">
-                    <div className="flex items-start gap-3">
-                      <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" />
-                      <div>
-                        <p className="text-sm font-semibold">Lessons are prepared but waiting for validation.</p>
-                        <p className="mt-1 text-sm text-blue-800">Your teacher or administrator can review and publish them for classroom access.</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-bold text-slate-950 flex items-center gap-2">
-                    <BookOpen size={20} className="text-accent" />
-                    {hasTopicFallback ? t('curriculum_topics') : t('curriculum_units')}
-                  </h3>
-                  {lessons.length > 0 && suggestions.length === 0 && (
-                    <button
-                      onClick={fetchGallery}
-                      disabled={isFetchingGallery || !aiAvailable}
-                      title={!aiAvailable ? "AI features need an API key, but your classroom content is available." : ""}
-                      className="text-xs font-medium text-blue-700 hover:underline flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {isFetchingGallery ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />}
-                      Fetch Lesson Gallery
-                    </button>
                   )}
-                </div>
 
-                {showDomainTabs && (
-                  <div className="rounded-2xl border border-slate-200 bg-white p-2">
-                    <div className="flex gap-2 overflow-x-auto">
-                      <button
-                        onClick={() => setActiveDomainKey('all')}
-                        className={`shrink-0 rounded-xl px-4 py-2 text-xs font-medium transition-all ${
-                          activeDomainKey === 'all'
-                            ? 'bg-accent text-white shadow-sm'
-                            : 'text-slate-500 hover:bg-slate-50 hover:text-slate-950'
-                        }`}
-                      >
-                        {t('all')}
-                      </button>
-                      {lessonDomainStats.map((domain) => (
-                        <button
-                          key={domain.key}
-                          onClick={() => setActiveDomainKey(domain.key)}
-                          className={`shrink-0 rounded-xl px-4 py-2 text-xs font-medium transition-all ${
-                            activeDomainKey === domain.key
-                              ? 'bg-accent text-white shadow-sm'
-                              : 'text-slate-500 hover:bg-slate-50 hover:text-slate-950'
-                          }`}
-                        >
-                          {domain.name}
-                          {hasLessons && <span className="ml-1 opacity-70">{domain.count}</span>}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {Array.isArray(lessons) && lessons.length > 0 ? (
-                    visibleLessons.length > 0 ? visibleLessons.map((lesson, i) => {
-                      const isClickable = isAdmin || isStudentVisibleLesson(lesson);
-                      const availabilityState = getLessonAvailabilityState(lesson);
-                      
-                      return (
-                        <motion.div 
-                          key={lesson.id}
-                          layout
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: i * 0.05 }}
-                          onClick={(e) => {
-                            const target = e.target as HTMLElement;
-                            // Safe check for detached React synthetic DOM nodes
-                            if (!target.isConnected || !document.body.contains(target)) return;
-
-                            // Handle click on practice test metrics section as direct test trigger
-                            if (target.closest('.practice-test-metrics-trigger')) {
-                              e.stopPropagation();
-                              const quizzes = (lesson.blocks || []).filter((b: any) => b.purpose === 'quiz' || b.type === 'quiz');
-                              const exercises = (lesson.blocks || []).filter((b: any) => b.purpose === 'practice' || b.purpose === 'exam' || b.type === 'practice' || b.type === 'exam');
-                              const hasTests = quizzes.length > 0 || exercises.length > 0;
-                              if (hasTests) {
-                                navigate(`/lesson/${lesson.id}`, { state: { startAtTest: true } });
-                              } else {
-                                navigate(`/lesson/${lesson.id}`);
-                              }
-                              return;
-                            }
-
-                            if (target.closest('.card-footer-actions') || target.closest('button')) return;
-                            if (isClickable) navigate(`/lesson/${lesson.id}`);
-                          }}
-                          className={`bg-white border border-slate-200 rounded-3xl overflow-hidden flex flex-col group transition-all dark:bg-paper dark:border-white/8 shadow-sm ${
-                            isClickable 
-                              ? 'cursor-pointer hover:border-accent/30 hover:shadow-lg' 
-                              : 'opacity-85 bg-slate-50/50 dark:bg-surface-low/50 cursor-not-allowed'
-                          }`}
-                          style={{ boxShadow: 'var(--ls-shadow)' }}
-                        >
-                          {/* Top Redesigned Teal Header Bar */}
-                          <div className={`px-5 py-3.5 flex items-center justify-between text-white shrink-0 ${
-                            isClickable ? 'bg-[#007A87] dark:bg-accent' : 'bg-slate-500 dark:bg-slate-700'
-                          }`}>
-                            <div className="flex items-center gap-2 min-w-0">
-                              <BookOpen className="w-4 h-4 shrink-0 text-white" />
-                              <h3 className="text-sm font-bold leading-tight truncate text-white dark:text-white" title={lesson.title}>{lesson.title}</h3>
-                            </div>
-                            <div className="flex items-center gap-1 shrink-0 ml-2">
-                              {module?.category && (
-                                <span className="bg-white/15 text-white text-[9px] font-bold px-2 py-0.5 rounded-md backdrop-blur-sm truncate max-w-[90px]">{module.category}</span>
-                              )}
-                              {(lesson.grade || currentGrade) && (
-                                <span className="bg-white/15 text-white text-[9px] font-bold px-2 py-0.5 rounded-md backdrop-blur-sm truncate max-w-[80px]">{lesson.grade || currentGrade}</span>
-                              )}
+                  {/* Tab Content */}
+                  {activeTab === 'lessons' && (
+                    <div className="space-y-4">
+                      {showValidationWarningBanner && (
+                        <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-amber-900 shrink-0">
+                          <div className="flex items-start gap-3">
+                            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+                            <div>
+                              <p className="text-sm font-semibold">Draft AI-assisted content is shown because no teacher-reviewed or officially validated lesson is available yet.</p>
+                              <p className="mt-1 text-sm text-amber-800">Use the status badge on each module title before treating it as final Moroccan curriculum truth.</p>
                             </div>
                           </div>
+                        </div>
+                      )}
 
-                          {/* Horizontal Dynamic Illustration Banner */}
-                          <div className="h-24 w-full overflow-hidden relative border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-surface-low shrink-0">
-                            <img 
-                              src={lesson.bannerImage || getLessonIllustration(lesson.title, lesson.subject || module?.name)}
-                              alt={lesson.title}
-                              className={`w-full h-full object-cover transition-transform duration-700 ${isClickable ? 'group-hover:scale-105' : ''}`}
-                            />
-                            {/* Pin / Unpin button on the illustration banner */}
+                      {!isAdmin && hasLessons && studentVisibleLessons.length === 0 && (
+                        <div className="rounded-xl border border-blue-200 bg-blue-50 px-5 py-4 text-blue-900 shadow-sm shrink-0">
+                          <div className="flex items-start gap-3">
+                            <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" />
+                            <div>
+                              <p className="text-sm font-semibold">Lessons are prepared but waiting for validation.</p>
+                              <p className="mt-1 text-sm text-blue-800">Your teacher or administrator can review and publish them for classroom access.</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between shrink-0">
+                        <h3 className="text-lg font-bold text-slate-950 flex items-center gap-2 dark:text-ink">
+                          <BookOpen size={20} className="text-accent" />
+                          {hasTopicFallback ? t('curriculum_topics') : t('curriculum_units')}
+                        </h3>
+                        {lessons.length > 0 && suggestions.length === 0 && (
+                          <button
+                            onClick={fetchGallery}
+                            disabled={isFetchingGallery || !aiAvailable}
+                            title={!aiAvailable ? "AI features need an API key, but your classroom content is available." : ""}
+                            className="text-xs font-medium text-blue-700 hover:underline flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {isFetchingGallery ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />}
+                            Fetch Lesson Gallery
+                          </button>
+                        )}
+                      </div>
+
+                      {showDomainTabs && (
+                        <div className="rounded-2xl border border-slate-200 bg-white p-2 dark:bg-paper dark:border-white/8 shrink-0">
+                          <div className="flex gap-2 overflow-x-auto no-scrollbar">
                             <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); togglePinLesson(lesson.id); }}
-                              className={`absolute top-2 right-2 z-10 w-7 h-7 rounded-full flex items-center justify-center border backdrop-blur-md transition-all shadow-sm cursor-pointer ${
-                                pinnedLessonIds.includes(lesson.id)
-                                  ? 'bg-amber-500 border-amber-400 text-white shadow-amber-500/40 shadow-md'
-                                  : 'bg-black/35 border-white/20 text-white/75 hover:text-white hover:bg-black/50'
+                              onClick={() => setActiveDomainKey('all')}
+                              className={`shrink-0 rounded-xl px-4 py-2 text-xs font-medium transition-all ${
+                                activeDomainKey === 'all'
+                                  ? 'bg-accent text-white shadow-sm'
+                                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-950 dark:hover:bg-surface-low dark:text-ink-muted'
                               }`}
-                              title={pinnedLessonIds.includes(lesson.id) ? 'Unpin Lesson' : 'Pin to Study Desk'}
                             >
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                viewBox="0 0 24 24"
-                                fill={pinnedLessonIds.includes(lesson.id) ? "currentColor" : "none"}
-                                stroke="currentColor"
-                                strokeWidth="2.5"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                className="w-3.5 h-3.5"
-                              >
-                                <line x1="12" y1="17" x2="12" y2="22"></line>
-                                <path d="M5 17h14v-1.76a2 2 0 0 0-.44-1.24l-2.78-3.55A2 2 0 0 1 15 9.24V5a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4.24a2 2 0 0 1-.78 1.21L5.44 14a2 2 0 0 0-.44 1.24Z"></path>
-                              </svg>
+                              {t('all')}
                             </button>
+                            {lessonDomainStats.map((domain) => (
+                              <button
+                                key={domain.key}
+                                onClick={() => setActiveDomainKey(domain.key)}
+                                className={`shrink-0 rounded-xl px-4 py-2 text-xs font-medium transition-all ${
+                                  activeDomainKey === domain.key
+                                    ? 'bg-accent text-white shadow-sm'
+                                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-950 dark:hover:bg-surface-low dark:text-ink-muted'
+                                }`}
+                              >
+                                {domain.name}
+                                {hasLessons && <span className="ml-1 opacity-70">{domain.count}</span>}
+                              </button>
+                            ))}
                           </div>
-
-                          {/* Card Body */}
-                          <div className="p-5 flex-1 flex flex-col space-y-4">
-                            {/* Metrics columns */}
-                            <div className="grid grid-cols-2 gap-4 text-sm border-b border-slate-100 pb-4 dark:border-white/6 items-center">
-                              {(() => {
-                                const quizzes = (lesson.blocks || []).filter((b: any) => b.purpose === 'quiz' || b.type === 'quiz');
-                                const exercises = (lesson.blocks || []).filter((b: any) => b.purpose === 'practice' || b.purpose === 'exam' || b.type === 'practice' || b.type === 'exam');
-                                const hasTests = quizzes.length > 0 || exercises.length > 0;
-                                return (
-                                  <div className="space-y-1 practice-test-metrics-trigger cursor-pointer hover:bg-slate-50 dark:hover:bg-surface-low rounded-xl p-1.5 transition-all" title={hasTests ? "Click to take practice test directly" : ""}>
-                                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 dark:text-ink">
-                                      <Target className="w-3.5 h-3.5 text-accent shrink-0" />
-                                      <span>Practice Test</span>
-                                    </div>
-                                    <p className="text-[10px] text-slate-500 dark:text-ink-muted leading-tight">
-                                      {hasTests 
-                                        ? `${quizzes.length} Quizzes • ${exercises.length} Exercises`
-                                        : 'No tests generated yet'}
-                                    </p>
-                                  </div>
-                                );
-                              })()}
-                              <div className="space-y-1">
-                                <div className="flex justify-between text-[11px] font-bold">
-                                  <span className="text-slate-400 dark:text-ink-muted">Progress</span>
-                                  <span className="text-slate-800 dark:text-ink">{lesson.status === 'done' ? '100%' : '0%'}</span>
-                                </div>
-                                <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden dark:bg-surface-mid">
-                                  <div 
-                                    className={`h-full rounded-full ${lesson.status === 'done' ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-surface-high'}`} 
-                                    style={{ width: lesson.status === 'done' ? '100%' : '0%' }} 
-                                  />
-                                </div>
+                        </div>
+                      )}
+                      
+                      {/* Lesson Cards -- conditional layout */}
+                      {layoutMode === 'carousel' ? (
+                        // CAROUSEL MODE
+                        <div className="pb-6">
+                          {Array.isArray(lessons) && lessons.length > 0 ? (
+                            visibleLessons.length > 0 ? (
+                              <HorizontalSlider>
+                                {visibleLessons.map((lesson, i) => {
+                                  const isClickable = isAdmin || isStudentVisibleLesson(lesson);
+                                  return (
+                                    <motion.div
+                                      key={lesson.id}
+                                      initial={{ opacity: 0, y: 10 }}
+                                      animate={{ opacity: 1, y: 0 }}
+                                      transition={{ delay: i * 0.05 }}
+                                      onClick={() => { if (isClickable) navigate(`/lesson/${lesson.id}`); }}
+                                      className={`bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col group transition-all dark:bg-paper dark:border-white/8 shadow-sm ${
+                                        isClickable
+                                          ? 'cursor-pointer hover:border-accent/30 hover:shadow-lg'
+                                          : 'opacity-85 cursor-not-allowed'
+                                      }`}
+                                      style={{ width: '280px', minWidth: '280px', boxShadow: 'var(--ls-shadow)' }}
+                                    >
+                                      <div className={`px-5 py-3.5 flex items-center gap-2 text-white shrink-0 ${
+                                        isClickable ? `bg-gradient-to-r ${lessonColorOverrides[lesson.id] || getCardGradient(lesson.id)}` : 'bg-slate-500 dark:bg-slate-700'
+                                      }`}>
+                                        <BookOpen className="w-4 h-4 shrink-0 text-white" />
+                                        <h3 className="text-sm font-bold leading-tight truncate text-white" title={lesson.title}>{lesson.title}</h3>
+                                      </div>
+                                      <div className="h-24 w-full overflow-hidden relative border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-surface-low shrink-0">
+                                        <img
+                                          src={lessonBannerOverrides[lesson.id] || lesson.bannerImage || getLessonIllustration(lesson.title, lesson.subject || module?.name)}
+                                          alt={lesson.title}
+                                          className={`w-full h-full object-cover transition-transform duration-700 opacity-75 ${isClickable ? 'group-hover:scale-105' : ''}`}
+                                        />
+                                      </div>
+                                      <div className="p-4 flex-1 flex flex-col space-y-3">
+                                        <AnimatePresence>
+                                          {expandedCards[lesson.id] && (
+                                            <motion.div
+                                              initial={{ height: 0, opacity: 0 }}
+                                              animate={{ height: 'auto', opacity: 1 }}
+                                              exit={{ height: 0, opacity: 0 }}
+                                              className="overflow-hidden space-y-3"
+                                            >
+                                              <div className="space-y-1 pb-1">
+                                                <div className="flex justify-between text-[11px] font-bold">
+                                                  <span className="text-slate-400 dark:text-ink-muted">Progress</span>
+                                                  <span className="text-slate-800 dark:text-ink">{lesson.status === 'done' ? '100%' : '0%'}</span>
+                                                </div>
+                                                <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden dark:bg-surface-mid">
+                                                  <div
+                                                    className={`h-full rounded-full ${lesson.status === 'done' ? 'bg-slate-700 dark:bg-slate-400' : 'bg-slate-300 dark:bg-surface-high'}`}
+                                                    style={{ width: lesson.status === 'done' ? '100%' : '0%' }}
+                                                  />
+                                                </div>
+                                              </div>
+                                            </motion.div>
+                                          )}
+                                        </AnimatePresence>
+                                        
+                                        {isClickable && (
+                                          <div className="flex items-center gap-2 mt-auto">
+                                            <button
+                                              type="button"
+                                              onClick={(e) => { e.stopPropagation(); navigate(`/lesson/${lesson.id}`); }}
+                                              className="flex-grow flex items-center justify-center gap-1.5 rounded-xl bg-slate-900 text-white hover:text-accent dark:bg-white/10 dark:text-ink dark:hover:text-accent px-3.5 py-2 text-xs font-bold transition-all shadow-sm"
+                                            >
+                                              <Play className="w-3 h-3 fill-current" />
+                                              {lesson.status === 'done' ? 'Review' : 'Start'}
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={(e) => toggleCardExpansion(lesson.id, e)}
+                                              className="rounded-xl border border-slate-200 bg-white p-2 text-xs font-bold text-slate-700 hover:text-accent transition-colors dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:text-accent flex items-center justify-center"
+                                            >
+                                              <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${expandedCards[lesson.id] ? 'rotate-180' : ''}`} />
+                                            </button>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </motion.div>
+                                  );
+                                })}
+                              </HorizontalSlider>
+                            ) : (
+                              <div className="rounded-2xl border border-solid border-slate-200 bg-white p-5 dark:border-white/8 dark:bg-paper">
+                                <p className="text-sm font-semibold text-slate-950 dark:text-ink">No lessons in this domain yet.</p>
                               </div>
-                            </div>
+                            )
+                          ) : hasTopicFallback ? (
+                            <HorizontalSlider>
+                              {visibleTopicFallbackRows.map((topic, i) => (
+                                <motion.div
+                                  key={topic.id}
+                                  initial={{ opacity: 0, y: 10 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  transition={{ delay: i * 0.03 }}
+                                  onClick={() => handleGenerateLesson(topic.title, true)}
+                                  className="bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col group hover:border-accent/30 hover:shadow-lg transition-all dark:bg-paper dark:border-white/8 shadow-sm cursor-pointer"
+                                  style={{ width: '240px', minWidth: '240px' }}
+                                >
+                                  <div className={`bg-gradient-to-r ${lessonColorOverrides[topic.id] || getCardGradient(topic.id)} px-4 py-3 flex items-center gap-2 text-white shrink-0`}>
+                                    <BookOpen className="w-4 h-4 shrink-0 text-white" />
+                                    <h3 className="text-sm font-bold truncate text-white" title={topic.title}>{topic.title}</h3>
+                                  </div>
+                                  <div className="h-20 w-full overflow-hidden border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-surface-low shrink-0">
+                                    <img
+                                      src={lessonBannerOverrides[topic.id] || getLessonIllustration(topic.title, module?.name)}
+                                      alt={topic.title}
+                                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 opacity-75"
+                                    />
+                                  </div>
+                                  <div className="p-3 flex-1 flex flex-col">
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); handleGenerateLesson(topic.title, true); }}
+                                      className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-white/10 dark:hover:bg-white/20 px-3 py-2 text-xs font-bold transition-all shadow-sm"
+                                    >
+                                      <Sparkles className="w-3 h-3" />
+                                      Generate Lesson
+                                    </button>
+                                  </div>
+                                </motion.div>
+                              ))}
+                            </HorizontalSlider>
+                          ) : null}
+                        </div>
+                      ) : (
+                        // GRID MODE
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-6">
+                        {Array.isArray(lessons) && lessons.length > 0 ? (
+                          visibleLessons.length > 0 ? visibleLessons.map((lesson, i) => {
+                            const isClickable = isAdmin || isStudentVisibleLesson(lesson);
+                            const availabilityState = getLessonAvailabilityState(lesson);
+                            
+                            return (
+                              <motion.div 
+                                key={lesson.id}
+                                layout
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: i * 0.05 }}
+                                onClick={(e) => {
+                                  const target = e.target as HTMLElement;
+                                  if (!target.isConnected || !document.body.contains(target)) return;
 
-                            {/* Last activity / status */}
-                            <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-ink-muted">
-                              <Clock className="w-4 h-4 text-slate-400 shrink-0" />
-                              <span>
-                                Last Active: {lesson.createdAt ? relativeTime(lesson.createdAt) : 'No activity yet'}
-                              </span>
-                            </div>
-
-                            {/* Footer: actions + status dot */}
-                            <div className="pt-2 flex items-center justify-between border-t border-slate-100 dark:border-white/6">
-                              {isClickable ? (
-                                <div className="flex items-center gap-2 card-footer-actions">
-                                  <button
-                                    type="button"
-                                    onClick={(e) => { e.stopPropagation(); navigate(`/lesson/${lesson.id}`); }}
-                                    className="flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 text-xs font-bold text-white transition-colors shadow-sm"
-                                  >
-                                    <Play className="w-3 h-3 fill-current text-white" />
-                                    {lesson.status === 'done' ? 'Review' : 'Start Lesson'}
-                                  </button>
-                                  {(() => {
+                                  if (target.closest('.practice-test-metrics-trigger')) {
+                                    e.stopPropagation();
                                     const quizzes = (lesson.blocks || []).filter((b: any) => b.purpose === 'quiz' || b.type === 'quiz');
                                     const exercises = (lesson.blocks || []).filter((b: any) => b.purpose === 'practice' || b.purpose === 'exam' || b.type === 'practice' || b.type === 'exam');
                                     const hasTests = quizzes.length > 0 || exercises.length > 0;
                                     if (hasTests) {
-                                      return (
-                                        <button
-                                          type="button"
-                                          onClick={(e) => { e.stopPropagation(); navigate(`/lesson/${lesson.id}`, { state: { startAtTest: true } }); }}
-                                          className="rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-700 transition-colors dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:bg-surface-low flex items-center gap-1.5 shadow-sm"
-                                        >
-                                          <Target size={12} className="text-accent shrink-0" />
-                                          Take Test
-                                        </button>
-                                      );
+                                      navigate(`/lesson/${lesson.id}`, { state: lessonNavigationState({ startAtTest: true }) });
+                                    } else {
+                                      navigate(`/lesson/${lesson.id}`, { state: lessonNavigationState() });
                                     }
-                                    return (
-                                      <button
-                                        type="button"
-                                        onClick={(e) => { e.stopPropagation(); navigate(`/lesson/${lesson.id}`); }}
-                                        className="rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-700 transition-colors dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:bg-surface-low"
-                                      >
-                                        View Plan
-                                      </button>
-                                    );
-                                  })()}
+                                    return;
+                                  }
+
+                                  if (target.closest('.card-footer-actions') || target.closest('button')) return;
+                                  if (isClickable) navigate(`/lesson/${lesson.id}`, { state: lessonNavigationState() });
+                                }}
+                                className={`bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col group transition-all dark:bg-paper dark:border-white/8 shadow-sm ${
+                                  isClickable 
+                                    ? 'cursor-pointer hover:border-accent/30 hover:shadow-lg' 
+                                    : 'opacity-85 bg-slate-50/50 dark:bg-surface-low/50 cursor-not-allowed'
+                                }`}
+                                style={{ boxShadow: 'var(--ls-shadow)' }}
+                              >
+                                {/* Top Redesigned Teal Header Bar */}
+                                <div className={`bg-gradient-to-r ${lessonColorOverrides[lesson.id] || getCardGradient(lesson.id)} px-5 py-3.5 flex items-center justify-between text-white shrink-0`}>
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <BookOpen className="w-4 h-4 shrink-0 text-white" />
+                                    <h3 className="text-sm font-bold leading-tight truncate text-white dark:text-white" title={lesson.title}>{lesson.title}</h3>
+                                  </div>
+                                  <div className="flex items-center gap-1 shrink-0 ml-2">
+                                    {module?.category && (
+                                      <span className="bg-white/15 text-white text-[9px] font-bold px-2 py-0.5 rounded-md backdrop-blur-sm truncate max-w-[90px]">{module.category}</span>
+                                    )}
+                                    {(lesson.grade || currentGrade) && (
+                                      <span className="bg-white/15 text-white text-[9px] font-bold px-2 py-0.5 rounded-md backdrop-blur-sm truncate max-w-[80px]">{lesson.grade || currentGrade}</span>
+                                    )}
+                                  </div>
                                 </div>
-                              ) : (
-                                <div className="flex-1 text-[11px] text-slate-500 dark:text-ink-muted font-medium pr-2 leading-relaxed">
-                                  {availabilityState === 'needs_review' 
-                                    ? 'Lesson exists but is waiting for review' 
-                                    : 'Starter lesson available for admin review'}
+
+                                {/* Horizontal Dynamic Illustration Banner */}
+                                <div className="h-24 w-full overflow-hidden relative border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-surface-low shrink-0">
+                                  <img 
+                                    src={lessonBannerOverrides[lesson.id] || lesson.bannerImage || getLessonIllustration(lesson.title, lesson.subject || module?.name)}
+                                    alt={lesson.title}
+                                    className={`w-full h-full object-cover transition-transform duration-700 opacity-75 ${isClickable ? 'group-hover:scale-105' : ''}`}
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); togglePinLesson(lesson.id); }}
+                                    className={`absolute top-2 right-2 z-10 w-7 h-7 rounded-full flex items-center justify-center border backdrop-blur-md transition-all shadow-sm cursor-pointer ${
+                                      pinnedLessonIds.includes(lesson.id)
+                                        ? 'bg-amber-500 border-amber-400 text-white shadow-amber-500/40 shadow-md'
+                                        : 'bg-black/35 border-white/20 text-white/75 hover:text-white hover:bg-black/50'
+                                    }`}
+                                    title={pinnedLessonIds.includes(lesson.id) ? 'Unpin Lesson' : 'Pin to Study Desk'}
+                                  >
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      viewBox="0 0 24 24"
+                                      fill={pinnedLessonIds.includes(lesson.id) ? "currentColor" : "none"}
+                                      stroke="currentColor"
+                                      strokeWidth="2.5"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      className="w-3.5 h-3.5"
+                                    >
+                                      <line x1="12" y1="17" x2="12" y2="22"></line>
+                                      <path d="M5 17h14v-1.76a2 2 0 0 0-.44-1.24l-2.78-3.55A2 2 0 0 1 15 9.24V5a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4.24a2 2 0 0 1-.78 1.21L5.44 14a2 2 0 0 0-.44 1.24Z"></path>
+                                    </svg>
+                                  </button>
                                 </div>
-                              )}
+                                
+                                {/* Card Body */}
+                                  <div className="p-5 flex-1 flex flex-col space-y-4">
+                                    <AnimatePresence>
+                                      {expandedCards[lesson.id] && (
+                                        <motion.div
+                                          initial={{ height: 0, opacity: 0 }}
+                                          animate={{ height: 'auto', opacity: 1 }}
+                                          exit={{ height: 0, opacity: 0 }}
+                                          transition={{ duration: 0.25 }}
+                                          className="overflow-hidden space-y-4"
+                                        >
+                                          <div className="grid grid-cols-2 gap-4 text-sm border-b border-slate-100 pb-4 dark:border-white/6 items-center">
+                                            {(() => {
+                                              const quizzes = (lesson.blocks || []).filter((b: any) => b.purpose === 'quiz' || b.type === 'quiz');
+                                              const exercises = (lesson.blocks || []).filter((b: any) => b.purpose === 'practice' || b.purpose === 'exam' || b.type === 'practice' || b.type === 'exam');
+                                              const hasTests = quizzes.length > 0 || exercises.length > 0;
+                                              return (
+                                                <div className="space-y-1 practice-test-metrics-trigger cursor-pointer hover:bg-slate-50 dark:hover:bg-surface-low rounded-xl p-1.5 transition-all" title={hasTests ? "Click to take practice test directly" : ""}>
+                                                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 dark:text-ink">
+                                                    <Target className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                                                    <span>Practice Test</span>
+                                                  </div>
+                                                  <p className="text-[10px] text-slate-500 dark:text-ink-muted leading-tight">
+                                                    {hasTests 
+                                                      ? `${quizzes.length} Quizzes • ${exercises.length} Exercises`
+                                                      : 'No tests generated yet'}
+                                                  </p>
+                                                </div>
+                                              );
+                                            })()}
+                                            <div className="space-y-1">
+                                              <div className="flex justify-between text-[11px] font-bold">
+                                                <span className="text-slate-400 dark:text-ink-muted">Progress</span>
+                                                <span className="text-slate-800 dark:text-ink">{lesson.status === 'done' ? '100%' : '0%'}</span>
+                                              </div>
+                                              <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden dark:bg-surface-mid">
+                                                <div 
+                                                  className={`h-full rounded-full ${lesson.status === 'done' ? 'bg-slate-700 dark:bg-slate-400' : 'bg-slate-300 dark:bg-surface-high'}`} 
+                                                  style={{ width: lesson.status === 'done' ? '100%' : '0%' }} 
+                                                />
+                                              </div>
+                                            </div>
+                                          </div>
 
-                              {isClickable ? (
-                                <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
-                                  lesson.status === 'done' ? 'text-emerald-700 dark:text-emerald-400' : 'text-accent'
-                                }`}>
-                                  <span className={`h-1.5 w-1.5 rounded-full ${lesson.status === 'done' ? 'bg-emerald-500 animate-pulse' : 'bg-accent'}`} />
-                                  {lesson.status === 'done' ? 'Completed' : 'Available'}
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                                  <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
-                                  {availabilityState === 'needs_review' ? 'Under Review' : 'Draft'}
-                                </span>
-                              )}
+                                          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-ink-muted">
+                                            <Clock className="w-4 h-4 text-slate-400 shrink-0" />
+                                            <span>
+                                              Last Active: {lesson.createdAt ? relativeTime(lesson.createdAt) : 'No activity yet'}
+                                            </span>
+                                          </div>
+                                        </motion.div>
+                                      )}
+                                    </AnimatePresence>
+
+                                    <div className="pt-2 flex items-center justify-between border-t border-slate-100 dark:border-white/6">
+                                      {isClickable ? (
+                                        <div className="flex items-center gap-2 card-footer-actions">
+                                          <button
+                                            type="button"
+                                            onClick={(e) => { e.stopPropagation(); navigate(`/lesson/${lesson.id}`); }}
+                                            className="flex items-center gap-1.5 rounded-lg bg-slate-900 text-white hover:text-accent dark:bg-white/10 dark:text-ink dark:hover:text-accent px-3.5 py-2 text-xs font-bold transition-all shadow-sm"
+                                          >
+                                            <Play className="w-3 h-3 fill-current" />
+                                            {lesson.status === 'done' ? 'Review' : 'Start'}
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={(e) => toggleCardExpansion(lesson.id, e)}
+                                            className="rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 hover:text-accent transition-colors dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:text-accent flex items-center gap-1"
+                                          >
+                                            Details
+                                            <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${expandedCards[lesson.id] ? 'rotate-180' : ''}`} />
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <div className="flex-1 text-[11px] text-slate-500 dark:text-ink-muted font-medium pr-2 leading-relaxed">
+                                          {availabilityState === 'needs_review' 
+                                            ? 'Lesson exists but is waiting for review' 
+                                            : 'Starter lesson available for admin review'}
+                                        </div>
+                                      )}
+
+                                      {isClickable ? (
+                                        <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
+                                          lesson.status === 'done' ? 'text-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-400'
+                                        }`}>
+                                          <span className={`h-1.5 w-1.5 rounded-full ${lesson.status === 'done' ? 'bg-slate-800 dark:bg-white animate-pulse' : 'bg-slate-300'}`} />
+                                          {lesson.status === 'done' ? 'Completed' : 'Available'}
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                          <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+                                          {availabilityState === 'needs_review' ? 'Under Review' : 'Draft'}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </motion.div>
+                              );
+                          }) : (
+                            <div className="col-span-full rounded-2xl border border-solid border-slate-200 bg-white p-5 dark:border-white/8 dark:bg-paper">
+                              <p className="text-sm font-semibold text-slate-950 dark:text-ink">No lessons in this domain yet.</p>
+                              <p className="mt-1 ls-micro-label">Switch back to {t('all')} to see every available lesson for this classroom.</p>
                             </div>
-                          </div>
-                        </motion.div>
-                      );
-                    }) : (
-                      <div className="col-span-full rounded-2xl border border-solid border-slate-200 bg-white p-5 dark:border-white/8 dark:bg-paper">
-                        <p className="text-sm font-semibold text-slate-950 dark:text-ink">No lessons in this domain yet.</p>
-                        <p className="mt-1 ls-micro-label">Switch back to {t('all')} to see every available lesson for this classroom.</p>
-                      </div>
-                    )
-                  ) : hasTopicFallback ? (
-                    visibleTopicFallbackRows.map((topic, i) => (
-                      <motion.div
-                        key={topic.id}
-                        layout
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: i * 0.03 }}
-                        onClick={(e) => {
-                          const target = e.target as HTMLElement;
-                          if (!target.isConnected || !document.body.contains(target)) return;
-                          if (target.closest('.card-footer-actions') || target.closest('button')) return;
-                          handleGenerateLesson(topic.title, true);
-                        }}
-                        className="bg-white border border-slate-200 rounded-3xl overflow-hidden flex flex-col group hover:border-accent/30 hover:shadow-lg transition-all dark:bg-paper dark:border-white/8 shadow-sm cursor-pointer"
-                        style={{ boxShadow: 'var(--ls-shadow)' }}
-                      >
-                        {/* Top Redesigned Teal Header Bar */}
-                        <div className="bg-[#007A87] px-5 py-3.5 flex items-center justify-between text-white dark:bg-accent shrink-0">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <BookOpen className="w-4 h-4 shrink-0 text-white" />
-                            <h3 className="text-sm font-bold leading-tight truncate text-white dark:text-white" title={topic.title}>{topic.title}</h3>
-                          </div>
-                          <div className="flex items-center gap-1 shrink-0 ml-2">
-                            {module?.category && (
-                              <span className="bg-white/15 text-white text-[9px] font-bold px-2 py-0.5 rounded-md backdrop-blur-sm truncate max-w-[90px]">{module.category}</span>
-                            )}
-                            {currentGrade && (
-                              <span className="bg-white/15 text-white text-[9px] font-bold px-2 py-0.5 rounded-md backdrop-blur-sm truncate max-w-[80px]">{currentGrade}</span>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Horizontal Dynamic Illustration Banner */}
-                        <div className="h-24 w-full overflow-hidden relative border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-surface-low shrink-0">
-                          <img 
-                            src={getLessonIllustration(topic.title, module?.name)}
-                            alt={topic.title}
-                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                          />
-                        </div>
-
-                        {/* Card Body */}
-                        <div className="p-5 flex-1 flex flex-col space-y-4">
-                          {/* Metrics columns */}
-                          <div className="grid grid-cols-2 gap-4 text-sm border-b border-slate-100 pb-4 dark:border-white/6 items-center">
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 dark:text-ink">
-                                <Target className="w-3.5 h-3.5 text-slate-400 dark:text-ink-muted shrink-0" />
-                                <span>Practice Test</span>
+                          )
+                        ) : hasTopicFallback ? (
+                          visibleTopicFallbackRows.map((topic, i) => (
+                            <motion.div
+                              key={topic.id}
+                              layout
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: i * 0.03 }}
+                              onClick={(e) => {
+                                const target = e.target as HTMLElement;
+                                if (!target.isConnected || !document.body.contains(target)) return;
+                                if (target.closest('.card-footer-actions') || target.closest('button')) return;
+                                handleGenerateLesson(topic.title, true);
+                              }}
+                              className="bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col group hover:border-accent/30 hover:shadow-lg transition-all dark:bg-paper dark:border-white/8 shadow-sm cursor-pointer"
+                              style={{ boxShadow: 'var(--ls-shadow)' }}
+                            >
+                              <div className={`bg-gradient-to-r ${lessonColorOverrides[topic.id] || getCardGradient(topic.id)} px-5 py-3.5 flex items-center justify-between text-white shrink-0`}>
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <BookOpen className="w-4 h-4 shrink-0 text-white" />
+                                  <h3 className="text-sm font-bold leading-tight truncate text-white dark:text-white" title={topic.title}>{topic.title}</h3>
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0 ml-2">
+                                  {module?.category && (
+                                    <span className="bg-white/15 text-white text-[9px] font-bold px-2 py-0.5 rounded-md backdrop-blur-sm truncate max-w-[90px]">{module.category}</span>
+                                  )}
+                                  {currentGrade && (
+                                    <span className="bg-white/15 text-white text-[9px] font-bold px-2 py-0.5 rounded-md backdrop-blur-sm truncate max-w-[80px]">{currentGrade}</span>
+                                  )}
+                                </div>
                               </div>
-                              <p className="text-[10px] text-slate-500 dark:text-ink-muted leading-tight">
-                                No tests generated yet
-                              </p>
-                            </div>
-                            <div className="space-y-1">
-                              <div className="flex justify-between text-[11px] font-bold">
-                                <span className="text-slate-400 dark:text-ink-muted">Progress</span>
-                                <span className="text-slate-800 dark:text-ink">0%</span>
-                              </div>
-                              <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden dark:bg-surface-mid">
-                                <div 
-                                  className="h-full rounded-full bg-slate-300 dark:bg-surface-high" 
-                                  style={{ width: '0%' }} 
+
+                              {/* Horizontal Dynamic Illustration Banner */}
+                              <div className="h-24 w-full overflow-hidden relative border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-surface-low shrink-0">
+                                <img 
+                                  src={lessonBannerOverrides[topic.id] || getLessonIllustration(topic.title, module?.name)}
+                                  alt={topic.title}
+                                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 opacity-75"
                                 />
                               </div>
-                            </div>
-                          </div>
+                              {/* Card Body */}
+                              <div className="p-5 flex-1 flex flex-col space-y-4">
+                                <AnimatePresence>
+                                  {expandedCards[topic.id] && (
+                                    <motion.div
+                                      initial={{ height: 0, opacity: 0 }}
+                                      animate={{ height: 'auto', opacity: 1 }}
+                                      exit={{ height: 0, opacity: 0 }}
+                                      transition={{ duration: 0.25 }}
+                                      className="overflow-hidden space-y-4"
+                                    >
+                                      <div className="grid grid-cols-2 gap-4 text-sm border-b border-slate-100 pb-4 dark:border-white/6 items-center">
+                                        <div className="space-y-1">
+                                          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 dark:text-ink">
+                                            <Target className="w-3.5 h-3.5 text-slate-400 dark:text-ink-muted shrink-0" />
+                                            <span>Practice Test</span>
+                                          </div>
+                                          <p className="text-[10px] text-slate-500 dark:text-ink-muted leading-tight">
+                                            No tests generated yet
+                                          </p>
+                                        </div>
+                                        <div className="space-y-1">
+                                          <div className="flex justify-between text-[11px] font-bold">
+                                            <span className="text-slate-400 dark:text-ink-muted">Progress</span>
+                                            <span className="text-slate-800 dark:text-ink">0%</span>
+                                          </div>
+                                          <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden dark:bg-surface-mid">
+                                            <div 
+                                              className="h-full rounded-full bg-slate-300 dark:bg-surface-high" 
+                                              style={{ width: '0%' }} 
+                                            />
+                                          </div>
+                                        </div>
+                                      </div>
 
-                          {/* Last activity / status */}
-                          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-ink-muted">
-                            <Clock className="w-4 h-4 text-slate-400 shrink-0" />
-                            <span>
-                              Last Active: No activity yet
-                            </span>
-                          </div>
+                                      <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-ink-muted">
+                                        <Clock className="w-4 h-4 text-slate-400 shrink-0" />
+                                        <span>
+                                          Last Active: No activity yet
+                                        </span>
+                                      </div>
+                                    </motion.div>
+                                  )}
+                                </AnimatePresence>
 
-                          {/* Footer: actions + status dot */}
-                          <div className="pt-2 flex items-center justify-between border-t border-slate-100 dark:border-white/6">
-                            <div className="flex items-center gap-2 card-footer-actions">
-                              <button
-                                type="button"
-                                onClick={(e) => { e.stopPropagation(); handleGenerateLesson(topic.title, true); }}
-                                disabled={!!generatingTitle}
-                                className="flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 text-xs font-bold text-white transition-colors shadow-sm disabled:opacity-60"
-                              >
-                                {generatingTitle === topic.title ? (
-                                  <Loader2 size={12} className="animate-spin text-white" />
-                                ) : (
-                                  <Play className="w-3 h-3 fill-current text-white" />
-                                )}
-                                Generate
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => { e.stopPropagation(); handleGenerateLesson(topic.title, true); }}
-                                className="rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-700 transition-colors dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:bg-surface-low"
-                              >
-                                View Plan
-                              </button>
-                            </div>
+                                <div className="pt-2 flex items-center justify-between border-t border-slate-100 dark:border-white/6">
+                                  <div className="flex items-center gap-2 card-footer-actions">
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); handleGenerateLesson(topic.title, true); }}
+                                      disabled={!!generatingTitle}
+                                      className="flex items-center gap-1.5 rounded-lg bg-slate-900 text-white hover:text-accent dark:bg-white/10 dark:text-ink dark:hover:text-accent px-3.5 py-2 text-xs font-bold transition-all shadow-sm disabled:opacity-60"
+                                    >
+                                      {generatingTitle === topic.title ? (
+                                        <Loader2 size={12} className="animate-spin text-white" />
+                                      ) : (
+                                        <Play className="w-3 h-3 fill-current" />
+                                      )}
+                                      Generate
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => toggleCardExpansion(topic.id, e)}
+                                      className="rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 hover:text-accent transition-colors dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:text-accent flex items-center gap-1"
+                                    >
+                                      Details
+                                      <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${expandedCards[topic.id] ? 'rotate-180' : ''}`} />
+                                    </button>
+                                  </div>
 
-                            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-600 dark:text-amber-400">
-                              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                              Not Started
-                            </span>
-                          </div>
-                        </div>
-                      </motion.div>
-                    ))
-                  ) : null}
-                </div>
-              </div>
-            )}
-          </>
-        )}
-
-        {activeTab === 'quizzes' && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-slate-950 flex items-center gap-2">
-                <Target size={20} className="text-accent" />
-                {t('available_quizzes')}
-              </h3>
-            </div>
-            {isLoadingExtra ? (
-              <div className="flex justify-center p-8"><Loader2 className="animate-spin text-accent" /></div>
-            ) : quizzes.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {quizzes.map((quiz) => (
-                  <div key={quiz.id} className="bg-white border border-slate-200 p-5 rounded-2xl hover:border-accent/30 transition-all cursor-pointer">
-                    <h4 className="font-bold text-slate-950">{quiz.title}</h4>
-                    <p className="ls-body-text mt-1">{quiz.description}</p>
-                    <div className="flex items-center gap-3 mt-4">
-                      <span className="text-xs font-medium bg-slate-50 px-2 py-1 rounded text-slate-500">{quiz.difficulty}</span>
-                      <span className="text-xs font-medium bg-slate-50 px-2 py-1 rounded text-slate-500">{quiz.questions?.length || 0} Questions</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="bg-slate-50/50 border border-solid border-slate-200 rounded-3xl p-16 text-center">
-                <p className="text-slate-500">{t('no_quizzes_for_lessons')}</p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {activeTab === 'exercises' && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-slate-950 flex items-center gap-2">
-                <Dumbbell size={20} className="text-accent" />
-                {t('practice_exercises')}
-              </h3>
-            </div>
-            {isLoadingExtra ? (
-              <div className="flex justify-center p-8"><Loader2 className="animate-spin text-accent" /></div>
-            ) : exercises.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {exercises.map((exercise) => (
-                  <div key={exercise.id} className="bg-white border border-slate-200 p-5 rounded-2xl hover:border-accent/30 transition-all cursor-pointer">
-                    <h4 className="font-bold text-slate-950">{exercise.title}</h4>
-                    <p className="ls-body-text mt-1 line-clamp-2">{exercise.prompt}</p>
-                    <div className="flex items-center gap-3 mt-4">
-                      <span className="text-xs font-medium bg-slate-50 px-2 py-1 rounded text-slate-500">{exercise.difficulty}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="bg-slate-50/50 border border-solid border-slate-200 rounded-3xl p-16 text-center">
-                <p className="text-slate-500">{t('no_exercises_for_lessons')}</p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Gallery Section */}
-        <AnimatePresence>
-          {suggestions.length > 0 && (
-            <motion.div 
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="space-y-4 pt-8 border-t border-slate-200"
-            >
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-bold text-slate-950 flex items-center gap-2">
-                  <Sparkles size={20} className="text-accent" />
-                  Suggested Module Titles
-                </h3>
-                <div className="flex items-center gap-4">
-                  {selectedSuggestions.length > 0 ? (
-                    <button 
-                      onClick={handleCurateSelected}
-                      disabled={!!generatingTitle}
-                      className="text-xs font-medium text-blue-700 hover:underline disabled:opacity-50"
-                    >
-                      {generatingTitle === 'selected' ? <Loader2 size={10} className="animate-spin inline mr-1" /> : null}
-                      Curate Selected ({selectedSuggestions.length})
-                    </button>
-                  ) : (
-                    <button 
-                      onClick={handleCurateAll}
-                      disabled={!!generatingTitle}
-                      className="text-xs font-medium text-blue-700 hover:underline disabled:opacity-50"
-                    >
-                      {generatingTitle === 'all' ? <Loader2 size={10} className="animate-spin inline mr-1" /> : null}
-                      Curate All
-                    </button>
-                  )}
-                  <button 
-                    onClick={() => setSuggestions([])}
-                    className="ls-micro-label hover:text-slate-950"
-                  >
-                    Close Gallery
-                  </button>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {Array.isArray(suggestions) && suggestions.map((suggestion, i) => {
-                  const isSelected = selectedSuggestions.includes(suggestion.title);
-                  const isThisGenerating = generatingTitle === suggestion.title;
-                  const anyGenerating = !!generatingTitle;
-
-                  return (
-                    <motion.div 
-                      key={i}
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: i * 0.05 }}
-                      onClick={() => {
-                        if (anyGenerating) return;
-                        setSelectedSuggestions(prev => 
-                          prev.includes(suggestion.title) 
-                            ? prev.filter(t => t !== suggestion.title) 
-                            : [...prev, suggestion.title]
-                        );
-                      }}
-                      className={`bg-white border p-6 rounded-2xl space-y-4 transition-all group cursor-pointer relative ${
-                        isSelected ? 'border-accent ring-1 ring-accent/20 bg-accent/[0.02]' : 'border-slate-200 hover:border-accent/30'
-                      } ${anyGenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                      {isSelected && (
-                        <div className="absolute top-4 right-4 text-accent">
-                          <CheckCircle2 size={16} />
-                        </div>
-                      )}
-                      <div className="space-y-1">
-                        <h4 className={`text-base font-bold transition-colors ${isSelected ? 'text-accent' : 'text-slate-950 group-hover:text-accent'}`}>
-                          {suggestion.title}
-                        </h4>
-                        <p className="ls-micro-label leading-relaxed">{suggestion.description}</p>
+                                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-slate-300 dark:bg-surface-high" />
+                                    Not Started
+                                  </span>
+                                </div>
+                              </div>
+                            </motion.div>
+                          ))
+                        ) : null}
                       </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {activeTab === 'quizzes' && (
+                <div className="space-y-4 pb-6">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-bold text-slate-950 flex items-center gap-2 dark:text-ink shrink-0">
+                      <Target size={20} className="text-accent" />
+                      {t('available_quizzes')}
+                    </h3>
+                  </div>
+                  {isLoadingExtra ? (
+                    <div className="flex justify-center p-8"><Loader2 className="animate-spin text-accent" /></div>
+                  ) : quizzes.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {quizzes.map((quiz) => (
+                        <div 
+                          key={quiz.id} 
+                          onClick={() => navigate(`/lesson/${quiz.lesson_id}`, { state: lessonNavigationState({ startAtTest: true }) })}
+                          className="bg-white border border-slate-200 p-5 rounded-2xl hover:border-accent/30 transition-all cursor-pointer hover:shadow-md dark:bg-paper dark:border-white/8 shadow-sm"
+                        >
+                          <h4 className="font-bold text-slate-950 dark:text-ink">{quiz.title}</h4>
+                          <p className="ls-body-text mt-1">{quiz.description}</p>
+                          <div className="flex items-center gap-3 mt-4">
+                            <span className="text-xs font-medium bg-slate-50 dark:bg-surface-low px-2 py-1 rounded text-slate-500 dark:text-ink-muted">{quiz.difficulty}</span>
+                            <span className="text-xs font-medium bg-slate-50 dark:bg-surface-low px-2 py-1 rounded text-slate-500 dark:text-ink-muted">{quiz.questions?.length || 0} Questions</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="bg-slate-50/50 border border-solid border-slate-200 rounded-xl p-16 text-center dark:bg-surface-low/10 dark:border-white/5">
+                      <p className="text-slate-500 dark:text-ink-muted">{t('no_quizzes_for_lessons')}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {activeTab === 'exercises' && (
+                <div className="space-y-4 pb-6">
+                  <div className="flex items-center justify-between text-slate-950 dark:text-ink">
+                    <h3 className="text-lg font-bold flex items-center gap-2">
+                      <Dumbbell size={20} className="text-accent" />
+                      {t('practice_exercises')}
+                    </h3>
+                  </div>
+                  {isLoadingExtra ? (
+                    <div className="flex justify-center p-8"><Loader2 className="animate-spin text-accent" /></div>
+                  ) : exercises.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {exercises.map((exercise) => (
+                        <div 
+                          key={exercise.id} 
+                          onClick={() => navigate(`/lesson/${exercise.lesson_id}`, { state: lessonNavigationState({ startAtTest: true }) })}
+                          className="bg-white border border-slate-200 p-5 rounded-2xl hover:border-accent/30 transition-all cursor-pointer hover:shadow-md dark:bg-paper dark:border-white/8 shadow-sm"
+                        >
+                          <h4 className="font-bold text-slate-950 dark:text-ink">{exercise.title}</h4>
+                          <p className="ls-body-text mt-1 line-clamp-2">{exercise.prompt}</p>
+                          <div className="flex items-center gap-3 mt-4">
+                            <span className="text-xs font-medium bg-slate-50 dark:bg-surface-low px-2 py-1 rounded text-slate-500 dark:text-ink-muted">{exercise.difficulty}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="bg-slate-50/50 border border-solid border-slate-200 rounded-xl p-16 text-center dark:bg-surface-low/10 dark:border-white/5">
+                      <p className="text-slate-500 dark:text-ink-muted">{t('no_exercises_for_lessons')}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Gallery Section */}
+              <AnimatePresence>
+                {suggestions.length > 0 && (
+                  <motion.div 
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="space-y-4 pt-8 border-t border-slate-200 dark:border-white/8 shrink-0"
+                  >
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-bold text-slate-950 dark:text-ink flex items-center gap-2">
+                        <Sparkles size={20} className="text-accent" />
+                        Suggested Module Titles
+                      </h3>
                       <div className="flex items-center gap-4">
+                        {selectedSuggestions.length > 0 ? (
+                          <button 
+                            onClick={handleCurateSelected}
+                            disabled={!!generatingTitle}
+                            className="text-xs font-medium text-blue-700 hover:underline disabled:opacity-50 dark:text-accent"
+                          >
+                            {generatingTitle === 'selected' ? <Loader2 size={10} className="animate-spin inline mr-1" /> : null}
+                            Curate Selected ({selectedSuggestions.length})
+                          </button>
+                        ) : (
+                          <button 
+                            onClick={handleCurateAll}
+                            disabled={!!generatingTitle}
+                            className="text-xs font-medium text-blue-700 hover:underline disabled:opacity-50 dark:text-accent"
+                          >
+                            {generatingTitle === 'all' ? <Loader2 size={10} className="animate-spin inline mr-1" /> : null}
+                            Curate All
+                          </button>
+                        )}
                         <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleGenerateLesson(suggestion.title);
-                          }}
-                          disabled={anyGenerating}
-                          className="flex items-center gap-2 text-xs font-medium text-blue-700 hover:underline disabled:opacity-50"
+                          onClick={() => setSuggestions([])}
+                          className="ls-micro-label hover:text-slate-950 dark:hover:text-ink"
                         >
-                          {isThisGenerating ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
-                          Curate
+                          Close Gallery
                         </button>
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleGenerateLesson(suggestion.title, true);
-                          }}
-                          disabled={anyGenerating}
-                          className="flex items-center gap-2 text-xs font-medium text-slate-950  hover:underline disabled:opacity-50"
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-6">
+                      {Array.isArray(suggestions) && suggestions.map((suggestion, i) => {
+                        const isSelected = selectedSuggestions.includes(suggestion.title);
+                        const isThisGenerating = generatingTitle === suggestion.title;
+                        const anyGenerating = !!generatingTitle;
+
+                        return (
+                          <motion.div 
+                            key={i}
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ delay: i * 0.05 }}
+                            onClick={() => {
+                              if (anyGenerating) return;
+                              setSelectedSuggestions(prev => 
+                                prev.includes(suggestion.title) 
+                                  ? prev.filter(t => t !== suggestion.title) 
+                                  : [...prev, suggestion.title]
+                              );
+                            }}
+                            className={`bg-white border p-6 rounded-2xl space-y-4 transition-all group cursor-pointer relative dark:bg-paper ${
+                              isSelected ? 'border-accent ring-1 ring-accent/20 bg-accent/[0.02]' : 'border-slate-200 hover:border-accent/30 dark:border-white/8'
+                            } ${anyGenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          >
+                            {isSelected && (
+                              <div className="absolute top-4 right-4 text-accent">
+                                <CheckCircle2 size={16} />
+                              </div>
+                            )}
+                            <div className="space-y-1">
+                              <h4 className={`text-base font-bold transition-colors ${isSelected ? 'text-accent' : 'text-slate-950 dark:text-ink group-hover:text-accent'}`}>
+                                {suggestion.title}
+                              </h4>
+                              <p className="ls-micro-label leading-relaxed">{suggestion.description}</p>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleGenerateLesson(suggestion.title);
+                                }}
+                                disabled={anyGenerating}
+                                className="flex items-center gap-2 text-xs font-medium text-blue-700 hover:underline disabled:opacity-50 dark:text-accent"
+                              >
+                                {isThisGenerating ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+                                Curate
+                              </button>
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleGenerateLesson(suggestion.title, true);
+                                }}
+                                disabled={anyGenerating}
+                                className="flex items-center gap-2 text-xs font-medium text-slate-950 dark:text-ink hover:underline disabled:opacity-50"
+                              >
+                                {isThisGenerating ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
+                                Curate & Launch
+                              </button>
+                            </div>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+            </div>
+          </div>
+
+          {/* Column 3: Classroom Widgets Sidebar (Right Column, 260px width) */}
+          <div className="flex md:w-[234px] w-full shrink-0 md:h-full bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 overflow-visible md:overflow-hidden flex-col p-4 sm:p-5">
+            <div className="flex-1 overflow-visible md:overflow-y-auto no-scrollbar flex flex-col gap-6 md:pr-1">
+              
+              {/* Subject Telemetry Card - Collapsible */}
+              <section className="bg-slate-900 text-white rounded-2xl p-5 relative overflow-hidden dark:bg-surface-low shrink-0">
+                <button 
+                  type="button" 
+                  onClick={() => toggleSidebarSection('telemetry')} 
+                  className="w-full flex items-center justify-between text-[10px] font-black text-slate-400 uppercase tracking-wider dark:text-ink-muted outline-none"
+                >
+                  <span>Telemetry</span>
+                  {sidebarCollapsedSections.telemetry ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                </button>
+                
+                <AnimatePresence initial={false}>
+                  {!sidebarCollapsedSections.telemetry && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden mt-3 space-y-4"
+                    >
+                      <h4 className="text-sm font-bold text-white dark:text-ink truncate max-w-[180px]" title={module.name}>{module.name} Status</h4>
+                      {/* Progress bar */}
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-xs font-bold">
+                          <span className="text-slate-400 dark:text-ink-muted">Syllabus Progress</span>
+                          <span className="text-white dark:text-ink">
+                            {lessons.length > 0 ? Math.round((lessons.filter(l => l.status === 'done').length / lessons.length) * 100) : (module.progress || 0)}%
+                          </span>
+                        </div>
+                        <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden dark:bg-surface-mid">
+                          <div 
+                            className="h-full rounded-full bg-slate-400 transition-all duration-500" 
+                            style={{ 
+                              width: `${lessons.length > 0 ? Math.round((lessons.filter(l => l.status === 'done').length / lessons.length) * 100) : (module.progress || 0)}%` 
+                            }} 
+                          />
+                        </div>
+                      </div>
+
+                      {/* Telemetry stats grid */}
+                      <div className="grid grid-cols-2 gap-3 text-xs border-t border-slate-800 pt-3 dark:border-white/5">
+                        <div>
+                          <p className="text-slate-500 dark:text-ink-muted font-medium">Completed</p>
+                          <p className="text-base font-bold text-white dark:text-ink mt-0.5">
+                            {lessons.filter(l => l.status === 'done').length} / {lessons.length}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-slate-500 dark:text-ink-muted font-medium">Total Tests</p>
+                          <p className="text-base font-bold text-white dark:text-ink mt-0.5">
+                            {quizzes.length + exercises.length}
+                          </p>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </section>
+
+              {/* Focus Timer Card - Collapsible */}
+              <section className="bg-slate-900 text-white rounded-2xl p-5 relative overflow-hidden group dark:bg-surface-low dark:text-ink shrink-0">
+                <button 
+                  type="button" 
+                  onClick={() => toggleSidebarSection('pomodoro')} 
+                  className="w-full flex items-center justify-between text-[10px] font-black text-slate-400 uppercase tracking-wider dark:text-ink-muted outline-none"
+                >
+                  <span>{t('deep_focus') || 'Deep Focus'}</span>
+                  {sidebarCollapsedSections.pomodoro ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                </button>
+
+                <AnimatePresence initial={false}>
+                  {!sidebarCollapsedSections.pomodoro && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden mt-3 space-y-3"
+                    >
+                      <div className="text-3xl font-bold tracking-tight text-white dark:text-ink">
+                        {formatTime(timerSeconds)}
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setIsTimerRunning(!isTimerRunning)}
+                          className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                            isTimerRunning
+                              ? 'bg-slate-800 text-white hover:bg-slate-700 dark:bg-surface-mid'
+                              : 'bg-white text-slate-900 hover:bg-slate-100'
+                          }`}
                         >
-                          {isThisGenerating ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
-                          Curate & Launch
+                          {isTimerRunning ? (t('pause') || 'Pause') : (t('dashboard_start') || 'Start Timer')}
+                        </button>
+                        <button
+                          onClick={() => { setIsTimerRunning(false); setTimerSeconds(defaultDuration * 60); }}
+                          className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-700 transition-all dark:bg-surface-mid"
+                        >
+                          <RefreshCw size={14} />
                         </button>
                       </div>
                     </motion.div>
-                  );
-                })}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+                  )}
+                </AnimatePresence>
+              </section>
+
+              {/* Support Zone / MyLevel - Collapsible */}
+              <section className="bg-slate-900 text-white rounded-2xl p-5 relative overflow-hidden group dark:bg-surface-low dark:text-ink shrink-0">
+                <button 
+                  type="button" 
+                  onClick={() => toggleSidebarSection('support')} 
+                  className="w-full flex items-center justify-between text-[10px] font-black text-slate-400 uppercase tracking-wider dark:text-ink-muted outline-none"
+                >
+                  <span>Support Zone</span>
+                  {sidebarCollapsedSections.support ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                </button>
+                
+                <AnimatePresence initial={false}>
+                  {!sidebarCollapsedSections.support && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden mt-3 space-y-4"
+                    >
+                      <p className="text-slate-300 dark:text-ink-secondary text-[11px] leading-relaxed">
+                        Check your real level, discover your gaps, and get a personal roadmap.
+                      </p>
+                      <button
+                        onClick={() => setIsSupportModalOpen(true)}
+                        className="w-full py-2.5 rounded-xl text-xs font-bold transition-all bg-white text-slate-900 hover:bg-slate-100"
+                      >
+                        Start MyLevel Check
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </section>
+
+              {/* Classroom Activity Log Card - Collapsible borderless list */}
+              <section className="space-y-4 pt-4 border-t border-slate-100 dark:border-white/5 shrink-0">
+                <button 
+                  type="button" 
+                  onClick={() => toggleSidebarSection('activityLog')} 
+                  className="w-full flex items-center justify-between text-xs font-bold text-slate-950 dark:text-ink uppercase tracking-wider outline-none"
+                >
+                  <div className="flex items-center gap-2">
+                    <span>{t('activity_log') || 'Activity Log'}</span>
+                    <span className="text-[9px] bg-slate-50 dark:bg-surface-low border border-slate-100 dark:border-white/5 text-slate-400 dark:text-ink-muted px-2 py-0.5 rounded-full font-bold">LIVE</span>
+                  </div>
+                  {sidebarCollapsedSections.activityLog ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                </button>
+                
+                <AnimatePresence initial={false}>
+                  {!sidebarCollapsedSections.activityLog && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden mt-3"
+                    >
+                      <div className="space-y-3.5 max-h-[220px] overflow-y-auto no-scrollbar">
+                        {activityLogs.length > 0 ? (
+                          activityLogs.map((log) => {
+                            const relativeTimeText = (() => {
+                              const diff = Date.now() - log.timestamp;
+                              const minutes = Math.floor(diff / 60000);
+                              if (minutes < 60) return `${minutes}m ago`;
+                              const hours = Math.floor(minutes / 60);
+                              if (hours < 24) return `${hours}h ago`;
+                              const days = Math.floor(hours / 24);
+                              return `${days}d ago`;
+                            })();
+
+                            return (
+                              <div key={log.id} className="flex gap-3 items-start text-xs py-0.5">
+                                <div className="text-slate-400 shrink-0 mt-0.5">
+                                  {log.type === 'lesson_completed' ? (
+                                    <CheckCircle2 size={12} />
+                                  ) : log.type === 'note_added' ? (
+                                    <FileText size={12} />
+                                  ) : log.type === 'pomodoro_start' ? (
+                                    <Timer size={12} />
+                                  ) : log.type === 'reminder_completed' ? (
+                                    <CheckSquare size={12} />
+                                  ) : (
+                                    <Loader2 size={12} className="animate-spin" />
+                                  )}
+                                </div>
+                                <div className="space-y-0.5 min-w-0">
+                                  <h4 className="font-bold text-slate-900 dark:text-ink truncate leading-snug text-[11px]" title={log.title}>
+                                    {log.title}
+                                  </h4>
+                                  {log.subtitle && (
+                                    <p className="text-[10px] text-slate-500 dark:text-ink-muted leading-relaxed line-clamp-1">
+                                      {log.subtitle}
+                                    </p>
+                                  )}
+                                  <p className="text-[9px] text-slate-400 dark:text-ink-muted">
+                                    {relativeTimeText}
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <div className="py-6 text-center bg-slate-50/10 dark:bg-surface-low/5 rounded-xl border border-solid border-slate-100 dark:border-white/5">
+                            <p className="text-[10px] font-medium text-slate-400 dark:text-ink-muted">
+                              No recent activity.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </section>
+
+            </div>
+          </div>
+        </div>
       </div>
 
+      {/* SupportZoneModal */}
+      <SupportZoneModal
+        isOpen={isSupportModalOpen}
+        onClose={() => setIsSupportModalOpen(false)}
+        subject={module.name}
+        grade={currentGrade}
+      />
     </Layout>
   );
 };

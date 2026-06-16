@@ -77,31 +77,35 @@ export const ensureBrowserSupabaseConfigured = async () => {
   if (isBrowserSupabaseConfigured) return true;
   if (runtimeConfigPromise) return runtimeConfigPromise;
 
-  runtimeConfigPromise = fetch("/api/config/supabase", {
-    method: "GET",
-    headers: { Accept: "application/json" },
-  })
-    .then(async (response) => {
-      if (!response.ok) return false;
-      const payload = await response.json() as {
-        configured?: boolean;
-        url?: string | null;
-        anonKey?: string | null;
-      };
+  runtimeConfigPromise = (async () => {
+    for (const endpoint of ["/supabase-config.json", "/api/config/supabase"]) {
+      try {
+        const response = await fetch(endpoint, {
+          method: "GET",
+          headers: { Accept: "application/json" },
+        });
+        if (!response.ok) continue;
 
-      if (!payload.configured || !isValidSupabaseUrl(payload.url || undefined) || !hasUsableSupabaseKey(payload.anonKey || undefined)) {
-        return false;
+        const payload = await response.json() as {
+          configured?: boolean;
+          url?: string | null;
+          anonKey?: string | null;
+        };
+
+        if (!payload.configured || !isValidSupabaseUrl(payload.url || undefined) || !hasUsableSupabaseKey(payload.anonKey || undefined)) {
+          continue;
+        }
+
+        activeClient = createClient<Database>(payload.url, payload.anonKey);
+        isBrowserSupabaseConfigured = true;
+        console.info("Supabase client initialized");
+        return true;
+      } catch (error) {
+        console.warn(`Supabase runtime config unavailable from ${endpoint}`, error);
       }
-
-      activeClient = createClient<Database>(payload.url, payload.anonKey);
-      isBrowserSupabaseConfigured = true;
-      console.info("Supabase client initialized");
-      return true;
-    })
-    .catch((error) => {
-      console.warn("Supabase runtime config unavailable", error);
-      return false;
-    })
+    }
+    return false;
+  })()
     .finally(() => {
       runtimeConfigPromise = null;
     });

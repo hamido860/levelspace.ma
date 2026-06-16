@@ -1,5 +1,7 @@
 {
     "rewrites": [
+        { "source": "/api/config/supabase", "destination": "/api/supabase-config" },
+        { "source": "/api/health/supabase", "destination": "/api/supabase-health" },
         { "source": "/api/(.*)", "destination": "/api/[...slug]?slug=$1" },
         { "source": "/(.*)", "destination": "/index.html" }
     ]

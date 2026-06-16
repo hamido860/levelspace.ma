@@ -80,8 +80,8 @@ export const isStudentVisibleLesson = (
   })();
 
 export const isAdminVisibleLesson = (
-  lesson: {
-    validation_status?: unknown;
+  lesson: { 
+    validation_status?: unknown; 
     is_ai_generated?: boolean;
     content?: string | null;
     blocks?: any[] | null;
@@ -95,7 +95,7 @@ export const isAdminVisibleLesson = (
   return hasContent;
 };
 
-export type LessonAvailabilityState =
+export type LessonAvailabilityState = 
   | "published"
   | "needs_review"
   | "draft_with_content"
@@ -104,9 +104,9 @@ export type LessonAvailabilityState =
   | "missing_content";
 
 export const getLessonAvailabilityState = (
-  lesson: {
-    teaching_contract?: unknown;
-    validation_status?: unknown;
+  lesson: { 
+    teaching_contract?: unknown; 
+    validation_status?: unknown; 
     is_ai_generated?: boolean;
     content?: string | null;
     blocks?: any[] | null;
@@ -127,13 +127,13 @@ export const getLessonAvailabilityState = (
     return "published";
   }
 
-  const validationStatus = String(lesson.validation_status || "").trim().toLowerCase();
-  if (validationStatus === "needs_review" || validationStatus === "teacher_reviewed" || validationStatus === "official_validated") {
+  const valStatus = String(lesson.validation_status || '').trim().toLowerCase();
+  if (valStatus === 'needs_review' || valStatus === 'teacher_reviewed' || valStatus === 'official_validated') {
     return "needs_review";
   }
 
-  const lessonStatus = String(lesson.status || "").trim().toLowerCase();
-  if (lessonStatus === "draft" || validationStatus === "ai_generated" || validationStatus === "unverified") {
+  const lessonStatus = String(lesson.status || '').trim().toLowerCase();
+  if (lessonStatus === 'draft' || valStatus === 'ai_generated' || valStatus === 'unverified') {
     return "draft_with_content";
   }
 

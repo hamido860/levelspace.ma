@@ -55,6 +55,15 @@ export const PEDAGOGY_RULES = {
     quizMinOptions: 4,
     exerciseMinSteps: 2,
   },
+
+  adaptiveAssessmentRules: [
+    "Do not give basic questions to learners who self-rate as A (Very confident) or B (Good).",
+    "Start A/B learners with medium/hard questions; start C/D learners with easier, guided questions.",
+    "Use mixed formats (multiple choice, fill in the blank, word problem, logic puzzle) and avoid repeating the same format consecutively.",
+    "If a learner answers correctly, increase difficulty and move to the next related skill.",
+    "If a learner answers incorrectly, ask another question from the same skill and reduce difficulty or change format.",
+    "Explain the final score with actionable insights rather than just providing a number."
+  ],
 };
 
 export function getMinimumBloomLevel(grade: string): number {

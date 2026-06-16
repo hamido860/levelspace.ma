@@ -15,7 +15,7 @@ import { useLanguage } from '../context/LanguageContext';
 
 export const Landing: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, signInDemoAdmin } = useAuth();
   const { t } = useLanguage();
 
   const handleCTA = () => {
@@ -23,6 +23,15 @@ export const Landing: React.FC = () => {
       navigate('/dashboard');
     } else {
       navigate('/login');
+    }
+  };
+
+  const handleDemoAdmin = async () => {
+    try {
+      await signInDemoAdmin();
+      navigate('/admin');
+    } catch (err) {
+      console.error('Demo Admin login failed:', err);
     }
   };
 
@@ -38,9 +47,17 @@ export const Landing: React.FC = () => {
             <span className="text-xl font-display font-bold tracking-tight">LevelSpace</span>
           </div>
           <div className="flex items-center gap-4">
+            {!user && (
+              <button 
+                onClick={handleDemoAdmin}
+                className="px-5 py-2.5 border border-accent/20 bg-accent/5 text-accent rounded-full font-medium text-sm hover:bg-accent/10 transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <span>Demo Admin</span>
+              </button>
+            )}
             <button 
               onClick={handleCTA}
-              className="px-6 py-2.5 bg-ink text-paper rounded-full font-medium text-sm hover:bg-accent transition-colors flex items-center gap-2"
+              className="px-6 py-2.5 bg-ink text-paper rounded-full font-medium text-sm hover:bg-accent transition-colors flex items-center gap-2 cursor-pointer"
             >
               {user ? t('dashboard') : 'Sign In'}
               <ArrowRight className="w-4 h-4" />
@@ -104,14 +121,22 @@ export const Landing: React.FC = () => {
           >
             <button 
               onClick={handleCTA}
-              className="w-full sm:w-auto px-8 py-4 bg-accent text-paper rounded-full font-bold text-lg shadow-md shadow-accent/20 hover:bg-accent-hover hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2"
+              className="w-full sm:w-auto px-8 py-4 bg-accent text-paper rounded-full font-bold text-lg shadow-md shadow-accent/20 hover:bg-accent-hover hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               {t('hero_cta_primary')}
               <ArrowRight className="w-5 h-5" />
             </button>
+            {!user && (
+              <button 
+                onClick={handleDemoAdmin}
+                className="w-full sm:w-auto px-8 py-4 bg-paper text-ink border border-ink/10 rounded-full font-bold text-lg hover:bg-accent/10 hover:text-accent hover:border-accent/30 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span>Demo Admin</span>
+              </button>
+            )}
             <button 
               onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
-              className="w-full sm:w-auto px-8 py-4 bg-paper text-ink border border-ink/10 rounded-full font-bold text-lg hover:bg-surface-low transition-all"
+              className="w-full sm:w-auto px-8 py-4 bg-paper text-ink border border-ink/10 rounded-full font-bold text-lg hover:bg-surface-low transition-all cursor-pointer"
             >
               {t('hero_cta_secondary')}
             </button>
@@ -128,7 +153,7 @@ export const Landing: React.FC = () => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.8 }}
-              className="md:col-span-2 relative rounded-3xl border border-ink/10 bg-paper shadow-md overflow-hidden aspect-[16/9] md:aspect-auto md:h-[400px] group"
+              className="md:col-span-2 relative rounded-xl border border-ink/10 bg-paper shadow-md overflow-hidden aspect-[16/9] md:aspect-auto md:h-[400px] group"
             >
               <div className="absolute inset-0 bg-ink/10 group-hover:bg-transparent transition-colors z-10"></div>
               <img 
@@ -144,7 +169,7 @@ export const Landing: React.FC = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.8, delay: 0.2 }}
-                className="relative rounded-3xl border border-ink/10 bg-paper shadow-md overflow-hidden h-[188px] group"
+                className="relative rounded-xl border border-ink/10 bg-paper shadow-md overflow-hidden h-[188px] group"
               >
                 <div className="absolute inset-0 bg-ink/10 group-hover:bg-transparent transition-colors z-10"></div>
                 <img 
@@ -159,7 +184,7 @@ export const Landing: React.FC = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.8, delay: 0.4 }}
-                className="relative rounded-3xl border border-ink/10 bg-paper shadow-md overflow-hidden h-[188px] group"
+                className="relative rounded-xl border border-ink/10 bg-paper shadow-md overflow-hidden h-[188px] group"
               >
                 <div className="absolute inset-0 bg-ink/10 group-hover:bg-transparent transition-colors z-10"></div>
                 <img 
@@ -206,7 +231,7 @@ export const Landing: React.FC = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.5, delay: i * 0.1 }}
-                className="p-8 rounded-3xl bg-surface-low border border-ink/5 hover:border-accent/20 transition-colors group"
+                className="p-8 rounded-xl bg-surface-low border border-ink/5 hover:border-accent/20 transition-colors group"
               >
                 <div className="w-12 h-12 bg-paper rounded-2xl flex items-center justify-center text-accent shadow-sm mb-6 group-hover:scale-110 transition-transform">
                   {feature.icon}

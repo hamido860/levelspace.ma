@@ -1,0 +1,266 @@
+[
+  {
+    "id": "4c121147-3ca4-4389-bf65-0c6c4a0322b6",
+    "title": "مدخل الحكمة",
+    "subject": "التربية الإسلامية",
+    "subject_code": "التربية_الإسلامية"
+  },
+  {
+    "id": "add06fbe-12eb-418f-80fd-1be7bcab7834",
+    "title": "مدخل القسط",
+    "subject": "التربية الإسلامية",
+    "subject_code": "التربية_الإسلامية"
+  },
+  {
+    "id": "d318db2e-a2eb-49ee-890c-7b908a47e04f",
+    "title": "مدخل الاستجابة",
+    "subject": "التربية الإسلامية",
+    "subject_code": "التربية_الإسلامية"
+  },
+  {
+    "id": "be03cc7e-2037-454a-985e-88cdaba8e222",
+    "title": "مدخل العقيدة",
+    "subject": "التربية الإسلامية",
+    "subject_code": "التربية_الإسلامية"
+  },
+  {
+    "id": "3924f1d6-12be-42d1-ac19-ba808f4da31f",
+    "title": "القرآن الكريم",
+    "subject": "التربية الإسلامية",
+    "subject_code": "التربية_الإسلامية"
+  },
+  {
+    "id": "302b2e2e-d000-49ca-a007-387f7fe1b5d3",
+    "title": "مدخل الاقتداء",
+    "subject": "التربية الإسلامية",
+    "subject_code": "التربية_الإسلامية"
+  },
+  {
+    "id": "4ac75b58-c68a-4e42-9bf9-78e01db34beb",
+    "title": "Lettres de l’alphabet",
+    "subject": "Français",
+    "subject_code": "FR"
+  },
+  {
+    "id": "9184a788-3957-4e47-a749-4ab4a81d2c57",
+    "title": "Cours 3ème période: sons composés",
+    "subject": "Français",
+    "subject_code": "FR"
+  },
+  {
+    "id": "6406bed6-66d2-448e-9873-675de0a306c2",
+    "title": "Cours 2ème période: sons simples",
+    "subject": "Français",
+    "subject_code": "FR"
+  },
+  {
+    "id": "7f311896-031c-41f4-a9c3-76c78b5c00e1",
+    "title": "Cours 4ème période: groupes de lettres",
+    "subject": "Français",
+    "subject_code": "FR"
+  },
+  {
+    "id": "298ed0f2-e2e4-45ac-a430-f4636997b035",
+    "title": "Cours 1ère période: voyelles et premières lettres",
+    "subject": "Français",
+    "subject_code": "FR"
+  },
+  {
+    "id": "bac50086-1a0c-49cb-8c86-069de990452e",
+    "title": "Vocabulaire IST: image, son, texte",
+    "subject": "Français",
+    "subject_code": "FR"
+  },
+  {
+    "id": "a3fdd7b5-e6b7-46f6-ab97-6297638ad282",
+    "title": "القراءة: حروف الدورة الثانية",
+    "subject": "اللغة العربية",
+    "subject_code": "اللغة_العربية"
+  },
+  {
+    "id": "b3aef239-b67d-4c0e-bbcd-310732e07170",
+    "title": "الحروف العربية حسب الترتيب الأبجدي",
+    "subject": "اللغة العربية",
+    "subject_code": "اللغة_العربية"
+  },
+  {
+    "id": "8754cb59-050d-4d89-9bbe-c72e19edf9e5",
+    "title": "القراءة: حروف الدورة الأولى",
+    "subject": "اللغة العربية",
+    "subject_code": "اللغة_العربية"
+  },
+  {
+    "id": "8a6ffffe-f3ed-4e39-94db-489983f0c64d",
+    "title": "قصص للأطفال",
+    "subject": "اللغة العربية",
+    "subject_code": "اللغة_العربية"
+  },
+  {
+    "id": "dbd10ce4-ea48-453b-9c76-07e41d73d637",
+    "title": "حروف وصور",
+    "subject": "اللغة العربية",
+    "subject_code": "اللغة_العربية"
+  },
+  {
+    "id": "e0f3485e-045f-4626-bae3-4eb2e1d22e3e",
+    "title": "الكتابة: حروف وكلمات الدورة الثانية",
+    "subject": "اللغة العربية",
+    "subject_code": "اللغة_العربية"
+  },
+  {
+    "id": "cf77ed2f-d377-4903-b2ea-5b658e9bf966",
+    "title": "النصوص",
+    "subject": "اللغة العربية",
+    "subject_code": "اللغة_العربية"
+  },
+  {
+    "id": "f544a440-8481-47d8-96ee-db587ff1ebf5",
+    "title": "الكتابة: حروف وكلمات الدورة الأولى",
+    "subject": "اللغة العربية",
+    "subject_code": "اللغة_العربية"
+  },
+  {
+    "id": "66ff8707-48b4-4cf8-84b9-52e1e8f80ca6",
+    "title": "التعبير الفني بالألوان والأشكال",
+    "subject": "التربية التشكيلية",
+    "subject_code": "ART_AR"
+  },
+  {
+    "id": "99da84c8-6d5a-416a-94e8-de0c558973d3",
+    "title": "الزخرفة والتشكيل البسيط",
+    "subject": "التربية التشكيلية",
+    "subject_code": "ART_AR"
+  },
+  {
+    "id": "e8d95d2a-0efc-47bb-9502-1875cbd1dad7",
+    "title": "الرسم والتلوين",
+    "subject": "التربية التشكيلية",
+    "subject_code": "ART_AR"
+  },
+  {
+    "id": "632e3716-7b95-40fe-91bd-3bfea52bf230",
+    "title": "التغذية عند الحيوانات",
+    "subject": "النشاط العلمي",
+    "subject_code": "النشاط_العلمي"
+  },
+  {
+    "id": "160544f6-ec5d-4a85-b670-1626dc8f32e5",
+    "title": "الضوء والظل",
+    "subject": "النشاط العلمي",
+    "subject_code": "النشاط_العلمي"
+  },
+  {
+    "id": "f9aa6693-53bb-423c-9807-e1c14a240517",
+    "title": "التنفس",
+    "subject": "النشاط العلمي",
+    "subject_code": "النشاط_العلمي"
+  },
+  {
+    "id": "c16eb7f2-ac55-423a-a214-0f190f80c25e",
+    "title": "أنواع الأجسام",
+    "subject": "النشاط العلمي",
+    "subject_code": "النشاط_العلمي"
+  },
+  {
+    "id": "1fe808fd-6a0a-40d3-986c-a28cf2f65ecc",
+    "title": "الزمان",
+    "subject": "النشاط العلمي",
+    "subject_code": "النشاط_العلمي"
+  },
+  {
+    "id": "62114175-474f-4f76-8db8-f9f4928fd4e2",
+    "title": "التوالد عند الحيوانات",
+    "subject": "النشاط العلمي",
+    "subject_code": "النشاط_العلمي"
+  },
+  {
+    "id": "b10bc45d-4789-4dbb-9f24-392558ab5862",
+    "title": "الحواس",
+    "subject": "النشاط العلمي",
+    "subject_code": "النشاط_العلمي"
+  },
+  {
+    "id": "b94501d4-cbf1-4ea4-8e1b-0c70ffa2f7ff",
+    "title": "التغذية عند الإنسان",
+    "subject": "النشاط العلمي",
+    "subject_code": "النشاط_العلمي"
+  },
+  {
+    "id": "44471659-d0f3-4881-9a49-20a8447119a6",
+    "title": "الطبيعة عبر الفصول",
+    "subject": "النشاط العلمي",
+    "subject_code": "النشاط_العلمي"
+  },
+  {
+    "id": "4b23dec9-75ba-4da6-add1-f610cfdafcb1",
+    "title": "الحركات",
+    "subject": "النشاط العلمي",
+    "subject_code": "النشاط_العلمي"
+  },
+  {
+    "id": "ee9bb0a1-48ea-4fb1-b577-546bcac569e0",
+    "title": "الماء",
+    "subject": "النشاط العلمي",
+    "subject_code": "النشاط_العلمي"
+  },
+  {
+    "id": "fd156d5a-c86c-4794-b501-1357eeb4e575",
+    "title": "قياس الأطوال",
+    "subject": "Mathématiques",
+    "subject_code": "MATH"
+  },
+  {
+    "id": "2c768453-421e-4637-897d-00b58c8e044a",
+    "title": "عد كميات صغيرة",
+    "subject": "Mathématiques",
+    "subject_code": "MATH"
+  },
+  {
+    "id": "6dd7905d-31ce-4362-8ebd-a7d1750c69e6",
+    "title": "العدد 0",
+    "subject": "Mathématiques",
+    "subject_code": "MATH"
+  },
+  {
+    "id": "612f5c7b-7014-466a-94b8-c38907e6d773",
+    "title": "العدد 10",
+    "subject": "Mathématiques",
+    "subject_code": "MATH"
+  },
+  {
+    "id": "f3632478-e5a4-459d-aa81-cc1adc23d88a",
+    "title": "الكتابات المختلفة لعدد",
+    "subject": "Mathématiques",
+    "subject_code": "MATH"
+  },
+  {
+    "id": "d8d07535-951d-4626-96f4-37d0f2d70d0c",
+    "title": "استعمال عدد لتذكير كمية",
+    "subject": "Mathématiques",
+    "subject_code": "MATH"
+  },
+  {
+    "id": "91012d4d-7899-46a0-a8eb-f1aad6f23c62",
+    "title": "متتالية الأعداد إلى 10",
+    "subject": "Mathématiques",
+    "subject_code": "MATH"
+  },
+  {
+    "id": "8aa6e56f-da4f-44c5-a617-a2b2523ce040",
+    "title": "وضعيات جمع (+) أو طرح (-)",
+    "subject": "Mathématiques",
+    "subject_code": "MATH"
+  },
+  {
+    "id": "a9bea2ce-ba67-4768-92f8-15c923b1f973",
+    "title": "مقارنة الأطوال",
+    "subject": "Mathématiques",
+    "subject_code": "MATH"
+  },
+  {
+    "id": "a3178a2f-c716-4845-bbf2-204ae55e85f2",
+    "title": "الرمزان + و=",
+    "subject": "Mathématiques",
+    "subject_code": "MATH"
+  }
+]

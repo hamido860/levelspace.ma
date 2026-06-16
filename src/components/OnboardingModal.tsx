@@ -6,14 +6,16 @@ import {
   BookA,
   BrainCircuit,
   CheckCircle2,
+  X,
   GraduationCap,
   Layers,
   LibraryBig,
   Loader2,
   Sparkles,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { updateProfile } from '../db/supabase';
+import { supabase, updateProfile } from '../db/supabase';
 import { db } from '../db/db';
 import {
   CurriculumGrade,
@@ -23,15 +25,16 @@ import {
   getSubjectsForGrade,
   validateGradeSubjectPair,
 } from '../services/curriculumService';
+import { SUPPORTED_SCOPE_EMPTY_MESSAGE } from '../config/supportedGrades';
 
 interface OnboardingModalProps {
   isOpen: boolean;
-  onComplete: () => void;
+  onComplete?: () => void;
+  inline?: boolean;
 }
 
 const cycleIcon = (cycleName: string) => {
   const normalized = cycleName.toLowerCase();
-  if (normalized.includes('primaire') || normalized.includes('primary')) return BookA;
   if (normalized.includes('coll') || normalized.includes('middle')) return LibraryBig;
   if (normalized.includes('lyc') || normalized.includes('high') || normalized.includes('bac')) return GraduationCap;
   return BrainCircuit;
@@ -58,29 +61,48 @@ const groupGradesByCycle = (grades: CurriculumGrade[]) => {
 
 const isDev = () => import.meta.env.DEV;
 
-export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComplete }) => {
+type BacTrack = {
+  id: string;
+  name: string;
+  section_id?: string | null;
+};
+
+const isBacGradeName = (gradeName?: string | null) => {
+  const normalized = String(gradeName || '').toLowerCase();
+  return normalized.includes('bac') && !normalized.includes('tronc commun');
+};
+
+export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComplete, inline = false }) => {
   const { profile, user } = useAuth();
+  const navigate = useNavigate();
 
   const [step, setStep] = useState(0);
   const [grades, setGrades] = useState<CurriculumGrade[]>([]);
   const [subjects, setSubjects] = useState<CurriculumSubject[]>([]);
   const [selectedCycleId, setSelectedCycleId] = useState('');
   const [selectedGradeId, setSelectedGradeId] = useState('');
+  const [selectedBacTrackId, setSelectedBacTrackId] = useState('');
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
+  const [bacTracks, setBacTracks] = useState<BacTrack[]>([]);
   const [isLoadingGrades, setIsLoadingGrades] = useState(false);
+  const [isLoadingTracks, setIsLoadingTracks] = useState(false);
   const [isLoadingSubjects, setIsLoadingSubjects] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
   const userName = profile?.full_name || (user?.email ? user.email.split('@')[0] : 'Explorer');
-  const totalSteps = 4;
+  const isActive = isOpen || inline;
   const cycleGroups = useMemo(() => groupGradesByCycle(grades), [grades]);
   const selectedCycle = cycleGroups.find((cycle) => cycle.id === selectedCycleId) || null;
   const selectedGrade = grades.find((grade) => grade.id === selectedGradeId) || null;
+  const selectedBacTrack = bacTracks.find((track) => track.id === selectedBacTrackId) || null;
   const selectedSubject = subjects.find((subject) => subject.id === selectedSubjectId) || null;
+  const requiresBacTrack = isBacGradeName(selectedGrade?.name);
+  const subjectStep = requiresBacTrack ? 4 : 3;
+  const totalSteps = requiresBacTrack ? 5 : 4;
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isActive) return;
 
     let cancelled = false;
     setIsLoadingGrades(true);
@@ -106,10 +128,53 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
     return () => {
       cancelled = true;
     };
-  }, [isOpen]);
+  }, [isActive]);
+
+  useEffect(() => {
+    if (!isActive) return;
+
+    let cancelled = false;
+    setIsLoadingTracks(true);
+
+    supabase
+      .from('bac_tracks')
+      .select('id, name, section_id')
+      .order('name', { ascending: true })
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) throw error;
+        setBacTracks(
+          (data || [])
+            .map((track: any) => ({
+              id: String(track.id || '').trim(),
+              name: String(track.name || '').trim(),
+              section_id: track.section_id ? String(track.section_id) : null,
+            }))
+            .filter((track) => track.id && track.name),
+        );
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        console.error('[onboarding] Failed to load bac tracks from Supabase:', error);
+        setErrorMessage('Unable to load bac tracks from Supabase.');
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingTracks(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isActive]);
 
   useEffect(() => {
     if (!selectedGradeId) {
+      setSubjects([]);
+      setSelectedSubjectId('');
+      return;
+    }
+
+    if (requiresBacTrack && !selectedBacTrackId) {
       setSubjects([]);
       setSelectedSubjectId('');
       return;
@@ -121,7 +186,23 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
     setErrorMessage('');
     setSelectedSubjectId('');
 
-    getSubjectsForGrade(selectedGradeId)
+    const loadSubjects = async () => {
+      const rows = await getSubjectsForGrade(selectedGradeId);
+      if (!requiresBacTrack || !selectedBacTrackId) return rows;
+
+      const { data, error } = await supabase
+        .from('bac_track_subjects')
+        .select('subject_id')
+        .eq('track_id', selectedBacTrackId);
+
+      if (error) throw error;
+
+      const allowedSubjectIds = new Set((data || []).map((row: any) => String(row.subject_id || '').trim()));
+      if (allowedSubjectIds.size === 0) return rows;
+      return rows.filter((subject) => allowedSubjectIds.has(subject.id));
+    };
+
+    loadSubjects()
       .then(async (rows) => {
         if (cancelled) return;
         setSubjects(rows);
@@ -145,11 +226,12 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
     return () => {
       cancelled = true;
     };
-  }, [grades, selectedGradeId]);
+  }, [grades, requiresBacTrack, selectedBacTrackId, selectedGradeId]);
 
   const handleSelectCycle = (cycleId: string) => {
     setSelectedCycleId(cycleId);
     setSelectedGradeId('');
+    setSelectedBacTrackId('');
     setSelectedSubjectId('');
     setSubjects([]);
     setErrorMessage('');
@@ -157,6 +239,14 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
 
   const handleSelectGrade = (grade: CurriculumGrade) => {
     setSelectedGradeId(grade.id);
+    setSelectedBacTrackId('');
+    setSelectedSubjectId('');
+    setSubjects([]);
+    setErrorMessage('');
+  };
+
+  const handleSelectTrack = (trackId: string) => {
+    setSelectedBacTrackId(trackId);
     setSelectedSubjectId('');
     setSubjects([]);
     setErrorMessage('');
@@ -164,10 +254,38 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
 
   const handleNext = () => setStep((current) => Math.min(current + 1, totalSteps));
   const handleBack = () => setStep((current) => Math.max(current - 1, 0));
+  const finishOnboarding = () => {
+    onComplete?.();
+    if (inline) navigate('/modules');
+  };
 
   const persistSetting = async (key: string, value: string) => {
     localStorage.setItem(key, value);
     await db.settings.put({ key, value });
+  };
+
+  const handleSkip = async () => {
+    setIsSaving(true);
+    setErrorMessage('');
+
+    try {
+      await persistSetting('has_completed_onboarding', 'true');
+
+      if (user) {
+        try {
+          await updateProfile(user.id, { onboarding_completed: true });
+        } catch (error: any) {
+          console.error('Failed to persist onboarding skip to database:', error.message);
+        }
+      }
+
+      finishOnboarding();
+    } catch (error) {
+      console.error('[onboarding] Failed to skip onboarding:', error);
+      setErrorMessage('Unable to skip onboarding right now.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleComplete = async () => {
@@ -202,27 +320,30 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
       await persistSetting('selected_subject', selectedSubject.name);
       await persistSetting('has_completed_onboarding', 'true');
 
-      localStorage.removeItem('selected_bac_track');
       localStorage.removeItem('selected_option');
-      await db.settings.delete('selected_bac_track');
+      await persistSetting('selected_bac_track', requiresBacTrack ? selectedBacTrackId : '');
       await db.settings.delete('selected_option');
 
       if (user) {
         try {
           await updateProfile(user.id, {
             onboarding_completed: true,
+            grade_id: selectedGrade.id,
+            track_id: requiresBacTrack ? selectedBacTrackId : null,
+            instruction_option_id: null,
             selected_grade_id: selectedGrade.id,
             selected_grade: selectedGrade.name,
             selected_subject_id: selectedSubject.id,
             selected_subject: selectedSubject.name,
-            selected_bac_track: null,
+            selected_option: null,
+            selected_bac_track: requiresBacTrack ? selectedBacTrackId : null,
           });
         } catch (error: any) {
           console.error('Failed to persist onboarding to database:', error.message);
         }
       }
 
-      onComplete();
+      finishOnboarding();
     } catch (error) {
       console.error('[onboarding] Failed to save curriculum selection:', error);
       setErrorMessage('Unable to save onboarding selection.');
@@ -231,22 +352,39 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
     }
   };
 
-  if (!isOpen) return null;
+  if (!isActive) return null;
 
   const canContinue =
     (step === 0) ||
     (step === 1 && Boolean(selectedCycleId)) ||
     (step === 2 && Boolean(selectedGradeId)) ||
-    (step === 3 && Boolean(selectedSubjectId));
+    (requiresBacTrack && step === 3 && Boolean(selectedBacTrackId)) ||
+    (step === subjectStep && Boolean(selectedSubjectId));
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-ink/40 p-4">
+    <div
+      className={
+        inline
+          ? 'relative mx-auto flex min-h-[calc(100vh-4rem)] items-center justify-center p-4'
+          : 'fixed inset-0 z-[200] flex items-center justify-center bg-ink/40 p-4'
+      }
+    >
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         className="relative w-full max-w-xl overflow-hidden rounded-[2rem] border border-ink/10 bg-paper shadow-md"
       >
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-accent/5 via-transparent to-transparent" />
+        <button
+          type="button"
+          onClick={handleSkip}
+          disabled={isSaving}
+          className="absolute right-4 top-4 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-ink/10 bg-paper text-muted shadow-sm transition-all hover:bg-surface-low hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
+          aria-label="Skip onboarding"
+          title="Skip onboarding"
+        >
+          <X className="h-4 w-4" />
+        </button>
 
         <div className="absolute left-0 top-0 h-1 w-full bg-ink/5">
           <motion.div
@@ -298,7 +436,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
                 {isLoadingGrades ? (
                   <LoadingState label="Loading grades..." />
                 ) : cycleGroups.length === 0 ? (
-                  <EmptyState message="No grades configured yet." />
+                  <EmptyState message={SUPPORTED_SCOPE_EMPTY_MESSAGE} />
                 ) : (
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     {cycleGroups.map((cycle) => {
@@ -365,7 +503,41 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
               </motion.div>
             )}
 
-            {step === 3 && (
+            {requiresBacTrack && step === 3 && (
+              <motion.div
+                key="step-track"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="flex flex-1 flex-col"
+              >
+                <StepHeader icon={<Layers className="h-5 w-5" />} title="Select Track" body="2 bac lessons depend on your exact track." />
+                {isLoadingTracks ? (
+                  <LoadingState label="Loading tracks..." />
+                ) : bacTracks.length === 0 ? (
+                  <EmptyState message="No bac tracks configured yet." />
+                ) : (
+                  <div className="grid max-h-[300px] grid-cols-1 gap-3 overflow-y-auto pr-2">
+                    {bacTracks.map((track) => (
+                      <button
+                        key={track.id}
+                        onClick={() => handleSelectTrack(track.id)}
+                        className={`flex items-center justify-between rounded-xl border-2 p-3 text-left text-sm font-bold transition-all ${
+                          selectedBacTrackId === track.id
+                            ? 'border-accent bg-accent/10 text-accent shadow-md'
+                            : 'border-transparent bg-surface-low text-ink hover:border-accent/30 hover:bg-paper'
+                        }`}
+                      >
+                        <span>{track.name}</span>
+                        {selectedBacTrackId === track.id && <CheckCircle2 className="h-5 w-5" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </motion.div>
+            )}
+
+            {step === subjectStep && (
               <motion.div
                 key="step-3"
                 initial={{ opacity: 0, x: 20 }}
@@ -420,6 +592,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
                 <div className="w-full space-y-4 rounded-2xl border border-ink/5 bg-surface-low p-5 text-left text-sm">
                   <SummaryRow label="Cycle" value={selectedGrade?.cycle?.name || selectedCycle?.name || ''} />
                   <SummaryRow label="Grade" value={selectedGrade?.name || ''} />
+                  {requiresBacTrack && <SummaryRow label="Track" value={selectedBacTrack?.name || ''} />}
                   <SummaryRow label="Subject" value={selectedSubject?.name || ''} />
                 </div>
               </motion.div>
@@ -434,22 +607,30 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
           )}
 
           <div className="relative z-10 mt-8 flex w-full items-center justify-between border-t border-ink/10 pt-6">
-            {step > 0 ? (
+            <div className="flex items-center gap-2">
+              {step > 0 && (
+                <button
+                  onClick={handleBack}
+                  className="group flex items-center gap-2 rounded-2xl px-5 py-2.5 text-sm font-bold text-muted transition-all hover:bg-ink/5 hover:text-ink"
+                >
+                  <ArrowRight className="h-4 w-4 rotate-180 transition-transform group-hover:-translate-x-1" />
+                  Back
+                </button>
+              )}
               <button
-                onClick={handleBack}
-                className="group flex items-center gap-2 rounded-2xl px-5 py-2.5 text-sm font-bold text-muted transition-all hover:bg-ink/5 hover:text-ink"
+                type="button"
+                onClick={handleSkip}
+                disabled={isSaving}
+                className="rounded-xl border border-ink/10 bg-paper px-4 py-2 text-sm font-semibold text-muted shadow-sm transition-all hover:bg-surface-low hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <ArrowRight className="h-4 w-4 rotate-180 transition-transform group-hover:-translate-x-1" />
-                Back
+                Skip for now
               </button>
-            ) : (
-              <div />
-            )}
+            </div>
 
             {step < totalSteps ? (
               <button
                 onClick={handleNext}
-                disabled={!canContinue || (step === 1 && isLoadingGrades) || (step === 3 && (isLoadingSubjects || subjects.length === 0))}
+                disabled={!canContinue || (step === 1 && isLoadingGrades) || (requiresBacTrack && step === 3 && isLoadingTracks) || (step === subjectStep && (isLoadingSubjects || subjects.length === 0))}
                 className="flex items-center gap-2 rounded-xl bg-ink px-5 py-2 text-sm font-semibold text-paper shadow-md transition-all hover:-translate-y-0.5 hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Continue

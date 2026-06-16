@@ -36,7 +36,59 @@ interface NavItem {
   matchPrefix?: boolean;
 }
 
+
+const isItemActive = (pathname: string, item: NavItem) => {
+  return item.matchPrefix
+    ? pathname === item.path || pathname.startsWith(`${item.path}/`)
+    : pathname === item.path;
+};
+
+const SidebarNavItem: React.FC<{
+  item: NavItem;
+  isActive: boolean;
+  isCollapsed: boolean;
+  onClick: () => void;
+}> = ({ item, isActive, isCollapsed, onClick }) => (
+  <button
+    aria-label={item.label}
+    onClick={onClick}
+    title={isCollapsed ? item.label : undefined}
+    className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3 px-3'} py-2.5 rounded-lg font-medium text-sm transition-all duration-200 ease-in-out ${
+      isActive
+        ? 'bg-accent text-white shadow-sm shadow-accent/20'
+        : 'text-muted hover:bg-ink/5'
+    }`}
+  >
+    <span className={isActive ? 'text-white' : 'text-muted'}>
+      {item.icon}
+    </span>
+    {!isCollapsed && <span>{item.label}</span>}
+  </button>
+);
+
+const MobileNavItem: React.FC<{
+  item: NavItem;
+  isActive: boolean;
+  onClick: () => void;
+}> = ({ item, isActive, onClick }) => (
+  <button
+    aria-label={item.label}
+    onClick={onClick}
+    className={`flex flex-col items-center justify-center gap-1 h-full px-3 min-w-[72px] shrink-0 transition-all duration-300 ${
+      isActive ? 'text-accent' : 'text-muted'
+    }`}
+  >
+    <div className={`p-1.5 rounded-xl transition-all duration-300 ${isActive ? 'bg-accent/10 scale-110' : ''}`}>
+      {React.cloneElement(item.icon as React.ReactElement<any>, { size: 20 })}
+    </div>
+    <span className={`text-[9px] font-bold uppercase tracking-tighter whitespace-nowrap transition-all duration-300 ${isActive ? 'opacity-100' : 'opacity-60'}`}>
+      {item.label}
+    </span>
+  </button>
+);
+
 export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsCollapsed }) => {
+
   const navigate = useNavigate();
   const location = useLocation();
   const { language, t } = useLanguage();
@@ -44,36 +96,31 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
 
   const mainNavItems: NavItem[] = [
     { label: t('dashboard'), icon: <LayoutDashboard size={20} />, path: '/dashboard' },
-    { label: t('profile'), icon: <User size={20} />, path: '/profile' },
     { label: t('classrooms'), icon: <GraduationCap size={20} />, path: '/modules' },
-    { label: t('library'), icon: <BookMarked size={20} />, path: '/library' },
-    { label: t('blueprints'), icon: <Layers3 size={20} />, path: '/blueprints' },
-    { label: t('schedule'), icon: <Calendar size={20} />, path: '/schedule' },
-    { label: t('progress'), icon: <BarChart3 size={20} />, path: '/progress' },
-    { label: 'AI Keys', icon: <KeyRound size={20} />, path: '/settings/ai-keys', matchPrefix: true },
+    { label: t('library'), icon: <BookMarked size={20} />, path: '/levelup' },
   ];
 
-  const toolNavItems: NavItem[] = isAdmin ? [
-    { label: 'Admin', icon: <ShieldCheck size={20} />, path: '/admin', matchPrefix: false },
-    { label: 'Curriculum', icon: <Database size={20} />, path: '/admin/curriculum-debug', matchPrefix: true },
-    { label: 'MCP Lessons', icon: <PackageSearch size={20} />, path: '/admin/mcp-lessons', matchPrefix: true },
-    { label: 'AI Ops', icon: <Brain size={20} />, path: '/admin/ai-command-center', matchPrefix: true },
-    { label: 'AI Diagnostics', icon: <Activity size={20} />, path: '/admin/ai-diagnostics', matchPrefix: true },
-    { label: 'AI Recovery', icon: <Wrench size={20} />, path: '/admin/ai-recovery', matchPrefix: true },
-  ] : [];
+
+  const adminNavItems: NavItem[] = [
+    ...(isAdmin ? [
+      { label: 'Admin Dashboard', icon: <ShieldCheck size={20} />, path: '/admin', matchPrefix: false }
+    ] : [])
+  ];
 
   return (
     <>
       {/* Desktop Sidebar */}
       <aside 
-        style={{ width: isCollapsed ? '64.9984px' : '176px' }}
-        className={`hidden md:flex h-screen fixed start-0 top-0 bg-surface-low flex-col p-4 gap-2 z-40 border-e border-ink/5 transition-all duration-300`}
+        style={{ width: isCollapsed ? '64.9984px' : '234px' }}
+        className="hidden md:flex h-[calc(100vh-6rem)] fixed start-6 top-20 bg-white dark:bg-paper flex-col p-4 gap-2 z-40 border border-slate-200 dark:border-white/8 rounded-xl shadow-lg transition-all duration-300"
       >
         <div className={`mb-6 px-2 flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
           {!isCollapsed && <h1 style={{ fontSize: '10.75px', fontFamily: 'Arial' }} className="text-lg font-black tracking-tighter text-accent uppercase mb-0">{t('my_space')}</h1>}
           {setIsCollapsed && (
             <button 
               onClick={() => setIsCollapsed(!isCollapsed)}
+              aria-expanded={!isCollapsed}
+              aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
               className="p-1.5 rounded-lg hover:bg-ink/5 text-muted hover:text-ink transition-all"
             >
               {isCollapsed 
@@ -86,55 +133,41 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
         
         <nav className="flex flex-col gap-1">
           {!isCollapsed && <p className="text-[10px] font-bold text-muted uppercase tracking-normal px-3 mb-2 opacity-50">{t('content')}</p>}
-          {mainNavItems.map((item) => {
-            const isActive = location.pathname === item.path;
-            return (
-              <button
-                key={item.path}
-                onClick={() => navigate(item.path)}
-                title={isCollapsed ? item.label : undefined}
-                className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3 px-3'} py-2.5 rounded-lg font-medium text-sm transition-all duration-200 ease-in-out ${
-                  isActive 
-                    ? 'bg-accent text-white shadow-sm shadow-accent/20' 
-                    : 'text-muted hover:bg-ink/5'
-                }`}
-              >
-                <span className={isActive ? 'text-white' : 'text-muted'}>
-                  {item.icon}
-                </span>
-                {!isCollapsed && <span>{item.label}</span>}
-              </button>
-            );
-          })}
+          {mainNavItems.map((item) => (
+            <SidebarNavItem
+              key={item.path}
+              item={item}
+              isActive={isItemActive(location.pathname, item)}
+              isCollapsed={isCollapsed}
+              onClick={() => navigate(item.path)}
+            />
+          ))}
         </nav>
 
-        <div className="mt-auto flex flex-col gap-1 pt-4 border-t border-ink/5">
-          {!isCollapsed && <p className="text-[10px] font-bold text-muted uppercase tracking-normal px-3 mb-2 opacity-50">{t('tools')}</p>}
-          {toolNavItems.map((item) => {
-            const isActive = item.matchPrefix
-              ? location.pathname === item.path || location.pathname.startsWith(`${item.path}/`)
-              : location.pathname === item.path;
-            return (
-              <button
-                key={item.path}
-                onClick={() => navigate(item.path)}
-                title={isCollapsed ? item.label : undefined}
-                className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3 px-3'} py-2.5 rounded-lg font-medium text-sm transition-all duration-200 ease-in-out ${
-                  isActive 
-                    ? 'bg-accent text-white shadow-sm shadow-accent/20' 
-                    : 'text-muted hover:bg-ink/5'
-                }`}
-              >
-                <span className={isActive ? 'text-white' : 'text-muted'}>
-                  {item.icon}
-                </span>
-                {!isCollapsed && <span>{item.label}</span>}
-              </button>
-            );
-          })}
-          
+        {/* Dynamic CTA Banner (Only shown when expanded) */}
+        {!isCollapsed && (
+          <div className="bg-gradient-to-br from-emerald-500/15 via-teal-500/15 to-accent/15 border border-emerald-500/30 dark:from-emerald-500/8 dark:via-teal-500/8 dark:to-accent/8 dark:border-emerald-500/15 p-5 rounded-[1.75rem] relative overflow-hidden shadow-md space-y-4 mt-auto mx-1 select-none">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-accent/8 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl pointer-events-none" />
+            <div className="flex items-center gap-2.5">
+              <Brain size={18} className="text-emerald-500 shrink-0 animate-pulse" />
+              <h4 className="text-xs font-black uppercase tracking-widest text-slate-900 dark:text-ink">LevelUp Pro</h4>
+            </div>
+            <p className="text-[11px] font-semibold text-slate-600 dark:text-ink-muted leading-relaxed">
+              Gain unlimited generated lessons, smart roadmaps & elite AI crew features.
+            </p>
+            <button
+              onClick={() => navigate('/pricing')}
+              className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white dark:bg-emerald-600 dark:hover:bg-emerald-700 text-xs font-black uppercase tracking-widest rounded-xl shadow-md hover:shadow-lg transition-all duration-300 text-center cursor-pointer active:scale-[0.98]"
+            >
+              Upgrade
+            </button>
+          </div>
+        )}
+
+        <div className={`flex flex-col gap-1 pt-4 border-t border-ink/5 ${isCollapsed ? 'mt-auto' : ''}`}>
           <button
             onClick={() => signOut()}
+            aria-label={t("logout")}
             title={isCollapsed ? t('logout') : undefined}
             className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3 px-3'} py-2.5 rounded-lg font-medium text-sm text-muted hover:bg-error/5 hover:text-error transition-all duration-200 ease-in-out mt-1`}
           >
@@ -146,29 +179,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
 
       {/* Mobile Bottom Navigation */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-surface-low border-t border-ink/5 z-50 px-4 flex items-center gap-2 overflow-x-auto no-scrollbar shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
-        {[...mainNavItems, ...toolNavItems].map((item) => {
-          const isActive = item.matchPrefix
-            ? location.pathname === item.path || location.pathname.startsWith(`${item.path}/`)
-            : location.pathname === item.path;
-          return (
-            <button
-              key={`mobile-${item.path}`}
-              onClick={() => navigate(item.path)}
-              className={`flex flex-col items-center justify-center gap-1 h-full px-3 min-w-[72px] shrink-0 transition-all duration-300 ${
-                isActive 
-                  ? 'text-accent' 
-                  : 'text-muted'
-              }`}
-            >
-              <div className={`p-1.5 rounded-xl transition-all duration-300 ${isActive ? 'bg-accent/10 scale-110' : ''}`}>
-                {React.cloneElement(item.icon as React.ReactElement<any>, { size: 20 })}
-              </div>
-              <span className={`text-[9px] font-bold uppercase tracking-tighter whitespace-nowrap transition-all duration-300 ${isActive ? 'opacity-100' : 'opacity-60'}`}>
-                {item.label}
-              </span>
-            </button>
-          );
-        })}
+        {[...mainNavItems, ...adminNavItems].map((item) => (
+          <MobileNavItem
+            key={`mobile-${item.path}`}
+            item={item}
+            isActive={isItemActive(location.pathname, item)}
+            onClick={() => navigate(item.path)}
+          />
+        ))}
       </nav>
     </>
   );

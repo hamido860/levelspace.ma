@@ -1,4 +1,4 @@
-const CACHE_NAME = 'levelspace-assets-v4';
+const CACHE_NAME = 'levelspace-assets-v3';
 const OFFLINE_URL = '/';
 
 // Essential core assets to cache immediately on install
@@ -37,8 +37,14 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(event.request.url);
 
-  // Avoid caching third-party APIs (Supabase, Gemini, etc.) in the SW
-  if (url.origin.includes('supabase.co') || url.origin.includes('googleapis.com') || url.pathname.startsWith('/api')) {
+  // Avoid caching third-party APIs (Supabase, Gemini, etc.) and local HMR / Dev assets
+  if (
+    url.origin.includes('supabase.co') || 
+    url.origin.includes('googleapis.com') || 
+    url.pathname.startsWith('/api') ||
+    url.hostname === 'localhost' || 
+    url.hostname === '127.0.0.1'
+  ) {
     return;
   }
 
@@ -62,25 +68,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Network First for local JS/CSS so localhost does not stay pinned to an old UI bundle.
-  if (url.origin === self.location.origin && /\.(js|css)$/.test(url.pathname)) {
-    event.respondWith(
-      fetch(event.request)
-        .then((networkResponse) => {
-          if (networkResponse.status === 200 || networkResponse.status === 0) {
-            const responseClone = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(event.request, responseClone);
-            });
-          }
-          return networkResponse;
-        })
-        .catch(() => caches.match(event.request))
-    );
-    return;
-  }
-
-  // Stale While Revalidate for fonts and static assets
+  // Stale While Revalidate for JS, CSS, fonts, and static assets
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       const fetchPromise = fetch(event.request)
@@ -93,7 +81,9 @@ self.addEventListener('fetch', (event) => {
           }
           return networkResponse;
         })
-        .catch(() => undefined);
+        .catch((err) => {
+          // Quiet logs to avoid flooding console in offline mode
+        });
 
       return cachedResponse || fetchPromise;
     })

@@ -4,16 +4,19 @@ import { toast } from "sonner";
 import {
   AlertTriangle,
   Bot,
+  Brain,
   CheckCircle2,
   Clock3,
   RefreshCw,
   ShieldAlert,
+  ShieldCheck,
   Sparkles,
   Wrench,
   X,
 } from "lucide-react";
 import { Layout } from "../components/Layout";
 import { SEO } from "../components/SEO";
+import { TabbedHeader, TabItem } from "../components/TabbedHeader";
 import {
   AiRecoveryDashboardKpis,
   loadAiRecoveryDashboardKpis,
@@ -87,7 +90,7 @@ const EMPTY_KPIS: AiRecoveryDashboardKpis = {
 };
 
 const Spinner: React.FC<{ label?: string }> = ({ label = "Loading..." }) => (
-  <div className="flex items-center justify-center gap-3 rounded-3xl border border-ink/10 bg-paper px-6 py-12 text-sm text-muted shadow-sm">
+  <div className="flex items-center justify-center gap-3 rounded-xl border border-ink/10 bg-paper px-6 py-12 text-sm text-muted shadow-sm">
     <RefreshCw className="h-4 w-4 animate-spin" />
     {label}
   </div>
@@ -106,7 +109,7 @@ const StatePanel: React.FC<{
       : "border-ink/10 bg-paper text-ink";
 
   return (
-    <div className={`rounded-3xl border px-6 py-8 shadow-sm ${toneClasses}`}>
+    <div className={`rounded-xl border px-6 py-8 shadow-sm ${toneClasses}`}>
       <div className="flex items-start gap-3">
         {tone === "danger" ? <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" /> : <Sparkles className="mt-0.5 h-5 w-5 shrink-0" />}
         <div className="space-y-2">
@@ -143,7 +146,7 @@ const KpiCard: React.FC<{
           : "text-ink";
 
   return (
-    <div className="rounded-3xl border border-ink/10 bg-paper p-5 shadow-sm">
+    <div className="rounded-xl border border-ink/10 bg-paper p-5 shadow-sm">
       <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-muted">{label}</div>
       <div className={`mt-3 text-4xl font-black tracking-tight ${valueClasses}`}>{value}</div>
       <p className="mt-2 text-sm text-muted">{description}</p>
@@ -533,7 +536,7 @@ export const AdminAiRecovery: React.FC = () => {
     }
 
     return (
-      <div className="overflow-hidden rounded-3xl border border-ink/10 bg-paper shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-ink/10 bg-paper shadow-sm">
         <div className="flex items-center justify-between border-b border-ink/10 px-5 py-4">
           <div>
             <h2 className="text-lg font-semibold text-ink">Failed lesson generation jobs</h2>
@@ -653,7 +656,7 @@ export const AdminAiRecovery: React.FC = () => {
     }
 
     return (
-      <div className="overflow-hidden rounded-3xl border border-ink/10 bg-paper shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-ink/10 bg-paper shadow-sm">
         <div className="flex flex-col gap-4 border-b border-ink/10 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-ink">Recovered lessons review queue</h2>
@@ -807,33 +810,33 @@ export const AdminAiRecovery: React.FC = () => {
             {!diagnosticsLoading && selectedDiagnostics ? (
               <>
                 <div className="grid gap-4 md:grid-cols-2">
-                  <div className="rounded-3xl border border-ink/10 bg-surface-low p-4">
+                  <div className="rounded-xl border border-ink/10 bg-surface-low p-4">
                     <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Job ID</div>
                     <div className="mt-2 font-mono text-sm text-ink">{selectedDiagnostics.job_id}</div>
                   </div>
-                  <div className="rounded-3xl border border-ink/10 bg-surface-low p-4">
+                  <div className="rounded-xl border border-ink/10 bg-surface-low p-4">
                     <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Topic ID</div>
                     <div className="mt-2 font-mono text-sm text-ink">{selectedDiagnostics.topic_id || "—"}</div>
                   </div>
-                  <div className="rounded-3xl border border-ink/10 bg-surface-low p-4">
+                  <div className="rounded-xl border border-ink/10 bg-surface-low p-4">
                     <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Topic title</div>
                     <div className="mt-2 text-sm text-ink">{formatNullable(selectedDiagnostics.topic_title)}</div>
                   </div>
-                  <div className="rounded-3xl border border-ink/10 bg-surface-low p-4">
+                  <div className="rounded-xl border border-ink/10 bg-surface-low p-4">
                     <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Grade</div>
                     <div className="mt-2 text-sm text-ink">{formatNullable(selectedDiagnostics.grade_name)}</div>
                   </div>
-                  <div className="rounded-3xl border border-ink/10 bg-surface-low p-4">
+                  <div className="rounded-xl border border-ink/10 bg-surface-low p-4">
                     <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Subject</div>
                     <div className="mt-2 text-sm text-ink">{formatNullable(selectedDiagnostics.subject_name)}</div>
                   </div>
-                  <div className="rounded-3xl border border-ink/10 bg-surface-low p-4">
+                  <div className="rounded-xl border border-ink/10 bg-surface-low p-4">
                     <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Attempts</div>
                     <div className="mt-2 text-sm text-ink">{selectedDiagnostics.attempts ?? 0}</div>
                   </div>
                 </div>
 
-                <div className="rounded-3xl border border-destructive/15 bg-destructive/5 p-5">
+                <div className="rounded-xl border border-destructive/15 bg-destructive/5 p-5">
                   <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-destructive">Last error</div>
                   <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-destructive">
                     {formatNullable(selectedDiagnostics.last_error)}
@@ -841,11 +844,11 @@ export const AdminAiRecovery: React.FC = () => {
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
-                  <div className="rounded-3xl border border-ink/10 bg-paper p-5 shadow-sm">
+                  <div className="rounded-xl border border-ink/10 bg-paper p-5 shadow-sm">
                     <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Existing lessons count</div>
                     <div className="mt-3 text-3xl font-black text-ink">{selectedDiagnostics.existing_lessons_count}</div>
                   </div>
-                  <div className="rounded-3xl border border-ink/10 bg-paper p-5 shadow-sm">
+                  <div className="rounded-xl border border-ink/10 bg-paper p-5 shadow-sm">
                     <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Existing lesson_blocks count</div>
                     <div className="mt-3 text-3xl font-black text-ink">
                       {selectedDiagnostics.existing_lesson_blocks_count ?? "—"}
@@ -857,12 +860,12 @@ export const AdminAiRecovery: React.FC = () => {
                 </div>
 
                 {selectedDiagnostics.existing_task ? (
-                  <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5 text-sm text-emerald-700">
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-5 text-sm text-emerald-700">
                     Existing recovery task: {selectedDiagnostics.existing_task.id} ({selectedDiagnostics.existing_task.status})
                   </div>
                 ) : null}
 
-                <div className="rounded-3xl border border-ink/10 bg-paper p-5 shadow-sm">
+                <div className="rounded-xl border border-ink/10 bg-paper p-5 shadow-sm">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <h3 className="text-lg font-semibold text-ink">Ordered topic outlines</h3>
@@ -890,7 +893,7 @@ export const AdminAiRecovery: React.FC = () => {
                   ) : (
                     <div className="mt-4 space-y-4">
                       {selectedDiagnostics.ordered_topic_outlines.map((outline, index) => (
-                        <div key={`${selectedDiagnostics.job_id}-outline-${index}`} className="rounded-3xl border border-ink/10 bg-surface-low p-4">
+                        <div key={`${selectedDiagnostics.job_id}-outline-${index}`} className="rounded-xl border border-ink/10 bg-surface-low p-4">
                           <div className="mb-3 text-sm font-semibold text-ink">
                             {outlineHeadline(outline as Record<string, unknown>, index)}
                           </div>
@@ -901,7 +904,7 @@ export const AdminAiRecovery: React.FC = () => {
                   )}
                 </div>
 
-                <div className="rounded-3xl border border-ink/10 bg-paper p-5 shadow-sm">
+                <div className="rounded-xl border border-ink/10 bg-paper p-5 shadow-sm">
                   <h3 className="text-lg font-semibold text-ink">Timestamps</h3>
                   <div className="mt-4 grid gap-4 md:grid-cols-3">
                     <div>
@@ -945,7 +948,7 @@ export const AdminAiRecovery: React.FC = () => {
 
     return (
       <div className="space-y-6">
-        <div className="rounded-3xl border border-ink/10 bg-paper p-5 shadow-sm">
+        <div className="rounded-xl border border-ink/10 bg-paper p-5 shadow-sm">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <label className="space-y-2">
               <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Event type</span>
@@ -1007,7 +1010,7 @@ export const AdminAiRecovery: React.FC = () => {
             body="No recovery events matched the current filters across ai_task_logs, ai_tasks.logs, and error_recovery_log."
           />
         ) : (
-          <div className="overflow-hidden rounded-3xl border border-ink/10 bg-paper shadow-sm">
+          <div className="overflow-hidden rounded-xl border border-ink/10 bg-paper shadow-sm">
             <div className="flex items-center justify-between border-b border-ink/10 px-5 py-4">
               <div>
                 <h2 className="text-lg font-semibold text-ink">AI Recovery event stream</h2>
@@ -1107,41 +1110,41 @@ export const AdminAiRecovery: React.FC = () => {
             {!recoveredLessonLoading && selectedRecoveredLesson ? (
               <>
                 <div className="grid gap-4 md:grid-cols-2">
-                  <div className="rounded-3xl border border-ink/10 bg-surface-low p-4">
+                  <div className="rounded-xl border border-ink/10 bg-surface-low p-4">
                     <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Lesson title</div>
                     <div className="mt-2 text-sm text-ink">{formatNullable(selectedRecoveredLesson.lesson.lesson_title)}</div>
                   </div>
-                  <div className="rounded-3xl border border-ink/10 bg-surface-low p-4">
+                  <div className="rounded-xl border border-ink/10 bg-surface-low p-4">
                     <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Topic</div>
                     <div className="mt-2 text-sm text-ink">{formatNullable(selectedRecoveredLesson.lesson.topic_title)}</div>
                     <div className="mt-1 font-mono text-xs text-muted">{selectedRecoveredLesson.lesson.topic_id || "—"}</div>
                   </div>
-                  <div className="rounded-3xl border border-ink/10 bg-surface-low p-4">
+                  <div className="rounded-xl border border-ink/10 bg-surface-low p-4">
                     <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Grade</div>
                     <div className="mt-2 text-sm text-ink">{formatNullable(selectedRecoveredLesson.lesson.grade)}</div>
                   </div>
-                  <div className="rounded-3xl border border-ink/10 bg-surface-low p-4">
+                  <div className="rounded-xl border border-ink/10 bg-surface-low p-4">
                     <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Subject</div>
                     <div className="mt-2 text-sm text-ink">{formatNullable(selectedRecoveredLesson.lesson.subject)}</div>
                   </div>
-                  <div className="rounded-3xl border border-ink/10 bg-surface-low p-4">
+                  <div className="rounded-xl border border-ink/10 bg-surface-low p-4">
                     <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Source type</div>
                     <div className="mt-2 text-sm text-ink">{formatNullable(selectedRecoveredLesson.lesson.source_type)}</div>
                   </div>
-                  <div className="rounded-3xl border border-ink/10 bg-surface-low p-4">
+                  <div className="rounded-xl border border-ink/10 bg-surface-low p-4">
                     <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Student publish allowed</div>
                     <div className="mt-2 text-sm text-ink">{selectedRecoveredLesson.lesson.student_publish_allowed ? "true" : "false"}</div>
                   </div>
                 </div>
 
-                <div className="rounded-3xl border border-ink/10 bg-paper p-5 shadow-sm">
+                <div className="rounded-xl border border-ink/10 bg-paper p-5 shadow-sm">
                   <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Teaching contract</div>
                   <div className="mt-4">
                     <JsonPreview value={selectedRecoveredLesson.lesson.teaching_contract} />
                   </div>
                 </div>
 
-                <div className="rounded-3xl border border-ink/10 bg-paper p-5 shadow-sm">
+                <div className="rounded-xl border border-ink/10 bg-paper p-5 shadow-sm">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <h3 className="text-lg font-semibold text-ink">Blocks</h3>
@@ -1193,7 +1196,7 @@ export const AdminAiRecovery: React.FC = () => {
     switch (activeTab.key) {
       case "dashboard":
         return (
-          <div className="rounded-3xl border border-ink/10 bg-paper p-6 shadow-sm">
+          <div className="rounded-xl border border-ink/10 bg-paper p-6 shadow-sm">
             <h2 className="text-xl font-semibold text-ink">Recovery overview</h2>
             <p className="mt-2 text-sm text-muted">
               This dashboard is intentionally read-only for now. It surfaces the live recovery backlog and review load
@@ -1204,7 +1207,7 @@ export const AdminAiRecovery: React.FC = () => {
       case "failed-jobs":
         return (
           <div className="space-y-6">
-            <div className="rounded-3xl border border-ink/10 bg-paper p-6 shadow-sm">
+            <div className="rounded-xl border border-ink/10 bg-paper p-6 shadow-sm">
               <div className="flex items-center gap-3">
                 <ShieldAlert className="h-5 w-5 text-destructive" />
                 <h2 className="text-xl font-semibold text-ink">Failed lesson jobs</h2>
@@ -1219,7 +1222,7 @@ export const AdminAiRecovery: React.FC = () => {
         );
       case "ai-tasks":
         return (
-          <div className="rounded-3xl border border-ink/10 bg-paper p-6 shadow-sm">
+          <div className="rounded-xl border border-ink/10 bg-paper p-6 shadow-sm">
             <div className="flex items-center gap-3">
               <Bot className="h-5 w-5 text-accent" />
               <h2 className="text-xl font-semibold text-ink">Lesson generation AI tasks</h2>
@@ -1233,7 +1236,7 @@ export const AdminAiRecovery: React.FC = () => {
       case "recovered-lessons":
         return (
           <div className="space-y-6">
-            <div className="rounded-3xl border border-ink/10 bg-paper p-6 shadow-sm">
+            <div className="rounded-xl border border-ink/10 bg-paper p-6 shadow-sm">
               <div className="flex items-center gap-3">
                 <CheckCircle2 className="h-5 w-5 text-emerald-600" />
                 <h2 className="text-xl font-semibold text-ink">Recovered lesson review queue</h2>
@@ -1250,7 +1253,7 @@ export const AdminAiRecovery: React.FC = () => {
       case "logs":
         return (
           <div className="space-y-6">
-            <div className="rounded-3xl border border-ink/10 bg-paper p-6 shadow-sm">
+            <div className="rounded-xl border border-ink/10 bg-paper p-6 shadow-sm">
               <div className="flex items-center gap-3">
                 <Clock3 className="h-5 w-5 text-muted" />
                 <h2 className="text-xl font-semibold text-ink">Recovery logs and observability</h2>
@@ -1268,129 +1271,175 @@ export const AdminAiRecovery: React.FC = () => {
     }
   };
 
+  const recoveryTabItems: TabItem[] = [
+    { id: "dashboard", label: "Dashboard", icon: Wrench },
+    { id: "failed-jobs", label: "Failed Jobs", icon: AlertTriangle },
+    { id: "ai-tasks", label: "AI Tasks", icon: Bot },
+    { id: "recovered-lessons", label: "Recovered", icon: CheckCircle2 },
+    { id: "logs", label: "Logs", icon: Clock3 },
+  ];
+
   return (
-    <Layout>
+    <Layout fullWidth>
       <SEO
         title="Admin AI Recovery"
         description="Admin-only AI Recovery dashboard with live Supabase metrics for failed jobs, AI tasks, and recovered lesson review states."
       />
 
-      <section className="space-y-6">
-        <div className="rounded-[28px] border border-ink/10 bg-paper p-6 shadow-sm">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div className="space-y-3">
-              <div className="text-[11px] font-bold uppercase tracking-[0.24em] text-accent">Admin only</div>
-              <div>
-                <h1 className="text-3xl font-black tracking-tight text-ink">AI Recovery</h1>
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
-                  Live recovery monitoring for lesson generation failures, lesson-generation AI task throughput, and
-                  recovered lesson review states. Counts come directly from Supabase and this shell does not enable any
-                  AI SQL generation yet.
-                </p>
-              </div>
+      <div className="admin-theme-scope h-full w-full bg-background flex flex-col overflow-hidden p-4">
+        
+        {/* Symmetrical 3-Column Layout Container */}
+        <div className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-4 overflow-hidden">
+        
+          {/* Column 2: Fluid Main Workspace */}
+          <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 p-6">
+            <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6">
+              
+      {/* Compact Shared Flat Tab Header */}
+      <TabbedHeader
+        title="AI Recovery Console"
+        tabs={recoveryTabItems}
+        activeTab={activeTab.key}
+        onChangeTab={(id) => {
+          const targetTab = RECOVERY_TABS.find((t) => t.key === id);
+          if (targetTab) navigate(targetTab.path);
+        }}
+      />
+
+              {/* Active Tab State Description (Compact typography, no border card) */}
+              <p className="text-[11px] text-muted -mt-2 px-1">
+                {activeTab.description}
+              </p>
+
+              {/* Dynamic Route View */}
+              {loading ? <Spinner label="Loading AI Recovery metrics..." /> : null}
+
+              {!loading && error ? (
+                <StatePanel
+                  title="Unable to load AI Recovery metrics"
+                  body={error}
+                  tone="danger"
+                  actionLabel="Retry"
+                  onAction={() => void loadMetrics()}
+                />
+              ) : null}
+
+              {!loading && !error ? (
+                <>
+                  {totalSignals === 0 ? (
+                    <StatePanel
+                      title="No recovery activity yet"
+                      body="Supabase returned zero rows across the current recovery KPI queries, so there is no failed, pending, completed, or review-state recovery activity to show right now."
+                    />
+                  ) : null}
+
+                  {renderRouteShell()}
+                </>
+              ) : null}
+
+            </div> {/* closes Column 2 scroll container */}
+          </div> {/* closes Column 2 main container */}
+
+          {/* Column 3: Right Action & Quick Diagnostics Sidebar */}
+          <div className="hidden lg:flex lg:w-[260px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-5">
+            <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-5 pr-1">
+              
+              {/* Connection Status widget */}
+              <section className="bg-slate-950 text-white rounded-2xl p-5 relative overflow-hidden">
+                <div className="relative z-10 space-y-4">
+                  <div>
+                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">System Health</h3>
+                    <div className="flex items-center gap-2 mt-1">
+                      <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="text-[11px] font-bold font-mono">Supabase Online</span>
+                    </div>
+                  </div>
+                  <div className="h-px bg-white/10" />
+                  <div className="space-y-1">
+                    <span className="text-[9px] font-mono text-white/40 uppercase">Recovery Mode</span>
+                    <p className="text-[11px] font-bold text-white flex items-center gap-1.5 capitalize">
+                      <Sparkles size={11} className="text-accent" />
+                      Live Observability
+                    </p>
+                  </div>
+                </div>
+              </section>
+
+              {/* Admin Consoles Section */}
+              <section className="space-y-2">
+                <p className="text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-wider">Admin Consoles</p>
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={() => navigate('/admin')}
+                    className="w-full flex items-center gap-2 p-2 bg-slate-50 dark:bg-surface-low/30 text-ink rounded-xl border border-slate-100 dark:border-white/5 hover:border-accent/30 transition-all text-left"
+                  >
+                    <ShieldCheck size={12} className="text-accent" />
+                    <span className="text-[11px] font-semibold">Admin Dashboard</span>
+                  </button>
+                  <button
+                    onClick={() => navigate('/admin/curriculum-review')}
+                    className="w-full flex items-center gap-2 p-2 bg-slate-50 dark:bg-surface-low/30 text-ink rounded-xl border border-slate-100 dark:border-white/5 hover:border-accent/30 transition-all text-left"
+                  >
+                    <Brain size={12} className="text-accent" />
+                    <span className="text-[11px] font-semibold">Curriculum Review</span>
+                  </button>
+                </div>
+              </section>
+
+              {/* Refresh Actions */}
+              <section className="space-y-2">
+                <p className="text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-wider">Mission Control</p>
+                <button
+                  onClick={() => void handleRefresh()}
+                  disabled={loading || failedJobsLoading}
+                  className="w-full flex items-center justify-between p-3 bg-slate-50 dark:bg-surface-low/30 rounded-xl border border-slate-100 dark:border-white/5 hover:border-accent/30 transition-all text-left"
+                >
+                  <div className="flex items-center gap-2 text-slate-700 dark:text-ink">
+                    <RefreshCw size={12} className={`text-accent ${loading || failedJobsLoading ? 'animate-spin' : ''}`} />
+                    <span className="text-[11px] font-semibold">Refresh Metrics</span>
+                  </div>
+                  {lastUpdated && (
+                    <span className="text-[9px] font-mono text-slate-400">{lastUpdated.split(' ')[0]}</span>
+                  )}
+                </button>
+              </section>
+
+              {/* Stacked Compact KPIs */}
+              <section className="space-y-3">
+                <p className="text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-wider">Queue & Backlog Metrics</p>
+                <div className="flex flex-col gap-3">
+                  <div className="bg-slate-50 dark:bg-surface-low/20 rounded-xl p-3 border border-slate-100 dark:border-white/5">
+                    <div className="text-[9px] font-semibold text-muted uppercase tracking-wider">Failed jobs</div>
+                    <div className="text-2xl font-black text-destructive mt-0.5">{kpis.failedJobs}</div>
+                  </div>
+                  <div className="bg-slate-50 dark:bg-surface-low/20 rounded-xl p-3 border border-slate-100 dark:border-white/5">
+                    <div className="text-[9px] font-semibold text-muted uppercase tracking-wider">Pending AI tasks</div>
+                    <div className="text-2xl font-black text-amber-600 mt-0.5">{kpis.pendingAiTasks}</div>
+                  </div>
+                  <div className="bg-slate-50 dark:bg-surface-low/20 rounded-xl p-3 border border-slate-100 dark:border-white/5">
+                    <div className="text-[9px] font-semibold text-muted uppercase tracking-wider">Completed AI tasks</div>
+                    <div className="text-2xl font-black text-emerald-600 mt-0.5">{kpis.completedAiTasks}</div>
+                  </div>
+                  <div className="bg-slate-50 dark:bg-surface-low/20 rounded-xl p-3 border border-slate-100 dark:border-white/5">
+                    <div className="text-[9px] font-semibold text-muted uppercase tracking-wider">Needing review</div>
+                    <div className="text-2xl font-black text-amber-600 mt-0.5">{kpis.lessonsNeedingReview}</div>
+                  </div>
+                  <div className="bg-slate-50 dark:bg-surface-low/20 rounded-xl p-3 border border-slate-100 dark:border-white/5">
+                    <div className="text-[9px] font-semibold text-muted uppercase tracking-wider">Approved recovered</div>
+                    <div className="text-2xl font-black text-emerald-600 mt-0.5">{kpis.approvedRecoveredLessons}</div>
+                  </div>
+                  <div className="bg-slate-50 dark:bg-surface-low/20 rounded-xl p-3 border border-slate-100 dark:border-white/5">
+                    <div className="text-[9px] font-semibold text-muted uppercase tracking-wider">Rejected recovered</div>
+                    <div className="text-2xl font-black text-destructive mt-0.5">{kpis.rejectedRecoveredLessons}</div>
+                  </div>
+                </div>
+              </section>
+
             </div>
+          </div> {/* closes Column 3 */}
 
-            <div className="flex flex-col items-start gap-3 sm:items-end">
-              <button
-                onClick={() => void handleRefresh()}
-                className="inline-flex items-center gap-2 rounded-full bg-ink px-5 py-2.5 text-sm font-medium text-paper transition-colors hover:bg-accent"
-              >
-                <RefreshCw className={`h-4 w-4 ${loading || failedJobsLoading ? "animate-spin" : ""}`} />
-                Refresh metrics
-              </button>
-              {lastUpdated ? <p className="text-xs text-muted">Last updated {lastUpdated}</p> : null}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-3">
-          {RECOVERY_TABS.map((tab) => {
-            const isActive = activeTab.key === tab.key;
-            return (
-              <button
-                key={tab.path}
-                onClick={() => navigate(tab.path)}
-                className={`rounded-full border px-4 py-2 text-sm font-medium transition-all ${
-                  isActive
-                    ? "border-accent bg-accent text-white shadow-sm shadow-accent/20"
-                    : "border-ink/10 bg-paper text-muted hover:border-accent/40 hover:text-ink"
-                }`}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="rounded-3xl border border-ink/10 bg-paper px-5 py-4 shadow-sm">
-          <p className="text-sm font-medium text-ink">{activeTab.label}</p>
-          <p className="mt-1 text-sm text-muted">{activeTab.description}</p>
-        </div>
-
-        {loading ? <Spinner label="Loading AI Recovery metrics..." /> : null}
-
-        {!loading && error ? (
-          <StatePanel
-            title="Unable to load AI Recovery metrics"
-            body={error}
-            tone="danger"
-            actionLabel="Retry"
-            onAction={() => void loadMetrics()}
-          />
-        ) : null}
-
-        {!loading && !error ? (
-          <>
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              <KpiCard
-                label="Failed jobs"
-                value={kpis.failedJobs}
-                description="lesson_gen_queue rows where status = 'failed'"
-                tone="danger"
-              />
-              <KpiCard
-                label="Pending AI tasks"
-                value={kpis.pendingAiTasks}
-                description="ai_tasks rows where target_area = 'lesson_generation' and status = 'pending'"
-                tone="warning"
-              />
-              <KpiCard
-                label="Completed AI tasks"
-                value={kpis.completedAiTasks}
-                description="ai_tasks rows where target_area = 'lesson_generation' and status = 'completed'"
-                tone="success"
-              />
-              <KpiCard
-                label="Lessons needing review"
-                value={kpis.lessonsNeedingReview}
-                description="lessons where teaching_contract->>'status' = 'needs_review'"
-                tone="warning"
-              />
-              <KpiCard
-                label="Approved recovered lessons"
-                value={kpis.approvedRecoveredLessons}
-                description="lessons where teaching_contract->>'status' = 'approved'"
-                tone="success"
-              />
-              <KpiCard
-                label="Rejected recovered lessons"
-                value={kpis.rejectedRecoveredLessons}
-                description="lessons where teaching_contract->>'status' = 'rejected'"
-                tone="danger"
-              />
-            </div>
-
-            {totalSignals === 0 ? (
-              <StatePanel
-                title="No recovery activity yet"
-                body="Supabase returned zero rows across the current recovery KPI queries, so there is no failed, pending, completed, or review-state recovery activity to show right now."
-              />
-            ) : null}
-
-            {renderRouteShell()}
-          </>
-        ) : null}
-      </section>
+        </div> {/* closes 3-Column Layout Container */}
+      </div>
 
       {renderDiagnosticsDrawer()}
       {renderRecoveredLessonDrawer()}

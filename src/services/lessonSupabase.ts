@@ -32,6 +32,8 @@ export const getLessonSelectColumns = ({
     "lesson_title",
     "content",
     "blocks",
+    "quizzes",
+    "exercises",
     "subtitle",
     ...(includeTags ? ["tags"] : []),
     "status",

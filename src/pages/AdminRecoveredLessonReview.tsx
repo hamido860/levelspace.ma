@@ -47,7 +47,7 @@ const RECOVERY_TABS = [
 ];
 
 const Spinner: React.FC<{ label?: string }> = ({ label = "Loading..." }) => (
-  <div className="flex items-center justify-center gap-3 rounded-3xl border border-ink/10 bg-paper px-6 py-12 text-sm text-muted shadow-sm">
+  <div className="flex items-center justify-center gap-3 rounded-xl border border-ink/10 bg-paper px-6 py-12 text-sm text-muted shadow-sm">
     <RefreshCw className="h-4 w-4 animate-spin" />
     {label}
   </div>
@@ -66,7 +66,7 @@ const StatePanel: React.FC<{
       : "border-ink/10 bg-paper text-ink";
 
   return (
-    <div className={`rounded-3xl border px-6 py-8 shadow-sm ${toneClasses}`}>
+    <div className={`rounded-xl border px-6 py-8 shadow-sm ${toneClasses}`}>
       <div className="flex items-start gap-3">
         {tone === "danger" ? <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" /> : <Sparkles className="mt-0.5 h-5 w-5 shrink-0" />}
         <div className="space-y-2">
@@ -92,7 +92,7 @@ const SectionCard: React.FC<{
   description?: string;
   children: React.ReactNode;
 }> = ({ title, description, children }) => (
-  <section className="rounded-3xl border border-ink/10 bg-paper p-6 shadow-sm">
+  <section className="rounded-xl border border-ink/10 bg-paper p-6 shadow-sm">
     <div className="mb-4">
       <h2 className="text-xl font-semibold text-ink">{title}</h2>
       {description ? <p className="mt-1 text-sm text-muted">{description}</p> : null}
@@ -561,7 +561,7 @@ export const AdminRecoveredLessonReview: React.FC = () => {
                 ) : (
                   <div className="space-y-4">
                     {editableBlocks.map((block, index) => (
-                      <div key={block.id || `block-${index}`} className="rounded-3xl border border-ink/10 bg-surface-low p-4">
+                      <div key={block.id || `block-${index}`} className="rounded-xl border border-ink/10 bg-surface-low p-4">
                         <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                           <div>
                             <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Block {index + 1}</div>
@@ -623,7 +623,7 @@ export const AdminRecoveredLessonReview: React.FC = () => {
 
             <SectionCard title="Student-Facing Preview" description="This is a quick review surface for the current edited content, not the student route itself.">
               <div className="space-y-4">
-                <div className="rounded-3xl border border-ink/10 bg-surface-low p-5">
+                <div className="rounded-xl border border-ink/10 bg-surface-low p-5">
                   <h3 className="text-2xl font-black tracking-tight text-ink">{formatText(lessonTitle)}</h3>
                   <p className="mt-2 text-sm text-muted">{formatText(subtitle)}</p>
                 </div>
@@ -632,7 +632,7 @@ export const AdminRecoveredLessonReview: React.FC = () => {
                   <p className="text-sm text-muted">No student-facing blocks to preview yet.</p>
                 ) : (
                   editableBlocks.map((block, index) => (
-                    <article key={block.id || `preview-${index}`} className="rounded-3xl border border-ink/10 bg-paper p-5 shadow-sm">
+                    <article key={block.id || `preview-${index}`} className="rounded-xl border border-ink/10 bg-paper p-5 shadow-sm">
                       <div className="flex items-center justify-between gap-3">
                         <div>
                           <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-accent">{block.type}</div>

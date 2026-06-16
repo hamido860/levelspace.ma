@@ -27,7 +27,7 @@ const AGENT_STYLES = {
   },
   "Reporter Agent": {
     icon: Bot,
-    className: "bg-slate-100 text-slate-600",
+    className: "bg-surface-mid text-ink-secondary",
   },
 };
 

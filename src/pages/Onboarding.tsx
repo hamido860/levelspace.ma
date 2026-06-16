@@ -1,18 +1,15 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
-import { SEO } from '../components/SEO';
 import { OnboardingModal } from '../components/OnboardingModal';
+import { SEO } from '../components/SEO';
 
 export const Onboarding: React.FC = () => {
-  const navigate = useNavigate();
-
   return (
     <Layout hideSidebar>
-      <SEO title="Onboarding" />
-      <div className="min-h-screen bg-background">
-        <OnboardingModal isOpen onComplete={() => navigate('/modules')} />
-      </div>
+      <SEO title="Set up your Levelspace" />
+      <main className="min-h-screen bg-background px-4 py-8 sm:px-6">
+        <OnboardingModal isOpen inline />
+      </main>
     </Layout>
   );
 };

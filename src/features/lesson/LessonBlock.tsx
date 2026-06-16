@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { CheckCircle2, Dumbbell, FileText, FlaskConical, HelpCircle, Lightbulb, ListChecks, PenTool, Target, XCircle, ChevronDown, ChevronUp, Brain } from 'lucide-react';
+import React from 'react';
+import { CheckCircle2, Dumbbell, FileText, FlaskConical, HelpCircle, Lightbulb, ListChecks, PenTool, Target, XCircle } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import ReactMarkdown from 'react-markdown';
+import Markdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import type { DisplayedLessonBlock, PedagogicalPurpose } from './useDisplayedLessonBlocks';
@@ -21,18 +21,6 @@ const PURPOSE_ICONS: Record<PedagogicalPurpose, React.ElementType> = {
   quiz: HelpCircle,
   exam: PenTool,
   summary: ListChecks,
-};
-
-const PURPOSE_COLORS: Record<PedagogicalPurpose, { bg: string; text: string }> = {
-  objective: { bg: 'bg-accent/10', text: 'text-accent' },
-  definition: { bg: 'bg-success/10', text: 'text-success' },
-  key_idea: { bg: 'bg-gold/10', text: 'text-gold' },
-  explanation: { bg: 'bg-accent/10', text: 'text-accent' },
-  example: { bg: 'bg-warning/10', text: 'text-warning' },
-  practice: { bg: 'bg-success/10', text: 'text-success' },
-  quiz: { bg: 'bg-accent/10', text: 'text-accent' },
-  exam: { bg: 'bg-warning/10', text: 'text-warning' },
-  summary: { bg: 'bg-accent/10', text: 'text-accent' },
 };
 
 type LessonBlockProps = {
@@ -63,9 +51,125 @@ const getContentText = (block: any) =>
     block?.exam?.question,
   ].filter(Boolean).join('\n\n');
 
-const MarkdownText: React.FC<{ children?: string }> = ({ children }) => (
-  <div className="prose prose-slate max-w-none text-ink prose-p:leading-8 prose-li:leading-8 prose-headings:text-ink prose-strong:text-ink">
-    <ReactMarkdown {...markdownPlugins}>{children || ''}</ReactMarkdown>
+const cleanDisplayTitle = (value: string) =>
+  value
+    .replace(/\.(pdf|docx?|pptx?)$/i, '')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const normalizeTitle = (value: string) =>
+  cleanDisplayTitle(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9\u0600-\u06FF]+/g, ' ')
+    .toLowerCase()
+    .trim();
+
+const isFileNameTitle = (value: string) => /\.(pdf|docx?|pptx?)$/i.test(value.trim());
+
+const getFirstMarkdownHeading = (markdown: string) => {
+  const headingLine = markdown
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find((line) => /^#{1,3}\s+/.test(line));
+
+  return headingLine ? cleanDisplayTitle(headingLine.replace(/^#{1,3}\s+/, '')) : '';
+};
+
+const stripDuplicateLeadingHeadings = (markdown: string, title: string) => {
+  const titleKey = normalizeTitle(title);
+  const lines = markdown.split(/\r?\n/);
+
+  while (lines.length > 0) {
+    const firstMeaningfulIndex = lines.findIndex((line) => line.trim());
+    if (firstMeaningfulIndex === -1) return '';
+    const headingMatch = lines[firstMeaningfulIndex].trim().match(/^#{1,3}\s+(.+)$/);
+    if (!headingMatch) break;
+
+    const headingText = headingMatch[1].trim();
+    const headingKey = normalizeTitle(headingText);
+    if (headingKey === titleKey || isFileNameTitle(headingText)) {
+      lines.splice(0, firstMeaningfulIndex + 1);
+      continue;
+    }
+    break;
+  }
+
+  return lines.join('\n').trim();
+};
+
+const lessonLabelPattern = String.raw`(?:Ex(?:emple)?|Remarque|Attention|Important|R[eè]gle|Regle|D[eé]finition|Definition|M[eé]thode|Methode|Astuce|A retenir|À retenir|R[eé]ponse|Reponse|Solution|Correction|Conclusion|Pourquoi)`;
+const recapTableLabelPattern = String.raw`(?:AVOIR|ETRE|ÊTRE|Participe\s+pass(?:e|é))`;
+
+const accentFrenchVerbRecap = (markdown: string) =>
+  markdown
+    .replace(/\bETRE\b/g, 'ÊTRE')
+    .replace(/\bParticipe passe\b/gi, 'Participe passé')
+    .replace(/\betre\s*->\s*ete\b/gi, 'être -> été')
+    .replace(/\b(aller\s*->\s*)alle\b/gi, '$1allé')
+    .replace(/\b(manger\s*->\s*)mange\b/gi, '$1mangé');
+
+const formatRecapTable = (markdown: string) => {
+  if (!/Tableau\s+r[eé]cap/i.test(markdown)) return markdown;
+
+  const recapLabelRegex = new RegExp(`\\b(${recapTableLabelPattern})\\s*:`, 'gi');
+  const normalized = accentFrenchVerbRecap(markdown).replace(/\bViewed\b/gi, '').replace(/\s+/g, ' ').trim();
+  const labels = Array.from(normalized.matchAll(recapLabelRegex));
+
+  if (labels.length < 2) return markdown;
+
+  const rows = labels.map((match, index) => {
+    const label = match[1].replace(/\s+/g, ' ').trim();
+    const start = (match.index || 0) + match[0].length;
+    const end = labels[index + 1]?.index ?? normalized.length;
+    const summary = normalized.slice(start, end).trim().replace(/\|/g, '\\|');
+    return `| **${label}** | ${summary} |`;
+  });
+
+  return [
+    '### Tableau recap',
+    '',
+    '| Point | Resume |',
+    '| --- | --- |',
+    ...rows,
+  ].join('\n');
+};
+
+const normalizeLessonMarkdown = (value: string, titleContext: string) => {
+  const normalized = accentFrenchVerbRecap(formatRecapTable(value))
+    .replace(/\\r\\n|\\n|\\r/g, '\n')
+    .replace(/\r\n?/g, '\n')
+    .replace(/\t/g, '  ')
+    .replace(new RegExp(`\\b(${lessonLabelPattern})\\s*[-\u2013\u2014]\\s+`, 'gi'), '$1: ')
+    .replace(/^\s*[\u2022\u25cf\u25aa\u25e6]\s+/gm, '- ')
+    .replace(/^(\s*)[-\u2013\u2014]\s+/gm, '$1- ')
+    .replace(/([^\n])\s+(\d+[.)]\s+)/g, '$1\n$2')
+    .replace(/^(\s*)(\d+)[.)]\s+/gm, '$1$2. ')
+    .replace(/([^\n])\s+([A-H][.)]\s+)/g, '$1\n$2')
+    .replace(/^(\s*)([A-H])[.)]\s+/gm, '$1- **$2.** ')
+    .replace(new RegExp(`([.!?)]?)\\s+(?=(${lessonLabelPattern})\\s*:)`, 'gi'), '$1\n')
+    .replace(new RegExp(`(^|\\n)((${lessonLabelPattern})\\s*:)`, 'gi'), '$1**$2** ')
+    .replace(/;\s+(?=[A-ZÀ-Ýa-zà-ÿ][^;:\n]{1,42}:)/g, '\n- ')
+    .replace(/,\s+(?=[^\n,.;:]+(?:->|→))/g, '\n- ')
+    .replace(/(^|\n)([^\n,.;:]+(?:->|→)[^\n]+)/g, '$1- $2')
+    .replace(/([.!?)]?)\s+(?=(Avec\s+(?:AVOIR|ETRE|ÊTRE)|Sans\s+accord)\s*:)/gi, '$1\n')
+    .replace(/(^|\n)((?:Avec\s+(?:AVOIR|ETRE|ÊTRE)|Sans\s+accord)\s*:[^\n]+)/gi, '$1- **$2**')
+    .replace(/^\s*[•●▪◦]\s+/gm, '- ')
+    .replace(/^(\s*)[-–—]\s+/gm, '$1- ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  return stripDuplicateLeadingHeadings(normalized, titleContext);
+};
+
+const MarkdownText: React.FC<{ children?: string; titleContext?: string; compact?: boolean }> = ({
+  children,
+  titleContext = '',
+  compact = false,
+}) => (
+  <div className={`lesson-reader-markdown ${compact ? 'lesson-reader-markdown--compact' : ''}`}>
+    <Markdown {...markdownPlugins}>{normalizeLessonMarkdown(children || '', titleContext)}</Markdown>
   </div>
 );
 
@@ -73,12 +177,12 @@ const SolutionPanel: React.FC<{ title?: string; content?: string }> = ({ title =
   <motion.div
     initial={{ opacity: 0, y: 8 }}
     animate={{ opacity: 1, y: 0 }}
-    className="p-4 rounded-2xl bg-surface-low border border-surface-mid"
+    className="lesson-answer-panel"
   >
     <div className="flex items-start gap-3">
       <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-success" />
       <div className="min-w-0">
-        <p className="text-sm font-bold text-ink">{title}</p>
+        <p className="lesson-answer-panel__title">{title}</p>
         <MarkdownText>{content || ''}</MarkdownText>
       </div>
     </div>
@@ -105,8 +209,12 @@ export const LessonBlock: React.FC<LessonBlockProps> = ({
   const block = item.block || {};
   const sourceIndex = item.sourceIndex;
   const Icon = PURPOSE_ICONS[item.purpose];
-  const colors = PURPOSE_COLORS[item.purpose];
   const contentText = getContentText(block);
+  const displayTitle = cleanDisplayTitle(item.title);
+  const shouldShowTitle = Boolean(displayTitle) && !isFileNameTitle(item.title);
+  const contentHeading = getFirstMarkdownHeading(contentText);
+  const isGenericExplanationLabel = item.label.toLowerCase() === 'explanation';
+  const headingLabel = shouldShowTitle ? displayTitle : contentHeading || (isGenericExplanationLabel ? '' : item.label);
   const quiz = block.quiz || (block.type === 'quiz' && block.question ? {
     question: block.question,
     options: block.options,
@@ -126,68 +234,50 @@ export const LessonBlock: React.FC<LessonBlockProps> = ({
   } : null);
 
   return (
-    <article id={item.id} className="bg-paper border border-surface-mid rounded-3xl p-6 md:p-8 shadow-sm scroll-mt-28 space-y-6">
-      {/* Block Header */}
-      <header className="flex items-start gap-4">
-        <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${colors.bg} ${colors.text}`}>
-          <Icon size={20} />
+    <article id={item.id} className="lesson-reader-block scroll-mt-28">
+      <header className="lesson-reader-block__header">
+        <div className="lesson-reader-block__icon">
+          <Icon size={18} />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-bold text-ink-muted uppercase tracking-[0.1em] mb-1">{item.label}</p>
-          <h2 className="text-xl md:text-2xl font-bold text-ink leading-snug">{item.title}</h2>
+          {headingLabel && <h2 className="lesson-reader-block__title">{headingLabel}</h2>}
         </div>
-        <span className={`hidden md:inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-normal shrink-0 ${
-          isViewed ? 'bg-success/10 text-success' : 'bg-surface-mid text-ink-muted'
-        }`}>
+        <span className={`lesson-reader-block__status ${isViewed ? 'lesson-reader-block__status--viewed' : ''}`}>
           {isViewed ? 'Viewed' : 'New'}
         </span>
       </header>
 
-      {/* Reading State Indicator */}
       {reading && (
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-accent/10 text-accent text-xs font-semibold">
-          <span className="h-2 w-2 rounded-full bg-accent animate-pulse" />
-          Reading this section aloud
+        <div className="lesson-reader-read-state">
+          <span /> Reading this section aloud
         </div>
       )}
 
-      {/* Main Content */}
-      {contentText && !quiz && !exercise && !exam && (
-        <div className="prose prose-slate max-w-none">
-          <MarkdownText>{contentText}</MarkdownText>
-        </div>
-      )}
+      {contentText && !quiz && !exercise && !exam && <MarkdownText titleContext={headingLabel || item.title}>{contentText}</MarkdownText>}
 
-      {/* Points List */}
       {Array.isArray(block.points) && block.points.length > 0 && (
-        <ul className="space-y-3 pl-5">
+        <ul className="lesson-reader-list">
           {block.points.map((point: string, index: number) => (
-            <li key={index} className="list-disc text-ink">
-              <MarkdownText>{point}</MarkdownText>
-            </li>
+            <li key={index}><MarkdownText>{point}</MarkdownText></li>
           ))}
         </ul>
       )}
 
-      {/* Rules List */}
       {Array.isArray(block.rules) && block.rules.length > 0 && (
-        <ul className="space-y-3 pl-5">
+        <ul className="lesson-reader-list">
           {block.rules.map((rule: string, index: number) => (
-            <li key={index} className="list-disc text-ink">
-              <MarkdownText>{rule}</MarkdownText>
-            </li>
+            <li key={index}><MarkdownText>{rule}</MarkdownText></li>
           ))}
         </ul>
       )}
 
-      {/* Examples */}
       {Array.isArray(block.examples) && block.examples.length > 0 && (
-        <div className="space-y-4">
+        <div className="lesson-reader-stack">
           {block.examples.map((example: any, index: number) => (
-            <div key={index} className="rounded-2xl bg-surface-low p-4 space-y-3">
+            <div key={index} className="lesson-reader-example">
               {example.question && <MarkdownText>{example.question}</MarkdownText>}
               {Array.isArray(example.steps) && example.steps.map((step: string, stepIndex: number) => (
-                <div key={stepIndex} className="mt-3 rounded-xl bg-paper p-4">
+                <div key={stepIndex} className="lesson-reader-example__step">
                   <MarkdownText>{step}</MarkdownText>
                 </div>
               ))}
@@ -197,11 +287,12 @@ export const LessonBlock: React.FC<LessonBlockProps> = ({
         </div>
       )}
 
-      {/* Quiz */}
       {quiz && Array.isArray(quiz.options) && (
-        <div className="rounded-2xl bg-surface-low p-6 space-y-4">
-          <MarkdownText>{quiz.question}</MarkdownText>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="lesson-reader-check">
+          <div className="lesson-reader-question">
+            <MarkdownText>{quiz.question}</MarkdownText>
+          </div>
+          <div className="lesson-reader-options">
             {quiz.options.map((option: string, optionIndex: number) => {
               const answered = quizAnswered[sourceIndex];
               const selected = quizSelectedOption[sourceIndex] === option;
@@ -212,15 +303,9 @@ export const LessonBlock: React.FC<LessonBlockProps> = ({
                   type="button"
                   disabled={answered}
                   onClick={() => onQuizAnswer(sourceIndex, option, quiz.correctAnswer)}
-                  className={`flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left text-sm font-medium transition-all ${
-                    answered && correct 
-                      ? 'border-success bg-success/10 text-success' 
-                      : answered && selected && !correct 
-                      ? 'border-error bg-error/10 text-error'
-                      : 'border-surface-mid bg-paper text-ink hover:border-surface-mid hover:bg-surface-low disabled:cursor-default'
-                  }`}
+                  className={`lesson-reader-option ${answered && correct ? 'lesson-reader-option--correct' : ''} ${answered && selected && !correct ? 'lesson-reader-option--wrong' : ''}`}
                 >
-                  <span><MarkdownText>{option}</MarkdownText></span>
+                  <span className="lesson-reader-option__text"><MarkdownText compact>{option}</MarkdownText></span>
                   {answered && correct && <CheckCircle2 size={18} />}
                   {answered && selected && !correct && <XCircle size={18} />}
                 </button>
@@ -232,90 +317,56 @@ export const LessonBlock: React.FC<LessonBlockProps> = ({
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
-                className={`mt-4 rounded-2xl p-4 text-sm font-medium ${
-                  quizCorrect[sourceIndex] ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'
-                }`}
+                className={`lesson-feedback ${quizCorrect[sourceIndex] ? 'lesson-feedback--good' : 'lesson-feedback--review'}`}
               >
-                <strong>{quizCorrect[sourceIndex] ? 'Correct!' : 'Review this concept.'}</strong>
-                {quiz.explanation && (
-                  <div className="mt-2">
-                    <MarkdownText>{quiz.explanation}</MarkdownText>
-                  </div>
-                )}
+                <p className="lesson-feedback__title">{quizCorrect[sourceIndex] ? 'Correct.' : 'Review this idea.'}</p>
+                {quiz.explanation && <MarkdownText>{quiz.explanation}</MarkdownText>}
               </motion.div>
             )}
           </AnimatePresence>
         </div>
       )}
 
-      {/* Exercise */}
       {exercise && (
-        <div className="rounded-2xl bg-surface-low p-6 space-y-4">
-          <MarkdownText>{exercise.question || exercise.prompt}</MarkdownText>
-          <div className="flex flex-col sm:flex-row gap-3">
+        <div className="lesson-reader-check">
+          <div className="lesson-reader-question">
+            <MarkdownText>{exercise.question || exercise.prompt}</MarkdownText>
+          </div>
+          <div className="lesson-reader-actions">
             {exercise.hint && (
-              <button 
-                type="button" 
-                onClick={() => onShowExerciseHint(sourceIndex)} 
-                className="px-6 py-3 rounded-xl border border-surface-mid bg-paper text-ink font-medium text-sm hover:bg-surface-low transition-all"
-              >
+              <button type="button" onClick={() => onShowExerciseHint(sourceIndex)} className="lesson-reader-secondary">
                 {exerciseHintShown[sourceIndex] ? 'Hint shown' : 'Show hint'}
               </button>
             )}
-            <button 
-              type="button" 
-              onClick={() => onExerciseSubmit(sourceIndex, exercise.solution || '')} 
-              className="px-6 py-3 rounded-xl bg-ink text-paper font-medium text-sm hover:bg-accent transition-all flex items-center justify-center gap-2"
-            >
-              <Target size={16} />
-              Show solution
+            <button type="button" onClick={() => onExerciseSubmit(sourceIndex, exercise.solution || '')} className="lesson-reader-primary">
+              {exerciseResult[sourceIndex] ? 'Hide solution' : 'Show solution'}
             </button>
           </div>
           {exerciseHintShown[sourceIndex] && exercise.hint && (
-            <div className="rounded-xl bg-paper p-4">
-              <p className="text-xs font-bold text-accent uppercase tracking-normal mb-2 flex items-center gap-2">
-                <Brain size={12} />
-                Hint
-              </p>
-              <MarkdownText>{exercise.hint}</MarkdownText>
-            </div>
+            <div className="lesson-hint"><MarkdownText>{exercise.hint}</MarkdownText></div>
           )}
           {exerciseResult[sourceIndex] && <SolutionPanel content={exercise.solution} />}
         </div>
       )}
 
-      {/* Exam */}
       {exam && (
-        <div className="rounded-2xl bg-warning/5 p-6 space-y-4 border border-warning/20">
-          {exam.source && <p className="text-xs font-bold text-ink-muted uppercase tracking-[0.1em]">{exam.source}</p>}
-          <MarkdownText>{exam.question}</MarkdownText>
-          <div className="flex flex-col sm:flex-row gap-3">
+        <div className="lesson-reader-check lesson-reader-check--exam">
+          {exam.source && <p className="lesson-reader-eyebrow">{exam.source}</p>}
+          <div className="lesson-reader-question">
+            <MarkdownText>{exam.question}</MarkdownText>
+          </div>
+          <div className="lesson-reader-actions">
             {exam.hint && (
-              <button 
-                type="button" 
-                onClick={() => onShowExamHint(sourceIndex)} 
-                className="px-6 py-3 rounded-xl border border-surface-mid bg-paper text-ink font-medium text-sm hover:bg-surface-low transition-all"
-              >
+              <button type="button" onClick={() => onShowExamHint(sourceIndex)} className="lesson-reader-secondary">
                 {examHintShown[sourceIndex] ? 'Hint shown' : 'Show hint'}
               </button>
             )}
-            <button 
-              type="button" 
-              onClick={() => onExamSubmit(sourceIndex, exam.solution || '')} 
-              className="px-6 py-3 rounded-xl bg-ink text-paper font-medium text-sm hover:bg-accent transition-all flex items-center justify-center gap-2"
-            >
-              <Target size={16} />
-              Show solution
+            <button type="button" onClick={() => onExamSubmit(sourceIndex, exam.solution || '')} className="lesson-reader-primary">
+              {examResult[sourceIndex] ? 'Hide solution' : 'Show solution'}
             </button>
           </div>
           {examHintShown[sourceIndex] && exam.hint && (
-            <div className="rounded-xl bg-paper p-4">
-              <p className="text-xs font-bold text-accent uppercase tracking-normal mb-2 flex items-center gap-2">
-                <Brain size={12} />
-                Hint
-              </p>
-              <MarkdownText>{exam.hint}</MarkdownText>
-            </div>
+            <div className="lesson-hint"><MarkdownText>{exam.hint}</MarkdownText></div>
           )}
           {examResult[sourceIndex] && <SolutionPanel content={exam.solution} />}
         </div>

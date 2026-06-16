@@ -2,7 +2,6 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import axios from "axios";
 import handleSupabaseHealth from "../src/server/api/supabaseHealth";
 import { handleAIEmbed, handleAIGenerate, handleAIExplain, handleAILessonBlocks, handleAIStatus } from "../src/server/api/aiHandlers";
-import https from "https";
 import { generateAIResponse, type AIProviderName, type AICredentialMode } from "../src/lib/ai/provider";
 import { handleDeleteUserAiKey, handleTestUserAiKey, handleUserAiKeys } from "../src/server/api/userAiKeys";
 import { backfillTopicsFromLessons } from "../lib/topicSync";
@@ -22,6 +21,7 @@ import {
   generateAiRecoveryRepairSql,
   getServerSupabase,
   isWriteMode,
+  requireAuthenticatedUser,
   loadAiRecoveryFailedJobs,
   loadAiRecoveryJobDiagnostics,
   loadAiRecoveryLogs,
@@ -56,8 +56,7 @@ import {
   loadCurriculumReviewDetail,
   loadCurriculumReviewItems,
 } from "../src/server/api/curriculumValidation";
-import { getEnvDiagnostics, getPlatformAiKey } from "../src/lib/envDiagnostics";
-import { hasUsableSupabaseKey, isValidSupabaseUrl } from "../src/lib/supabase/env";
+import { getServerSupabaseEnv } from "../src/lib/supabase/server";
 
 type JsonBody = Record<string, any>;
 type RouteHandler = (req: VercelRequest, res: VercelResponse, segments: string[]) => Promise<VercelResponse | void>;
@@ -103,15 +102,8 @@ function sendError(res: VercelResponse, error: unknown, fallbackMessage: string)
     return res.status(error.status).json({ error: error.message });
   }
 
-  const message =
-    error instanceof Error
-      ? error.message
-      : error && typeof error === "object" && "message" in error && typeof (error as { message?: unknown }).message === "string"
-        ? (error as { message: string }).message
-        : fallbackMessage;
-
   return res.status(500).json({
-    error: message,
+    error: error instanceof Error ? error.message : fallbackMessage,
   });
 }
 
@@ -149,7 +141,7 @@ async function handleNvidiaProxy(req: VercelRequest, res: VercelResponse) {
   if (req.method === "OPTIONS") {
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Nvidia-Api-Key");
     return res.status(200).end();
   }
 
@@ -159,7 +151,14 @@ async function handleNvidiaProxy(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const apiKey = getPlatformAiKey("nvidia");
+  try {
+    await requireAuthenticatedUser(req);
+  } catch (error) {
+    return sendError(res, error, "Unauthorized");
+  }
+
+  const customApiKey = req.headers["x-nvidia-api-key"] as string | undefined;
+  const apiKey = customApiKey || process.env.NVIDIA_API_KEY;
 
   if (!apiKey || apiKey === "MY_NVIDIA_API_KEY") {
     return res.status(503).json({ error: "NVIDIA API key not configured." });
@@ -188,58 +187,6 @@ async function handleNvidiaProxy(req: VercelRequest, res: VercelResponse) {
   }
 }
 
-const UNSPLASH_ACCESS_KEY = process.env.UNSPLASH_ACCESS_KEY || "";
-
-async function handleUnsplashSearch(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== "GET") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
-
-  const query = readQuery(req, "query");
-  const page = parseInt(readQuery(req, "page") || "1", 10);
-  const perPage = parseInt(readQuery(req, "per_page") || "30", 10);
-
-  if (!query) {
-    return res.status(400).json({ error: "query is required" });
-  }
-
-  try {
-    const response = await axios.get("https://api.unsplash.com/search/photos", {
-      params: { query, page: Math.min(page, 10), per_page: Math.min(perPage, 30) },
-      headers: {
-        Authorization: `Client-ID ${UNSPLASH_ACCESS_KEY}`,
-        "Accept-Version": "v1",
-      },
-      timeout: 10000,
-      httpsAgent: new https.Agent({ keepAlive: true }),
-    });
-
-    const images = (response.data?.results || []).map((photo: any) => ({
-      id: photo.id,
-      url: `${photo.urls.raw}&w=800&q=60&fit=crop&auto=format`,
-      thumb: `${photo.urls.thumb}&q=60`,
-      small: `${photo.urls.small}&q=60`,
-      regular: `${photo.urls.regular}&q=60`,
-      title: photo.description || photo.alt_description || photo.user?.name || "Untitled",
-      author: photo.user?.name || "Unknown",
-      authorUrl: photo.user?.links?.html || "",
-      sourceUrl: photo.links?.html || "",
-      color: photo.color || "#cccccc",
-    }));
-
-    return res.status(200).json({
-      images,
-      total: response.data?.total || 0,
-      total_pages: Math.min(response.data?.total_pages || 1, 10),
-      page: Math.min(page, 10),
-    });
-  } catch (error: any) {
-    const message = error?.response?.data?.errors?.[0] || error?.response?.data?.error || error.message;
-    console.error("[Unsplash Proxy] Error:", message);
-    return res.status(error?.response?.status || 502).json({ error: `Unsplash API error: ${message}` });
-  }
-}
-
 async function handleAiRoot(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "GET") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -262,22 +209,12 @@ async function handleSupabasePublicConfig(req: VercelRequest, res: VercelRespons
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const url = process.env.VITE_SUPABASE_URL || "";
-  const anonKey = process.env.VITE_SUPABASE_ANON_KEY || "";
-  const configured = isValidSupabaseUrl(url) && hasUsableSupabaseKey(anonKey);
+  const env = getServerSupabaseEnv();
   return res.status(200).json({
-    configured,
-    url: configured ? url : null,
-    anonKey: configured ? anonKey : null,
+    configured: env.urlConfigured && env.anonKeyConfigured,
+    url: env.urlConfigured ? env.url : null,
+    anonKey: env.anonKeyConfigured ? env.anonKey : null,
   });
-}
-
-async function handleEnvDiagnostics(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== "GET") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
-
-  return res.status(200).json(getEnvDiagnostics());
 }
 
 async function handleAiPlanTask(req: VercelRequest, res: VercelResponse) {
@@ -1200,7 +1137,6 @@ async function handleAiRecovery(req: VercelRequest, res: VercelResponse, segment
 
 const rootRoutes: Record<string, RouteHandler> = {
   "nvidia-proxy": handleNvidiaProxy,
-  "unsplash-search": handleUnsplashSearch,
   "ai": handleAiRoot,
   "ai-plan-task": handleAiPlanTask,
   "ai-execute-task": handleAiExecuteTask,
@@ -1217,7 +1153,6 @@ const rootRoutes: Record<string, RouteHandler> = {
   "ai/lesson-blocks": handleAILessonBlocks,
   "ai/embed": handleAIEmbed,
   "ai/status": handleAIStatus,
-  "diagnostics/env": handleEnvDiagnostics,
   "config/supabase": handleSupabasePublicConfig,
   "health/supabase": handleSupabaseHealth,
   "admin/curriculum-review": handleCurriculumReviewList,

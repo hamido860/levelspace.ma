@@ -76,7 +76,7 @@ export const Pricing: React.FC = () => {
             <motion.div
               key={plan.id}
               whileHover={{ y: -5 }}
-              className={`relative p-8 rounded-3xl border transition-all ${
+              className={`relative p-8 rounded-xl border transition-all ${
                 plan.highlight
                   ? 'bg-ink border-ink text-paper shadow-md shadow-ink/20'
                   : 'bg-paper border-ink/5 text-ink'
@@ -130,7 +130,7 @@ export const Pricing: React.FC = () => {
           ))}
         </div>
 
-        <div className="bg-paper border border-ink/5 rounded-3xl p-8 flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="bg-paper border border-ink/5 rounded-xl p-8 flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-accent/10 rounded-2xl flex items-center justify-center text-accent">
               <Star className="w-6 h-6" />

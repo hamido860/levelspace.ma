@@ -35,7 +35,7 @@ const RECOVERY_TABS = [
 ];
 
 const Spinner: React.FC<{ label?: string }> = ({ label = "Loading..." }) => (
-  <div className="flex items-center justify-center gap-3 rounded-3xl border border-ink/10 bg-paper px-6 py-12 text-sm text-muted shadow-sm">
+  <div className="flex items-center justify-center gap-3 rounded-xl border border-ink/10 bg-paper px-6 py-12 text-sm text-muted shadow-sm">
     <RefreshCw className="h-4 w-4 animate-spin" />
     {label}
   </div>
@@ -54,7 +54,7 @@ const StatePanel: React.FC<{
       : "border-ink/10 bg-paper text-ink";
 
   return (
-    <div className={`rounded-3xl border px-6 py-8 shadow-sm ${toneClasses}`}>
+    <div className={`rounded-xl border px-6 py-8 shadow-sm ${toneClasses}`}>
       <div className="flex items-start gap-3">
         {tone === "danger" ? <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" /> : <Sparkles className="mt-0.5 h-5 w-5 shrink-0" />}
         <div className="space-y-2">
@@ -80,7 +80,7 @@ const SectionCard: React.FC<{
   description?: string;
   children: React.ReactNode;
 }> = ({ title, description, children }) => (
-  <section className="rounded-3xl border border-ink/10 bg-paper p-6 shadow-sm">
+  <section className="rounded-xl border border-ink/10 bg-paper p-6 shadow-sm">
     <div className="mb-4">
       <h2 className="text-xl font-semibold text-ink">{title}</h2>
       {description ? <p className="mt-1 text-sm text-muted">{description}</p> : null}
@@ -350,19 +350,19 @@ export const AdminAiRecoveryTaskDetail: React.FC = () => {
           })}
         </div>
 
-        <div className="rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800 shadow-sm">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800 shadow-sm">
           Recovered lesson content stays blocked until a human approves the guarded execution path. This page never runs
           SQL directly from the client.
         </div>
 
         {!loading && !error && detail && !safetyAllowed ? (
-          <div className="rounded-3xl border border-destructive/20 bg-destructive/5 px-5 py-4 text-sm text-destructive shadow-sm">
+          <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-5 py-4 text-sm text-destructive shadow-sm">
             Approve Execute stays disabled until the latest stored safety check returns <span className="font-semibold">allowed = true</span>.
           </div>
         ) : null}
 
         {!loading && !error && detail && safetyAllowed && latestApprovalStatus !== "approved" ? (
-          <div className="rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800 shadow-sm">
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800 shadow-sm">
             Execute Approved SQL stays disabled until a human approval record reaches <span className="font-semibold">approved</span>.
           </div>
         ) : null}
@@ -386,24 +386,24 @@ export const AdminAiRecoveryTaskDetail: React.FC = () => {
               description="Current task identity, workflow state, and approval readiness."
             >
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <div className="rounded-3xl border border-ink/10 bg-surface-low p-4">
+                <div className="rounded-xl border border-ink/10 bg-surface-low p-4">
                   <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Task</div>
                   <div className="mt-2 text-sm font-semibold text-ink">{formatText(detail.task.title || detail.task.task_name)}</div>
                   <div className="mt-1 font-mono text-xs text-muted">{detail.task.id}</div>
                 </div>
-                <div className="rounded-3xl border border-ink/10 bg-surface-low p-4">
+                <div className="rounded-xl border border-ink/10 bg-surface-low p-4">
                   <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Status</div>
                   <div className={`mt-2 inline-flex rounded-full px-3 py-1 text-xs font-medium ${formatStatusTone(detail.task.status)}`}>
                     {detail.task.status}
                   </div>
                   <div className="mt-2 text-xs text-muted">Progress {detail.task.progress ?? 0}%</div>
                 </div>
-                <div className="rounded-3xl border border-ink/10 bg-surface-low p-4">
+                <div className="rounded-xl border border-ink/10 bg-surface-low p-4">
                   <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Priority</div>
                   <div className="mt-2 text-sm text-ink">{formatText(detail.task.priority)}</div>
                   <div className="mt-2 text-xs text-muted">Target {formatText(detail.task.target_area)}</div>
                 </div>
-                <div className="rounded-3xl border border-ink/10 bg-surface-low p-4">
+                <div className="rounded-xl border border-ink/10 bg-surface-low p-4">
                   <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Approval</div>
                   <div className="mt-2 text-sm text-ink">{detail.task.requires_approval ? "Required" : "Not required"}</div>
                   <div className="mt-2 text-xs text-muted">Latest approval {formatText(String(detail.latest_approval?.status || "none"))}</div>
@@ -411,11 +411,11 @@ export const AdminAiRecoveryTaskDetail: React.FC = () => {
               </div>
 
               <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <div className="rounded-3xl border border-ink/10 bg-paper p-4">
+                <div className="rounded-xl border border-ink/10 bg-paper p-4">
                   <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Instructions</div>
                   <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-ink">{formatText(detail.task.instructions)}</p>
                 </div>
-                <div className="rounded-3xl border border-ink/10 bg-paper p-4">
+                <div className="rounded-xl border border-ink/10 bg-paper p-4">
                   <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Timestamps</div>
                   <div className="mt-3 space-y-2 text-sm text-ink">
                     <p>Created: {formatDateTime(detail.task.created_at)}</p>
@@ -433,28 +433,28 @@ export const AdminAiRecoveryTaskDetail: React.FC = () => {
             >
               {detail.queue_job ? (
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                  <div className="rounded-3xl border border-ink/10 bg-surface-low p-4">
+                  <div className="rounded-xl border border-ink/10 bg-surface-low p-4">
                     <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Job ID</div>
                     <div className="mt-2 font-mono text-sm text-ink">{detail.queue_job.id}</div>
                   </div>
-                  <div className="rounded-3xl border border-ink/10 bg-surface-low p-4">
+                  <div className="rounded-xl border border-ink/10 bg-surface-low p-4">
                     <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Topic</div>
                     <div className="mt-2 text-sm text-ink">{formatText(detail.topic?.title)}</div>
                     <div className="mt-1 font-mono text-xs text-muted">{detail.topic?.id || detail.queue_job.topic_id || "—"}</div>
                   </div>
-                  <div className="rounded-3xl border border-ink/10 bg-surface-low p-4">
+                  <div className="rounded-xl border border-ink/10 bg-surface-low p-4">
                     <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Grade / Subject</div>
                     <div className="mt-2 text-sm text-ink">{formatText(detail.grade?.name)}</div>
                     <div className="mt-1 text-xs text-muted">{formatText(detail.subject?.name)}</div>
                   </div>
-                  <div className="rounded-3xl border border-ink/10 bg-surface-low p-4">
+                  <div className="rounded-xl border border-ink/10 bg-surface-low p-4">
                     <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Attempts</div>
                     <div className="mt-2 text-sm text-ink">{detail.queue_job.attempts ?? 0}</div>
                     <div className={`mt-2 inline-flex rounded-full px-3 py-1 text-xs font-medium ${formatStatusTone(detail.queue_job.status)}`}>
                       {formatText(detail.queue_job.status)}
                     </div>
                   </div>
-                  <div className="md:col-span-2 xl:col-span-4 rounded-3xl border border-destructive/15 bg-destructive/5 p-5">
+                  <div className="md:col-span-2 xl:col-span-4 rounded-xl border border-destructive/15 bg-destructive/5 p-5">
                     <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-destructive">Last error</div>
                     <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-destructive">
                       {formatText(detail.queue_job.last_error)}
@@ -477,7 +477,7 @@ export const AdminAiRecoveryTaskDetail: React.FC = () => {
               ) : (
                 <div className="space-y-4">
                   {detail.ordered_topic_outlines.map((outline, index) => (
-                    <div key={`${detail.task.id}-outline-${index}`} className="rounded-3xl border border-ink/10 bg-surface-low p-4">
+                    <div key={`${detail.task.id}-outline-${index}`} className="rounded-xl border border-ink/10 bg-surface-low p-4">
                       <div className="mb-3 text-sm font-semibold text-ink">
                         {String((outline.title || outline.name || outline.heading || `Outline ${index + 1}`) as string)}
                       </div>
@@ -493,11 +493,11 @@ export const AdminAiRecoveryTaskDetail: React.FC = () => {
               description="Any existing lessons for the same topic and the current lesson_blocks footprint."
             >
               <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-3xl border border-ink/10 bg-surface-low p-5">
+                <div className="rounded-xl border border-ink/10 bg-surface-low p-5">
                   <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Existing lessons</div>
                   <div className="mt-3 text-3xl font-black text-ink">{detail.existing_lessons.length}</div>
                 </div>
-                <div className="rounded-3xl border border-ink/10 bg-surface-low p-5">
+                <div className="rounded-xl border border-ink/10 bg-surface-low p-5">
                   <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Existing lesson_blocks</div>
                   <div className="mt-3 text-3xl font-black text-ink">
                     {detail.lesson_blocks_status === "missing_table" ? "—" : detail.lesson_blocks.length}
@@ -516,7 +516,7 @@ export const AdminAiRecoveryTaskDetail: React.FC = () => {
                     const lessonId = typeof lesson.id === "string" ? lesson.id : "";
                     const blocks = lessonBlocksByLessonId.get(lessonId) || [];
                     return (
-                      <div key={lessonId || `lesson-${lessonIndex}`} className="rounded-3xl border border-ink/10 bg-paper p-5">
+                      <div key={lessonId || `lesson-${lessonIndex}`} className="rounded-xl border border-ink/10 bg-paper p-5">
                         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                           <div>
                             <h3 className="text-lg font-semibold text-ink">
@@ -574,29 +574,29 @@ export const AdminAiRecoveryTaskDetail: React.FC = () => {
               {detail.safety_check ? (
                 <div className="space-y-4">
                   <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                    <div className="rounded-3xl border border-ink/10 bg-surface-low p-4">
+                    <div className="rounded-xl border border-ink/10 bg-surface-low p-4">
                       <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Allowed</div>
                       <div className="mt-2 text-sm text-ink">{String(Boolean(detail.safety_check.allowed))}</div>
                     </div>
-                    <div className="rounded-3xl border border-ink/10 bg-surface-low p-4">
+                    <div className="rounded-xl border border-ink/10 bg-surface-low p-4">
                       <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Errors</div>
                       <div className="mt-2 text-sm text-ink">{safetyErrors.length}</div>
                     </div>
-                    <div className="rounded-3xl border border-ink/10 bg-surface-low p-4">
+                    <div className="rounded-xl border border-ink/10 bg-surface-low p-4">
                       <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Warnings</div>
                       <div className="mt-2 text-sm text-ink">{safetyWarnings.length}</div>
                     </div>
-                    <div className="rounded-3xl border border-ink/10 bg-surface-low p-4">
+                    <div className="rounded-xl border border-ink/10 bg-surface-low p-4">
                       <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Checked at</div>
                       <div className="mt-2 text-sm text-ink">{formatDateTime(typeof detail.safety_check.executed_at === "string" ? detail.safety_check.executed_at : null)}</div>
                     </div>
                   </div>
-                  <div className="rounded-3xl border border-ink/10 bg-paper p-4">
+                  <div className="rounded-xl border border-ink/10 bg-paper p-4">
                     <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">Summary</div>
                     <p className="mt-3 text-sm leading-6 text-ink">{formatText(String(detail.safety_check.summary || "—"))}</p>
                   </div>
                   {safetyErrors.length > 0 ? (
-                    <div className="rounded-3xl border border-destructive/20 bg-destructive/5 p-4">
+                    <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-4">
                       <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-destructive">Errors</div>
                       <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-destructive">
                         {safetyErrors.map((item) => (
@@ -606,7 +606,7 @@ export const AdminAiRecoveryTaskDetail: React.FC = () => {
                     </div>
                   ) : null}
                   {safetyWarnings.length > 0 ? (
-                    <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4">
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
                       <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-amber-800">Warnings</div>
                       <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-amber-800">
                         {safetyWarnings.map((item) => (
@@ -639,7 +639,7 @@ export const AdminAiRecoveryTaskDetail: React.FC = () => {
                   ) : (
                     <div className="space-y-3">
                       {detail.logs.map((log) => (
-                        <div key={log.id} className="rounded-3xl border border-ink/10 bg-surface-low p-4">
+                        <div key={log.id} className="rounded-xl border border-ink/10 bg-surface-low p-4">
                           <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
                             <div>
                               <div className="text-sm font-semibold text-ink">

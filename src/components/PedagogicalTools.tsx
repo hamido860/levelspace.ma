@@ -463,10 +463,10 @@ const Flashcards: React.FC<{ lessonId: string }> = ({ lessonId }) => {
           transition={{ duration: 0.6, type: "spring", stiffness: 260, damping: 20 }}
           className="w-full h-full relative preserve-3d"
         >
-          <div className="absolute inset-0 backface-hidden bg-background border border-ink/5 rounded-3xl flex items-center justify-center p-8 text-center">
+          <div className="absolute inset-0 backface-hidden bg-background border border-ink/5 rounded-xl flex items-center justify-center p-8 text-center">
             <h3 className="text-xl font-bold text-ink">{cards[currentIndex]?.front || ''}</h3>
           </div>
-          <div className="absolute inset-0 backface-hidden bg-accent text-white rounded-3xl flex items-center justify-center p-8 text-center rotate-y-180">
+          <div className="absolute inset-0 backface-hidden bg-accent text-white rounded-xl flex items-center justify-center p-8 text-center rotate-y-180">
             <p className="text-sm leading-relaxed">{cards[currentIndex]?.back || ''}</p>
           </div>
         </motion.div>
@@ -679,7 +679,7 @@ export const PedagogicalTools: React.FC<ToolProps> = ({ category, lessonId }) =>
                 initial={{ opacity: 0, scale: 0.9, y: 40 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.9, y: 40 }}
-                className="relative w-full max-w-2xl bg-paper rounded-3xl shadow-md overflow-hidden flex flex-col max-h-[90vh]"
+                className="relative w-full max-w-2xl bg-paper rounded-xl shadow-md overflow-hidden flex flex-col max-h-[90vh]"
               >
                 {/* Modal Header */}
                 <div className="p-8 pb-4 flex justify-between items-start border-b border-ink/5">

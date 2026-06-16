@@ -3,7 +3,7 @@ const LEVEL_STYLES = {
   high: "bg-orange-50 text-orange-700",
   medium: "bg-yellow-50 text-yellow-800",
   low: "bg-blue-50 text-blue-700",
-  pending: "bg-slate-100 text-slate-600",
+  pending: "bg-surface-mid text-ink-secondary",
   approved: "bg-emerald-50 text-emerald-700",
   rejected: "bg-rose-50 text-rose-700",
 };

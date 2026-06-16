@@ -83,6 +83,8 @@ const start = async () => {
     appType: "custom",
   });
 
+  app.use(express.static(path.resolve(__dirname, "public")));
+
   app.use(vite.middlewares);
 
   app.use("*", async (req, res, next) => {

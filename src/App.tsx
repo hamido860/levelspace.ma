@@ -9,17 +9,11 @@ import { Modules } from './pages/Modules';
 import { LessonView } from './pages/LessonView';
 import { QuizInterface } from './pages/QuizInterface';
 import { Dashboard } from './pages/Dashboard';
-import { StudyPlanner } from './pages/StudyPlanner';
-import { Progress } from './pages/Progress';
 import { Settings } from './pages/Settings';
-import { AiKeysSettings } from './pages/AiKeysSettings';
-import { BlueprintHub } from './pages/BlueprintHub';
 import { ClassroomView } from './pages/ClassroomView';
-import { Library } from './pages/Library';
+import { LevelUp } from './pages/LevelUp';
 import { Admin } from './pages/Admin';
-import { AdminCurriculumDebug } from './pages/AdminCurriculumDebug';
 import { AdminCurriculumReview } from './pages/AdminCurriculumReview';
-import { AdminMcpLessons } from './pages/AdminMcpLessons';
 import { AiCommandCenter } from './pages/AiCommandCenter';
 import { AdminAiRecovery } from './pages/AdminAiRecovery';
 import { AdminAiRecoveryTaskDetail } from './pages/AdminAiRecoveryTaskDetail';
@@ -33,6 +27,7 @@ import { Pricing } from './pages/Pricing';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AICrewStatus } from './components/AICrewStatus';
+import { SelectionActions } from './components/SelectionActions';
 
 export default function App() {
   return (
@@ -52,17 +47,12 @@ export default function App() {
                 <Route path="/lesson/:id" element={<ProtectedRoute><LessonView /></ProtectedRoute>} />
                 <Route path="/classroom/:id" element={<ProtectedRoute><ClassroomView /></ProtectedRoute>} />
                 <Route path="/quiz/:id" element={<ProtectedRoute><QuizInterface /></ProtectedRoute>} />
-                <Route path="/blueprints" element={<ProtectedRoute><BlueprintHub /></ProtectedRoute>} />
-                <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
-                <Route path="/progress" element={<ProtectedRoute><Progress /></ProtectedRoute>} />
-                <Route path="/schedule" element={<ProtectedRoute><StudyPlanner /></ProtectedRoute>} />
+                <Route path="/levelup" element={<ProtectedRoute><LevelUp /></ProtectedRoute>} />
+                <Route path="/library" element={<Navigate to="/levelup" replace />} />
                 <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-                <Route path="/settings/ai-keys" element={<ProtectedRoute><AiKeysSettings /></ProtectedRoute>} />
                 <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                 <Route path="/admin" element={<ProtectedRoute requireAdmin><Admin /></ProtectedRoute>} />
-                <Route path="/admin/curriculum-debug" element={<ProtectedRoute requireAdmin><AdminCurriculumDebug /></ProtectedRoute>} />
                 <Route path="/admin/curriculum-review" element={<ProtectedRoute requireAdmin><AdminCurriculumReview /></ProtectedRoute>} />
-                <Route path="/admin/mcp-lessons" element={<ProtectedRoute requireAdmin><AdminMcpLessons /></ProtectedRoute>} />
                 <Route path="/admin/ai-command-center" element={<ProtectedRoute requireAdmin><AiCommandCenter /></ProtectedRoute>} />
                 <Route path="/admin/ai-diagnostics" element={<ProtectedRoute requireAdmin><AdminAiDiagnostics /></ProtectedRoute>} />
                 <Route path="/admin/ai-recovery" element={<ProtectedRoute requireAdmin><AdminAiRecovery /></ProtectedRoute>} />
@@ -74,6 +64,7 @@ export default function App() {
                 <Route path="/admin/ai-recovery/logs" element={<ProtectedRoute requireAdmin><AdminAiRecovery /></ProtectedRoute>} />
               </Routes>
             </Router>
+            <SelectionActions />
             <Toaster position="bottom-right" richColors />
             <AICrewStatus />
           </SearchProvider>

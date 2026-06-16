@@ -37,9 +37,9 @@ export const Login: React.FC = () => {
       if (mode === 'login') {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        navigate('/dashboard');
+        navigate(from || '/dashboard');
       } else {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -49,7 +49,12 @@ export const Login: React.FC = () => {
           }
         });
         if (error) throw error;
-        alert('Check your email for the confirmation link!');
+
+        if (data.session) {
+          navigate(from || '/dashboard');
+        } else {
+          alert('Check your email for the confirmation link!');
+        }
       }
     } catch (err: any) {
       setError(err.message);
@@ -60,7 +65,12 @@ export const Login: React.FC = () => {
 
   const handleSocialLogin = async (provider: 'google' | 'facebook') => {
     try {
-      const { error } = await supabase.auth.signInWithOAuth({ provider });
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: window.location.origin
+        }
+      });
       if (error) throw error;
     } catch (err: any) {
       if (err.message.includes('not enabled')) {
@@ -88,38 +98,101 @@ export const Login: React.FC = () => {
   return (
     <Layout hideSidebar>
       <SEO title={mode === 'login' ? "Login" : "Sign Up"} />
-      <div className="min-h-[100dvh] w-full flex items-center justify-center bg-background p-4 md:p-8 font-sans relative overflow-hidden">
-        {/* Background Accents */}
-        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_0%_0%,_var(--tw-gradient-stops))] from-accent/5 via-transparent to-transparent pointer-events-none" />
-        <div className="absolute bottom-0 right-0 w-full h-full bg-[radial-gradient(circle_at_100%_100%,_var(--tw-gradient-stops))] from-accent/5 via-transparent to-transparent pointer-events-none" />
+      <div className="min-h-[100dvh] w-full flex items-center justify-center bg-[#f7f7f6] p-3 font-sans relative overflow-hidden">
+        {/* Background Accents with Animation */}
+        <motion.div 
+          animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
+          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-accent/20 via-accent/5 to-transparent blur-3xl pointer-events-none" 
+        />
+        <motion.div 
+          animate={{ scale: [1, 1.2, 1], opacity: [0.2, 0.4, 0.2] }}
+          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+          className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-accent/15 via-transparent to-transparent blur-3xl pointer-events-none" 
+        />
 
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="w-full max-w-md bg-paper rounded-[2rem] shadow-md shadow-ink/5 border border-ink/5 overflow-hidden lg:scale-[0.70] lg:origin-center"
+          transition={{ duration: 0.6, ease: "easeOut" }}
+          className="w-full max-w-[73.5rem] overflow-hidden rounded-[2.5rem] border border-black/5 bg-white shadow-2xl shadow-black/5 relative z-10 grid min-h-[min(832px,calc(100dvh-1.5rem))] md:grid-cols-[0.8fr_1.2fr]"
         >
-          {/* Top Branding Bar */}
-          <div className="bg-accent p-6 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-paper/20  rounded-lg flex items-center justify-center border border-paper/30">
-                <BookOpen className="text-paper w-5 h-5" />
+          {/* Left Panel: Premium Branding & Info showcase (Hidden on narrow mobile) */}
+          <aside className="relative hidden overflow-hidden bg-slate-950 p-11 text-white md:flex md:flex-col md:justify-between">
+            <div className="absolute -right-20 -top-16 h-64 w-64 rounded-full bg-accent/30 blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-20 -left-14 h-56 w-56 rounded-full bg-blue-400/20 blur-3xl pointer-events-none" />
+            
+            <div className="relative">
+              <div className="mb-9 flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent text-white shadow-lg shadow-accent/30">
+                  <Sparkles className="h-6 w-6" />
+                </div>
+                <span className="font-display text-2xl font-bold tracking-tight">Levelspace</span>
               </div>
-              <span className="text-paper font-display font-bold tracking-tight">LevelSpace</span>
-            </div>
-            <div className="text-[10px] font-mono font-bold text-paper/60 uppercase tracking-normal">
-              MMXXIV
-            </div>
-          </div>
-
-          <div className="p-8 md:p-10 space-y-8">
-            <div className="space-y-2">
-              <h2 className="text-3xl font-serif font-medium tracking-tight text-ink">
-                {mode === 'login' ? 'Welcome back' : 'Create account'}
-              </h2>
-              <p className="text-muted text-sm font-light">
-                {mode === 'login' ? 'Please enter your details to sign in.' : 'Join our community of curated learners.'}
+              <p className="mb-4 text-sm font-bold uppercase tracking-[0.22em] text-blue-300">Authentication Command Center</p>
+              <h2 className="max-w-sm text-3xl font-bold leading-tight">Content is everywhere. Guidance is not.</h2>
+              <p className="mt-5 max-w-xs text-base font-medium leading-relaxed text-white/60">
+                Unlock your personalized learning space. Track focus, master subjects, and level up with AI-guided curriculums.
               </p>
+            </div>
+
+            <div className="relative space-y-3 mt-8">
+              {[
+                ['01', 'Curriculum-aware classrooms'],
+                ['02', 'AI-guided modular lessons'],
+                ['03', 'Deep focus & mastery metrics'],
+              ].map(([number, label]) => (
+                <div key={number} className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 px-4 py-3.5">
+                  <span className="text-base font-bold tracking-widest text-blue-300">{number}</span>
+                  <span className="text-base font-semibold text-white/80">{label}</span>
+                </div>
+              ))}
+            </div>
+          </aside>
+
+          {/* Right Panel: Clean form selection & inputs */}
+          <div className="bg-white p-8 text-slate-950 md:p-14 flex flex-col justify-center space-y-8">
+            <div className="space-y-4">
+              <h2 className="text-4xl font-serif font-medium tracking-tight text-slate-950">
+                {mode === 'login' ? 'Welcome back' : 'Create your space'}
+              </h2>
+              <p className="text-slate-500 text-base font-light">
+                {mode === 'login' ? 'Please enter your details to sign in.' : 'Find your level. Build your skills. Level up with confidence.'}
+              </p>
+            </div>
+
+            {/* Tab Selector */}
+            <div className="flex bg-slate-100 rounded-2xl p-1 shrink-0">
+              <button
+                type="button"
+                onClick={() => setMode('login')}
+                className={`flex-1 py-3 rounded-xl text-base font-semibold transition-all cursor-pointer ${
+                  mode === 'login'
+                    ? 'bg-white text-slate-950 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                Sign In
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode('signup')}
+                className={`flex-1 py-3 rounded-xl text-base font-semibold transition-all cursor-pointer ${
+                  mode === 'signup'
+                    ? 'bg-white text-slate-950 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                Sign Up
+              </button>
+              <button
+                type="button"
+                onClick={handleDemoAdminLogin}
+                className="flex-1 py-3 rounded-xl text-base font-semibold text-accent hover:bg-accent/5 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Sparkles size={17} />
+                Demo Admin
+              </button>
             </div>
 
             {error && (
@@ -130,10 +203,10 @@ export const Login: React.FC = () => {
             )}
 
             <form className="space-y-6" onSubmit={handleAuth}>
-              <div className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-mono font-bold text-muted uppercase tracking-normal px-1 flex items-center gap-2">
-                    <Mail className="w-3 h-3" />
+              <div className="space-y-5">
+                <div className="space-y-2">
+                  <label className="text-sm font-mono font-bold text-slate-500 uppercase tracking-normal px-1 flex items-center gap-3">
+                    <Mail className="w-4 h-4" />
                     Email Address
                   </label>
                   <input 
@@ -142,15 +215,33 @@ export const Login: React.FC = () => {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="name@example.com"
-                    className="w-full h-11 bg-background border border-ink/5 rounded-xl px-4 focus:ring-1 focus:ring-accent/30 outline-none transition-all text-sm font-medium"
+                    className="w-full h-15 bg-white border border-slate-200 rounded-2xl px-6 text-lg font-medium text-slate-950 placeholder:text-slate-500 outline-none transition-all hover:border-slate-300 focus:border-accent/40 focus:ring-2 focus:ring-accent/30"
                   />
                 </div>
-                <div className="space-y-1.5">
+                <div className="space-y-2">
                   <div className="flex items-center justify-between px-1">
-                    <label className="text-[10px] font-mono font-bold text-muted uppercase tracking-normal flex items-center gap-2">
-                      <Lock className="w-3 h-3" />
+                    <label className="text-sm font-mono font-bold text-slate-500 uppercase tracking-normal flex items-center gap-3">
+                      <Lock className="w-4 h-4" />
                       Password
                     </label>
+                    {mode === 'login' && (
+                      <button 
+                        type="button" 
+                        onClick={() => {
+                          if (!email) {
+                            setError('Please enter your email address first to reset your password.');
+                            return;
+                          }
+                          supabase.auth.resetPasswordForEmail(email, {
+                            redirectTo: `${window.location.origin}/reset-password`,
+                          });
+                          alert("If an account exists, a password reset email has been sent.");
+                        }}
+                        className="text-base font-medium text-accent hover:underline"
+                      >
+                        Forgot password?
+                      </button>
+                    )}
                   </div>
                   <input 
                     type="password" 
@@ -158,7 +249,7 @@ export const Login: React.FC = () => {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full h-11 bg-background border border-ink/5 rounded-xl px-4 focus:ring-1 focus:ring-accent/30 outline-none transition-all text-sm font-medium"
+                    className="w-full h-15 bg-white border border-slate-200 rounded-2xl px-6 text-lg font-medium text-slate-950 placeholder:text-slate-500 outline-none transition-all hover:border-slate-300 focus:border-accent/40 focus:ring-2 focus:ring-accent/30"
                   />
                 </div>
               </div>
@@ -166,73 +257,49 @@ export const Login: React.FC = () => {
               <button 
                 type="submit"
                 disabled={loading}
-                className="group w-full h-12 bg-ink text-paper rounded-full font-medium text-base shadow-sm shadow-ink/10 hover:bg-accent active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                className="group w-full h-15 bg-slate-950 text-white rounded-2xl font-semibold text-lg shadow-md shadow-slate-950/15 hover:shadow-lg hover:shadow-slate-950/25 hover:-translate-y-0.5 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:hover:translate-y-0 cursor-pointer"
               >
                 {loading ? 'Processing...' : mode === 'login' ? 'Sign In' : 'Sign Up'}
-                {!loading && <LogIn className="w-4 h-4 group-hover:translate-x-1 transition-transform" />}
+                {!loading && <LogIn className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" />}
               </button>
             </form>
 
-            <div className="rounded-2xl border border-accent/15 bg-accent/5 p-4 space-y-3">
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-xl bg-accent text-paper flex items-center justify-center shrink-0">
-                  <Sparkles className="w-4 h-4" />
-                </div>
-                <div className="space-y-1">
-                  <h3 className="text-sm font-bold text-ink">Admin demo mode</h3>
-                  <p className="text-xs text-muted leading-relaxed">
-                    Open the platform with a local admin identity for demos and UI testing, without a real Supabase login.
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                disabled={loading}
-                onClick={handleDemoAdminLogin}
-                className="w-full h-11 bg-accent text-paper rounded-full flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-normal hover:bg-accent-hover transition-all disabled:opacity-50"
-              >
-                Enter Admin Demo
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
+            <button
+              type="button"
+              disabled={loading}
+              onClick={handleDemoAdminLogin}
+              className="w-full h-15 border border-accent/20 bg-accent/5 text-accent rounded-2xl flex items-center justify-center gap-3 text-base font-medium hover:bg-accent/10 transition-all disabled:opacity-50 cursor-pointer"
+            >
+              <Sparkles className="w-5 h-5" />
+              Continue as Demo Admin
+              <ArrowRight className="w-5 h-5" />
+            </button>
 
             <div className="relative py-2">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-ink/5"></div>
               </div>
-              <div className="relative flex justify-center text-[9px] uppercase tracking-[0.2em] font-mono font-bold">
-                <span className="bg-paper px-4 text-muted/60">Or continue with</span>
+              <div className="relative flex justify-center text-sm uppercase tracking-[0.28em] font-mono font-bold">
+                <span className="bg-white px-6 text-slate-400">Or continue with</span>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-4">
               <button 
                 onClick={() => handleSocialLogin('google')}
-                className="h-11 bg-background border border-ink/5 rounded-full flex items-center justify-center gap-2 hover:bg-ink/5 transition-all group"
+                className="h-15 bg-white border border-slate-200 rounded-2xl flex items-center justify-center gap-3 hover:bg-slate-50 hover:-translate-y-0.5 shadow-sm hover:shadow-md transition-all group cursor-pointer"
               >
-                <img src="https://www.google.com/favicon.ico" alt="Google" className="w-3.5 h-3.5 grayscale group-hover:grayscale-0 transition-all" />
-                <span className="text-[10px] font-bold text-ink uppercase tracking-normal">Google</span>
+                <img src="https://www.google.com/favicon.ico" alt="Google" className="w-4 h-4 grayscale group-hover:grayscale-0 transition-all" />
+                <span className="text-base font-bold text-slate-950 uppercase tracking-normal">Google</span>
               </button>
               <button 
                 onClick={() => handleSocialLogin('facebook')}
-                className="h-11 bg-background border border-ink/5 rounded-full flex items-center justify-center gap-2 hover:bg-ink/5 transition-all group"
+                className="h-15 bg-white border border-slate-200 rounded-2xl flex items-center justify-center gap-3 hover:bg-slate-50 hover:-translate-y-0.5 shadow-sm hover:shadow-md transition-all group cursor-pointer"
               >
-                <Facebook className="w-3.5 h-3.5 text-[#1877F2]" />
-                <span className="text-[10px] font-bold text-ink uppercase tracking-normal">Facebook</span>
+                <Facebook className="w-5 h-5 text-[#1877F2]" />
+                <span className="text-base font-bold text-slate-950 uppercase tracking-normal">Facebook</span>
               </button>
             </div>
-
-            <p className="text-center text-[11px] text-muted font-medium pt-2">
-              {mode === 'login' ? "Don't have an account?" : "Already have an account?"} 
-              <button 
-                onClick={() => setMode(mode === 'login' ? 'signup' : 'login')} 
-                className="font-bold text-accent hover:underline flex items-center gap-1 mx-auto mt-1 uppercase tracking-normal text-[9px]"
-              >
-                {mode === 'login' ? 'Sign up for free' : 'Sign in instead'}
-                <ArrowRight className="w-3 h-3" />
-              </button>
-            </p>
           </div>
         </motion.div>
       </div>

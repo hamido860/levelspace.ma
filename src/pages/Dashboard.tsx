@@ -7,6 +7,8 @@ import {
   RefreshCw,
   Settings,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Check,
   Plus,
   Search,
@@ -17,7 +19,9 @@ import {
   Zap,
   Loader2,
   AlertCircle,
-  Cloud
+  Cloud,
+  Activity,
+  Play
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
@@ -37,12 +41,83 @@ import { ConnectionStatusModal } from '../components/ConnectionStatusModal';
 import { OnboardingModal } from '../components/OnboardingModal';
 import { CalendarWidget } from '../components/CalendarWidget';
 import { PlanSessionModal } from '../components/PlanSessionModal';
+import { SupportZoneModal } from '../components/SupportZoneModal';
+
+const getLessonIllustration = (title: string | null | undefined, category?: string | null | undefined) => {
+  const t = String(title || '').toLowerCase();
+  const c = String(category || '').toLowerCase();
+  
+  if (
+    t.includes('math') || 
+    t.includes('geom') || 
+    t.includes('arith') || 
+    t.includes('calcul') || 
+    t.includes('algebra') || 
+    t.includes('suite') || 
+    t.includes('série') || 
+    t.includes('analyse') || 
+    c.includes('math')
+  ) {
+    return '/illustrations/math_geometry.png';
+  }
+  if (
+    t.includes('physic') || 
+    t.includes('physiq') || 
+    t.includes('chem') || 
+    t.includes('chim') || 
+    t.includes('electr') || 
+    t.includes('circuit') || 
+    t.includes('combust') || 
+    c.includes('phys') || 
+    c.includes('chim')
+  ) {
+    return '/illustrations/physics_chemistry.png';
+  }
+  if (
+    t.includes('svt') || 
+    t.includes('earth') || 
+    t.includes('life') || 
+    t.includes('tecton') || 
+    t.includes('plaqu') || 
+    t.includes('séisme') || 
+    t.includes('volcan') || 
+    t.includes('roche') || 
+    t.includes('géolog') || 
+    t.includes('biolog') || 
+    c.includes('svt') || 
+    c.includes('vie')
+  ) {
+    return '/illustrations/earth_sciences.png';
+  }
+  if (
+    t.includes('lang') || 
+    t.includes('arab') || 
+    t.includes('french') || 
+    t.includes('franç') || 
+    t.includes('read') || 
+    t.includes('book') || 
+    t.includes('littér') || 
+    t.includes('philoso') || 
+    t.includes('lexiq') || 
+    t.includes('gramm') || 
+    t.includes('ortho') || 
+    t.includes('conju') || 
+    c.includes('lang') || 
+    c.includes('fr') || 
+    c.includes('ar') || 
+    c.includes('phil')
+  ) {
+    return '/illustrations/humanities_languages.png';
+  }
+  return '/illustrations/default_edu.png';
+};
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const { user, profile, isPro, signOut, dbConnected, refreshDbConnection, syncData } = useAuth();
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const [timerActive, setTimerActive] = useState(false);
   const [selectedModule, setSelectedModule] = useState<{ id: string, name: string } | null>(null);
   const [isFetchingGallery, setIsFetchingGallery] = useState(false);
@@ -61,15 +136,58 @@ export const Dashboard: React.FC = () => {
   const [isPlanSessionOpen, setIsPlanSessionOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
+  const [showMetrics, setShowMetrics] = useState(false);
+  const [sidebarCollapsedSections, setSidebarCollapsedSections] = useState({
+    pomodoro: false,
+    support: false,
+    stats: false,
+  });
+
+  const toggleSidebarSection = (section: 'pomodoro' | 'support' | 'stats') => {
+    setSidebarCollapsedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
 
   React.useEffect(() => {
-    const hasCompleted = localStorage.getItem('has_completed_onboarding');
-    if (hasCompleted !== 'true') {
+    const hasCompleted = localStorage.getItem('has_completed_onboarding') === 'true' || profile?.onboarding_completed === true;
+    if (!hasCompleted) {
       setIsOnboardingOpen(true);
     }
-  }, []);
+  }, [profile?.onboarding_completed]);
 
-  const allModules = useLiveQuery(() => db.modules.toArray()) || [];
+  const allModulesVal = useLiveQuery(() => db.modules.toArray());
+  const allLessonsVal = useLiveQuery(() => db.lessons.toArray());
+  
+  const allModules = allModulesVal || [];
+  const allLessons = allLessonsVal || [];
+
+  const lessonCountByModuleId = useMemo(
+    () => allLessons.reduce<Record<string, number>>((acc, l) => {
+      acc[l.moduleId] = (acc[l.moduleId] || 0) + 1;
+      return acc;
+    }, {}),
+    [allLessons],
+  );
+
+  const lastActivityByModuleId = useMemo(
+    () => allLessons.reduce<Record<string, number>>((acc, l) => {
+      if (!acc[l.moduleId] || l.createdAt > acc[l.moduleId]) acc[l.moduleId] = l.createdAt;
+      return acc;
+    }, {}),
+    [allLessons],
+  );
+
+  const relativeTime = (ts: number) => {
+    const diff = Date.now() - ts;
+    const minutes = Math.floor(diff / 60000);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  };
   const lastViewedLessonId = useLiveQuery(async () => {
     const setting = await db.settings.get('last_viewed_lesson_id');
     return setting?.value;
@@ -78,12 +196,18 @@ export const Dashboard: React.FC = () => {
   const visibleLastLesson = lastLesson && isStudentVisibleLesson(lastLesson) ? lastLesson : undefined;
 
   const activeModules = useMemo(() => allModules.filter(m => m.selected), [allModules]);
-  const reminders = useLiveQuery(() => db.tasks.toArray()) || [];
-  const schedule = useLiveQuery(() => db.schedule.toArray()) || [];
-  const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
+  const remindersVal = useLiveQuery(() => db.tasks.toArray());
+  const scheduleVal = useLiveQuery(() => db.schedule.toArray());
+  const dbSettingsVal = useLiveQuery(() => db.settings.toArray());
+
+  const isLoading = allModulesVal === undefined || allLessonsVal === undefined || remindersVal === undefined || scheduleVal === undefined || dbSettingsVal === undefined;
+  
+  const reminders = remindersVal || [];
+  const schedule = scheduleVal || [];
+  const dbSettings = dbSettingsVal || [];
   const settingsMap = useMemo(() => Object.fromEntries(dbSettings.map(s => [s.key, s.value])), [dbSettings]);
 
-  const selectedGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || 'Grade 12';
+  const selectedGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || '';
   const selectedCountry = settingsMap['selected_country'] || localStorage.getItem('selected_country') || '';
   const currentSession = settingsMap['current_session'] || localStorage.getItem('current_session') || 'Fall 2024';
   const defaultDuration = Number(settingsMap['default_session_duration'] || localStorage.getItem('default_session_duration') || 25);
@@ -157,7 +281,7 @@ export const Dashboard: React.FC = () => {
           status: (lesson as any)._pending ? 'pending' : 'done',
           createdAt: Date.now()
         });
-        navigate(`/lesson/${newLessonId}`);
+        navigate(`/lesson/${newLessonId}`, { state: { from: '/dashboard', moduleId: selectedModule.id } });
       }
     } catch (error) {
       console.error("Failed to fetch or generate lesson:", error);
@@ -228,428 +352,266 @@ export const Dashboard: React.FC = () => {
   }, [isReminderModalOpen]);
 
   return (
-    <Layout>
+    <Layout fullWidth>
       <SEO title="Dashboard" />
-      <div className="max-w-7xl mx-auto space-y-12 pb-20 relative">
-        {/* Top Bar - Minimal Actions */}
-        <div className="flex items-center justify-between px-4">
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 bg-accent rounded-xl flex items-center justify-center ">
-              <Brain className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-lg font-bold text-slate-950 leading-tight dark:text-ink">{t('dashboard')}</h1>
-              <p className="ls-micro-label">{t('academic_repository')}</p>
-            </div>
-          </div>
+      <div className="h-full w-full bg-background flex flex-col overflow-hidden p-4">
+        
+        {/* Symmetrical Layout Container */}
+        <div className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-3 overflow-hidden">
           
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={() => navigate('/pricing')}
-              className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-semibold transition-all ${
-                isPro 
-                  ? 'bg-accent/10 border-accent/20 text-accent shadow-sm' 
-                  : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 dark:bg-paper dark:border-white/10 dark:text-ink-muted dark:hover:border-white/20'
-              }`}
-            >
-              {isPro ? <Sparkles className="w-3 h-3" /> : <Zap className="w-3 h-3" />}
-              {isPro ? 'Pro Member' : 'Free Plan'}
-            </button>
-            {dbConnected !== null && (
-              <div className="flex items-center gap-1">
-                <button 
-                  onClick={async () => {
-                    setIsSyncing(true);
-                    try {
-                      const results = await syncData();
-                      if (results.errors.length > 0) {
-                        alert(`Sync completed with errors:\n${results.errors.join('\n')}`);
-                      } else {
-                        alert(`Sync successful!\nModules: ${results.modules}\nLessons: ${results.lessons}\nTasks: ${results.tasks}`);
-                      }
-                    } catch (err) {
-                      alert('Sync failed. Please check your connection.');
-                    } finally {
-                      setIsSyncing(false);
-                    }
-                  }}
-                  disabled={isSyncing || !dbConnected}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${dbConnected ? 'bg-accent/10 border-accent/20 text-accent' : 'bg-error/10 border-error/20 text-error'} text-[11px] font-semibold  transition-all disabled:opacity-50`}
+          {/* Column 2: Main Dashboard Content (Middle Column, flex-grow) */}
+          <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 p-6">
+            <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6">
+              {/* Page Header */}
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/5 pb-5">
+                <h1 className="ls-page-title text-slate-950 dark:text-ink">
+                  {t('dashboard') || 'Dashboard'}
+                </h1>
+                <button
+                  type="button"
+                  onClick={() => setShowMetrics(current => !current)}
+                  aria-expanded={showMetrics}
+                  className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-semibold text-slate-500 transition-all hover:bg-slate-100 hover:text-slate-700 dark:text-ink-muted dark:hover:bg-white/5 dark:hover:text-ink"
                 >
-                  {isSyncing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Cloud className="w-3 h-3" />}
-                  {isSyncing ? 'Syncing...' : 'Sync to Cloud'}
-                </button>
-                <button 
-                  onClick={() => setIsStatusModalOpen(true)}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${dbConnected ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600' : 'bg-error/10 border-error/20 text-error'} text-[11px] font-semibold  transition-all`}
-                >
-                  <div className={`w-1.5 h-1.5 rounded-full ${dbConnected ? 'bg-emerald-500' : 'bg-error'} animate-pulse`} />
-                  {dbConnected ? 'Cloud Connected' : 'Local Only'}
-                </button>
-                <button 
-                  onClick={async () => {
-                    await refreshDbConnection();
-                  }}
-                  className="p-1.5 hover:bg-slate-950/5 rounded-full text-slate-500 transition-all dark:text-ink-muted dark:hover:bg-surface-low"
-                  title="Refresh Connection"
-                >
-                  <RefreshCw className={`w-3 h-3 ${dbConnected === null ? 'animate-spin' : ''}`} />
+                  {showMetrics ? 'Hide metrics' : 'Show metrics'}
+                  {showMetrics ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                 </button>
               </div>
-            )}
-            <button 
-              onClick={() => setShowAuditModal(true)}
-              className="flex items-center gap-2 px-4 py-2 ls-card ls-micro-label hover:border-accent/30 hover:text-accent transition-all"
-            >
-              <Search className="w-3.5 h-3.5" />
-              {t('run_audit')}
-            </button>
-            <button 
-              onClick={async () => {
-                if (confirm(t('reset_confirm'))) {
-                  await db.modules.clear();
-                  await db.lessons.clear();
-                  await db.tasks.clear();
-                  await db.schedule.clear();
-                  localStorage.removeItem('curated_modules');
-                  window.location.reload();
-                }
-              }}
-              className="flex items-center gap-2 px-4 py-2 ls-card text-xs font-medium text-error/60  hover:bg-error/5 hover:text-error transition-all"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              {t('reset')}
-            </button>
-          </div>
-        </div>
 
-        {/* Hero Section - Minimal & Clean */}
-        <section className="relative overflow-hidden ls-card-pad mx-4 p-8">
-          <div className="relative z-10 max-w-lg space-y-6">
-            <div className="space-y-2">
-              <div className="flex items-center gap-3">
-                <p className="ls-status-badge">
-                  {t('personalized_for', { grade: selectedGrade })}
-                </p>
-                <div className="w-1 h-1 rounded-full bg-slate-950/20" />
-                <p className="text-xs font-medium text-slate-500 dark:text-ink-muted">
-                  {currentSession}
-                </p>
+              {showMetrics && <section className="mt-2">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  {[
+                    { label: 'Focus Quotient', value: '8.4', unit: '/10', icon: <Brain />, trend: '+12%' },
+                    { label: 'Deep Work Total', value: '24.5', unit: 'hrs', icon: <Timer />, trend: '+4.2h' },
+                    { label: 'Mastery Delta', value: '+18', unit: '%', icon: <Zap />, trend: 'Optimal' },
+                    { label: 'Lessons to Review', value: '2', unit: '', icon: <AlertCircle />, trend: '-1 this week' }
+                  ].map((stat, i) => (
+                    <motion.div 
+                      key={i}
+                      initial={{ opacity: 0, y: 10 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.05 }}
+                      viewport={{ once: true }}
+                      className="bg-slate-50/50 dark:bg-surface-low/30 p-5 rounded-2xl border border-slate-100 dark:border-white/5 space-y-3 shadow-sm hover:border-accent/30 transition-all cursor-default"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-surface-low flex items-center justify-center text-slate-400 dark:text-ink-muted">
+                          {React.cloneElement(stat.icon as React.ReactElement<any>, { size: 16 })}
+                        </div>
+                        <span className="text-[9px] font-bold text-emerald-500 uppercase tracking-normal">{stat.trend}</span>
+                      </div>
+                      
+                      <div className="space-y-1">
+                        <p className="text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-normal">{stat.label}</p>
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-2xl font-bold text-slate-800 dark:text-ink">{stat.value}</span>
+                          <span className="text-[10px] font-medium text-slate-400 dark:text-ink-muted">{stat.unit}</span>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </section>}
+
+              {/* Bottom Utilities: Interactive Calendar & Upcoming Assignments Grid */}
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+                
+                {/* Academic Calendar Utility */}
+                <div className="flex flex-col min-h-0">
+                  <CalendarWidget />
+                </div>
+
+                {/* Upcoming Assignments Utility */}
+                <div className="bg-white dark:bg-paper rounded-2xl border border-slate-200 dark:border-white/8 p-5 shadow-sm space-y-4 flex flex-col min-h-0">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-white/5">
+                    <div className="flex items-center gap-2 text-slate-900 dark:text-ink">
+                      <BookOpen className="w-4.5 h-4.5 text-accent shrink-0" />
+                      <h3 className="text-sm font-bold">{t('upcoming_assignments') || 'Upcoming Assignments'}</h3>
+                    </div>
+                    <button 
+                      onClick={() => setIsReminderModalOpen(true)} 
+                      className="text-xs font-bold text-accent hover:underline flex items-center gap-1"
+                    >
+                      <Plus size={12} /> {t('add') || 'Add'}
+                    </button>
+                  </div>
+                  
+                  <div className="flex flex-col gap-3 overflow-y-auto no-scrollbar max-h-[360px]">
+                    {isLoading ? (
+                      <div className="py-12 flex justify-center items-center">
+                        <Loader2 className="w-5 h-5 text-accent animate-spin" />
+                      </div>
+                    ) : reminders.filter(r => !r.completed).length > 0 ? (
+                      reminders
+                        .filter(r => !r.completed)
+                        .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
+                        .slice(0, 5)
+                        .map((reminder, i) => (
+                          <motion.div 
+                            key={reminder.id}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: i * 0.05 }}
+                            className="bg-slate-50/50 dark:bg-surface-low/30 border border-slate-100 dark:border-white/5 p-4 rounded-xl flex items-center justify-between group shadow-sm hover:border-accent/30 transition-all"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                                reminder.type === 'exam' || reminder.type === 'controle' 
+                                  ? 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400' 
+                                  : 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400'
+                              }`}>
+                                {reminder.type === 'exam' || reminder.type === 'controle' ? <AlertCircle size={18} /> : <BookOpen size={18} />}
+                              </div>
+                              <div>
+                                <h4 className="text-sm font-bold text-slate-950 line-clamp-1 dark:text-ink">{reminder.title}</h4>
+                                <p className="text-xs font-medium text-slate-500 mt-0.5 dark:text-ink-muted">
+                                  {reminder.dueDate ? format(new Date(reminder.dueDate), 'MMM dd, yyyy') : 'No date'}
+                                </p>
+                              </div>
+                            </div>
+                            <button 
+                              onClick={() => toggleReminder(reminder.id)}
+                              className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 transition-all dark:border-white/10 dark:hover:bg-emerald-500/10"
+                            >
+                              <Check size={14} />
+                            </button>
+                          </motion.div>
+                        ))
+                    ) : (
+                      <div className="py-12 text-center bg-slate-50/30 dark:bg-surface-low/10 rounded-xl border border-solid border-slate-100 dark:border-white/5">
+                        <p className="text-xs font-medium text-slate-500 dark:text-ink-muted">
+                          {t('no_pending_reminders') || 'No upcoming assignments. You are all caught up!'}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
               </div>
-              <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
-                {t('motivation_power')}
-              </h1>
-            </div>
-
-            <div className="flex flex-wrap gap-3">
-              <button 
-                onClick={() => navigate('/modules')}
-                className="ls-button-primary"
-              >
-                {t('dashboard_explore')}
-              </button>
-              <button 
-                onClick={() => navigate('/blueprints')}
-                className="ls-button-secondary"
-              >
-                {t('view_blueprints')}
-              </button>
-            </div>
-          </div>
-        </section>
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 px-4">
-          {/* Main Content - Classrooms */}
-          <div className="lg:col-span-8 space-y-8">
-            {/* Last Lesson Quick Action */}
-            {visibleLastLesson && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                onClick={() => navigate(`/lesson/${visibleLastLesson.id}`)}
-                className="ls-interactive-card-pad flex items-center justify-between group cursor-pointer"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="ls-icon-tile">
-                    <BookOpen size={20} />
-                  </div>
-                  <div>
-                    <p className="ls-micro-label">Continue Learning</p>
-                    <h3 className="text-sm font-bold text-slate-950 dark:text-ink">{visibleLastLesson.title}</h3>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 text-slate-600 dark:text-ink-secondary">
-                  <span className="text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">Resume</span>
-                  <ChevronRight size={18} />
-                </div>
-              </motion.div>
-            )}
-
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <h2 className="ls-section-title">{t('active_classrooms')}</h2>
-                <p className="ls-body-text">{t('active_paths_desc')}</p>
-              </div>
-              <button 
-                onClick={() => navigate('/modules')}
-                className="ls-button-secondary"
-              >
-                {t('manage')} <ArrowRight className="w-3 h-3" />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {allModules.length > 0 ? (
-                allModules.map((module, i) => (
-                  <motion.div
-                    key={module.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.05 }}
-                    onClick={() => handleModuleClick(module.id, module.name)}
-                    className="group relative ls-interactive-card cursor-pointer p-6 space-y-6"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="ls-badge">
-                        {module.code}
-                      </span>
-                      <div className="flex items-center gap-1.5">
-                        <span className={module.selected ? 'ls-status-badge' : 'ls-badge'}>{module.selected ? t('active') : t('inactive')}</span>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <h3 className="text-xl font-bold text-slate-950 leading-tight group-hover:text-accent transition-colors dark:text-ink">
-                        {module.name}
-                      </h3>
-                      <p className="ls-body-text line-clamp-2 leading-relaxed">
-                        {module.description}
-                      </p>
-                    </div>
-
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between ls-micro-label">
-                        <span>{t('progress')}</span>
-                        <span>{module.progress}%</span>
-                      </div>
-                      <div className="h-[4.5px] bg-surface-low rounded-full overflow-hidden dark:bg-surface-mid">
-                        <motion.div 
-                          initial={{ width: 0 }}
-                          animate={{ width: `${module.progress}%` }}
-                          className="h-full bg-accent"
-                        />
-                      </div>
-                    </div>
-                  </motion.div>
-                ))
-              ) : (
-                <div className="col-span-full py-20 bg-slate-50/30 border border-slate-200 rounded-2xl flex flex-col items-center justify-center text-center space-y-4 dark:bg-surface-low/20 dark:border-white/8">
-                  <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center dark:bg-surface-mid" style={{ boxShadow: 'var(--ls-shadow)' }}>
-                    <BookOpen className="w-6 h-6 text-slate-500 dark:text-ink-muted" />
-                  </div>
-                  <div className="space-y-1">
-                    <p className="font-bold text-slate-950 dark:text-ink">{t('dashboard_explore')}</p>
-                    <p className="ls-micro-label">{t('dashboard_continue')}</p>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
 
-          {/* Sidebar - Focus & Agenda */}
-          <div className="lg:col-span-4 space-y-8">
-            {/* Focus Timer Card */}
-            <section className="bg-[#0D1117] text-white rounded-2xl p-6 space-y-6">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-medium text-white/60">{t('deep_focus')}</h3>
-                <div className="flex items-center gap-1.5">
-                  <div className={`w-1.5 h-1.5 rounded-full ${isTimerRunning ? 'bg-accent animate-pulse' : 'bg-white/20'}`} />
-                  <span className="text-xs font-medium text-white/60 ">
-                    {isTimerRunning ? t('active') : t('idle')}
-                  </span>
-                </div>
-              </div>
+          {/* Column 3: Dashboard Widgets Sidebar (Right Column, 260px width) */}
+          <div className="flex lg:w-[234px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-5">
+            <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6 pr-1">
               
-              <div className="text-center">
-                <div className="text-5xl font-bold tracking-tighter mb-1">
-                  {formatTime(timerSeconds)}
-                </div>
-                <p className="text-xs font-medium text-white/40 ">{t('pomodoro_session')}</p>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setIsTimerRunning(!isTimerRunning)}
-                  className={`flex-1 py-3 rounded-xl font-bold text-[10px] transition-all ${
-                    isTimerRunning
-                      ? 'bg-white/10 text-white hover:bg-white/20'
-                      : 'bg-accent text-white hover:bg-white hover:text-[#0D1117]'
-                  }`}
+              {/* Deep Focus Pomodoro - Premium Calmer Box */}
+              <section className="bg-slate-900 text-white rounded-2xl p-5 relative dark:bg-surface-low">
+                <button 
+                  type="button" 
+                  onClick={() => toggleSidebarSection('pomodoro')} 
+                  className="w-full flex items-center justify-between text-xs font-bold text-slate-400 uppercase tracking-wider dark:text-ink-muted outline-none"
                 >
-                  {isTimerRunning ? t('pause') : t('dashboard_start')}
+                  <span>Deep Focus</span>
+                  {sidebarCollapsedSections.pomodoro ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
                 </button>
-                <button
-                  onClick={() => setIsPlanSessionOpen(true)}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-white/10 border border-white/10 rounded-xl text-[10px] font-bold text-white hover:bg-white/20 transition-all"
-                >
-                  <Brain className="w-3 h-3" />
-                  Plan
-                </button>
-                <button
-                  onClick={() => { setIsTimerRunning(false); setTimerSeconds(defaultDuration * 60); }}
-                  className="w-10 h-10 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center hover:bg-white/10 transition-all shrink-0"
-                >
-                  <RefreshCw className="w-3.5 h-3.5 text-white/60" />
-                </button>
-              </div>
-            </section>
-
-            {/* Calendar Widget */}
-            <CalendarWidget />
-
-            {/* Learning Stats */}
-            <section className="bg-white rounded-2xl p-6 border border-slate-200 dark:bg-paper dark:border-white/8">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <p className="text-[9px] font-bold text-slate-500 dark:text-ink-muted">{t('modules')}</p>
-                  <span className="ls-section-title">{activeModules.length}</span>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-[9px] font-bold text-slate-500 dark:text-ink-muted">{t('avg_completion')}</p>
-                  <span className="ls-section-title">
-                    {Math.round(activeModules.reduce((acc, m) => acc + m.progress, 0) / (activeModules.length || 1))}%
-                  </span>
-                </div>
-              </div>
-            </section>
-
-            {/* Reminders & Exams */}
-            <section className="space-y-6">
-              {/* Upcoming Exams & Controles */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-medium text-blue-700 flex items-center gap-2 dark:text-accent">
-                    <AlertCircle className="w-3 h-3" />
-                    {t('upcoming_exams')}
-                  </h3>
-                  <button 
-                    onClick={() => setIsReminderModalOpen(true)}
-                    className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Add
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  {reminders
-                    .filter(r => (r.type === 'exam' || r.type === 'controle') && !r.completed)
-                    .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
-                    .slice(0, 3)
-                    .map((reminder) => (
-                      <div key={reminder.id} className="flex items-center gap-3 p-3 bg-accent/5 border border-accent/10 rounded-xl">
-                        <div className="w-8 h-8 bg-accent/10 rounded-lg flex items-center justify-center shrink-0">
-                          <Brain className="w-4 h-4 text-accent" />
-                        </div>
-                        <div className="flex-grow min-w-0">
-                          <h4 className="text-xs font-bold text-slate-950 truncate dark:text-ink">{reminder.title}</h4>
-                          <p className="text-[9px] font-bold text-accent ">
-                            {reminder.type === 'exam' ? t('exam') : t('controle')} • {reminder.dueDate ? format(new Date(reminder.dueDate), 'MMM dd') : 'No date'}
-                          </p>
-                        </div>
-                        <button 
-                          onClick={() => toggleReminder(reminder.id)}
-                          className="w-6 h-6 rounded-full border-accent/20 flex items-center justify-center hover:bg-accent hover:text-white transition-all"
+                
+                <AnimatePresence initial={false}>
+                  {!sidebarCollapsedSections.pomodoro && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden mt-3"
+                    >
+                      <div className="text-3xl font-bold tracking-tight mb-3 text-white dark:text-ink">{formatTime(timerSeconds)}</div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setIsTimerRunning(!isTimerRunning)}
+                          className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                            isTimerRunning ? 'bg-slate-800 text-white hover:bg-slate-700' : 'bg-white text-slate-900 hover:bg-slate-100'
+                          }`}
                         >
-                          <Check size={12} />
+                          {isTimerRunning ? 'Pause' : 'Start Timer'}
+                        </button>
+                        <button
+                          onClick={() => { setIsTimerRunning(false); setTimerSeconds(defaultDuration * 60); }}
+                          className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-700 transition-all dark:bg-surface-mid"
+                        >
+                          <RefreshCw size={14} />
                         </button>
                       </div>
-                    ))}
-                  {reminders.filter(r => (r.type === 'exam' || r.type === 'controle') && !r.completed).length === 0 && (
-                    <p className="text-[10px] text-slate-500 italic px-2 dark:text-ink-muted">{t('no_pending_reminders')}</p>
+                    </motion.div>
                   )}
-                </div>
-              </div>
+                </AnimatePresence>
+              </section>
 
-              {/* General Reminders */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="ls-micro-label">{t('reminders')}</h3>
-                  <button className="text-[9px] font-bold text-accent ">{t('view_all')}</button>
-                </div>
-                <div className="space-y-2">
-                  {reminders
-                    .filter(r => r.type !== 'exam' && r.type !== 'controle' && !r.completed)
-                    .slice(0, 3)
-                    .map((reminder) => (
-                      <div key={reminder.id} onClick={() => toggleReminder(reminder.id)} className="flex items-center gap-3 p-3 ls-card cursor-pointer hover:border-accent/20 transition-all">
-                        <div className={`w-4 h-4 rounded border flex items-center justify-center ${reminder.completed ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-200 dark:border-white/15'}`}>
-                          {reminder.completed && <Check size={10} />}
+              {/* Support Zone / MyLevel - Collapsible & Premium borderless box */}
+              <section className="space-y-3">
+                <button 
+                  type="button" 
+                  onClick={() => toggleSidebarSection('support')}
+                  className="w-full flex items-center justify-between text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-wider outline-none"
+                >
+                  <span>Support Zone</span>
+                  {sidebarCollapsedSections.support ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
+                </button>
+                
+                <AnimatePresence initial={false}>
+                  {!sidebarCollapsedSections.support && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden mt-1"
+                    >
+                      <div className="p-4 bg-slate-50 dark:bg-surface-low/30 rounded-2xl border border-slate-100 dark:border-white/5 space-y-4 shadow-sm">
+                        <p className="text-xs text-slate-600 dark:text-ink-secondary leading-relaxed">
+                          Check your real level, discover your gaps, and get a personal roadmap.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setIsSupportModalOpen(true)}
+                          className="w-full py-2.5 rounded-xl text-xs font-bold transition-all bg-slate-900 text-white hover:bg-slate-800 dark:bg-white/10 dark:hover:bg-white/20"
+                        >
+                          Start MyLevel Check
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </section>
+
+              {/* Learning Stats - Collapsible & Premium borderless box */}
+              <section className="space-y-3">
+                <button 
+                  type="button" 
+                  onClick={() => toggleSidebarSection('stats')}
+                  className="w-full flex items-center justify-between text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-wider outline-none"
+                >
+                  <span>Learning Stats</span>
+                  {sidebarCollapsedSections.stats ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
+                </button>
+                
+                <AnimatePresence initial={false}>
+                  {!sidebarCollapsedSections.stats && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden mt-1"
+                    >
+                      <div className="p-4 bg-slate-50 dark:bg-surface-low/30 rounded-2xl border border-slate-100 dark:border-white/5 space-y-3 shadow-sm">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-slate-500 dark:text-ink-muted">{t('active_modules') || 'Active Modules'}</span>
+                          <span className="font-bold text-slate-800 dark:text-ink">{activeModules.length}</span>
                         </div>
-                        <div className="flex-grow min-w-0">
-                          <span className={`text-xs font-medium block truncate ${reminder.completed ? 'text-slate-500 line-through dark:text-ink-muted' : 'text-slate-950 dark:text-ink'}`}>{reminder.title}</span>
-                          {reminder.dueDate && (
-                            <span className="text-[8px] font-bold text-slate-500 dark:text-ink-muted">
-                              {format(new Date(reminder.dueDate), 'MMM dd')}
-                            </span>
-                          )}
+                        <div className="flex justify-between text-xs">
+                          <span className="text-slate-500 dark:text-ink-muted">{t('avg_completion') || 'Avg Completion'}</span>
+                          <span className="font-bold text-slate-800 dark:text-ink">
+                            {Math.round(activeModules.reduce((acc, m) => acc + m.progress, 0) / (activeModules.length || 1))}%
+                          </span>
                         </div>
                       </div>
-                    ))}
-                </div>
-              </div>
-            </section>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </section>
 
-            {/* Schedule */}
-            <section className="space-y-6">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold text-slate-950 dark:text-ink">{t('agenda')}</h3>
-                <CalendarIcon className="w-4 h-4 text-slate-500 dark:text-ink-muted" />
-              </div>
-              <div className="space-y-4">
-                {schedule.filter(e => e.date?.includes('-')).length > 0 ? (
-                  schedule
-                    .filter(e => e.date?.includes('-'))
-                    .sort((a, b) => a.date.localeCompare(b.date))
-                    .slice(0, 3)
-                    .map((event) => {
-                      const d = new Date(event.date);
-                      return (
-                        <div key={event.id} className="flex gap-4">
-                          <div className="flex flex-col items-center justify-center w-12 h-12 bg-slate-50 rounded-xl shrink-0 dark:bg-surface-low">
-                            <span className="text-[9px] font-medium text-slate-500 uppercase dark:text-ink-muted">{format(d, 'MMM')}</span>
-                            <span className="text-lg font-bold text-slate-950 leading-none dark:text-ink">{format(d, 'd')}</span>
-                          </div>
-                          <div className="space-y-1">
-                            <h4 className="text-sm font-bold text-slate-950 leading-tight dark:text-ink">{event.title}</h4>
-                            {event.time && (
-                              <div className="flex items-center gap-2 text-[10px] text-slate-500 font-medium uppercase tracking-wider dark:text-ink-muted">
-                                <Clock className="w-3 h-3" />
-                                {event.time}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })
-                ) : (
-                  <p className="ls-micro-label italic">{t('no_upcoming_events')}</p>
-                )}
-              </div>
-            </section>
-
-            {/* Preferences - Subtle */}
-            <div className="pt-10 border-t border-slate-200 dark:border-white/8">
-              <button
-                onClick={() => navigate('/settings')}
-                className="flex items-center gap-2 ls-micro-label hover:text-slate-950 transition-colors dark:hover:text-ink"
-              >
-                <Settings className="w-3.5 h-3.5" />
-                {t('preferences')}
-              </button>
             </div>
           </div>
         </div>
-
+      
         {/* Floating Action Button */}
         <motion.button
           whileHover={{ scale: 1.05 }}
@@ -880,8 +842,13 @@ export const Dashboard: React.FC = () => {
         isOpen={isOnboardingOpen}
         onComplete={() => {
           setIsOnboardingOpen(false);
-          window.location.reload();
         }}
+      />
+
+      <SupportZoneModal
+        isOpen={isSupportModalOpen}
+        onClose={() => setIsSupportModalOpen(false)}
+        grade={profile?.grade || "Grade 9"}
       />
     </Layout>
   );
