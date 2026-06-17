@@ -176,7 +176,11 @@ export const LessonBlock: React.FC<LessonBlockProps> = ({
         </div>
       )}
 
-      {contentText && !quiz && !exercise && !exam && <MarkdownText>{contentText}</MarkdownText>}
+      {contentText && !quiz && !exercise && !exam && (
+        <div className={item.purpose === 'example' ? 'md:whitespace-nowrap overflow-x-auto no-scrollbar' : ''}>
+          <MarkdownText>{contentText}</MarkdownText>
+        </div>
+      )}
 
       {Array.isArray(block.points) && block.points.length > 0 && (
         <ul className="lesson-reader-list">
@@ -197,7 +201,7 @@ export const LessonBlock: React.FC<LessonBlockProps> = ({
       {Array.isArray(block.examples) && block.examples.length > 0 && (
         <div className="lesson-reader-stack">
           {block.examples.map((example: any, index: number) => (
-            <div key={index} className="lesson-reader-example">
+            <div key={index} className="lesson-reader-example md:whitespace-nowrap overflow-x-auto no-scrollbar">
               {example.question && <MarkdownText>{example.question}</MarkdownText>}
               {Array.isArray(example.steps) && example.steps.map((step: string, stepIndex: number) => (
                 <div key={stepIndex} className="lesson-reader-example__step">
