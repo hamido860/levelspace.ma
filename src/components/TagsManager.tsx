@@ -65,7 +65,9 @@ export const TagsManager: React.FC<TagsManagerProps> = ({
             {!readonly && (
               <button 
                 onClick={(e) => { e.stopPropagation(); onRemoveTag(tag); }}
-                className="ml-0.5 rounded-full p-0.5 transition-colors hover:bg-error/10 hover:text-error"
+                title={`Remove tag ${tag}`}
+                aria-label={`Remove tag ${tag}`}
+                className="ml-0.5 rounded-full p-0.5 transition-colors hover:bg-error/10 hover:text-error focus:outline-none focus-visible:ring-2 focus-visible:ring-error focus-visible:ring-offset-1"
               >
                 <X className="h-3 w-3" />
               </button>
@@ -83,7 +85,7 @@ export const TagsManager: React.FC<TagsManagerProps> = ({
       {!readonly && (
         <div className="relative flex items-center">
           {isAdding ? (
-            <div className="flex items-center gap-1 rounded-full border border-ink/10 bg-paper px-3 py-1 shadow-sm">
+            <div className="flex items-center gap-1 rounded-full border border-ink/10 bg-paper px-3 py-1 shadow-sm focus-within:ring-2 focus-within:ring-accent focus-within:ring-offset-1">
               <input
                 ref={inputRef}
                 type="text"
@@ -92,6 +94,7 @@ export const TagsManager: React.FC<TagsManagerProps> = ({
                 onKeyDown={handleKeyDown}
                 onBlur={handleAdd}
                 placeholder="Add tag..."
+                aria-label="Add new tag"
                 className="w-24 bg-transparent text-[10px] font-medium text-ink outline-none placeholder:text-muted/50"
                 onClick={(e) => e.stopPropagation()}
               />
@@ -99,8 +102,9 @@ export const TagsManager: React.FC<TagsManagerProps> = ({
           ) : (
             <button
               onClick={(e) => { e.stopPropagation(); setIsAdding(true); }}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2"
               title="Add Tag"
+              aria-label="Add Tag"
             >
               <Plus className="h-4 w-4" />
               Add tag
