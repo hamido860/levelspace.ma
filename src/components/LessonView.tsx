@@ -77,12 +77,7 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson }) => {
         {activeTab === 'content' && (
           <div className="bg-paper p-8 rounded-xl border border-surface-mid shadow-sm prose prose-slate max-w-none">
             <div className="markdown-body">
-              <ReactMarkdown 
-                remarkPlugins={[remarkMath]} 
-                rehypePlugins={[rehypeKatex]}
-              >
-                {lesson.content}
-              </ReactMarkdown>
+              <ReactMarkdown>{lesson.content}</ReactMarkdown>
             </div>
           </div>
         )}
