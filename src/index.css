@@ -1426,7 +1426,11 @@ html[data-preview="mobile"] .lesson-view-container {
   margin-bottom: 1.25rem !important;
 }
 
-.lesson-reader-option .lesson-reader-markdown p {
+.lesson-reader-option .lesson-reader-markdown p,
+.lesson-feedback .lesson-reader-markdown p,
+.lesson-hint .lesson-reader-markdown p {
+  font-size: 0.9rem !important;
+  line-height: 1.6 !important;
   margin-bottom: 0 !important;
 }
 

@@ -227,8 +227,19 @@ export const LessonBlock: React.FC<LessonBlockProps> = ({
                 animate={{ opacity: 1, height: 'auto' }}
                 className={`lesson-feedback ${quizCorrect[sourceIndex] ? 'lesson-feedback--good' : 'lesson-feedback--review'}`}
               >
-                <strong>{quizCorrect[sourceIndex] ? 'Correct.' : 'Review this idea.'}</strong>
-                {quiz.explanation && <MarkdownText>{quiz.explanation}</MarkdownText>}
+                <div className="flex items-start gap-3">
+                  {quizCorrect[sourceIndex] ? (
+                    <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-success" />
+                  ) : (
+                    <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-error" />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-ink mb-1">
+                      {quizCorrect[sourceIndex] ? 'Correct!' : 'Review this idea.'}
+                    </p>
+                    {quiz.explanation && <MarkdownText>{quiz.explanation}</MarkdownText>}
+                  </div>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
