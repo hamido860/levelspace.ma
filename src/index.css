@@ -1,12 +1,12 @@
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@500;600;700;800&family=DM+Sans:wght@300;400;500&family=Inter:wght@100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Noto+Sans+Arabic:wght@100..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&family=Inter:wght@100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Noto+Sans+Arabic:wght@100..900&display=swap');
 @import "katex/dist/katex.min.css";
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --font-sans: "DM Sans", "Inter", "Noto Sans Arabic", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Syne", "Noto Sans Arabic", sans-serif;
+  --font-sans: "Plus Jakarta Sans", "Inter", "Noto Sans Arabic", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Plus Jakarta Sans", "Noto Sans Arabic", sans-serif;
   --font-serif: "Cormorant Garamond", "Noto Sans Arabic", serif;
   --font-mono: "JetBrains Mono", "Noto Sans Arabic", monospace;
 
@@ -331,27 +331,28 @@
 }
 
 .lesson-reader-block {
-  @apply py-2;
+  @apply py-4 md:py-6 px-1 md:px-4;
 }
 
 .lesson-reader-block__header {
-  @apply mb-5 flex items-start gap-4;
+  @apply mb-6 flex items-center gap-4 pb-4 border-b border-slate-100 dark:border-white/5;
 }
 
 .lesson-reader-block__icon {
-  @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-mid text-ink-secondary  ;
+  @apply flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-surface-low text-ink-secondary border border-slate-100 dark:border-white/5;
 }
 
 .lesson-reader-eyebrow {
-  @apply text-xs font-medium text-ink-muted ;
+  @apply text-[10px] font-extrabold uppercase tracking-widest text-ink-muted;
 }
 
 .lesson-reader-block__title {
-  @apply mt-1 text-xl font-bold leading-snug text-ink md:text-2xl;
+  font-family: var(--font-sans) !important;
+  @apply mt-0.5 text-lg font-extrabold tracking-tight text-ink md:text-xl;
 }
 
 .lesson-reader-block__status {
-  @apply hidden items-center rounded-full bg-surface-mid px-2.5 py-1 text-[11px] font-semibold text-ink-secondary md:inline-flex  ;
+  @apply hidden items-center rounded-full bg-surface-mid px-2.5 py-1 text-[10px] font-bold text-ink-secondary md:inline-flex;
 }
 
 .lesson-reader-block__status--viewed {
@@ -367,62 +368,65 @@
 }
 
 .lesson-reader-markdown {
-  @apply prose prose-sm max-w-none text-ink prose-p:leading-8 prose-li:leading-8 prose-headings:text-ink prose-strong:text-ink;
+  @apply prose prose-sm max-w-none text-ink prose-p:leading-relaxed prose-li:leading-relaxed prose-headings:text-ink prose-strong:text-ink;
 }
 
 .lesson-reader-list {
-  @apply mt-3 space-y-3 pl-5;
+  @apply mt-4 space-y-3.5 pl-6;
 }
 
 .lesson-reader-list li {
-  @apply list-disc text-ink;
+  @apply list-disc text-ink mb-2;
+  line-height: 1.75 !important;
 }
 
 .lesson-reader-stack {
-  @apply space-y-4;
+  @apply space-y-5;
 }
 
 .lesson-reader-example,
 .lesson-reader-check,
 .lesson-answer-panel,
 .lesson-hint {
-  @apply rounded-2xl bg-surface-low p-4;
+  @apply rounded-2xl bg-surface-low p-5 border border-slate-100 dark:border-white/5 shadow-sm;
 }
 
 .lesson-reader-check--exam {
-  @apply bg-warning-soft/70;
+  @apply bg-warning-soft/40 border-warning/15;
 }
 
 .lesson-reader-example__step {
-  @apply mt-3 rounded-xl bg-paper px-4 py-3;
+  @apply mt-3.5 rounded-xl bg-paper px-4 py-3 border border-slate-100 dark:border-white/5 shadow-sm;
 }
 
 .lesson-reader-options {
-  @apply mt-4 grid gap-2;
+  @apply mt-4 grid gap-3;
 }
 
 .lesson-reader-option {
-  @apply flex w-full items-center justify-between gap-3 rounded-2xl border border-surface-mid bg-paper px-4 py-3 text-left text-sm font-medium text-ink transition-colors hover:border-ink/15 disabled:cursor-default    ;
+  @apply flex w-full items-center justify-between gap-3 rounded-2xl border border-surface-mid bg-paper px-5 py-3.5 text-left text-sm font-medium text-ink transition-all hover:border-ink/15 hover:bg-surface-low/30 hover:scale-[1.005] active:scale-[0.995] disabled:cursor-default disabled:hover:scale-100 disabled:hover:bg-paper;
 }
 
 .lesson-reader-option--correct {
-  @apply border-success bg-success-soft text-success;
+  @apply border-success bg-success-soft text-success font-semibold;
+  box-shadow: 0 0 0 1px var(--color-success);
 }
 
 .lesson-reader-option--wrong {
-  @apply border-error bg-error-soft text-error;
+  @apply border-error bg-error-soft text-error font-semibold;
+  box-shadow: 0 0 0 1px var(--color-error);
 }
 
 .lesson-feedback {
-  @apply mt-4 rounded-2xl p-4 text-sm;
+  @apply mt-4 rounded-2xl p-5 text-sm border shadow-sm;
 }
 
 .lesson-feedback--good {
-  @apply bg-success-soft text-success;
+  @apply bg-success-soft text-success border-success/15;
 }
 
 .lesson-feedback--review {
-  @apply bg-warning-soft text-warning;
+  @apply bg-warning-soft text-warning border-warning/15;
 }
 
 .lesson-reader-actions {
@@ -1085,4 +1089,503 @@
 .dark .admin-theme-scope .hover\:border-gray-900:hover {
   border-color: color-mix(in srgb, var(--ink) 18%, transparent) !important;
 }
+
+/* Base safety */
+html,
+body,
+#root {
+  width: 100%;
+  min-height: 100%;
+  overflow-x: hidden;
+}
+
+.app-shell,
+.dashboard-layout,
+.modules-layout {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr) 320px;
+  width: 100%;
+  min-width: 0;
+}
+
+.main-content {
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+/* Mobile fix */
+@media (max-width: 768px) {
+  .app-shell,
+  .dashboard-layout,
+  .modules-layout {
+    display: block;
+    width: 100%;
+  }
+
+  .sidebar,
+  .left-sidebar,
+  .right-panel,
+  .study-panel,
+  .focus-panel {
+    display: none;
+  }
+
+  .main-content,
+  main {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    padding: 16px;
+    margin: 0;
+    overflow-x: hidden;
+  }
+
+  .classrooms-grid,
+  .modules-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .classroom-card,
+  .module-card {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .topbar,
+  .header {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   DEV-ONLY MOBILE PREVIEW
+   Activated by html[data-preview="mobile"].
+   Constrains the app to 390 px and forces mobile
+   layout without relying on viewport media queries.
+   ═══════════════════════════════════════════════ */
+
+html[data-preview="mobile"] body {
+  background: repeating-conic-gradient(
+    color-mix(in srgb, var(--ink) 4%, var(--background)) 0% 25%,
+    var(--background) 0% 50%
+  ) 0 0 / 20px 20px;
+  display: flex;
+  justify-content: center;
+}
+
+html[data-preview="mobile"] #root {
+  width: 390px;
+  max-width: 390px;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-color: var(--background);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--ink) 8%, transparent),
+    0 4px 60px rgba(0,0,0,0.18);
+  position: relative;
+}
+
+/* ── Hide the fixed desktop sidebar ────────── */
+html[data-preview="mobile"] [data-ls-desktop-sidebar] {
+  display: none !important;
+}
+
+/* ── Remove the sidebar left-padding on <main> ── */
+html[data-preview="mobile"] main {
+  padding-inline-start: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  overflow-x: hidden !important;
+}
+
+/* ── Show the mobile bottom nav ──────────────── */
+html[data-preview="mobile"] [data-ls-mobile-nav] {
+  display: flex !important;
+  position: fixed !important;
+  bottom: 0 !important;
+  left: auto !important;
+  right: auto !important;
+  width: 390px !important;
+  z-index: 9998 !important;
+}
+
+/* ── Hide/Show customized panels ────────────── */
+html[data-preview="mobile"] [data-ls-right-panel] {
+  display: none !important;
+}
+
+/* Hide the widgets panel inside LessonReader by targeting its classes */
+html[data-preview="mobile"] main .lg\:w-\[260px\] {
+  display: none !important;
+}
+
+/* ── Hide desktop topbar elements to prevent overcrowding ── */
+/* Hide search bar */
+html[data-preview="mobile"] header.fixed .lg\:block,
+html[data-preview="mobile"] header.fixed [class*="lg:block"] {
+  display: none !important;
+}
+
+/* Hide cloud database connection badge */
+html[data-preview="mobile"] header.fixed .sm\:flex,
+html[data-preview="mobile"] header.fixed [class*="sm:flex"] {
+  display: none !important;
+}
+
+/* Hide vertical divider in action icons */
+html[data-preview="mobile"] header.fixed .md\:block,
+html[data-preview="mobile"] header.fixed [class*="md:block"] {
+  display: none !important;
+}
+
+/* Hide grade and session active subtitle under UserProfile on mobile preview */
+html[data-preview="mobile"] header.fixed .flex.flex-col > .flex:nth-child(2) {
+  display: none !important;
+}
+
+/* Hide last two buttons in the action icons group (Profile and Settings) on mobile preview */
+html[data-preview="mobile"] header.fixed .flex.items-center.gap-1.bg-surface-low button:nth-last-child(-n+2) {
+  display: none !important;
+}
+
+/* ── Constrain the fixed topbar inside the frame ── */
+html[data-preview="mobile"] header.fixed {
+  position: absolute !important;
+  width: 390px !important;
+  max-width: 100% !important;
+  left: 0 !important;
+  right: auto !important;
+}
+
+/* ── Force grids to single-column ────────────── */
+html[data-preview="mobile"] .classrooms-grid,
+html[data-preview="mobile"] .modules-grid,
+html[data-preview="mobile"] .lessons-grid {
+  grid-template-columns: 1fr !important;
+}
+
+/* ── Navigation Overrides in LessonReader ────── */
+/* Hide the Left and Right side desktop nav arrows */
+html[data-preview="mobile"] .md\:min-h-\[400px\] > .hidden.md\:flex {
+  display: none !important;
+}
+
+/* Show the mobile bottom navigation row inside the card */
+html[data-preview="mobile"] main .md\:hidden.flex {
+  display: flex !important;
+}
+
+/* ── Navigation Overrides in LessonReader ────── */
+/* Position Left and Right Nav absolute at the bottom corners on mobile to free up content width */
+@media (max-width: 768px) {
+  .lesson-player-left-nav {
+    position: absolute !important;
+    left: 12px !important;
+    bottom: 12px !important;
+    top: auto !important;
+    transform: none !important;
+    width: auto !important;
+    height: auto !important;
+    z-index: 30 !important;
+  }
+
+  .lesson-player-right-nav {
+    position: absolute !important;
+    right: 12px !important;
+    bottom: 12px !important;
+    top: auto !important;
+    transform: none !important;
+    width: auto !important;
+    height: auto !important;
+    z-index: 30 !important;
+  }
+
+  .lesson-player-content-area {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+    padding-bottom: 5.5rem !important;
+    width: 100% !important;
+  }
+  
+  .lesson-player-container {
+    overflow: visible !important;
+  }
+}
+
+html[data-preview="mobile"] .lesson-player-left-nav {
+  position: absolute !important;
+  left: 12px !important;
+  bottom: 12px !important;
+  top: auto !important;
+  transform: none !important;
+  width: auto !important;
+  height: auto !important;
+  z-index: 30 !important;
+}
+
+html[data-preview="mobile"] .lesson-player-right-nav {
+  position: absolute !important;
+  right: 12px !important;
+  bottom: 12px !important;
+  top: auto !important;
+  transform: none !important;
+  width: auto !important;
+  height: auto !important;
+  z-index: 30 !important;
+}
+
+html[data-preview="mobile"] .lesson-player-content-area {
+  padding-left: 1rem !important;
+  padding-right: 1rem !important;
+  padding-bottom: 5.5rem !important;
+  width: 100% !important;
+}
+
+html[data-preview="mobile"] .lesson-player-container {
+  overflow: visible !important;
+}
+
+/* ── Mobile Safe-Area & Bottom Nav Overrides ──── */
+@media (max-width: 768px) {
+  [data-ls-mobile-nav] {
+    height: calc(4.75rem + env(safe-area-inset-bottom, 0px)) !important;
+    padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px)) !important;
+    box-sizing: border-box !important;
+  }
+  
+  [data-ls-mobile-nav] button {
+    height: 4rem !important;
+  }
+}
+
+html[data-preview="mobile"] [data-ls-mobile-nav] {
+  position: absolute !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 4.75rem !important;
+  padding-bottom: 0.75rem !important;
+  box-sizing: border-box !important;
+}
+
+html[data-preview="mobile"] [data-ls-mobile-nav] button {
+  height: 4rem !important;
+}
+
+/* ── Lesson View Content Padding ──── */
+@media (max-width: 768px) {
+  .lesson-view-container {
+    padding-bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px)) !important;
+    box-sizing: border-box !important;
+  }
+}
+
+html[data-preview="mobile"] .lesson-view-container {
+  padding-bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px)) !important;
+  box-sizing: border-box !important;
+}
+
+/* ── Typography & Readability Improvements ──── */
+.lesson-banner-title {
+  font-size: clamp(1.1rem, 4.5vw, 1.45rem) !important;
+  line-height: 1.4 !important;
+  text-align: center !important;
+  width: 85% !important;
+  max-width: 85% !important;
+  margin: 0 auto !important;
+  direction: inherit !important;
+}
+
+.lesson-reader-block__title {
+  font-family: var(--font-sans) !important;
+  font-size: clamp(1.25rem, 5vw, 1.55rem) !important;
+  line-height: 1.35 !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.015em !important;
+  word-break: keep-all !important;
+  overflow-wrap: break-word !important;
+}
+
+.lesson-reader-markdown {
+  max-width: 65ch !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+.lesson-reader-markdown p, 
+.lesson-reader-markdown li {
+  font-size: clamp(0.975rem, 4vw, 1.075rem) !important;
+  line-height: 1.75 !important;
+  margin-bottom: 1.25rem !important;
+}
+
+.lesson-reader-option .lesson-reader-markdown p {
+  margin-bottom: 0 !important;
+}
+
+.lesson-reader-markdown ul,
+.lesson-reader-markdown ol {
+  margin-bottom: 1.25rem !important;
+}
+
+/* Prevent horizontal overflow on any phone widths */
+@media (max-width: 768px) {
+  html, body, #root, main, .lesson-player-container, .lesson-player-content-area {
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+  }
+}
+html[data-preview="mobile"] #root,
+html[data-preview="mobile"] main,
+html[data-preview="mobile"] .lesson-player-container,
+html[data-preview="mobile"] .lesson-player-content-area {
+  max-width: 100% !important;
+  overflow-x: hidden !important;
+}
+
+@media (max-width: 768px) {
+  .classrooms-page {
+    padding-bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px)) !important;
+    overflow-x: hidden !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .classrooms-grid {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .classroom-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+}
+
+html[data-preview="mobile"] .classrooms-page {
+  padding-bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px)) !important;
+  overflow-x: hidden !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+html[data-preview="mobile"] .classrooms-grid,
+html[data-preview="mobile"] .lessons-grid {
+  grid-template-columns: 1fr !important;
+  gap: 16px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+html[data-preview="mobile"] .classroom-card {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+@media (max-width: 640px) {
+  .classrooms-page {
+    padding-inline: 12px !important;
+  }
+
+  .classroom-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .classroom-toolbar .secondary-mobile-control {
+    display: none;
+  }
+}
+
+/* ── Classroom Header mobile/preview overrides ── */
+@media (max-width: 1024px) {
+  .classroom-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 16px !important;
+  }
+  .classroom-header-actions {
+    width: 100% !important;
+    justify-content: flex-start !important;
+    flex-wrap: wrap !important;
+  }
+  .classroom-header-badges {
+    flex-wrap: nowrap !important;
+  }
+}
+
+html[data-preview="mobile"] .classroom-header {
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 16px !important;
+}
+
+html[data-preview="mobile"] .classroom-header-actions {
+  width: 100% !important;
+  justify-content: flex-start !important;
+  flex-wrap: wrap !important;
+}
+
+html[data-preview="mobile"] .classroom-header-badges {
+  flex-wrap: nowrap !important;
+}
+
+html[data-preview="mobile"] .classroom-header-badge {
+  white-space: nowrap !important;
+}
+
+/* ── Telemetry Stats Banner responsive & mobile preview overrides ── */
+.telemetry-stats-banner {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.5rem;
+}
+.telemetry-stat-card {
+  background-color: transparent;
+  padding: 0;
+  border-radius: 0;
+}
+.telemetry-stat-card:not(:first-child) {
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  padding-left: 1.5rem;
+}
+
+@media (max-width: 639px) {
+  .telemetry-stats-banner {
+    grid-template-columns: 1fr !important;
+    gap: 0.875rem !important;
+  }
+  .telemetry-stat-card {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    padding: 1rem !important;
+    border-radius: 0.75rem !important;
+    border-left: none !important;
+    padding-left: 1rem !important;
+  }
+}
+
+html[data-preview="mobile"] .telemetry-stats-banner {
+  grid-template-columns: 1fr !important;
+  gap: 0.875rem !important;
+}
+
+html[data-preview="mobile"] .telemetry-stat-card {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  padding: 1rem !important;
+  border-radius: 0.75rem !important;
+  border-left: none !important;
+  padding-left: 1rem !important;
+}
+
 

@@ -143,42 +143,43 @@ export const QuizInterface: React.FC = () => {
 
   return (
     <Layout fullWidth>
-      <div className="h-full w-full bg-background flex flex-col overflow-hidden p-4">
+      <div className="h-full w-full bg-background flex flex-col overflow-hidden p-3 md:p-4">
         <div className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-4 overflow-hidden">
 
           {/* Column 2: Main Quiz Content */}
-          <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 p-8">
-            <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-8">
+          <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 p-5 md:p-8">
+            <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6 md:gap-8">
               {/* Quiz Header Info Bar */}
-              <div className="relative p-6 bg-slate-50 dark:bg-surface-low/30 border border-slate-100 dark:border-white/5 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm">
+              <div className="relative p-5 md:p-6 bg-slate-50 dark:bg-surface-low/30 border border-slate-100 dark:border-white/5 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2 text-[10px] font-bold text-accent uppercase tracking-wider">
                     <span>{mockQuiz.moduleName}</span>
                     <span className="h-1 w-1 rounded-full bg-slate-300 dark:bg-white/20" />
                     <span>{mockQuiz.timeLimitMinutes} min limit</span>
                   </div>
-                  <h1 className="text-xl font-serif font-bold text-slate-950 dark:text-ink">{mockQuiz.title}</h1>
+                  <h1 className="text-lg md:text-xl font-serif font-bold text-slate-950 dark:text-ink">{mockQuiz.title}</h1>
                 </div>
                 <button
                   onClick={() => navigate(-1)}
-                  className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 rounded-xl text-xs font-semibold shadow-sm transition-all dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:bg-surface-low self-start md:self-auto"
+                  className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 rounded-xl text-xs font-semibold shadow-sm transition-all dark:border-white/10 dark:bg-paper dark:text-ink-secondary dark:hover:bg-surface-low self-start md:self-auto cursor-pointer"
                 >
                   <ArrowLeft size={13} className="text-accent" />
                   Back to Lesson
                 </button>
               </div>
+              
               {/* Progress Bar Section */}
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <div className="flex justify-between items-end">
                   <div className="space-y-1">
                     <span className="text-[10px] font-mono font-bold uppercase tracking-normal text-muted">
                       Question {currentQuestionIndex + 1} / {totalQuestions}
                     </span>
-                    <h3 className="text-xl font-serif font-medium">Current Trajectory</h3>
+                    <h3 className="text-sm md:text-base font-serif font-medium">Current Trajectory</h3>
                   </div>
                   <div className="flex items-baseline gap-1">
-                    <span className="text-3xl font-serif font-medium">{Math.round(progress)}</span>
-                    <span className="text-sm font-mono text-muted uppercase tracking-normal">%</span>
+                    <span className="text-2xl font-serif font-medium">{Math.round(progress)}</span>
+                    <span className="text-xs font-mono text-muted uppercase tracking-normal">%</span>
                   </div>
                 </div>
                 <div className="h-[2px] w-full bg-ink/5 rounded-full overflow-hidden">
@@ -191,97 +192,97 @@ export const QuizInterface: React.FC = () => {
                 </div>
               </div>
 
-        {/* Question Area */}
-        <div className="space-y-16">
-          <div className="space-y-8">
-            <div className="flex items-center gap-4">
-              <div className="h-px w-12 bg-accent"></div>
-              <span className="text-[10px] font-mono font-bold uppercase tracking-normal text-accent">Inquiry</span>
-            </div>
-            <h2 className="text-4xl md:text-6xl font-serif font-medium leading-[1.1] text-ink">
-              {currentQuestion.text}
-            </h2>
-          </div>
-
-          <div className="grid gap-6">
-            {currentQuestion.options?.map((option, i) => {
-              const letter = String.fromCharCode(65 + i);
-              const isSelected = selectedOption === option;
-              
-              return (
-                <motion.button
-                  key={i}
-                  whileHover={{ x: 12 }}
-                  onClick={() => handleOptionSelect(option)}
-                  className={`w-full p-10 text-left rounded-4xl border transition-all duration-300 flex items-center justify-between group relative ${
-                    isSelected
-                      ? 'bg-paper border-accent shadow-md shadow-accent/5'
-                      : 'bg-background border-ink/5 hover:border-ink/20'
-                  }`}
-                >
-                  <div className="flex items-center gap-8">
-                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-mono font-bold text-xs transition-all duration-300 ${
-                      isSelected
-                        ? 'bg-ink text-paper'
-                        : 'bg-paper text-muted border border-ink/5'
-                    }`}>
-                      {letter}
-                    </div>
-                    <span className={`text-xl font-light tracking-tight transition-colors ${isSelected ? 'text-ink font-medium' : 'text-muted group-hover:text-ink'}`}>
-                      {option}
-                    </span>
+              {/* Question Area */}
+              <div className="space-y-8 md:space-y-12">
+                <div className="space-y-4 md:space-y-6">
+                  <div className="flex items-center gap-4">
+                    <div className="h-px w-8 bg-accent"></div>
+                    <span className="text-[10px] font-mono font-bold uppercase tracking-normal text-accent">Inquiry</span>
                   </div>
-                  <AnimatePresence>
-                    {isSelected && (
-                      <motion.div 
-                        initial={{ scale: 0, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0, opacity: 0 }}
-                        className="w-8 h-8 rounded-full bg-accent flex items-center justify-center shadow-sm shadow-accent/20"
+                  <h2 className="text-2xl md:text-4xl font-serif font-semibold leading-tight text-ink">
+                    {currentQuestion.text}
+                  </h2>
+                </div>
+
+                <div className="grid gap-4">
+                  {currentQuestion.options?.map((option, i) => {
+                    const letter = String.fromCharCode(65 + i);
+                    const isSelected = selectedOption === option;
+                    
+                    return (
+                      <motion.button
+                        key={i}
+                        whileHover={{ x: 6 }}
+                        onClick={() => handleOptionSelect(option)}
+                        className={`w-full p-4 md:p-5 text-left rounded-2xl md:rounded-3xl border transition-all duration-300 flex items-center justify-between group relative cursor-pointer ${
+                          isSelected
+                            ? 'bg-paper border-accent shadow-md shadow-accent/5'
+                            : 'bg-background border-ink/5 hover:border-ink/20'
+                        }`}
                       >
-                        <CheckCircle2 className="w-4 h-4 text-paper" />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </motion.button>
-              );
-            })}
-          </div>
+                        <div className="flex items-center gap-4 md:gap-6 min-w-0">
+                          <div className={`w-10 h-10 md:w-11 md:h-11 rounded-xl flex items-center justify-center font-mono font-bold text-xs transition-all duration-300 shrink-0 ${
+                            isSelected
+                              ? 'bg-ink text-paper'
+                              : 'bg-paper text-muted border border-ink/5'
+                          }`}>
+                            {letter}
+                          </div>
+                          <span className={`text-sm md:text-base font-medium transition-colors truncate ${isSelected ? 'text-ink' : 'text-muted group-hover:text-ink'}`}>
+                            {option}
+                          </span>
+                        </div>
+                        <AnimatePresence>
+                          {isSelected && (
+                            <motion.div 
+                              initial={{ scale: 0, opacity: 0 }}
+                              animate={{ scale: 1, opacity: 1 }}
+                              exit={{ scale: 0, opacity: 0 }}
+                              className="w-6 h-6 rounded-full bg-accent flex items-center justify-center shadow-sm shadow-accent/20 shrink-0"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5 text-paper" />
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </motion.button>
+                    );
+                  })}
+                </div>
 
-          {/* Focus Tip */}
-          <motion.section 
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="p-12 bg-paper rounded-4xl space-y-8 border border-ink/5 relative overflow-hidden group"
-          >
-            <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
-              <Target className="w-24 h-24" />
-            </div>
-            <div className="flex items-center gap-3 text-muted">
-              <Lightbulb className="w-4 h-4 text-accent" />
-              <span className="text-[10px] font-mono font-bold uppercase tracking-normal">Curator's Insight</span>
-            </div>
-            <p className="text-ink/80 italic font-serif text-2xl leading-relaxed relative z-10">
-              "The whole is other than the sum of the parts." <br />
-              <span className="text-sm font-mono uppercase tracking-normal not-italic opacity-40 mt-4 block">— Kurt Koffka</span>
-            </p>
-          </motion.section>
+                {/* Focus Tip */}
+                <motion.section 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 }}
+                  className="p-6 md:p-8 bg-paper rounded-2xl md:rounded-3xl space-y-4 border border-ink/5 relative overflow-hidden group"
+                >
+                  <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
+                    <Target className="w-24 h-24" />
+                  </div>
+                  <div className="flex items-center gap-3 text-muted">
+                    <Lightbulb className="w-4 h-4 text-accent" />
+                    <span className="text-[10px] font-mono font-bold uppercase tracking-normal">Curator's Insight</span>
+                  </div>
+                  <p className="text-ink/80 italic font-serif text-base md:text-lg leading-relaxed relative z-10">
+                    "The whole is other than the sum of the parts." <br />
+                    <span className="text-xs font-mono uppercase tracking-normal not-italic opacity-40 mt-4 block">— Kurt Koffka</span>
+                  </p>
+                </motion.section>
 
-          {/* Action Button */}
-          <div className="pt-8">
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={handleSubmit}
-              disabled={!selectedOption}
-              className="group w-full py-6 bg-ink text-paper rounded-full font-medium text-sm uppercase tracking-normal flex items-center justify-center gap-4 shadow-md shadow-ink/20 disabled:opacity-20 disabled:grayscale disabled:cursor-not-allowed hover:bg-accent transition-all duration-300"
-            >
-              Submit Response
-              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </motion.button>
-          </div>
-        </div>
+                {/* Action Button */}
+                <div className="pt-4 md:pt-6">
+                  <motion.button
+                    whileHover={{ scale: 1.01 }}
+                    whileTap={{ scale: 0.99 }}
+                    onClick={handleSubmit}
+                    disabled={!selectedOption}
+                    className="group w-full py-4 bg-ink text-paper rounded-xl md:rounded-2xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2.5 shadow-md shadow-ink/20 disabled:opacity-20 disabled:grayscale disabled:cursor-not-allowed hover:bg-accent transition-all duration-300 cursor-pointer"
+                  >
+                    Submit Response
+                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </motion.button>
+                </div>
+              </div>
             </div>
           </div>
 

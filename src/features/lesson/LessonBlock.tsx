@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle2, Dumbbell, FileText, FlaskConical, HelpCircle, Lightbulb, ListChecks, PenTool, Target, XCircle } from 'lucide-react';
+import { CheckCircle2, Dumbbell, FileText, FlaskConical, HelpCircle, Lightbulb, ListChecks, PenTool, Target, XCircle, Volume2, Bot } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import Markdown from 'react-markdown';
 import remarkMath from 'remark-math';
@@ -39,6 +39,8 @@ type LessonBlockProps = {
   onShowExerciseHint: (sourceIndex: number) => void;
   onExamSubmit: (sourceIndex: number, solution: string) => void;
   onShowExamHint: (sourceIndex: number) => void;
+  onSpeak?: () => void;
+  onAskAI?: () => void;
 };
 
 const getContentText = (block: any) =>
@@ -89,6 +91,8 @@ export const LessonBlock: React.FC<LessonBlockProps> = ({
   onShowExerciseHint,
   onExamSubmit,
   onShowExamHint,
+  onSpeak,
+  onAskAI,
 }) => {
   const block = item.block || {};
   const sourceIndex = item.sourceIndex;
@@ -121,6 +125,32 @@ export const LessonBlock: React.FC<LessonBlockProps> = ({
         <div className="min-w-0 flex-1">
           <p className="lesson-reader-eyebrow">{item.label}</p>
           <h2 className="lesson-reader-block__title">{item.title}</h2>
+        </div>
+        <div className="flex items-center gap-1.5 mr-2 shrink-0">
+          {onSpeak && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onSpeak(); }}
+              className={`w-7 h-7 rounded-full flex items-center justify-center border transition-all cursor-pointer ${
+                reading 
+                  ? 'bg-accent/20 border-accent text-accent animate-pulse' 
+                  : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:bg-surface-low dark:border-white/5 dark:text-ink-muted dark:hover:text-ink hover:scale-105'
+              }`}
+              title="Read Aloud"
+            >
+              <Volume2 size={12} />
+            </button>
+          )}
+          {onAskAI && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onAskAI(); }}
+              className="w-7 h-7 rounded-full flex items-center justify-center bg-slate-50 border border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:bg-surface-low dark:border-white/5 dark:text-ink-muted dark:hover:text-ink transition-all cursor-pointer hover:scale-105"
+              title="Ask AI Assistant"
+            >
+              <Bot size={12} />
+            </button>
+          )}
         </div>
         <span className={`lesson-reader-block__status ${isViewed ? 'lesson-reader-block__status--viewed' : ''}`}>
           {isViewed ? 'Viewed' : 'New'}
