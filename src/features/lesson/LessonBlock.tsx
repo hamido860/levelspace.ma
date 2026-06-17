@@ -59,6 +59,19 @@ const MarkdownText: React.FC<{ children?: string }> = ({ children }) => (
   </div>
 );
 
+const InlineMarkdownText: React.FC<{ children?: string }> = ({ children }) => (
+  <span className="lesson-reader-markdown inline-block">
+    <Markdown 
+      {...markdownPlugins} 
+      components={{
+        p: ({ node, ...props }) => <span {...props} />
+      }}
+    >
+      {children || ''}
+    </Markdown>
+  </span>
+);
+
 const SolutionPanel: React.FC<{ title?: string; content?: string }> = ({ title = 'Solution', content }) => (
   <motion.div
     initial={{ opacity: 0, y: 8 }}
@@ -168,7 +181,7 @@ export const LessonBlock: React.FC<LessonBlockProps> = ({
       {Array.isArray(block.points) && block.points.length > 0 && (
         <ul className="lesson-reader-list">
           {block.points.map((point: string, index: number) => (
-            <li key={index}><MarkdownText>{point}</MarkdownText></li>
+            <li key={index}><InlineMarkdownText>{point}</InlineMarkdownText></li>
           ))}
         </ul>
       )}
@@ -176,7 +189,7 @@ export const LessonBlock: React.FC<LessonBlockProps> = ({
       {Array.isArray(block.rules) && block.rules.length > 0 && (
         <ul className="lesson-reader-list">
           {block.rules.map((rule: string, index: number) => (
-            <li key={index}><MarkdownText>{rule}</MarkdownText></li>
+            <li key={index}><InlineMarkdownText>{rule}</InlineMarkdownText></li>
           ))}
         </ul>
       )}
@@ -213,7 +226,7 @@ export const LessonBlock: React.FC<LessonBlockProps> = ({
                   onClick={() => onQuizAnswer(sourceIndex, option, quiz.correctAnswer)}
                   className={`lesson-reader-option ${answered && correct ? 'lesson-reader-option--correct' : ''} ${answered && selected && !correct ? 'lesson-reader-option--wrong' : ''}`}
                 >
-                  <span><MarkdownText>{option}</MarkdownText></span>
+                  <span><InlineMarkdownText>{option}</InlineMarkdownText></span>
                   {answered && correct && <CheckCircle2 size={18} />}
                   {answered && selected && !correct && <XCircle size={18} />}
                 </button>

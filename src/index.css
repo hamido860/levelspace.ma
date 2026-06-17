@@ -1419,11 +1419,16 @@ html[data-preview="mobile"] .lesson-view-container {
   margin-right: auto !important;
 }
 
-.lesson-reader-markdown p, 
-.lesson-reader-markdown li {
+.lesson-reader-markdown p {
   font-size: clamp(0.975rem, 4vw, 1.075rem) !important;
   line-height: 1.75 !important;
   margin-bottom: 1.25rem !important;
+}
+
+.lesson-reader-markdown li {
+  font-size: clamp(0.975rem, 4vw, 1.075rem) !important;
+  line-height: 1.75 !important;
+  margin-bottom: 0.375rem !important;
 }
 
 .lesson-reader-option .lesson-reader-markdown p,
