@@ -465,12 +465,12 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
         <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden">
         
         {/* Redesigned Card Container */}
-        <div className="w-full h-full md:bg-white md:dark:bg-paper md:rounded-xl md:shadow-lg md:border md:border-slate-200 md:dark:border-white/8 overflow-hidden flex flex-col gap-3 md:gap-0 bg-transparent">
+        <div className="w-full h-full md:bg-white md:dark:bg-paper md:rounded-xl md:shadow-lg md:border md:border-slate-200 md:dark:border-white/8 overflow-hidden flex flex-col gap-2 md:gap-0 bg-transparent">
           
           {/* Header Area Card */}
           <div className="bg-white dark:bg-paper rounded-xl md:rounded-none border border-slate-200 dark:border-white/8 md:border-none shadow-md md:shadow-none overflow-hidden flex flex-col shrink-0">
             {/* Top Full-bleed Image Banner */}
-            <div className="h-24 w-full relative bg-slate-100 dark:bg-surface-low shrink-0 overflow-hidden border-b border-slate-100 dark:border-white/5 group">
+            <div className="h-16 md:h-20 w-full relative bg-slate-100 dark:bg-surface-low shrink-0 overflow-hidden border-b border-slate-100 dark:border-white/5 group">
               <img 
                 src={bannerImage || getLessonIllustration(title, subject)}
                 alt={title}
@@ -544,7 +544,7 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
             </div>
 
             {/* Sub-header Ribbon for Progress and Domain Filters */}
-            <div className="bg-slate-50 dark:bg-surface-low border-b border-slate-100 dark:border-white/5 px-6 py-2 flex items-center justify-between gap-4 shrink-0 flex-wrap md:flex-nowrap">
+            <div className="bg-slate-50 dark:bg-surface-low border-b border-slate-100 dark:border-white/5 px-6 py-1.5 flex items-center justify-between gap-4 shrink-0 flex-wrap md:flex-nowrap">
               {/* Progress info */}
               <div className="flex items-center gap-3 shrink-0">
                 <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-ink-muted">
@@ -605,7 +605,7 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
           <div className="lesson-player-container flex-1 min-h-0 flex flex-col relative overflow-hidden bg-white dark:bg-paper rounded-xl md:rounded-none border border-slate-200 dark:border-white/8 md:border-none shadow-md md:shadow-none">
             
             {/* Scrollable Content Area */}
-            <div className="lesson-player-content-area flex-grow overflow-y-auto no-scrollbar flex flex-col justify-start space-y-6 p-6 min-w-0 h-full">
+            <div className="lesson-player-content-area flex-grow overflow-y-auto no-scrollbar flex flex-col justify-start space-y-4 md:space-y-6 p-4 md:p-6 min-w-0 h-full">
               
               {/* Speech Boundary Karaoke visualizer panel */}
               {isSpeaking && speakingState && speakingState.activeSentence && (
