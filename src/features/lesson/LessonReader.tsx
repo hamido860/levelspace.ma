@@ -454,7 +454,7 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
   };
 
   return (
-    <div className="w-full md:h-full flex flex-col md:overflow-hidden bg-slate-50/50 dark:bg-background select-none">
+    <div className="w-full md:h-full flex flex-col md:overflow-hidden bg-slate-50/50 dark:bg-background">
       <SelectionActions />
       
 
