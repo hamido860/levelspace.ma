@@ -632,7 +632,7 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
               )}
 
               {/* Display blocks */}
-              <div className="flex-grow flex flex-col space-y-8 divide-y divide-slate-100 dark:divide-white/5">
+              <div className="flex-grow flex flex-col space-y-2 divide-y divide-slate-100 dark:divide-white/5">
                 {displayedBlocks.length > 0 ? (
                   displayedBlocks.map((block, index) => {
                     const isViewed = viewedBlockIds.has(block.id);
@@ -642,9 +642,9 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
                       <div 
                         key={block.id} 
                         id={block.id}
-                        className={`w-full flex flex-col ${index > 0 ? 'pt-8' : ''}`}
+                        className={`w-full flex flex-col ${index > 0 ? 'pt-2' : ''}`}
                       >
-                        <div className="pt-2 text-slate-700 leading-relaxed dark:text-ink-secondary">
+                        <div className="text-slate-700 leading-relaxed dark:text-ink-secondary">
                           <LessonBlock
                             item={block}
                             isViewed={isViewed}

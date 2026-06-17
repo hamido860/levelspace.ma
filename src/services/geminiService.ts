@@ -862,6 +862,7 @@ export interface LessonSuggestion {
 
 export interface LessonTemplate {
   id?: string;
+  topic_id?: string;
   country: string;
   grade: string;
   subject: string;
@@ -873,6 +874,10 @@ export interface LessonTemplate {
   exam: any;
   similarity?: number;
   blocks?: AILessonBlock[];
+  tags?: string[];
+  teaching_contract?: any;
+  subtitle?: string;
+  cycle?: string;
 }
 
 // ─── Orchestration: Pro plans, Gemma 4 executes ──────────────────────────────
@@ -1406,6 +1411,32 @@ export const generateFullLesson = async (
         retries - 1, referenceUrls, existingContext, isAdmin, _correctionPrompt,
       );
     }
+  }
+};
+
+export const extractChunkMetadata = async (chunkContent: string): Promise<{ topic: string; subject: string; moduleName: string } | null> => {
+  if (!chunkContent || !checkAIProvider()) return null;
+  try {
+    const prompt = `Analyze the following educational content and extract the most appropriate Topic/Title, Subject (e.g. Math, Physics, History), and Module Name (a broader category or chapter name, e.g. "Module 1: Mechanics"). Respond ONLY in JSON matching this schema: {"topic": "string", "subject": "string", "moduleName": "string"}.
+
+Content:
+${chunkContent.substring(0, 1500)}`;
+
+    const response = await generateContentWithFallback({
+      model: modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]),
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        maxOutputTokens: 300,
+      }
+    }, "extractChunkMetadata");
+
+    if (response && response.text) {
+      return safeJsonParse(response.text) as { topic: string; subject: string; moduleName: string };
+    }
+    return null;
+  } catch (err) {
+    console.error("Failed to extract chunk metadata:", err);
     return null;
   }
 };
