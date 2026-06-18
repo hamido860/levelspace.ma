@@ -36,6 +36,9 @@ import { HorizontalSlider } from '../components/HorizontalSlider';
 import { LayoutGrid, Rows3, Shuffle } from 'lucide-react';
 import { getCardGradient, randomBanner, randomCardGradient } from '../utils/cardColors';
 
+// ⚡ Bolt Performance Optimization: Stable empty array for `useLiveQuery` fallbacks
+// Prevents unnecessary re-renders when data is undefined by maintaining referential equality
+const EMPTY_ARRAY: any[] = [];
 
 const normalizeLessonTitle = (title: string | null | undefined) =>
   String(title || '').trim().toLocaleLowerCase();
@@ -379,7 +382,7 @@ export const ClassroomView: React.FC = () => {
   });
 
   // Fetch notes for all lessons in this classroom
-  const lessonIds = useMemo(() => (allLessons || []).map(l => l.id), [allLessons]);
+  const lessonIds = useMemo(() => (allLessons || EMPTY_ARRAY).map(l => l.id), [allLessons]);
   const classroomNotes = useLiveQuery(
     async () => {
       if (lessonIds.length === 0) return [];
@@ -390,7 +393,7 @@ export const ClassroomView: React.FC = () => {
 
   // Fetch all reminders/tasks to capture completed classroom checkmarks
   const remindersVal = useLiveQuery(() => db.tasks.toArray());
-  const reminders = remindersVal || [];
+  const reminders = remindersVal || EMPTY_ARRAY;
 
   // Local state to log Pomodoro focus timer starts dynamically
   const [pomodoroLogs, setPomodoroLogs] = useState<Array<{
@@ -496,7 +499,7 @@ export const ClassroomView: React.FC = () => {
       setPinnedLessonIds([]);
     }
   }, [pinStorageKey, allLessons?.length]);
-  const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
+  const dbSettings = useLiveQuery(() => db.settings.toArray()) || EMPTY_ARRAY;
   const settingsMap = useMemo(() => Object.fromEntries(dbSettings.map(s => [s.key, s.value])), [dbSettings]);
 
   const defaultDuration = Number(settingsMap['default_session_duration'] || localStorage.getItem('default_session_duration') || 25);
