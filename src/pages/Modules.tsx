@@ -45,6 +45,10 @@ import { useLanguage } from '../context/LanguageContext';
 import { AnnouncementBanner } from '../components/AnnouncementBanner';
 import { getCardGradient, randomBanner, randomCardGradient, CARD_GRADIENTS } from '../utils/cardColors';
 
+// ⚡ Bolt Performance Optimization: Stable empty array for `useLiveQuery` fallbacks
+// Prevents unnecessary re-renders when data is undefined by maintaining referential equality
+const EMPTY_ARRAY: any[] = [];
+
 const relativeTime = (ts: number) => {
   const diff = Date.now() - ts;
   const minutes = Math.floor(diff / 60000);
@@ -344,9 +348,9 @@ export const Modules: React.FC = () => {
   const aiUnavailableMsg = 'AI curriculum suggestions require an API key.';
 
   const dbModules = useLiveQuery(() => db.modules.toArray());
-  const allLessons = useLiveQuery(() => db.lessons.toArray()) || [];
+  const allLessons = useLiveQuery(() => db.lessons.toArray()) || EMPTY_ARRAY;
 
-  const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
+  const dbSettings = useLiveQuery(() => db.settings.toArray()) || EMPTY_ARRAY;
   const settingsMap = useMemo(() => Object.fromEntries(dbSettings.map(s => [s.key, s.value])), [dbSettings]);
 
   const country = settingsMap['selected_country'] || localStorage.getItem('selected_country') || '';
@@ -444,7 +448,7 @@ export const Modules: React.FC = () => {
   const [bacIntOptionName, setBacIntOptionName] = useState<string>('');
   const trustedSubjectNames = useMemo(() => buildTrustedSubjectNames(country, grade, bacTrackName || selectedBacTrackId), [country, grade, bacTrackName, selectedBacTrackId]);
   const trustedSubjectSet = useMemo(() => buildTrustedSubjectSet(trustedSubjectNames), [trustedSubjectNames]);
-  const modules = useMemo(() => (dbModules || [])
+  const modules = useMemo(() => (dbModules || EMPTY_ARRAY)
     .filter((module) => moduleMatchesTrustedSubjects(module, trustedSubjectSet))
     .map(m => ({
       ...m,
@@ -550,7 +554,7 @@ export const Modules: React.FC = () => {
       }
 
       if (modulesToStore.length > 0) {
-        const existingById = new Map((dbModules || []).map((module) => [module.id, module]));
+        const existingById = new Map((dbModules || EMPTY_ARRAY).map((module) => [module.id, module]));
         const mergedModules = modulesToStore.map((module) => {
           const existing = existingById.get(module.id);
           if (!existing) return module;
@@ -567,7 +571,7 @@ export const Modules: React.FC = () => {
 
         if (scopedSubjectRows !== null) {
           const nextIds = new Set(mergedModules.map((module) => module.id));
-          const staleModuleIds = (dbModules || [])
+          const staleModuleIds = (dbModules || EMPTY_ARRAY)
             .filter((module) => !nextIds.has(module.id))
             .map((module) => module.id);
 
