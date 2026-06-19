@@ -169,6 +169,13 @@ async function getAdminApiHeaders() {
     "Content-Type": "application/json",
   };
 
+  // Demo admin check MUST come first — a stale non-admin session token
+  // in the browser will otherwise override the bypass header and cause 403s.
+  if (typeof localStorage !== "undefined" && localStorage.getItem("demo_admin_logged_in") === "true") {
+    headers["x-levelspace-demo-admin"] = "true";
+    return headers;
+  }
+
   const { data } = await supabase.auth.getSession();
   const accessToken = data?.session?.access_token;
 

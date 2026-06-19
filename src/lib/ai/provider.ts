@@ -42,7 +42,7 @@ const isProductionLike = () => process.env.NODE_ENV === "production" || process.
 
 // DEV ONLY - remove after auth is implemented
 export const isDevAdminAiKeyModeEnabled = () => {
-  const explicitlyEnabled = isTruthy(process.env.NEXT_PUBLIC_ENABLE_DEV_ADMIN_AI_KEYS);
+  const explicitlyEnabled = isTruthy(process.env.ENABLE_DEV_ADMIN_AI_KEYS) || isTruthy(process.env.NEXT_PUBLIC_ENABLE_DEV_ADMIN_AI_KEYS);
   return explicitlyEnabled && !isProductionLike();
 };
 

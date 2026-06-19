@@ -780,9 +780,11 @@ export const ClassroomView: React.FC = () => {
     if (!module) return [] as SupabaseLessonRow[];
 
     const subjectCandidates = getSubjectCandidates(module.name, module.category);
-    const { gradeId, subjectId, subjectIds } = await resolveCurriculumIds(currentGrade, module.name, module.category);
+    const gradeCandidates = [currentGrade, String(currentGrade).toLowerCase()];
+
     const fetchAttempt = async (includeValidation: boolean) => {
-      const selectColumns = getLessonSelectColumns({ includeValidation, includeTags: true });
+      const selectColumns = getLessonSelectColumns({ includeValidation, includeTags: true, includeContent: false });
+      const { gradeId, subjectId, subjectIds } = await resolveCurriculumIds(currentGrade, module.name, module.category);
 
       if (gradeId && (subjectIds.length > 0 || subjectId)) {
           const topicQuery = supabase
@@ -1263,14 +1265,25 @@ export const ClassroomView: React.FC = () => {
   };
 
   const getAdminApiHeaders = async () => {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    // Demo admin check MUST come first — a stale non-admin session token
+    // in the browser will otherwise override the bypass header and cause 403s.
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('demo_admin_logged_in') === 'true') {
+      headers['x-levelspace-demo-admin'] = 'true';
+      return headers;
+    }
+
     const { data } = await supabase.auth.getSession();
     const accessToken = data?.session?.access_token;
 
-    return {
-      'Content-Type': 'application/json',
-      'x-levelspace-demo-admin': 'true',
-      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-    };
+    if (accessToken) {
+      headers.Authorization = `Bearer ${accessToken}`;
+    }
+
+    return headers;
   };
 
   const handleGenerateLesson = async (title?: string, autoNavigate = false) => {
