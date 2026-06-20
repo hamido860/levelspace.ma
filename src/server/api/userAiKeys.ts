@@ -53,14 +53,16 @@ async function testProviderKey(provider: UserAiKeyProvider, apiKey: string) {
     return response.ok;
   }
 
-  const endpoint =
-    provider === "openrouter"
-      ? "https://openrouter.ai/api/v1/chat/completions"
-      : "https://api.openai.com/v1/chat/completions";
-  const model =
-    provider === "openrouter"
-      ? process.env.OPENROUTER_MODEL || "openai/gpt-4o-mini"
-      : process.env.OPENAI_MODEL || "gpt-4o-mini";
+  let endpoint = "https://api.openai.com/v1/chat/completions";
+  let model = process.env.OPENAI_MODEL || "gpt-4o-mini";
+
+  if (provider === "openrouter") {
+    endpoint = "https://openrouter.ai/api/v1/chat/completions";
+    model = process.env.OPENROUTER_MODEL || "openai/gpt-4o-mini";
+  } else if (provider === "nvidia") {
+    endpoint = "https://integrate.api.nvidia.com/v1/chat/completions";
+    model = process.env.NVIDIA_MODEL || "meta/llama-3.3-70b-instruct";
+  }
 
   const response = await fetch(endpoint, {
     method: "POST",

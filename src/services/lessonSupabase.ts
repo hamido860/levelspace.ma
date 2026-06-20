@@ -20,20 +20,18 @@ const VALIDATION_STATUS_SET = new Set([
 type LessonSelectOptions = {
   includeTags?: boolean;
   includeValidation?: boolean;
+  includeContent?: boolean;
 };
 
 export const getLessonSelectColumns = ({
   includeTags = false,
   includeValidation = true,
+  includeContent = true,
 }: LessonSelectOptions = {}) => {
   const columns = [
     "id",
     "topic_id",
     "lesson_title",
-    "content",
-    "blocks",
-    "quizzes",
-    "exercises",
     "subtitle",
     ...(includeTags ? ["tags"] : []),
     "status",
@@ -42,7 +40,7 @@ export const getLessonSelectColumns = ({
     "subject",
     ...(includeValidation ? [...LESSON_VALIDATION_COLUMNS] : []),
     "is_ai_generated",
-    "teaching_contract",
+    ...(includeContent ? ["content", "blocks", "quizzes", "exercises", "teaching_contract"] : []),
   ];
 
   return columns.join(", ");
@@ -52,9 +50,10 @@ export const isMissingLessonValidationColumnError = (error: unknown) => {
   const code = String((error as { code?: string } | null)?.code || "");
   const message = String((error as { message?: string } | null)?.message || "").toLocaleLowerCase();
 
-  if (code !== "42703") return false;
+  if (code !== "42703" && code !== "PGRST204") return false;
 
-  return LESSON_VALIDATION_COLUMNS.some((column) => message.includes(column.toLocaleLowerCase()));
+  const ALL_OPTIONAL_COLUMNS = [...LESSON_VALIDATION_COLUMNS, "source_mode", "status"];
+  return ALL_OPTIONAL_COLUMNS.some((column) => message.includes(column.toLocaleLowerCase()));
 };
 
 export const stripLessonValidationFields = <T extends Record<string, unknown>>(payload: T) => {

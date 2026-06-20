@@ -110,7 +110,9 @@ const PROVIDER_MODELS = {
     { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet', desc: 'Supreme general intelligence & code synthesis', speed: '720ms', cost: 'High' }
   ],
   nvidia: [
-    { id: 'google/gemma-3-27b-it', name: 'Gemma 3 27B', desc: 'Moroccan lesson generation default NIM model', speed: '280ms', cost: 'Server Credits' }
+    { id: 'meta/llama-3.3-70b-instruct', name: 'Llama 3.3 70B', desc: 'Default NIM model for complex reasoning', speed: '280ms', cost: 'Medium' },
+    { id: 'meta/llama-3.1-405b-instruct', name: 'Llama 3.1 405B', desc: 'Massive model for highest quality outputs', speed: '550ms', cost: 'High' },
+    { id: 'google/gemma-2-27b-it', name: 'Gemma 2 27B', desc: 'Fast, efficient Google model', speed: '200ms', cost: 'Low' }
   ]
 };
 
@@ -139,10 +141,47 @@ export const Settings: React.FC = () => {
   const [bacTrack, setBacTrack] = useState("");
   const [bacIntOption, setBacIntOption] = useState("");
 
-  const [dbBacSections, setDbBacSections] = useState<any[]>([]);
   const [dbBacTracks, setDbBacTracks] = useState<any[]>([]);
   const [dbBacIntOptions, setDbBacIntOptions] = useState<any[]>([]);
-  const [dbBacTrackIntOptions, setDbBacTrackIntOptions] = useState<any[]>([]);
+
+  const dynamicSections = useMemo(() => {
+    const sectionsMap = new Map();
+    dbBacTracks.forEach(t => {
+      const sectionId = t.section_id || t.metadata?.bac_section_id || t.metadata?.section_id;
+      if (sectionId) {
+        sectionsMap.set(sectionId, {
+          id: sectionId,
+          name: t.metadata?.bac_section_name || t.metadata?.bac_section_code || 'Other',
+          code: t.metadata?.bac_section_code || 'OTHER'
+        });
+      }
+    });
+    return Array.from(sectionsMap.values());
+  }, [dbBacTracks]);
+
+  const hasTracks = useMemo(() => {
+    if (!selectedGradeId) return false;
+    const hasGradeIdMapping = dbBacTracks.some((t) => t.grade_id !== null);
+    if (hasGradeIdMapping) {
+      return dbBacTracks.some((t) => t.grade_id === selectedGradeId);
+    }
+    return selectedGrade.includes('Bac') && !selectedGrade.includes('Tronc Commun');
+  }, [selectedGradeId, selectedGrade, dbBacTracks]);
+
+  const displayTracks = useMemo(() => {
+    let list = dbBacTracks;
+    const hasGradeIdMapping = dbBacTracks.some((t) => t.grade_id !== null);
+    if (hasGradeIdMapping && selectedGradeId) {
+      list = dbBacTracks.filter((t) => t.grade_id === selectedGradeId);
+    }
+    if (bacSection) {
+      list = list.filter((track) => {
+        const secId = track.section_id || track.metadata?.bac_section_id || track.metadata?.section_id;
+        return secId === bacSection;
+      });
+    }
+    return list;
+  }, [selectedGradeId, dbBacTracks, bacSection]);
 
   const [currentSession, setCurrentSession] = useState<string>('Fall 2024');
   const [defaultDuration, setDefaultDuration] = useState<number>(60);
@@ -294,18 +333,12 @@ export const Settings: React.FC = () => {
         if (Object.keys(gradesMap).length > 0) setDbGrades(gradesMap);
         if (Object.keys(gradeOptionsMap).length > 0) setDbGradeOptions(gradeOptionsMap);
 
-        // Fetch Baccalaureate data
-        const { data: sectionsData } = await supabase.from('bac_sections').select('*');
-        if (sectionsData) setDbBacSections(sectionsData);
-        
-        const { data: tracksData } = await supabase.from('bac_tracks').select('*');
+        // Fetch tracks and instruction options
+        const { data: tracksData } = await supabase.from('tracks').select('id, name, grade_id, track_order, metadata');
         if (tracksData) setDbBacTracks(tracksData);
         
-        const { data: intOptionsData } = await supabase.from('bac_international_options').select('*');
+        const { data: intOptionsData } = await supabase.from('instruction_options').select('id, name, option_code, language_code');
         if (intOptionsData) setDbBacIntOptions(intOptionsData);
-        
-        const { data: trackIntOptionsData } = await supabase.from('bac_track_international_options').select('*');
-        if (trackIntOptionsData) setDbBacTrackIntOptions(trackIntOptionsData);
       } catch (err) {
         console.error("Failed to fetch metadata", err);
       }
@@ -341,11 +374,11 @@ export const Settings: React.FC = () => {
   );
 
   const currentCountryName = availableCountries.find(c => c.code === selectedCountry)?.name || selectedCountry;
-  const selectedSectionName = dbBacSections.find((section) => section.id === bacSection)?.name || '';
+  const selectedSectionName = dynamicSections.find((section: any) => section.id === bacSection)?.name || '';
   const selectedTrackName = dbBacTracks.find((track) => track.id === bacTrack)?.name || '';
   const selectedInstructionOption = dbBacIntOptions.find((option) => option.id === bacIntOption);
   const selectedOptionName = selectedInstructionOption?.name || '';
-  const selectedOptionCode = selectedInstructionOption?.code || selectedInstructionOption?.name || '';
+  const selectedOptionCode = selectedInstructionOption?.option_code || selectedInstructionOption?.name || '';
   const lockedAcademicValues = useMemo(() => ({
     selected_country: String(settingsMap.selected_country || 'Morocco'),
     selected_grade_id: String(profile?.selected_grade_id || settingsMap.selected_grade_id || selectedGradeId || ''),
@@ -462,11 +495,11 @@ export const Settings: React.FC = () => {
         await updateProfile(user.id, {
           grade_id: academicValues.selected_grade_id || null,
           instruction_option_id: academicValues.selected_bac_int_option || null,
-          track_id: null,
+          track_id: academicValues.selected_bac_track || null,
           selected_grade: academicValues.selected_grade,
           selected_grade_id: academicValues.selected_grade_id || null,
           selected_option: selectedOptionCode || null,
-          selected_bac_track: null,
+          selected_bac_track: academicValues.selected_bac_track || null,
           onboarding_completed: true,
         });
       } catch (err: any) {
@@ -703,37 +736,39 @@ export const Settings: React.FC = () => {
                     </div>
                   </div>
 
-                  {selectedCountry === 'Morocco' && (selectedGrade.includes('Bac') || selectedGrade.includes('Tronc Commun')) && (
+                  {selectedCountry === 'Morocco' && hasTracks && (
                     <div className="space-y-4">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('section')}</label>
-                        <div className="grid grid-cols-1 gap-2 max-h-[180px] overflow-y-auto pr-2 custom-scrollbar">
-                          {dbBacSections.map((section) => (
-                            <button
-                              key={section.id}
-                              onClick={() => {
-                                setBacSection(section.id);
-                                setBacTrack('');
-                                setBacIntOption('');
-                              }}
-                              className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
-                                bacSection === section.id
-                                  ? 'bg-accent border-accent text-paper shadow-sm shadow-accent/20'
-                                  : 'bg-background border-ink/5 text-ink hover:border-accent/30'
-                              }`}
-                            >
-                              <span className="text-xs font-medium text-left pr-2">{section.name}</span>
-                              {bacSection === section.id && <CheckCircle2 className="w-3.5 h-3.5 text-paper shrink-0" />}
-                            </button>
-                          ))}
+                      {dynamicSections.length > 0 && (
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('section')}</label>
+                          <div className="grid grid-cols-1 gap-2 max-h-[180px] overflow-y-auto pr-2 custom-scrollbar">
+                            {dynamicSections.map((section: any) => (
+                              <button
+                                key={section.id}
+                                onClick={() => {
+                                  setBacSection(section.id);
+                                  setBacTrack('');
+                                  setBacIntOption('');
+                                }}
+                                className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
+                                  bacSection === section.id
+                                    ? 'bg-accent border-accent text-paper shadow-sm shadow-accent/20'
+                                    : 'bg-background border-ink/5 text-ink hover:border-accent/30'
+                                }`}
+                              >
+                                <span className="text-xs font-medium text-left pr-2">{section.name}</span>
+                                {bacSection === section.id && <CheckCircle2 className="w-3.5 h-3.5 text-paper shrink-0" />}
+                              </button>
+                            ))}
+                          </div>
                         </div>
-                      </div>
+                      )}
 
-                      {bacSection && !selectedGrade.includes('Tronc Commun') && (
+                      {(bacSection || dynamicSections.length === 0) && (
                         <div className="space-y-2">
                           <label className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('track')}</label>
                           <div className="grid grid-cols-1 gap-2 max-h-[180px] overflow-y-auto pr-2 custom-scrollbar">
-                            {dbBacTracks.filter((track) => track.section_id === bacSection).map((track) => (
+                            {displayTracks.map((track) => (
                               <button
                                 key={track.id}
                                 onClick={() => {
@@ -754,41 +789,35 @@ export const Settings: React.FC = () => {
                         </div>
                       )}
 
-                      {bacTrack && !selectedGrade.includes('Tronc Commun') && dbBacTrackIntOptions.some((item) => item.track_id === bacTrack) && (
+                      {bacTrack && dbBacIntOptions.length > 0 && (
                         <div className="space-y-2">
                           <label className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('international_option')}</label>
                           <div className="grid grid-cols-1 gap-2 max-h-[180px] overflow-y-auto pr-2 custom-scrollbar">
                             <button
                               onClick={() => setBacIntOption('')}
                               className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
-                                bacIntOption === ''
-                                  ? 'bg-accent border-accent text-paper shadow-sm shadow-accent/20'
-                                  : 'bg-background border-ink/5 text-ink hover:border-accent/30'
+                                  bacIntOption === ''
+                                    ? 'bg-accent border-accent text-paper shadow-sm shadow-accent/20'
+                                    : 'bg-background border-ink/5 text-ink hover:border-accent/30'
                               }`}
                             >
                               <span className="text-xs font-medium text-left pr-2">{t('none')}</span>
                               {bacIntOption === '' && <CheckCircle2 className="w-3.5 h-3.5 text-paper shrink-0" />}
                             </button>
-                            {dbBacTrackIntOptions
-                              .filter((item) => item.track_id === bacTrack)
-                              .map((item) => {
-                                const option = dbBacIntOptions.find((match) => match.id === item.international_option_id);
-                                if (!option) return null;
-                                return (
-                                  <button
-                                    key={option.id}
-                                    onClick={() => setBacIntOption(option.id)}
-                                    className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
-                                      bacIntOption === option.id
-                                        ? 'bg-accent border-accent text-paper shadow-sm shadow-accent/20'
-                                        : 'bg-background border-ink/5 text-ink hover:border-accent/30'
-                                    }`}
-                                  >
-                                    <span className="text-xs font-medium text-left pr-2">{option.name}</span>
-                                    {bacIntOption === option.id && <CheckCircle2 className="w-3.5 h-3.5 text-paper shrink-0" />}
-                                  </button>
-                                );
-                              })}
+                            {dbBacIntOptions.map((option) => (
+                              <button
+                                key={option.id}
+                                onClick={() => setBacIntOption(option.id)}
+                                className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
+                                  bacIntOption === option.id
+                                    ? 'bg-accent border-accent text-paper shadow-sm shadow-accent/20'
+                                    : 'bg-background border-ink/5 text-ink hover:border-accent/30'
+                                }`}
+                              >
+                                <span className="text-xs font-medium text-left pr-2">{option.name}</span>
+                                {bacIntOption === option.id && <CheckCircle2 className="w-3.5 h-3.5 text-paper shrink-0" />}
+                              </button>
+                            ))}
                           </div>
                         </div>
                       )}
@@ -943,7 +972,7 @@ export const Settings: React.FC = () => {
                           type="button"
                           onClick={() => {
                             setAiProvider(provider);
-                            const defaults = { gemini: 'gemini-2.5-flash', nvidia: 'google/gemma-3-27b-it', openrouter: 'openai/gpt-4o-mini', openai: 'gpt-4o-mini' } as const;
+                            const defaults = { gemini: 'gemini-2.5-flash', nvidia: 'meta/llama-3.3-70b-instruct', openrouter: 'openai/gpt-4o-mini', openai: 'gpt-4o-mini' } as const;
                             setAiModel(aiStatus?.models?.[provider] || defaults[provider]);
                           }}
                           className={`p-3 rounded-2xl border text-left transition-all duration-300 flex flex-col justify-between h-20 cursor-pointer ${providerStyles[provider]}`}

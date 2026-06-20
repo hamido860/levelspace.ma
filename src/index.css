@@ -331,11 +331,11 @@
 }
 
 .lesson-reader-block {
-  @apply py-2 md:py-3 px-1 md:px-4;
+  @apply py-5 md:py-7 px-2 md:px-6;
 }
 
 .lesson-reader-block__header {
-  @apply mb-3 flex items-center gap-3 pb-2.5 border-b border-slate-100 dark:border-white/5;
+  @apply mb-5 flex items-center gap-4 pb-3.5 border-b border-slate-100 dark:border-white/5;
 }
 
 .lesson-reader-block__icon {
@@ -368,27 +368,46 @@
 }
 
 .lesson-reader-markdown {
-  @apply prose prose-sm max-w-none text-ink prose-p:leading-relaxed prose-li:leading-relaxed prose-headings:text-ink prose-strong:text-ink;
+  @apply prose prose-sm max-w-none prose-p:leading-relaxed prose-li:leading-relaxed prose-headings:font-bold;
+  color: var(--ink-secondary);
+  --tw-prose-body: var(--ink-secondary);
+  --tw-prose-headings: var(--ink);
+  --tw-prose-bold: var(--ink);
+  --tw-prose-bullets: var(--accent);
+  --tw-prose-counters: var(--accent);
+  --tw-prose-quotes: var(--ink-muted);
+  --tw-prose-quote-borders: var(--accent);
 }
 
+.lesson-reader-markdown code::before,
+.lesson-reader-markdown code::after {
+  content: "" !important;
+}
+
+.lesson-reader-markdown .inline-code-badge {
+  color: var(--ink) !important;
+  background-color: var(--surface-low) !important;
+}
+
+
 .lesson-reader-list {
-  @apply mt-4 space-y-3.5 pl-6;
+  @apply mt-6 space-y-4 pl-6 mb-6;
 }
 
 .lesson-reader-list li {
-  @apply list-disc text-ink mb-2;
-  line-height: 1.75 !important;
+  @apply list-disc text-ink mb-3;
+  line-height: 1.8 !important;
 }
 
 .lesson-reader-stack {
-  @apply space-y-5;
+  @apply space-y-6;
 }
 
 .lesson-reader-example,
 .lesson-reader-check,
 .lesson-answer-panel,
 .lesson-hint {
-  @apply rounded-2xl bg-surface-low p-5 border border-slate-100 dark:border-white/5 shadow-sm;
+  @apply rounded-2xl bg-surface-low p-6 md:p-8 border border-slate-100 dark:border-white/5 shadow-sm;
 }
 
 .lesson-reader-check--exam {
@@ -1405,43 +1424,50 @@ html[data-preview="mobile"] .lesson-view-container {
 
 .lesson-reader-block__title {
   font-family: var(--font-sans) !important;
-  font-size: clamp(1.25rem, 5vw, 1.55rem) !important;
+  font-size: clamp(1.05rem, 4vw, 1.25rem) !important;
   line-height: 1.35 !important;
-  font-weight: 800 !important;
+  font-weight: 700 !important;
   letter-spacing: -0.015em !important;
   word-break: keep-all !important;
   overflow-wrap: break-word !important;
 }
 
 .lesson-reader-markdown {
-  max-width: 65ch !important;
+  max-width: 68ch !important;
   margin-left: auto !important;
   margin-right: auto !important;
+  color: var(--ink-secondary) !important;
 }
 
 .lesson-reader-markdown p {
   font-size: clamp(0.975rem, 4vw, 1.075rem) !important;
-  line-height: 1.75 !important;
-  margin-bottom: 1.25rem !important;
+  line-height: 1.8 !important;
+  margin-bottom: 1.5rem !important;
+  color: var(--ink-secondary) !important;
+}
+
+.lesson-reader-markdown strong {
+  color: var(--ink) !important;
+  font-weight: 700 !important;
+}
+
+.lesson-reader-markdown h3,
+.lesson-reader-markdown h4 {
+  color: var(--ink) !important;
+  font-weight: 700 !important;
+  margin-top: 1.8em !important;
+  margin-bottom: 0.75em !important;
 }
 
 .lesson-reader-markdown li {
   font-size: clamp(0.975rem, 4vw, 1.075rem) !important;
-  line-height: 1.75 !important;
-  margin-bottom: 0.375rem !important;
+  line-height: 1.8 !important;
+  margin-bottom: 0.5rem !important;
+  color: var(--ink-secondary) !important;
 }
 
-.lesson-reader-option .lesson-reader-markdown p,
-.lesson-feedback .lesson-reader-markdown p,
-.lesson-hint .lesson-reader-markdown p {
-  font-size: 0.9rem !important;
-  line-height: 1.6 !important;
-  margin-bottom: 0 !important;
-}
-
-.lesson-reader-markdown ul,
-.lesson-reader-markdown ol {
-  margin-bottom: 1.25rem !important;
+.lesson-reader-markdown li::marker {
+  color: var(--accent) !important;
 }
 
 /* Prevent horizontal overflow on any phone widths */

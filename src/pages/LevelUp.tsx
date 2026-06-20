@@ -44,6 +44,7 @@ import { TabbedHeader, TabItem } from '../components/TabbedHeader';
 import { toast } from 'sonner';
 import Markdown from 'react-markdown';
 import remarkMath from 'remark-math';
+import remarkGfm from 'remark-gfm';
 import rehypeKatex from 'rehype-katex';
 import {
   fetchQuranSurahs,
@@ -1222,7 +1223,7 @@ export const LevelUp: React.FC = () => {
                     {/* Tutorial content */}
                     <div className="prose prose-slate dark:prose-invert max-w-none text-sm text-slate-800 dark:text-ink-secondary leading-relaxed font-sans space-y-4">
                       <Markdown 
-                        remarkPlugins={[remarkMath]} 
+                        remarkPlugins={[remarkMath, remarkGfm]} 
                         rehypePlugins={[rehypeKatex]}
                       >
                         {selectedGap.explanationSnippet}
@@ -1335,7 +1336,7 @@ export const LevelUp: React.FC = () => {
 
               <div className="flex-grow overflow-y-auto no-scrollbar prose prose-slate dark:prose-invert max-w-none text-left p-2">
                 <Markdown 
-                  remarkPlugins={[remarkMath]} 
+                  remarkPlugins={[remarkMath, remarkGfm]} 
                   rehypePlugins={[rehypeKatex]}
                 >
                   {selectedResource.content || '# Content Not Loaded'}

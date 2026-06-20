@@ -1398,7 +1398,7 @@ export async function loadAiRecoveryJobDiagnostics(
   let existingLessonBlocksCount: number | null = 0;
   let lessonBlocksStatus: "available" | "missing_table" = "available";
 
-  let lessonRows: Array<{ id: string }> = [];
+  let lessonRows: Array<{ id: string; blocks?: any[] | null }> = [];
   if (queueJob.topic_id) {
     const { count, error: lessonsCountError } = await supabase
       .from("lessons")
@@ -1412,33 +1412,22 @@ export async function loadAiRecoveryJobDiagnostics(
 
     const { data: lessonsForBlocks, error: lessonsForBlocksError } = await supabase
       .from("lessons")
-      .select("id")
+      .select("id, blocks")
       .eq("topic_id", queueJob.topic_id);
 
     if (lessonsForBlocksError) {
       throw lessonsForBlocksError;
     }
 
-    lessonRows = (lessonsForBlocks || []) as Array<{ id: string }>;
+    lessonRows = (lessonsForBlocks || []) as Array<{ id: string; blocks?: any[] | null }>;
   }
 
-  const lessonIds = lessonRows.map((lesson) => lesson.id);
-  if (lessonIds.length > 0) {
-    const { count, error: blocksError } = await supabase
-      .from("lesson_blocks")
-      .select("*", { count: "exact", head: true })
-      .in("lesson_id", lessonIds);
-
-    if (blocksError) {
-      if (isMissingTableError(blocksError)) {
-        existingLessonBlocksCount = null;
-        lessonBlocksStatus = "missing_table";
-      } else {
-        throw blocksError;
-      }
-    } else {
-      existingLessonBlocksCount = count ?? 0;
-    }
+  if (lessonRows.length > 0) {
+    existingLessonBlocksCount = lessonRows.reduce((acc, row) => {
+      const blocksCount = Array.isArray(row.blocks) ? row.blocks.length : 0;
+      return acc + blocksCount;
+    }, 0);
+    lessonBlocksStatus = "available";
   }
 
   const outlines =
@@ -1474,10 +1463,9 @@ export async function loadAiRecoveryRecoveredLessons(
   if (!["needs_review", "approved", "rejected"].includes(status)) {
     throw new AiCommandCenterHttpError(400, "Unsupported recovered lesson status filter.");
   }
-
   const { data: lessons, error } = await supabase
     .from("lessons")
-    .select("id, lesson_title, title, subtitle, grade, subject, topic_id, teaching_contract, created_at, updated_at")
+    .select("id, lesson_title, title, subtitle, grade, subject, topic_id, blocks, teaching_contract, created_at, updated_at")
     .eq("teaching_contract->>status", status)
     .order("created_at", { ascending: false });
 
@@ -1498,24 +1486,10 @@ export async function loadAiRecoveryRecoveredLessons(
   const topicContext = await fetchTopicContext(supabase, topicIds);
   const blocksByLessonId = new Map<string, number>();
 
-  if (lessonIds.length > 0) {
-    const { data: blocks, error: blocksError } = await supabase
-      .from("lesson_blocks")
-      .select("lesson_id")
-      .in("lesson_id", lessonIds);
-
-    if (blocksError) {
-      if (!isMissingTableError(blocksError)) {
-        throw blocksError;
-      }
-    } else {
-      ((blocks || []) as JsonRecord[]).forEach((block) => {
-        const lessonId = typeof block.lesson_id === "string" ? block.lesson_id : "";
-        if (!lessonId) return;
-        blocksByLessonId.set(lessonId, (blocksByLessonId.get(lessonId) || 0) + 1);
-      });
-    }
-  }
+  lessonRows.forEach((lesson) => {
+    const blocksCount = Array.isArray(lesson.blocks) ? lesson.blocks.length : 0;
+    blocksByLessonId.set(String(lesson.id), blocksCount);
+  });
 
   return lessonRows.map((lesson) =>
     buildRecoveredLessonSummary(
@@ -1549,19 +1523,8 @@ export async function loadAiRecoveryRecoveredLessonDetail(
   let blocks: JsonRecord[] = [];
   let blocksStatus: "available" | "missing_table" = "available";
 
-  const { data: lessonBlocks, error: blocksError } = await supabase
-    .from("lesson_blocks")
-    .select("*")
-    .eq("lesson_id", lessonId);
-
-  if (blocksError) {
-    if (isMissingTableError(blocksError)) {
-      blocksStatus = "missing_table";
-    } else {
-      throw blocksError;
-    }
-  } else {
-    blocks = sortLessonBlocks((lessonBlocks || []) as JsonRecord[]);
+  if (Array.isArray(lesson.blocks)) {
+    blocks = sortLessonBlocks((lesson.blocks || []) as JsonRecord[]);
   }
 
   const topicId = typeof lesson.topic_id === "string" ? lesson.topic_id : null;
@@ -1740,61 +1703,7 @@ export async function saveRecoveredLessonReviewEdits(
     throw lessonUpdateError;
   }
 
-  if (detail.blocks_status === "available") {
-    const existingBlocks = sortLessonBlocks(detail.blocks);
-    if (existingBlocks.length !== normalizedBlocks.length) {
-      throw new AiCommandCenterHttpError(
-        400,
-        "This review page only supports editing the existing block set. Add or remove blocks directly in SQL if the lesson shape must change.",
-      );
-    }
 
-    for (let index = 0; index < normalizedBlocks.length; index += 1) {
-      const existingBlock = existingBlocks[index];
-      const incomingBlock = normalizedBlocks[index];
-      const blockId = typeof existingBlock.id === "string" ? existingBlock.id : null;
-
-      if (!blockId) {
-        throw new AiCommandCenterHttpError(400, "A lesson block row is missing its id and cannot be safely updated.");
-      }
-
-      const nextBlockPayload: JsonRecord = {
-        lesson_id: lessonId,
-        updated_at: nowIso(),
-      };
-
-      if ("order_index" in existingBlock || "order_index" in incomingBlock) {
-        nextBlockPayload.order_index = index;
-      }
-      if ("order" in existingBlock || "order" in incomingBlock) {
-        nextBlockPayload.order = index;
-      }
-      if ("position" in existingBlock || "position" in incomingBlock) {
-        nextBlockPayload.position = index;
-      }
-      if ("block_order" in existingBlock || "block_order" in incomingBlock) {
-        nextBlockPayload.block_order = index;
-      }
-      if ("title" in existingBlock || "title" in incomingBlock) {
-        nextBlockPayload.title = typeof incomingBlock.title === "string" ? incomingBlock.title : "";
-      }
-      if ("type" in existingBlock || "type" in incomingBlock) {
-        nextBlockPayload.type = normalizeLessonBlockType(incomingBlock.type);
-      }
-      if ("content" in existingBlock || "content" in incomingBlock) {
-        nextBlockPayload.content = typeof incomingBlock.content === "string" ? incomingBlock.content : "";
-      }
-
-      const { error: blockUpdateError } = await supabase
-        .from("lesson_blocks")
-        .update(nextBlockPayload)
-        .eq("id", blockId);
-
-      if (blockUpdateError) {
-        throw blockUpdateError;
-      }
-    }
-  }
 
   const sourceTaskId = typeof detail.lesson.teaching_contract.source_task_id === "string"
     ? detail.lesson.teaching_contract.source_task_id
@@ -2590,7 +2499,7 @@ export async function loadAiRecoveryTaskDetail(
   if (topicId) {
     const { data: lessons, error: lessonsError } = await supabase
       .from("lessons")
-      .select("id, lesson_title, title, topic_id, slug, teaching_contract, created_at, updated_at")
+      .select("id, lesson_title, title, topic_id, slug, blocks, teaching_contract, created_at, updated_at")
       .eq("topic_id", topicId)
       .order("created_at", { ascending: false });
 
@@ -2599,25 +2508,14 @@ export async function loadAiRecoveryTaskDetail(
     }
 
     existingLessons = (lessons || []) as JsonRecord[];
-    const lessonIds = existingLessons.map((lesson) => lesson.id).filter(Boolean);
-
-    if (lessonIds.length > 0) {
-      const { data: blocks, error: blocksError } = await supabase
-        .from("lesson_blocks")
-        .select("*")
-        .in("lesson_id", lessonIds);
-
-      if (blocksError) {
-        if (isMissingTableError(blocksError)) {
-          lessonBlocksStatus = "missing_table";
-          lessonBlocks = [];
-        } else {
-          throw blocksError;
-        }
-      } else {
-        lessonBlocks = (blocks || []) as JsonRecord[];
-      }
-    }
+    lessonBlocks = existingLessons.flatMap((lesson) => {
+      const blocks = Array.isArray(lesson.blocks) ? (lesson.blocks as JsonRecord[]) : [];
+      return blocks.map(block => ({
+        ...block,
+        lesson_id: lesson.id
+      }));
+    });
+    lessonBlocksStatus = "available";
   }
 
   return {

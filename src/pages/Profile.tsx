@@ -68,7 +68,7 @@ export const Profile: React.FC = () => {
         const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(selectedBacTrackId);
 
         if (isUUID) {
-          const { data } = await supabase.from('bac_tracks').select('name').eq('id', selectedBacTrackId).single();
+          const { data } = await supabase.from('tracks').select('name').eq('id', selectedBacTrackId).single();
           if (data) {
             setBacTrackName(data.name);
           }

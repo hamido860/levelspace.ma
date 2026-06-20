@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import { AdminCurriculumDebug } from "./AdminCurriculumDebug";
 import { AdminMcpLessons } from "./AdminMcpLessons";
+import { AdminLessonGeneratorModal } from "../components/admin/AdminLessonGeneratorModal";
 import { AiKeysModal } from "../components/settings/AiKeysModal";
 import { TabbedHeader, TabItem } from "../components/TabbedHeader";
 
@@ -366,6 +367,7 @@ export const Admin: React.FC = () => {
   const [ragRepairLoading, setRagRepairLoading] = useState(false);
   const [ragRepairResult, setRagRepairResult] = useState<RagTopicRepairResult | null>(null);
   const [ragRepairError, setRagRepairError] = useState("");
+  const [selectedRagChunk, setSelectedRagChunk] = useState<any | null>(null);
 
   // Dormant modal state kept isolated until protected workflow routes are added.
   const [execModal, setExecModal] = useState<{ task: any; open: boolean } | null>(null);
@@ -429,8 +431,8 @@ export const Admin: React.FC = () => {
       "lesson_gen_queue","rag_chunks","rag_questions","exercises","quizzes",
       "quiz_results","exercise_attempts","notes","tasks","schedule","settings",
       "app_settings","audits","topic_outlines","lesson_gen_log","student_progress",
-      "student_answers","ghost_interventions","lesson_blocks","skills","user_skills",
-      "bac_sections","bac_tracks","bac_exams","bac_track_subjects","grade_subjects",
+      "student_answers","ghost_interventions","skills","user_skills",
+      "tracks","track_subjects","instruction_options","grade_subjects",
       "embeddings","embeddings_archive",
     ];
     const results = await Promise.all(
@@ -1323,6 +1325,12 @@ export const Admin: React.FC = () => {
                                         </div>
                                         <p className="text-xs text-ink-secondary leading-relaxed line-clamp-2">{c.content}</p>
                                       </div>
+                                      <button
+                                        onClick={() => setSelectedRagChunk(c)}
+                                        className="flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-600 transition-all hover:bg-sky-100 hover:text-sky-700 active:scale-95 border border-sky-200/50"
+                                      >
+                                        <Zap className="h-3 w-3" /> Generate Lesson
+                                      </button>
                                     </div>
                                   ))}
                                 </div>
@@ -2086,6 +2094,11 @@ export const Admin: React.FC = () => {
         isOpen={isAiKeysOpen}
         onClose={() => setIsAiKeysOpen(false)}
         mode="admin"
+      />
+      <AdminLessonGeneratorModal
+        isOpen={!!selectedRagChunk}
+        onClose={() => setSelectedRagChunk(null)}
+        chunk={selectedRagChunk}
       />
     </Layout>
   );

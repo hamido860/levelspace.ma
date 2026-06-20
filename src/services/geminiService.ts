@@ -80,8 +80,8 @@ export const setNvidiaApiKey = (key: string) => {
   }
 };
 
-export const NVIDIA_MODEL = "google/gemma-3-27b-it";
-export const NVIDIA_WORKER_MODEL = "google/gemma-3-27b-it"; // Gemma 3 27B — primary bulk lesson worker
+export const NVIDIA_MODEL = "meta/llama-3.3-70b-instruct";
+export const NVIDIA_WORKER_MODEL = "meta/llama-3.3-70b-instruct"; // Llama 3.3 70B — primary bulk lesson worker
 
 export async function callNvidiaAPI(params: {
   prompt: string;
@@ -184,6 +184,24 @@ export const modelQuotaTracker = {
   allGeminiExhausted(): boolean {
     return GEMINI_FALLBACKS.every((m) => this.isExhausted(m));
   },
+};
+
+export const resolveModelForProvider = (): string | undefined => {
+  const provider = getAiProvider();
+  
+  if (!provider) {
+    return undefined; // Let the backend use its default provider and model
+  }
+  
+  if (provider === "nvidia") {
+    return NVIDIA_MODEL;
+  }
+  
+  if (provider === "gemini") {
+    return modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]) || "gemini-2.5-flash";
+  }
+  
+  return undefined;
 };
 
 const extractResponseText = (response: any): string =>
@@ -681,7 +699,16 @@ export async function generateAIContent(
   try {
     const config = params.config || {};
     const preferredProvider = params.provider || getAiProvider() || undefined;
-    const preferredModel = params.model || getAiModel() || undefined;
+    let preferredModel = params.model || getAiModel() || undefined;
+    
+    // Auto-migrate EOL Gemma 3 models to Llama 3.3 for NVIDIA provider
+    if (preferredModel === "google/gemma-3-27b-it" || preferredModel === "google/gemma-2-27b-it") {
+       if (preferredProvider === "nvidia" || !preferredProvider) {
+           preferredModel = "meta/llama-3.3-70b-instruct";
+           localStorage.setItem("ai_model", preferredModel); // update cache for future
+       }
+    }
+
     const fallbackEnabled = localStorage.getItem("ai_fallback_enabled");
     const { data: sessionData } = await supabase.auth.getSession();
     const accessToken = sessionData.session?.access_token;
@@ -1213,7 +1240,7 @@ Return ONLY the refined Markdown content. Do not include any conversational fill
   try {
     const response = await generateContentWithFallback(
       {
-        model: "gemini-3.1-pro-preview",
+        model: resolveModelForProvider(),
         contents: prompt,
       },
       "refineLessonContent"
@@ -1411,6 +1438,7 @@ export const generateFullLesson = async (
         retries - 1, referenceUrls, existingContext, isAdmin, _correctionPrompt,
       );
     }
+    throw error;
   }
 };
 
@@ -1811,7 +1839,7 @@ export const generateAnotherExample = async (
 
     const response = await generateContentWithFallback(
       {
-        model: "gemini-3.1-pro-preview",
+        model: resolveModelForProvider(),
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -3206,7 +3234,7 @@ export const askAdminAI = async (
 
     const response = await generateContentWithFallback(
       {
-        model: "gemini-3.1-pro-preview",
+        model: resolveModelForProvider(),
         contents: prompt,
         config: {
           maxOutputTokens: 4096,
@@ -3219,6 +3247,48 @@ export const askAdminAI = async (
     return response.text?.trim() || "I couldn't generate a response.";
   } catch (error) {
     console.error("Error asking Admin AI:", error);
+    throw error;
+  }
+};
+
+export const rewriteLessonContent = async (
+  instruction: string,
+  currentContent: string,
+  title: string
+): Promise<string> => {
+  try {
+    const prompt = `You are an expert educator and content editor. Your task is to rewrite, improve, or update the educational lesson content based on the user's instructions.
+
+CRITICAL RULES:
+1. RAG Sourcing: If "Current Lesson Content" is provided, treat it as your absolute factual foundation and do not hallucinate external facts. However, if the content is empty or the instructions ask to "generate from scratch", you MAY use your extensive educational knowledge to generate a comprehensive lesson.
+2. Language & Culture: Output language MUST perfectly match the user's request or existing content. If Arabic, use Modern Standard Arabic (Fus'ha) tailored and simplified for Moroccan students (avoid overly complex classical vocabulary unless it is an Arabic Literature lesson).
+3. Subject Adaptation: If this is a Math/Science (STEM) lesson, focus on step-by-step logic, tables, formulas, and practical examples. If it is Literature/Language, focus on text analysis, quotes, grammar rules, and storytelling.
+4. Formatting: Actively use rich GitHub Flavored Markdown (bullet points, numbered lists, tables, bold text, blockquotes). Do NOT output a giant wall of plain text.
+
+Current Lesson Title: ${title}
+
+Current Lesson Content (Markdown):
+${currentContent}
+
+User Instructions:
+"${instruction}"
+
+Please return ONLY the updated/rewritten lesson content in standard Markdown. Do not include any introductory remarks, metadata, explanations, or wrapping markdown code block indicators (like \`\`\`markdown) unless specifically requested. Output the pure revised markdown content itself.`;
+
+    const response = await generateContentWithFallback(
+      {
+        model: resolveModelForProvider(),
+        contents: prompt,
+        config: {
+          maxOutputTokens: 4096,
+        },
+      },
+      "rewriteLessonContent",
+    );
+
+    return response.text?.trim() || "I couldn't generate a response.";
+  } catch (error) {
+    console.error("Error in rewriteLessonContent:", error);
     throw error;
   }
 };
@@ -3287,7 +3357,7 @@ export const auditClassroomContent = async (
 
     const response = await generateContentWithFallback(
       {
-        model: "gemini-3.1-pro-preview",
+        model: resolveModelForProvider(),
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -3344,7 +3414,7 @@ export async function smartExtractFromResource(
     
     const response = await generateContentWithFallback(
       {
-        model: "gemini-3.1-pro-preview",
+        model: resolveModelForProvider(),
         contents: [
           {
             role: "user",
@@ -3396,7 +3466,7 @@ export async function evaluateExtractionWeakness(
 
     const response = await generateContentWithFallback(
       {
-        model: "gemini-3.1-pro-preview",
+        model: resolveModelForProvider(),
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -3501,7 +3571,7 @@ export async function findSimilarResources(
 
     const response = await generateContentWithFallback(
       {
-        model: "gemini-3.1-pro-preview",
+        model: resolveModelForProvider(),
         contents: prompt,
         config: {
           tools: [{ googleSearch: {} }]

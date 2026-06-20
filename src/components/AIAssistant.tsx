@@ -6,6 +6,7 @@ import { chatWithTutor, ChatMessage, generateProactiveGreeting, generateFullLess
 import { searchLessons, saveLesson } from '../services/ragService';
 import Markdown from 'react-markdown';
 import remarkMath from 'remark-math';
+import remarkGfm from 'remark-gfm';
 import rehypeKatex from 'rehype-katex';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
@@ -279,7 +280,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
                           msg.parts[0].text
                         ) : (
                           <div className="prose prose-sm prose-invert prose-p:leading-relaxed prose-pre:bg-slate-950 prose-pre:text-slate-100 max-w-none">
-                            <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{msg.parts[0].text}</Markdown>
+                            <Markdown remarkPlugins={[remarkMath, remarkGfm]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>{msg.parts[0].text}</Markdown>
                           </div>
                         )}
                       </div>

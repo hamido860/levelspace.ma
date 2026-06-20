@@ -153,8 +153,9 @@ export const updateLesson = async (
 export const saveLesson = async (
   lesson: LessonTemplate,
   userId?: string,
-  isAiGenerated: boolean = false
-): Promise<boolean> => {
+  isAiGenerated: boolean = false,
+  lessonIdToUpdate?: string
+): Promise<string | null> => {
   try {
     const topicResolution = await resolveTopicForLesson(
       supabase as any,
@@ -178,7 +179,7 @@ export const saveLesson = async (
       topic_id: topicId,
       lesson_title: lesson.lesson_title,
       content: lesson.content,
-      blocks: lesson.blocks && lesson.blocks.length > 0 ? lesson.blocks : null, // NEW
+      blocks: lesson.blocks && lesson.blocks.length > 0 ? lesson.blocks : null,
       exercises: lesson.exercises || [],
       quizzes: lesson.quizzes || [],
       mod: lesson.mod,
@@ -195,25 +196,50 @@ export const saveLesson = async (
     let insertedLesson: { id: string } | null = null;
     let lessonError: any = null;
 
-    const firstInsert = await supabase.from("lessons").insert(lessonInsertPayload).select('id').single();
-    insertedLesson = firstInsert.data;
-    lessonError = firstInsert.error;
+    if (lessonIdToUpdate) {
+      // Update existing lesson
+      const { data, error } = await supabase.from("lessons").update(lessonInsertPayload).eq('id', lessonIdToUpdate).select('id').single();
+      insertedLesson = data;
+      lessonError = error;
+      
+      if (lessonError && isMissingLessonValidationColumnError(lessonError)) {
+         const { data: legacyData, error: legacyError } = await supabase
+           .from("lessons")
+           .update(stripLessonValidationFields(lessonInsertPayload))
+           .eq('id', lessonIdToUpdate)
+           .select('id')
+           .single();
+         insertedLesson = legacyData;
+         lessonError = legacyError;
+      }
+    } else {
+      // Insert new lesson
+      const firstInsert = await supabase.from("lessons").insert(lessonInsertPayload).select('id').single();
+      insertedLesson = firstInsert.data;
+      lessonError = firstInsert.error;
 
-    if (lessonError && isMissingLessonValidationColumnError(lessonError)) {
-      const legacyInsert = await supabase
-        .from("lessons")
-        .insert(stripLessonValidationFields(lessonInsertPayload))
-        .select('id')
-        .single();
+      if (lessonError && isMissingLessonValidationColumnError(lessonError)) {
+        const legacyInsert = await supabase
+          .from("lessons")
+          .insert(stripLessonValidationFields(lessonInsertPayload))
+          .select('id')
+          .single();
 
-      insertedLesson = legacyInsert.data;
-      lessonError = legacyInsert.error;
+        insertedLesson = legacyInsert.data;
+        lessonError = legacyInsert.error;
+      }
     }
 
     if (lessonError) throw lessonError;
     
-    const lessonId = insertedLesson.id;
+    const lessonId = insertedLesson!.id;
     const actualUserId = userId === "dummy-user-id" ? null : (userId || null);
+
+    // If updating, delete old quizzes/exercises first
+    if (lessonIdToUpdate) {
+      await supabase.from("quizzes").delete().eq("lesson_id", lessonId);
+      await supabase.from("exercises").delete().eq("lesson_id", lessonId);
+    }
 
     // 2. Insert Quizzes
     if (lesson.quizzes && lesson.quizzes.length > 0) {
@@ -255,9 +281,9 @@ export const saveLesson = async (
       if (exerciseError) console.error("Error saving exercises:", exerciseError);
     }
 
-    return true;
+    return lessonId;
   } catch (error) {
     console.error("Error saving lesson:", error);
-    return false;
+    return null;
   }
 };

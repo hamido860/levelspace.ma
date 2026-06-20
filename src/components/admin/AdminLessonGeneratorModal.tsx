@@ -14,7 +14,8 @@ import {
   Check, 
   Plus, 
   BookOpen,
-  Activity
+  Activity,
+  XCircle
 } from "lucide-react";
 
 export interface AdminLessonGeneratorModalProps {
@@ -42,18 +43,21 @@ export const AdminLessonGeneratorModal: React.FC<AdminLessonGeneratorModalProps>
   const [grades, setGrades] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
   const [topics, setTopics] = useState<any[]>([]);
+  const [lessons, setLessons] = useState<any[]>([]);
   const [relatedChunks, setRelatedChunks] = useState<any[]>([]);
   
   // Loading States for lists
   const [loadingGrades, setLoadingGrades] = useState(false);
   const [loadingSubjects, setLoadingSubjects] = useState(false);
   const [loadingTopics, setLoadingTopics] = useState(false);
+  const [loadingLessons, setLoadingLessons] = useState(false);
   const [loadingRelatedChunks, setLoadingRelatedChunks] = useState(false);
 
   // Form State
   const [selectedGradeId, setSelectedGradeId] = useState("");
   const [selectedSubjectId, setSelectedSubjectId] = useState("");
   const [selectedTopicId, setSelectedTopicId] = useState("");
+  const [selectedLessonId, setSelectedLessonId] = useState("");
   const [isCreatingNewTopic, setIsCreatingNewTopic] = useState(false);
   const [newTopicTitle, setNewTopicTitle] = useState("");
   
@@ -151,7 +155,7 @@ export const AdminLessonGeneratorModal: React.FC<AdminLessonGeneratorModalProps>
           setTopics(data || []);
         } catch (err: any) {
           console.error("Error fetching topics:", err);
-          toast.error("Failed to load topics.");
+          toast.error("Failed to load topics for selected subject.");
         } finally {
           setLoadingTopics(false);
         }
@@ -160,8 +164,37 @@ export const AdminLessonGeneratorModal: React.FC<AdminLessonGeneratorModalProps>
     } else {
       setTopics([]);
       setSelectedTopicId("");
+      setIsCreatingNewTopic(false);
     }
   }, [selectedGradeId, selectedSubjectId]);
+
+  // 3b. Fetch lessons when topic changes
+  useEffect(() => {
+    if (selectedTopicId) {
+      const fetchLessons = async () => {
+        setLoadingLessons(true);
+        setLessons([]);
+        // Don't clear selectedLessonId if it was just auto-detected
+        try {
+          const { data, error: lessonsErr } = await supabase
+            .from("lessons")
+            .select("id, title")
+            .eq("topic_id", selectedTopicId)
+            .order("title");
+          if (lessonsErr) throw lessonsErr;
+          setLessons(data || []);
+        } catch (err: any) {
+          console.error("Error fetching lessons:", err);
+        } finally {
+          setLoadingLessons(false);
+        }
+      };
+      fetchLessons();
+    } else {
+      setLessons([]);
+      setSelectedLessonId("");
+    }
+  }, [selectedTopicId]);
 
   // 4. Fetch related chunks for selectedTopicId
   useEffect(() => {
@@ -176,7 +209,7 @@ export const AdminLessonGeneratorModal: React.FC<AdminLessonGeneratorModalProps>
             .limit(10);
           if (chunksErr) throw chunksErr;
           setRelatedChunks(data || []);
-        } catch (err) {
+        } catch (err: any) {
           console.error("Error fetching related chunks by topic_id:", err);
         } finally {
           setLoadingRelatedChunks(false);
@@ -326,6 +359,7 @@ export const AdminLessonGeneratorModal: React.FC<AdminLessonGeneratorModalProps>
         let detectedGradeId = "";
         let detectedSubjectId = "";
         let detectedTopicId = "";
+        let detectedLessonId = "";
         let detectedModuleName = "";
         let detectedLanguage = "fr";
         
@@ -480,82 +514,30 @@ export const AdminLessonGeneratorModal: React.FC<AdminLessonGeneratorModalProps>
           }
         }
         
-        // AI Extraction fallback if missing critical metadata mapping
-        if ((!detectedSubjectId || !detectedTopicId) && checkAIProvider()) {
-          reasons.push("Metadata incomplete. Querying AI model to extract suggestions...");
-          try {
-            const extracted = await extractChunkMetadata(chunk.content);
-            if (extracted && isMounted) {
-              if (!detectedModuleName && extracted.moduleName) {
-                setModuleName(extracted.moduleName);
-              }
-              
-              // Match AI extracted subject to loaded grade subjects
-              if (!detectedSubjectId && extracted.subject) {
-                const subStr = extracted.subject.toLowerCase().trim();
-                const foundSub = subjects.find((s: any) => 
-                  s.name.toLowerCase().includes(subStr) || subStr.includes(s.name.toLowerCase())
-                );
-                if (foundSub) {
-                  setSelectedSubjectId(foundSub.id);
-                  detectedSubjectId = foundSub.id;
-                  reasons.push(`AI Extracted Subject: matched to "${foundSub.name}"`);
-                  
-                  // Query topics for this AI resolved subject
-                  const { data: topicsData } = await supabase
-                    .from("topics")
-                    .select("id, title")
-                    .eq("grade_id", detectedGradeId || selectedGradeId)
-                    .eq("subject_id", foundSub.id)
-                    .order("title");
-                  setTopics(topicsData || []);
-                  
-                  if (!detectedTopicId && extracted.topic) {
-                    const topicStr = extracted.topic.toLowerCase().trim();
-                    const foundTopic = (topicsData || []).find((t: any) => 
-                      t.title.toLowerCase().includes(topicStr) || topicStr.includes(t.title.toLowerCase())
-                    );
-                    if (foundTopic) {
-                      setSelectedTopicId(foundTopic.id);
-                      detectedTopicId = foundTopic.id;
-                      reasons.push(`AI Extracted Topic: matched to "${foundTopic.title}"`);
-                    } else {
-                      setIsCreatingNewTopic(true);
-                      setNewTopicTitle(extracted.topic);
-                      reasons.push(`AI Extracted Topic: "${extracted.topic}" (no match, suggesting creation)`);
-                    }
-                  }
-                } else {
-                  reasons.push(`AI Extracted Subject "${extracted.subject}" did not match grade curriculum.`);
-                }
-              }
-            }
-          } catch (aiErr) {
-            console.error("AI extraction error:", aiErr);
+        // If we still have no grade, set confidence to zero and allow manual pick
+        if (!detectedGradeId) {
+          reasons.push("No grade information found in chunk DB or metadata. Please select manually.");
+          if (isMounted) {
+            setConfidence({ score: 0, label: "Low", reasons });
+            setIsExtracting(false);
           }
+          return;
         }
-        
-        // Confidence Calculations
+
+        // Calculate confidence based on what was detected purely from DB/metadata
         let score = 0;
-        let label = "Low";
-        if (detectedGradeId) score += 30;
-        if (detectedSubjectId) score += 30;
-        if (detectedTopicId) score += 40;
-        else if (isCreatingNewTopic && newTopicTitle) score += 20;
+        if (detectedGradeId) score += 33;
+        if (detectedSubjectId) score += 33;
+        if (detectedTopicId) score += 34;
         
-        if (score >= 90) label = "High";
-        else if (score >= 60) label = "Medium";
-        else label = "Low";
+        let label = "Low";
+        if (score >= 66) label = "Medium";
+        if (score === 100) label = "High";
         
         if (isMounted) {
-          setConfidence({
-            score,
-            label,
-            reasons: reasons.filter(Boolean),
-          });
+          setConfidence({ score, label, reasons });
+          setIsExtracting(false);
         }
-        
-        if (isMounted) setIsExtracting(false);
       };
       
       performAutoDetection();
@@ -656,7 +638,12 @@ export const AdminLessonGeneratorModal: React.FC<AdminLessonGeneratorModalProps>
       };
       
       // Save lesson using the updated saveLesson that returns the UUID
-      const savedLessonId = await saveLesson(finalLessonData, "system", true);
+      const savedLessonId = await saveLesson(
+        finalLessonData, 
+        "system", 
+        true,
+        selectedLessonId || undefined
+      );
       
       if (!savedLessonId || typeof savedLessonId !== "string") {
         throw new Error("Failed to save the lesson to Supabase.");
@@ -758,58 +745,26 @@ export const AdminLessonGeneratorModal: React.FC<AdminLessonGeneratorModalProps>
               </div>
             </div>
 
-            {/* Auto-detection & Quality Check Summary */}
-            <div className="bg-surface-low p-4 rounded-xl border border-surface-mid space-y-3">
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs font-bold text-ink-muted uppercase tracking-wider flex items-center gap-1.5">
-                  <Activity className="w-4 h-4 text-emerald-500" />
-                  Auto-Detection Details
-                </h4>
-                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                  confidence.label === "High" ? "bg-emerald-100 text-emerald-800" :
-                  confidence.label === "Medium" ? "bg-amber-100 text-amber-800" :
-                  "bg-slate-200 text-slate-800"
-                }`}>
-                  Confidence: {confidence.label} ({confidence.score}%)
-                </span>
+            {/* Quality Check Summary */}
+            <div className="bg-surface border border-surface-mid rounded-xl p-4 space-y-4">
+              <div className="flex items-center text-sm font-semibold text-ink-muted uppercase tracking-wider">
+                <Activity className="w-4 h-4 mr-2" />
+                Quality Check
               </div>
               
-              {confidence.reasons.length > 0 ? (
-                <ul className="text-xs text-ink-secondary list-disc pl-4 space-y-1">
-                  {confidence.reasons.map((reason, i) => (
-                    <li key={i}>{reason}</li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-xs text-ink-muted italic">Running detection checks...</p>
-              )}
-
-              {/* Quality Check Alert */}
-              <div className="pt-2 border-t border-surface-mid/60 flex items-start gap-2 text-xs">
-                {qualityCheck.passed ? (
-                  qualityCheck.isWarning ? (
-                    <div className="bg-amber-50 text-amber-800 border border-amber-200 p-2.5 rounded-lg flex items-start gap-1.5 w-full">
-                      <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-amber-600" />
-                      <div>
-                        <span className="font-bold">Quality Check Warning:</span> {qualityCheck.reason}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="bg-emerald-50 text-emerald-800 border border-emerald-200 p-2.5 rounded-lg flex items-start gap-1.5 w-full">
-                      <CheckCircle className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600" />
-                      <div>
-                        <span className="font-bold">Quality Check:</span> Passed all criteria. Content is valid.
-                      </div>
-                    </div>
-                  )
-                ) : (
-                  <div className="bg-red-50 text-red-800 border border-red-200 p-2.5 rounded-lg flex items-start gap-1.5 w-full">
-                    <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5 text-red-600" />
-                    <div>
-                      <span className="font-bold">Quality Check Failed:</span> {qualityCheck.reason}
-                    </div>
-                  </div>
-                )}
+              <div className={`flex items-center p-3 rounded-lg border ${
+                qualityCheck.passed 
+                  ? qualityCheck.isWarning 
+                    ? "bg-amber-50 border-amber-200 text-amber-800"
+                    : "bg-emerald-50 border-emerald-200 text-emerald-800"
+                  : "bg-red-50 border-red-200 text-red-800"
+              }`}>
+                {qualityCheck.passed && !qualityCheck.isWarning && <CheckCircle className="w-5 h-5 mr-3 shrink-0" />}
+                {qualityCheck.passed && qualityCheck.isWarning && <AlertTriangle className="w-5 h-5 mr-3 shrink-0" />}
+                {!qualityCheck.passed && <XCircle className="w-5 h-5 mr-3 shrink-0" />}
+                <p className="text-sm">
+                  <span className="font-semibold">{qualityCheck.passed ? "Quality Check:" : "Validation Failed:"}</span> {qualityCheck.reason || "Passed all criteria. Content is valid."}
+                </p>
               </div>
             </div>
             
@@ -830,7 +785,7 @@ export const AdminLessonGeneratorModal: React.FC<AdminLessonGeneratorModalProps>
                     onChange={(e) => setSelectedGradeId(e.target.value)}
                     className="w-full border border-surface-mid rounded-lg px-3 py-2 text-sm bg-paper text-ink"
                   >
-                    <option value="">Auto-detected from chunk metadata</option>
+                    <option value="">Select a grade manually...</option>
                     {grades.map(g => (
                       <option key={g.id} value={g.id}>{g.name}</option>
                     ))}
@@ -905,6 +860,30 @@ export const AdminLessonGeneratorModal: React.FC<AdminLessonGeneratorModalProps>
                     ))}
                   </select>
                 )}
+              </div>
+
+              {/* Parent Lesson Selector */}
+              <div className="space-y-1 col-span-2">
+                <label className="text-sm font-semibold text-ink">
+                  Parent Lesson <span className="text-xs text-ink-muted font-normal">(Optional)</span>
+                </label>
+                <select
+                  value={selectedLessonId}
+                  onChange={(e) => setSelectedLessonId(e.target.value)}
+                  disabled={!selectedTopicId || loadingLessons || isCreatingNewTopic}
+                  className="w-full border border-surface-mid rounded-lg px-3 py-2 text-sm bg-paper text-ink disabled:opacity-50"
+                >
+                  <option value="">
+                    {loadingLessons 
+                      ? "Loading lessons..." 
+                      : isCreatingNewTopic 
+                        ? "Save topic first to assign to a lesson"
+                        : "Generate as a new lesson"}
+                  </option>
+                  {lessons.map(l => (
+                    <option key={l.id} value={l.id}>{l.title}</option>
+                  ))}
+                </select>
               </div>
 
               {/* Module Name */}

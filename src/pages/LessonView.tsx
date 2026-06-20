@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { AlertCircle, Loader2, Edit } from 'lucide-react';
 import { Layout } from '../components/Layout';
 import { Modal } from '../components/Modal';
+import { AdminLessonEditorModal } from '../components/admin/AdminLessonEditorModal';
 import { SEO } from '../components/SEO';
 import { EduWorkspace } from '../components/workspace/EduWorkspace';
 import { db } from '../db/db';
@@ -198,7 +199,7 @@ export const LessonView: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { t, language } = useLanguage();
-  const { isAdmin } = useAuth();
+  const { isAdmin, isDemoAdmin } = useAuth();
   const lesson = useLiveQuery(() => (id ? db.lessons.get(id) : undefined), [id]);
   const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
   const settingsMap = useMemo(() => {
@@ -220,6 +221,7 @@ export const LessonView: React.FC = () => {
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [noteContent, setNoteContent] = useState('');
   const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const [readingBlockIndex, setReadingBlockIndex] = useState<number | null>(null);
   const [quizAnswered, setQuizAnswered] = useState<Record<number, boolean>>({});
   const [quizCorrect, setQuizCorrect] = useState<Record<number, boolean>>({});
@@ -244,6 +246,7 @@ export const LessonView: React.FC = () => {
     setSupabaseExercises([]);
     setCurriculumContext(null);
     setCurriculumOrderedLessons([]);
+    setIsEditing(false);
   }, [id]);
 
   useEffect(() => {
@@ -652,7 +655,33 @@ export const LessonView: React.FC = () => {
   const readerSourceBlocks = useMemo(() => {
     let baseBlocks = [...storedBlocks];
     if (baseBlocks.length === 0 && effectiveLesson?.content?.trim()) {
-      baseBlocks = [{ type: 'content', title: effectiveLesson.title, content: effectiveLesson.content }];
+      const content = effectiveLesson.content;
+      // Split the markdown content into sections grouped by headings (##)
+      const parts = content.split(/(?=^##\s)/m).filter((p: string) => p.trim());
+      
+      if (parts.length > 0 && parts.some((p: string) => p.startsWith('## ') || p.startsWith('# '))) {
+        baseBlocks = parts.map((part: string) => {
+          const lines = part.split('\n');
+          let title = effectiveLesson.title;
+          let body = part;
+
+          if (part.startsWith('## ')) {
+            title = lines[0].replace(/^##\s+/, '').trim();
+            body = lines.slice(1).join('\n').trim();
+          } else if (part.startsWith('# ')) {
+            title = lines[0].replace(/^#\s+/, '').trim();
+            body = lines.slice(1).join('\n').trim();
+          }
+
+          return { 
+            type: 'explanation', 
+            title: title || effectiveLesson.title, 
+            content: body || part 
+          };
+        });
+      } else {
+        baseBlocks = [{ type: 'content', title: effectiveLesson.title, content: effectiveLesson.content }];
+      }
     }
 
     // 1. Gather all quizzes from Supabase separate table and embedded column/local record
@@ -890,7 +919,20 @@ export const LessonView: React.FC = () => {
         type="article"
       />
 
-      <div dir={contentDir} className="h-full w-full bg-background flex flex-col overflow-hidden p-4">
+      <div dir={contentDir} className="h-full w-full bg-background flex flex-col overflow-hidden p-4 relative">
+        {/* Floating Edit Button for Admins */}
+        {(isAdmin || isDemoAdmin) && (
+          <button
+            type="button"
+            onClick={() => setIsEditing(true)}
+            className="fixed bottom-6 right-6 z-[999] flex items-center gap-2 rounded-full bg-accent px-5 py-3 text-xs font-bold uppercase tracking-wider text-white shadow-xl shadow-accent/20 transition-all hover:scale-105 hover:bg-accent/90 active:scale-95 cursor-pointer"
+            title="Edit & Validate Lesson"
+          >
+            <Edit size={14} className="stroke-[2.5]" />
+            <span>Edit Lesson</span>
+          </button>
+        )}
+
         <LessonReader
           title={effectiveLesson.title}
           subtitle={effectiveLesson.subtitle || `${displayedBlocks.length} sections`}
@@ -984,6 +1026,25 @@ export const LessonView: React.FC = () => {
           isOpen={isSupportModalOpen}
           onClose={() => setIsSupportModalOpen(false)}
           grade={currentGrade || "Grade 9"}
+        />
+
+        <AdminLessonEditorModal
+          isOpen={isEditing}
+          onClose={() => setIsEditing(false)}
+          lesson={effectiveLesson}
+          onSave={(updated) => {
+            setSupabaseLesson(prev => {
+              if (!prev) return null;
+              return {
+                ...prev,
+                lesson_title: updated.title || updated.lesson_title || prev.lesson_title,
+                content: updated.content ?? prev.content,
+                blocks: null, // Clear blocks from local state to render new markdown
+                validation_status: 'teacher_reviewed',
+                status: 'done'
+              };
+            });
+          }}
         />
       </div>
     </Layout>

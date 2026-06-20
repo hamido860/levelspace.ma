@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Markdown from "react-markdown";
+import remarkGfm from 'remark-gfm';
 import { toast } from "sonner";
 import {
   AlertTriangle,
@@ -643,7 +644,7 @@ export const AdminRecoveredLessonReview: React.FC = () => {
                         </div>
                       </div>
                       <div className="prose prose-sm mt-4 max-w-none text-ink">
-                        <Markdown>{block.content || "_No content yet._"}</Markdown>
+                        <Markdown remarkPlugins={[remarkGfm]}>{block.content || "_No content yet._"}</Markdown>
                       </div>
                     </article>
                   ))

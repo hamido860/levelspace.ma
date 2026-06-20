@@ -909,24 +909,7 @@ async function saveQueueSuccess(supabaseAdmin: any, queueJobId: string | null) {
   if (error) console.error("lesson_gen_queue success update error:", error);
 }
 
-async function persistLessonBlocks(
-  supabaseAdmin: any,
-  lessonId: string,
-  blocks: NormalizedLessonBlock[]
-) {
-  const { error: deleteError } = await supabaseAdmin.from("lesson_blocks").delete().eq("lesson_id", lessonId);
-  if (deleteError) throw new Error(`lesson_blocks cleanup failed: ${formatDbError(deleteError)}`);
 
-  const rows = blocks.map((block, index) => ({
-    lesson_id: lessonId,
-    type: block.type,
-    content: block.content,
-    order_index: index + 1,
-  }));
-
-  const { error } = await supabaseAdmin.from("lesson_blocks").insert(rows);
-  if (error) throw new Error(`lesson_blocks insert failed: ${formatDbError(error)}`);
-}
 
 const stringifyBlocks = (blocks: unknown) =>
   Array.isArray(blocks)
@@ -1410,40 +1393,7 @@ Deno.serve(async (req) => {
       model: activeModel,
     });
 
-    try {
-      await persistLessonBlocks(supabaseAdmin, lessonId, lessonBlocks);
-    } catch (blockErr: any) {
-      const detailedError = blockErr?.message || "lesson_blocks insert failed: unknown error";
-      console.error("Failed to insert lesson blocks:", blockErr);
-      await writeGenerationLog(supabaseAdmin, {
-        lessonId,
-        topicId: topicContext?.topicId ?? null,
-        blocksCount: lessonBlocks.length,
-        success: false,
-        error: detailedError,
-        durationMs: Date.now() - startedAt,
-      });
-      await saveQueueError(supabaseAdmin, queueJobId, detailedError);
-      await recordGenerationFailure(supabaseAdmin, observability, {
-        error: blockErr,
-        phase: "lesson_blocks",
-        topicId: activeTopicId,
-        lessonId,
-        blocksCount: lessonBlocks.length,
-        model: activeModel,
-      });
-      await updateMcpGenerationRun(supabaseAdmin, activeMcpRunId, {
-        status: "failed",
-        lesson_id: lessonId,
-        output_summary: { error: detailedError, phase: "lesson_blocks" },
-      });
-
-      return new Response(
-        JSON.stringify({ success: false, error: detailedError, lessonId }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-    await writeAiTaskLog(supabaseAdmin, observability, "lesson_blocks_inserted", "Lesson blocks inserted.", {
+    await writeAiTaskLog(supabaseAdmin, observability, "lesson_blocks_saved_in_lessons_jsonb", "Lesson blocks saved in lessons JSONB.", {
       topic_id: activeTopicId,
       lesson_id: lessonId,
       blocks_count: lessonBlocks.length,

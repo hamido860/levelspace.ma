@@ -19,7 +19,7 @@ import { toast } from 'sonner';
 import { supabase } from '../../db/supabase';
 import { Modal } from '../Modal';
 
-type Provider = 'gemini' | 'openrouter' | 'openai';
+type Provider = 'gemini' | 'openrouter' | 'openai' | 'nvidia';
 type CredentialMode = 'byok' | 'platform';
 
 type KeyItem = {
@@ -69,6 +69,13 @@ const PROVIDER_INFO: Record<Provider, { label: string, color: string, badgeGlow:
     badgeGlow: 'bg-purple-500/10 border-purple-500/20 text-purple-600 dark:text-purple-400',
     bgGradient: 'from-purple-500/5 to-pink-500/5 dark:from-purple-500/10 dark:to-pink-500/5',
     borderTheme: 'hover:border-purple-500/40 focus-within:border-purple-500 focus-within:ring-purple-500/20'
+  },
+  nvidia: {
+    label: 'NVIDIA',
+    color: 'text-green-500',
+    badgeGlow: 'bg-green-500/10 border-green-500/20 text-green-600 dark:text-green-400',
+    bgGradient: 'from-green-500/5 to-emerald-500/5 dark:from-green-500/10 dark:to-emerald-500/5',
+    borderTheme: 'hover:border-green-500/40 focus-within:border-green-500 focus-within:ring-green-500/20'
   }
 };
 
@@ -115,6 +122,7 @@ export const AiKeysModal: React.FC<AiKeysModalProps> = ({ isOpen, onClose, mode 
     if (clean.startsWith('AIza')) return 'gemini';
     if (clean.startsWith('sk-or-')) return 'openrouter';
     if (clean.startsWith('sk-proj-') || (clean.startsWith('sk-') && !clean.startsWith('sk-or-') && !clean.startsWith('sk-ant-'))) return 'openai';
+    if (clean.startsWith('nvapi-')) return 'nvidia';
     return 'unknown';
   };
 
@@ -219,7 +227,7 @@ export const AiKeysModal: React.FC<AiKeysModalProps> = ({ isOpen, onClose, mode 
 
   const handleAddKey = async () => {
     if (detectedProvider === 'unknown') {
-      toast.error('Unable to add key', { description: 'Please paste a valid Gemini, OpenAI, or OpenRouter API key.' });
+      toast.error('Unable to add key', { description: 'Please paste a valid Gemini, OpenAI, OpenRouter, or NVIDIA API key.' });
       return;
     }
 

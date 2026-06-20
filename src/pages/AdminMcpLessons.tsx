@@ -46,7 +46,7 @@ type DetailData = {
 };
 
 type TrackRow = { id: string; name: string | null };
-type QueueTrackRow = { topic_id: string | null; track_id: string | null; bac_tracks?: TrackRow | null };
+type QueueTrackRow = { topic_id: string | null; track_id: string | null; tracks?: TrackRow | null };
 type FilterState = {
   allGrades: boolean;
   academicLevel: string;
@@ -174,15 +174,15 @@ export const AdminMcpLessons: React.FC = () => {
           ? supabase.from("topic_material_requirements").select("*").in("topic_id", topicIds)
           : Promise.resolve({ data: [], error: null }),
         topicIds.length
-          ? supabase.from("lesson_gen_queue").select("topic_id, track_id, bac_tracks:track_id(id, name)").in("topic_id", topicIds)
+          ? supabase.from("lesson_gen_queue").select("topic_id, track_id, tracks:track_id(id, name)").in("topic_id", topicIds)
           : Promise.resolve({ data: [], error: null }),
-        supabase.from("bac_tracks").select("id, name").order("name", { ascending: true }),
+        supabase.from("tracks").select("id, name").order("name", { ascending: true }),
       ]);
 
       const nextTrackByTopic = new Map<string, TrackRow>();
       ((queueTrackResult.data || []) as QueueTrackRow[]).forEach((item) => {
-        if (item.topic_id && item.bac_tracks?.name && !nextTrackByTopic.has(item.topic_id)) {
-          nextTrackByTopic.set(item.topic_id, item.bac_tracks);
+        if (item.topic_id && item.tracks?.name && !nextTrackByTopic.has(item.topic_id)) {
+          nextTrackByTopic.set(item.topic_id, item.tracks);
         }
       });
       setTrackByTopic(nextTrackByTopic);

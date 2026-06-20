@@ -1,14 +1,123 @@
 import React from 'react';
-import { CheckCircle2, Dumbbell, FileText, FlaskConical, HelpCircle, Lightbulb, ListChecks, PenTool, Target, XCircle, Volume2, Bot } from 'lucide-react';
+import { CheckCircle2, Dumbbell, FileText, FlaskConical, HelpCircle, Lightbulb, ListChecks, PenTool, Target, XCircle, Volume2, Bot, ChevronDown, ChevronUp, Sparkles, Info } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import Markdown from 'react-markdown';
 import remarkMath from 'remark-math';
+import remarkGfm from 'remark-gfm';
 import rehypeKatex from 'rehype-katex';
 import type { DisplayedLessonBlock, PedagogicalPurpose } from './useDisplayedLessonBlocks';
 
+const extractText = (node: any): string => {
+  if (node.type === 'text') return node.value || '';
+  if (node.children) return node.children.map(extractText).join('');
+  return '';
+};
+
 const markdownPlugins = {
-  remarkPlugins: [remarkMath],
+  remarkPlugins: [remarkMath, remarkGfm],
   rehypePlugins: [[rehypeKatex, { strict: false }]] as any,
+  components: {
+    blockquote: ({ node, children, ...props }: any) => {
+      const textContent = extractText(node).toLowerCase();
+      
+      let isExample = false;
+      let isQuiz = false;
+      let isNote = false;
+      
+      if (textContent.includes('example') || textContent.includes('exemple') || textContent.includes('مثال')) {
+        isExample = true;
+      } else if (textContent.includes('quiz') || textContent.includes('question') || textContent.includes('سؤال')) {
+        isQuiz = true;
+      } else if (textContent.includes('note') || textContent.includes('ملاحظة') || textContent.includes('remarque') || textContent.includes('important')) {
+        isNote = true;
+      }
+
+      let bgClass = "bg-slate-100 border-slate-200 dark:bg-surface-low dark:border-white/5";
+      let icon = null;
+      let titleClass = "text-slate-800 dark:text-ink";
+      let label = "";
+
+      if (isExample) {
+        bgClass = "bg-amber-500/10 border-amber-500/20";
+        icon = <Sparkles className="text-amber-500" size={16} />;
+        titleClass = "text-amber-700 dark:text-amber-400";
+        label = "Example";
+      } else if (isQuiz) {
+        bgClass = "bg-purple-500/10 border-purple-500/20";
+        icon = <HelpCircle className="text-purple-500" size={16} />;
+        titleClass = "text-purple-700 dark:text-purple-400";
+        label = "Quiz";
+      } else if (isNote) {
+        bgClass = "bg-blue-500/10 border-blue-500/20";
+        icon = <Info className="text-blue-500" size={16} />;
+        titleClass = "text-blue-700 dark:text-blue-400";
+        label = "Note";
+      } else {
+        return (
+          <blockquote className="border-l-4 border-accent/50 pl-5 py-2 my-6 text-slate-600 dark:text-ink-secondary italic bg-slate-50 dark:bg-surface-low/50 rounded-r-lg" {...props}>
+            {children}
+          </blockquote>
+        );
+      }
+
+      return (
+        <div className={`my-8 p-6 md:p-8 rounded-2xl border ${bgClass} shadow-sm`}>
+          {icon && (
+            <div className={`flex items-center gap-2 font-bold mb-3 ${titleClass}`}>
+              {icon}
+              <span className="uppercase text-[11px] tracking-wider font-display">
+                {label}
+              </span>
+            </div>
+          )}
+          <div className="text-sm leading-relaxed text-slate-700 dark:text-ink-secondary prose prose-sm max-w-none">
+            {children}
+          </div>
+        </div>
+      );
+    },
+    table: ({ node, children, ...props }: any) => (
+      <div className="overflow-x-auto my-8 rounded-xl border border-slate-200 dark:border-white/10 shadow-sm bg-white dark:bg-paper">
+        <table className="w-full text-left border-collapse text-sm" {...props}>
+          {children}
+        </table>
+      </div>
+    ),
+    th: ({ node, children, ...props }: any) => (
+      <th className="bg-slate-50 dark:bg-surface-low border-b border-slate-200 dark:border-white/10 p-4 font-bold text-slate-900 dark:text-ink" {...props}>
+        {children}
+      </th>
+    ),
+    td: ({ node, children, ...props }: any) => (
+      <td className="p-4 border-b border-slate-200 dark:border-white/10 text-slate-700 dark:text-ink-secondary last:border-b-0" {...props}>
+        {children}
+      </td>
+    ),
+    code: ({ node, className, children, ...props }: any) => {
+      const match = /language-(\w+)/.exec(className || '');
+      const isBlock = match || String(children).includes('\n');
+      
+      if (isBlock) {
+        return (
+          <div className="my-8 rounded-xl border border-slate-200 dark:border-white/10 overflow-hidden bg-slate-900 shadow-sm">
+            <div className="flex items-center px-4 py-2 bg-slate-800 border-b border-slate-700">
+              <span className="text-xs font-mono text-slate-400 uppercase tracking-wider">{match ? match[1] : 'Code'}</span>
+            </div>
+            <div className="p-4 overflow-x-auto">
+              <code className={`${className || ''} block text-sm font-mono text-slate-50`} {...props}>
+                {children}
+              </code>
+            </div>
+          </div>
+        );
+      }
+      return (
+        <code className="px-1.5 py-0.5 mx-0.5 rounded-md bg-surface-low text-ink font-semibold text-[0.9em] not-italic inline-code-badge" style={{ fontFamily: 'inherit' }} {...props}>
+          {children}
+        </code>
+      );
+    }
+  }
 };
 
 const PURPOSE_ICONS: Record<PedagogicalPurpose, React.ElementType> = {
@@ -107,6 +216,7 @@ export const LessonBlock: React.FC<LessonBlockProps> = ({
   onSpeak,
   onAskAI,
 }) => {
+  const [isOpen, setIsOpen] = React.useState(item.sourceIndex === 0); // First block open by default
   const block = item.block || {};
   const sourceIndex = item.sourceIndex;
   const Icon = PURPOSE_ICONS[item.purpose];
@@ -164,17 +274,32 @@ export const LessonBlock: React.FC<LessonBlockProps> = ({
               <Bot size={12} />
             </button>
           )}
+          {/* Accordion Toggle Button */}
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
+            className={`w-7 h-7 rounded-full flex items-center justify-center border transition-all cursor-pointer ${
+              isOpen 
+                ? 'bg-accent border-accent text-white hover:bg-accent/90' 
+                : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:bg-surface-low dark:border-white/5 dark:text-ink-muted dark:hover:text-ink hover:scale-105'
+            }`}
+            title={isOpen ? "Collapse" : "Expand"}
+          >
+            {isOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </button>
         </div>
         <span className={`lesson-reader-block__status ${isViewed ? 'lesson-reader-block__status--viewed' : ''}`}>
           {isViewed ? 'Viewed' : 'New'}
         </span>
       </header>
 
-      {reading && (
-        <div className="lesson-reader-read-state">
-          <span /> Reading this section aloud
-        </div>
-      )}
+      {isOpen && (
+        <div className="animate-in slide-in-from-top-2 duration-300">
+          {reading && (
+            <div className="lesson-reader-read-state">
+              <span /> Reading this section aloud
+            </div>
+          )}
 
       {contentText && !quiz && !exercise && !exam && <MarkdownText>{contentText}</MarkdownText>}
 
@@ -298,6 +423,8 @@ export const LessonBlock: React.FC<LessonBlockProps> = ({
           )}
           {examResult[sourceIndex] && <SolutionPanel content={exam.solution} />}
         </div>
+      )}
+      </div>
       )}
     </article>
   );
