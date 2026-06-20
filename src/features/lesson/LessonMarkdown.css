@@ -205,3 +205,44 @@
 .lesson-reader-secondary {
   @apply bg-paper text-ink hover:bg-surface-mid;
 }
+
+/* Premium Table Styling */
+.lesson-markdown-table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+  text-align: inherit !important;
+}
+
+.lesson-markdown-table tr:nth-child(even) {
+  background-color: rgba(0, 0, 0, 0.015) !important;
+}
+.dark .lesson-markdown-table tr:nth-child(even) {
+  background-color: rgba(255, 255, 255, 0.015) !important;
+}
+
+.lesson-markdown-table tr:hover {
+  background-color: rgba(0, 0, 0, 0.03) !important;
+}
+.dark .lesson-markdown-table tr:hover {
+  background-color: rgba(255, 255, 255, 0.03) !important;
+}
+
+.lesson-markdown-th {
+  background-color: var(--surface-low) !important;
+  border-bottom: 1px solid var(--surface-mid) !important;
+  padding: 0.85rem 1.1rem !important;
+  font-weight: 700 !important;
+  color: var(--ink) !important;
+  text-align: inherit !important;
+}
+
+.lesson-markdown-td {
+  padding: 0.85rem 1.1rem !important;
+  border-bottom: 1px solid var(--surface-low) !important;
+  color: var(--ink-secondary) !important;
+  text-align: inherit !important;
+}
+
+.lesson-markdown-table tr:last-child .lesson-markdown-td {
+  border-bottom: none !important;
+}

@@ -80,18 +80,18 @@ const markdownPlugins = {
     },
     table: ({ node, children, ...props }: any) => (
       <div className="overflow-x-auto my-5 rounded-xl border border-slate-200 dark:border-white/10 shadow-sm bg-white dark:bg-paper">
-        <table className="w-full text-left border-collapse text-sm" {...props}>
+        <table className="w-full border-collapse text-sm lesson-markdown-table" {...props}>
           {children}
         </table>
       </div>
     ),
     th: ({ node, children, ...props }: any) => (
-      <th className="bg-slate-50 dark:bg-surface-low border-b border-slate-200 dark:border-white/10 p-4 font-bold text-slate-900 dark:text-ink" {...props}>
+      <th className="lesson-markdown-th" {...props}>
         {children}
       </th>
     ),
     td: ({ node, children, ...props }: any) => (
-      <td className="p-4 border-b border-slate-200 dark:border-white/10 text-slate-700 dark:text-ink-secondary last:border-b-0" {...props}>
+      <td className="lesson-markdown-td" {...props}>
         {children}
       </td>
     ),
