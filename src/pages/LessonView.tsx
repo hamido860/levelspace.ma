@@ -20,6 +20,8 @@ import { isDraftValidationStatus } from '../services/curriculumValidation';
 import { getQuizzesByLesson } from '../services/quizService';
 import { getExercisesByLesson } from '../services/exerciseService';
 
+const EMPTY_ARRAY: any[] = [];
+
 type SupabaseLessonRecord = {
   id?: string;
   topic_id?: string | null;
@@ -200,7 +202,8 @@ export const LessonView: React.FC = () => {
   const { t, language } = useLanguage();
   const { isAdmin } = useAuth();
   const lesson = useLiveQuery(() => (id ? db.lessons.get(id) : undefined), [id]);
-  const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
+  const dbSettingsVal = useLiveQuery(() => db.settings.toArray());
+  const dbSettings = dbSettingsVal || EMPTY_ARRAY;
   const settingsMap = useMemo(() => {
     if (!Array.isArray(dbSettings)) return {};
     return Object.fromEntries(dbSettings.map((setting) => [setting.key, setting.value]));
@@ -481,10 +484,11 @@ export const LessonView: React.FC = () => {
 
   // Use moduleId from effective lesson, falling back to subject_id from curriculum or the lesson's own module
   const targetModuleId = effectiveLesson?.moduleId || curriculumContext?.subject_id || lesson?.moduleId;
-  const lessonsInModule = useLiveQuery(
+  const lessonsInModuleVal = useLiveQuery(
     () => (targetModuleId ? db.lessons.where('moduleId').equals(targetModuleId).sortBy('createdAt') : Promise.resolve([])),
     [targetModuleId]
   );
+  const lessonsInModule = lessonsInModuleVal || EMPTY_ARRAY;
 
   const localOrderedLessons = useMemo(() => {
     if (!lessonsInModule) return [];
@@ -508,7 +512,7 @@ export const LessonView: React.FC = () => {
 
   // Fetch all reminders/tasks to capture completed classroom checkmarks
   const remindersVal = useLiveQuery(() => db.tasks.toArray());
-  const reminders = remindersVal || [];
+  const reminders = remindersVal || EMPTY_ARRAY;
 
   // Local state to log Pomodoro focus timer starts dynamically
   const [pomodoroLogs, setPomodoroLogs] = useState<Array<{

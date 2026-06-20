@@ -45,6 +45,8 @@ import { useLanguage } from '../context/LanguageContext';
 import { AnnouncementBanner } from '../components/AnnouncementBanner';
 import { getCardGradient, randomBanner, randomCardGradient, CARD_GRADIENTS } from '../utils/cardColors';
 
+const EMPTY_ARRAY: any[] = [];
+
 const relativeTime = (ts: number) => {
   const diff = Date.now() - ts;
   const minutes = Math.floor(diff / 60000);
@@ -344,9 +346,11 @@ export const Modules: React.FC = () => {
   const aiUnavailableMsg = 'AI curriculum suggestions require an API key.';
 
   const dbModules = useLiveQuery(() => db.modules.toArray());
-  const allLessons = useLiveQuery(() => db.lessons.toArray()) || [];
+  const allLessonsVal = useLiveQuery(() => db.lessons.toArray());
+  const allLessons = allLessonsVal || EMPTY_ARRAY;
 
-  const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
+  const dbSettingsVal = useLiveQuery(() => db.settings.toArray());
+  const dbSettings = dbSettingsVal || EMPTY_ARRAY;
   const settingsMap = useMemo(() => Object.fromEntries(dbSettings.map(s => [s.key, s.value])), [dbSettings]);
 
   const country = settingsMap['selected_country'] || localStorage.getItem('selected_country') || '';
