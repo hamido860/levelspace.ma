@@ -37,11 +37,13 @@ const markdownPlugins = {
       let titleClass = "text-slate-800 dark:text-ink";
       let label = "";
 
+      let isExampleCard = false;
       if (isExample) {
         bgClass = "bg-amber-500/10 border-amber-500/20";
         icon = <Sparkles className="text-amber-500" size={16} />;
         titleClass = "text-amber-700 dark:text-amber-400";
         label = "Example";
+        isExampleCard = true;
       } else if (isQuiz) {
         bgClass = "bg-purple-500/10 border-purple-500/20";
         icon = <HelpCircle className="text-purple-500" size={16} />;
@@ -61,7 +63,7 @@ const markdownPlugins = {
       }
 
       return (
-        <div className={`my-5 p-5 md:p-6 rounded-2xl border ${bgClass} shadow-sm`}>
+        <div className={`my-5 p-5 md:p-6 rounded-2xl border ${bgClass} shadow-sm ${isExampleCard ? 'lesson-example-card' : ''}`}>
           {icon && (
             <div className={`flex items-center gap-2 font-bold mb-3 ${titleClass}`}>
               {icon}

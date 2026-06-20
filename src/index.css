@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&family=Inter:wght@100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Noto+Sans+Arabic:wght@100..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&family=Inter:wght@100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Noto+Sans+Arabic:wght@100..900&family=Caveat:wght@400..700&display=swap');
 @import "katex/dist/katex.min.css";
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
@@ -9,6 +9,7 @@
   --font-display: "Plus Jakarta Sans", "Noto Sans Arabic", sans-serif;
   --font-serif: "Cormorant Garamond", "Noto Sans Arabic", serif;
   --font-mono: "JetBrains Mono", "Noto Sans Arabic", monospace;
+  --font-script: "Caveat", "Noto Sans Arabic", cursive;
 
   --color-background: var(--background);
   --color-ink: var(--ink);
@@ -408,6 +409,25 @@
 .lesson-answer-panel,
 .lesson-hint {
   @apply rounded-2xl bg-surface-low p-5 md:p-6 border border-slate-100 dark:border-white/5 shadow-sm;
+}
+
+.lesson-reader-example,
+.lesson-example-card {
+  font-family: var(--font-script) !important;
+  font-size: clamp(1.1rem, 4vw, 1.25rem) !important;
+}
+
+.lesson-reader-example code,
+.lesson-example-card code {
+  font-family: var(--font-mono) !important;
+  font-size: 0.85em !important;
+}
+
+.lesson-reader-example h3,
+.lesson-reader-example h4,
+.lesson-example-card h3,
+.lesson-example-card h4 {
+  font-family: var(--font-display) !important;
 }
 
 .lesson-reader-check--exam {
