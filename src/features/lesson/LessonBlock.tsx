@@ -54,14 +54,14 @@ const markdownPlugins = {
         label = "Note";
       } else {
         return (
-          <blockquote className="border-l-4 border-accent/50 pl-5 py-2 my-6 text-slate-600 dark:text-ink-secondary italic bg-slate-50 dark:bg-surface-low/50 rounded-r-lg" {...props}>
+          <blockquote className="border-l-4 border-accent/50 pl-4 py-1.5 my-4 text-slate-600 dark:text-ink-secondary italic bg-slate-50 dark:bg-surface-low/50 rounded-r-lg" {...props}>
             {children}
           </blockquote>
         );
       }
 
       return (
-        <div className={`my-8 p-6 md:p-8 rounded-2xl border ${bgClass} shadow-sm`}>
+        <div className={`my-5 p-5 md:p-6 rounded-2xl border ${bgClass} shadow-sm`}>
           {icon && (
             <div className={`flex items-center gap-2 font-bold mb-3 ${titleClass}`}>
               {icon}
@@ -77,7 +77,7 @@ const markdownPlugins = {
       );
     },
     table: ({ node, children, ...props }: any) => (
-      <div className="overflow-x-auto my-8 rounded-xl border border-slate-200 dark:border-white/10 shadow-sm bg-white dark:bg-paper">
+      <div className="overflow-x-auto my-5 rounded-xl border border-slate-200 dark:border-white/10 shadow-sm bg-white dark:bg-paper">
         <table className="w-full text-left border-collapse text-sm" {...props}>
           {children}
         </table>
@@ -99,7 +99,7 @@ const markdownPlugins = {
       
       if (isBlock) {
         return (
-          <div className="my-8 rounded-xl border border-slate-200 dark:border-white/10 overflow-hidden bg-slate-900 shadow-sm">
+          <div className="my-5 rounded-xl border border-slate-200 dark:border-white/10 overflow-hidden bg-slate-900 shadow-sm">
             <div className="flex items-center px-4 py-2 bg-slate-800 border-b border-slate-700">
               <span className="text-xs font-mono text-slate-400 uppercase tracking-wider">{match ? match[1] : 'Code'}</span>
             </div>
