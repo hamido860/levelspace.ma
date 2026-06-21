@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo, useReducer } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { MessageCircle, X, Send, Bot, User, Loader2, Copy, Check, Brain } from 'lucide-react';
+import { MessageCircle, Send, Bot, User, Loader2, Copy, Check, Brain } from 'lucide-react';
 import { chatWithTutor, ChatMessage, generateProactiveGreeting, generateFullLesson } from '../services/geminiService';
 import { searchLessons, saveLesson } from '../services/ragService';
 import Markdown from 'react-markdown';
@@ -11,6 +11,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { useAppSettings } from '../context/AppSettingsContext';
 import { toast } from 'sonner';
+import { Modal } from './Modal';
 import 'mathlive';
 import { detectLanguage, resolveExpectedLanguage, type LangCode } from '../mcp/languagePolicy';
 import { TutorModeRenderer } from '../features/tutor/TutorModeRenderer';
@@ -155,6 +156,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
     [country, subject, lessonContent, language]
   );
   const copy = assistantCopy[assistantLanguage] || assistantCopy.en;
+  const isRtlAssistant = assistantLanguage === 'ar';
   const { user, isAdmin } = useAuth();
   const { settings } = useAppSettings();
   const askAiAccess = settings.ask_ai_access || 'admin';
@@ -166,11 +168,15 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [assistantSideOverride, setAssistantSideOverride] = useState<'rtl' | 'ltr' | null>(null);
   const [tutorContext, dispatchTutor] = useReducer(tutorReducer, createInitialTutorContext({
     currentSectionTitle: title,
     currentSectionText: lessonContent,
   }));
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const shouldUseRtlLayout = assistantSideOverride
+    ? assistantSideOverride === 'rtl'
+    : isRtlAssistant;
 
   const handleCopy = (text: string, id: number) => {
     navigator.clipboard.writeText(text);
@@ -216,8 +222,15 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
   useEffect(() => {
     setMounted(true);
 
-    const handleOpenAIAssistant = (e: CustomEvent<{ initialInput?: string }>) => {
+    const handleOpenAIAssistant = (e: CustomEvent<{ initialInput?: string; direction?: 'rtl' | 'ltr'; languageHint?: AssistantLang }>) => {
       setIsOpen(true);
+      if (e.detail?.direction) {
+        setAssistantSideOverride(e.detail.direction);
+      } else if (e.detail?.languageHint === 'ar') {
+        setAssistantSideOverride('rtl');
+      } else {
+        setAssistantSideOverride(null);
+      }
       if (e.detail?.initialInput) {
         // Skip proactive greeting since user has an immediate query
         setGreetingFetched(true);
@@ -389,7 +402,10 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0, opacity: 0 }}
-            onClick={() => setIsOpen(true)}
+            onClick={() => {
+              setAssistantSideOverride(null);
+              setIsOpen(true);
+            }}
             data-selection-actions-ignore="true"
             className="fixed bottom-6 right-6 w-14 h-14 bg-accent text-white rounded-full shadow-md flex items-center justify-center hover:bg-accent-hover hover:scale-105 transition-all z-50 group"
           >
@@ -399,38 +415,55 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ x: '100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            transition={{ type: 'spring', damping: 30, stiffness: 240 }}
-            data-selection-actions-ignore="true"
-            className="fixed inset-y-0 right-0 z-50 flex h-full w-full max-w-[720px] flex-col overflow-hidden border-l border-white/10 bg-[#171c23] text-slate-100 shadow-2xl"
-          >
-            {/* Header */}
-            <div className="flex shrink-0 items-center justify-between bg-[#000417] px-8 py-8 text-white">
-              <div className="flex min-w-0 items-center gap-4">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-500/10 text-blue-400 ring-1 ring-blue-500/20">
-                  <Brain className="h-6 w-6 shrink-0" />
-                </div>
-                <div className="min-w-0 text-left">
-                  <h3 className="truncate text-xl font-bold tracking-tight text-white">{title || "AI Tutor"}</h3>
-                  <p className="text-[11px] text-white/45 uppercase tracking-[0.18em] font-mono">{subject || "Lesson"} - {copy.active}</p>
-                </div>
+      <Modal
+        isOpen={isOpen}
+        onClose={() => setIsOpen(false)}
+        title={<h3 className="truncate text-xl font-bold tracking-tight text-white">{title || "AI Tutor"}</h3>}
+        subtitle={<p className="text-[11px] text-white/45 uppercase tracking-[0.18em] font-mono">{subject || "Lesson"} - {copy.active}</p>}
+        icon={<Brain className="h-5 w-5 shrink-0" />}
+        variant="dark"
+        placement={shouldUseRtlLayout ? 'left' : 'right'}
+        closePosition={shouldUseRtlLayout ? 'start' : 'end'}
+        maxWidth="3xl"
+        headerClassName="px-8 py-6"
+        bodyClassName="min-h-0 bg-[#171c23] px-8 py-8 text-slate-200 custom-scrollbar"
+        footer={
+          <div className="px-6 py-5">
+            {messages.length > 0 && tutorContext.currentMode !== 'reading_mode' && (
+              <div className="mb-4 border-b border-white/10 pb-4">
+                {renderTutorMode(true)}
               </div>
-              <button 
-                type="button"
-                onClick={() => setIsOpen(false)}
-                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/5 text-white/55 transition-all hover:bg-white/10 hover:text-white"
-              >
-                <X size={24} />
-              </button>
-            </div>
-
-            {/* Messages */}
-            <div className="min-h-0 flex-1 overflow-y-auto bg-[#171c23] px-8 py-8 text-slate-200 custom-scrollbar">
+            )}
+            <form
+              onSubmit={(e) => { e.preventDefault(); handleSend(input); }}
+              className="flex flex-col gap-2"
+            >
+              <div className="flex items-end gap-2">
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSend(input);
+                    }
+                  }}
+                  placeholder={copy.placeholder}
+                  className="min-h-[52px] min-w-0 flex-1 max-h-32 resize-none rounded-2xl border border-white/10 bg-[#1c232c] p-4 text-sm text-slate-100 placeholder:text-slate-500 focus:border-blue-400/50 focus:outline-none custom-scrollbar"
+                  rows={1}
+                />
+                <button
+                  type="submit"
+                  disabled={!input.trim() || isLoading}
+                  className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-2xl border border-blue-400/20 bg-[#20262e] text-blue-300 transition-all hover:scale-105 hover:border-blue-300/40 hover:bg-[#263241] disabled:opacity-50 disabled:hover:scale-100"
+                >
+                  <Send size={18} />
+                </button>
+              </div>
+            </form>
+          </div>
+        }
+      >
               {messages.length === 0 && isLoading ? (
                 <div className="flex h-full min-h-[360px] flex-col items-center justify-center space-y-5 text-center">
                   <div className="flex h-20 w-20 items-center justify-center rounded-full bg-blue-500/10 text-blue-400">
@@ -503,46 +536,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ lessonContent, strictR
                   <div ref={messagesEndRef} />
                 </>
               )}
-            </div>
-
-            {/* Input */}
-            <div className="shrink-0 border-t border-white/10 bg-[#111820] px-6 py-5">
-              {messages.length > 0 && tutorContext.currentMode !== 'reading_mode' && (
-                <div className="mb-4 border-b border-white/10 pb-4">
-                  {renderTutorMode(true)}
-                </div>
-              )}
-              <form 
-                onSubmit={(e) => { e.preventDefault(); handleSend(input); }}
-                className="flex flex-col gap-2"
-              >
-                <div className="flex items-end gap-2">
-                  <textarea
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSend(input);
-                      }
-                    }}
-                    placeholder={copy.placeholder}
-                    className="min-h-[52px] min-w-0 flex-1 max-h-32 resize-none rounded-2xl border border-white/10 bg-[#1c232c] p-4 text-sm text-slate-100 placeholder:text-slate-500 focus:border-blue-400/50 focus:outline-none custom-scrollbar"
-                    rows={1}
-                  />
-                  <button
-                    type="submit"
-                    disabled={!input.trim() || isLoading}
-                    className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-2xl border border-blue-400/20 bg-[#20262e] text-blue-300 transition-all hover:scale-105 hover:border-blue-300/40 hover:bg-[#263241] disabled:opacity-50 disabled:hover:scale-100"
-                  >
-                    <Send size={18} />
-                  </button>
-                </div>
-              </form>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      </Modal>
     </>,
     document.body
   );

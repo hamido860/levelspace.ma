@@ -13,9 +13,12 @@ type QuickDefResult = {
 
 type SelectionState = 'idle' | 'loading' | 'result';
 
+const ARABIC_TEXT_PATTERN = /[\u0600-\u06FF]/;
+
 const IGNORE_SELECTION_SELECTOR = [
   '#selection-actions',
   '[data-selection-actions-ignore="true"]',
+  '[role="dialog"]',
   '.explanation-modal-content',
   'button',
   'a',
@@ -187,16 +190,26 @@ export const SelectionActions = () => {
   const handleAskAI = () => {
     if (selection) {
       const context = `${selection.text} ${selection.context}`.toLowerCase();
+      const shouldUseArabic = language === 'ar' || ARABIC_TEXT_PATTERN.test(context);
       const shouldUseFrench =
-        language === 'fr' ||
-        /\b(le|la|les|un|une|des|verbe|phrase|sujet|cours|texte)\b/.test(context) ||
-        /[àâçéèêëîïôùûüÿœ]/i.test(context);
-      const initialInput = shouldUseFrench
+        !shouldUseArabic &&
+        (
+          language === 'fr' ||
+          /\b(le|la|les|un|une|des|verbe|phrase|sujet|cours|texte)\b/.test(context) ||
+          /[àâçéèêëîïôùûüÿœ]/i.test(context)
+        );
+      const initialInput = shouldUseArabic
+        ? `ساعدني على فهم الجزء الصعب في "${selection.text}".`
+        : shouldUseFrench
         ? `Aide-moi a comprendre ce qui est difficile dans "${selection.text}".`
         : `Help me understand what is difficult about "${selection.text}".`;
       window.dispatchEvent(
         new CustomEvent('open-ai-assistant', {
-          detail: { initialInput }
+          detail: {
+            initialInput,
+            direction: shouldUseArabic ? 'rtl' : 'ltr',
+            languageHint: shouldUseArabic ? 'ar' : shouldUseFrench ? 'fr' : 'en'
+          }
         })
       );
       resetSelection(true);
