@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   Sparkles,
   XCircle,
+  Trash2,
 } from "lucide-react";
 import { supabase } from "../db/supabase";
 import { db } from "../db/db";
@@ -271,6 +272,30 @@ export const AdminMcpLessons: React.FC = () => {
       setBusy(null);
     }
   }, [loadRows]);
+
+  const deleteQualityCheck = useCallback(async (id: string) => {
+    try {
+      const { error } = await supabase.from("mcp_quality_checks").delete().eq("id", id);
+      if (error) throw error;
+      toast.success("Quality check deleted.");
+      setDetail((prev) => {
+        const next = { ...prev };
+        for (const lessonId in next) {
+          if (next[lessonId].checks.some((c) => c.id === id)) {
+            next[lessonId] = {
+              ...next[lessonId],
+              checks: next[lessonId].checks.filter((c) => c.id !== id),
+            };
+          }
+        }
+        return next;
+      });
+    } catch (err) {
+      toast.error("Failed to delete quality check", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }, []);
 
   const filterOptions = useMemo(() => {
     const levels = new Set<string>();
@@ -535,7 +560,7 @@ export const AdminMcpLessons: React.FC = () => {
                     <div className="grid gap-4 border-t border-ink/5 bg-surface-low/50 p-4 lg:grid-cols-3">
                       <DetailPanel title="Sources" rows={rowDetail.evidence} empty="No source evidence rows." />
                       <DetailPanel title="Materials" rows={rowDetail.materials} empty="No lesson materials." />
-                      <DetailPanel title="MCP Checks" rows={rowDetail.checks} empty="No MCP quality checks." />
+                      <DetailPanel title="MCP Checks" rows={rowDetail.checks} empty="No MCP quality checks." onDelete={deleteQualityCheck} />
                     </div>
                   )}
                 </div>
@@ -547,7 +572,7 @@ export const AdminMcpLessons: React.FC = () => {
   );
 };
 
-const DetailPanel: React.FC<{ title: string; rows: any[]; empty: string }> = ({ title, rows, empty }) => (
+const DetailPanel: React.FC<{ title: string; rows: any[]; empty: string; onDelete?: (id: string) => void }> = ({ title, rows, empty, onDelete }) => (
   <div className="rounded-2xl border border-ink/10 bg-paper p-4">
     <h3 className="text-xs font-bold uppercase tracking-normal text-ink">{title}</h3>
     {rows.length === 0 ? (
@@ -555,9 +580,28 @@ const DetailPanel: React.FC<{ title: string; rows: any[]; empty: string }> = ({ 
     ) : (
       <div className="mt-3 max-h-80 space-y-2 overflow-y-auto pr-1">
         {rows.slice(0, 12).map((row, index) => (
-          <pre key={row.id || index} className="whitespace-pre-wrap rounded-xl bg-surface-low p-3 text-[11px] leading-5 text-muted">
-            {JSON.stringify(row, null, 2)}
-          </pre>
+          <div key={row.id || index} className="group relative rounded-xl bg-surface-low p-3 text-[11px] leading-5 text-muted">
+            {title === "MCP Checks" ? (
+              <div className="pr-6">
+                <div className="mb-1 flex items-center gap-2 font-bold">
+                  <span className={`rounded px-1.5 py-0.5 text-[9px] uppercase ${row.status === "warning" ? "bg-amber-100 text-amber-700" : row.status === "fail" ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"}`}>{row.status}</span>
+                  <span className="text-ink">{row.category}</span>
+                </div>
+                <div className="text-muted">{row.message}</div>
+              </div>
+            ) : (
+              <pre className="whitespace-pre-wrap">{JSON.stringify(row, null, 2)}</pre>
+            )}
+            {onDelete && row.id && (
+              <button
+                onClick={() => onDelete(row.id)}
+                className="absolute right-2 top-2 rounded bg-red-100 p-1.5 text-red-700 opacity-0 transition-opacity hover:bg-red-200 group-hover:opacity-100"
+                title="Delete this record"
+              >
+                <Trash2 className="h-3 w-3" />
+              </button>
+            )}
+          </div>
         ))}
       </div>
     )}

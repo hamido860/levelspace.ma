@@ -35,7 +35,7 @@ import {
 import { HorizontalSlider } from '../components/HorizontalSlider';
 import { LayoutGrid, Rows3, Shuffle } from 'lucide-react';
 import { getCardGradient, randomBanner, randomCardGradient } from '../utils/cardColors';
-
+import { useSearch } from '../context/SearchContext';
 
 const normalizeLessonTitle = (title: string | null | undefined) =>
   String(title || '').trim().toLocaleLowerCase();
@@ -287,6 +287,7 @@ export const ClassroomView: React.FC = () => {
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
   const { t } = useLanguage();
+  const { searchQuery } = useSearch();
   const label = (key: string, fallback: string) => {
     const translated = t(key);
     return translated && translated !== key ? translated : fallback;
@@ -712,30 +713,51 @@ export const ClassroomView: React.FC = () => {
   }, [frenchDomainByCode, hasLessons, lessons, topicDomainById, topicFallbackDomains]);
   const showDomainTabs = lessonDomainStats.length > 0 || topicFallbackDomains.length > 0;
   const visibleLessons = useMemo(() => {
-    if (!showDomainTabs || activeDomainKey === 'all') return lessons;
+    let filtered = lessons;
+    if (showDomainTabs && activeDomainKey !== 'all') {
+      filtered = filtered.filter((lesson) => {
+        const domain =
+          (lesson.topic_id ? topicDomainById.get(lesson.topic_id) : undefined) ||
+          (() => {
+            const code = inferFrenchDomainCodeFromTitle(lesson.title);
+            const frenchDomain = code ? frenchDomainByCode.get(code) : undefined;
+            return frenchDomain
+              ? { key: frenchDomain.code, code: frenchDomain.code, name: frenchDomain.name, order: frenchDomain.order }
+              : undefined;
+          })();
 
-    return lessons.filter((lesson) => {
-      const domain =
-        (lesson.topic_id ? topicDomainById.get(lesson.topic_id) : undefined) ||
-        (() => {
-          const code = inferFrenchDomainCodeFromTitle(lesson.title);
-          const frenchDomain = code ? frenchDomainByCode.get(code) : undefined;
-          return frenchDomain
-            ? { key: frenchDomain.code, code: frenchDomain.code, name: frenchDomain.name, order: frenchDomain.order }
-            : undefined;
-        })();
+        return domain?.key === activeDomainKey;
+      });
+    }
 
-      return domain?.key === activeDomainKey;
-    });
-  }, [activeDomainKey, frenchDomainByCode, lessons, showDomainTabs, topicDomainById]);
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter(lesson => 
+        (lesson.title && lesson.title.toLowerCase().includes(q)) || 
+        (lesson.subtitle && lesson.subtitle.toLowerCase().includes(q))
+      );
+    }
+
+    return filtered;
+  }, [activeDomainKey, frenchDomainByCode, lessons, showDomainTabs, topicDomainById, searchQuery]);
   const visibleTopicFallbackRows = useMemo(() => {
-    if (!showDomainTabs || activeDomainKey === 'all') return topicFallbackRows;
+    let filtered = topicFallbackRows;
+    if (showDomainTabs && activeDomainKey !== 'all') {
+      filtered = filtered.filter((topic) => {
+        const key = topic.domain_id || topic.domain_code || topic.domain_name;
+        return key === activeDomainKey;
+      });
+    }
 
-    return topicFallbackRows.filter((topic) => {
-      const key = topic.domain_id || topic.domain_code || topic.domain_name;
-      return key === activeDomainKey;
-    });
-  }, [activeDomainKey, showDomainTabs, topicFallbackRows]);
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter(topic => 
+        (topic.title && topic.title.toLowerCase().includes(q))
+      );
+    }
+
+    return filtered;
+  }, [activeDomainKey, showDomainTabs, topicFallbackRows, searchQuery]);
   const hasSupplementalContent = quizzes.length > 0 || exercises.length > 0;
   const showStats = module?.progress > 0 || hasLessons || hasTopicFallback;
   const showTabs = true;
@@ -2274,7 +2296,7 @@ export const ClassroomView: React.FC = () => {
                     <div className="flex justify-center p-8"><Loader2 className="animate-spin text-accent" /></div>
                   ) : quizzes.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {quizzes.map((quiz) => (
+                      {quizzes.filter(q => !searchQuery || q.title?.toLowerCase().includes(searchQuery.toLowerCase())).map((quiz) => (
                         <div 
                           key={quiz.id} 
                           onClick={() => navigate(`/lesson/${quiz.lesson_id}`, { state: lessonNavigationState({ startAtTest: true }) })}
@@ -2309,7 +2331,7 @@ export const ClassroomView: React.FC = () => {
                     <div className="flex justify-center p-8"><Loader2 className="animate-spin text-accent" /></div>
                   ) : exercises.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {exercises.map((exercise) => (
+                      {exercises.filter(e => !searchQuery || e.title?.toLowerCase().includes(searchQuery.toLowerCase())).map((exercise) => (
                         <div 
                           key={exercise.id} 
                           onClick={() => navigate(`/lesson/${exercise.lesson_id}`, { state: lessonNavigationState({ startAtTest: true }) })}

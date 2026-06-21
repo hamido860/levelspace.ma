@@ -1039,7 +1039,7 @@ export const LessonView: React.FC = () => {
                 ...prev,
                 lesson_title: updated.title || updated.lesson_title || prev.lesson_title,
                 content: updated.content ?? prev.content,
-                blocks: null, // Clear blocks from local state to render new markdown
+                blocks: updated.blocks,
                 validation_status: 'teacher_reviewed',
                 status: 'done'
               };

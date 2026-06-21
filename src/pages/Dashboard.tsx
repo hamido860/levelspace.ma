@@ -42,6 +42,7 @@ import { OnboardingModal } from '../components/OnboardingModal';
 import { CalendarWidget } from '../components/CalendarWidget';
 import { PlanSessionModal } from '../components/PlanSessionModal';
 import { SupportZoneModal } from '../components/SupportZoneModal';
+import { useSearch } from '../context/SearchContext';
 
 const getLessonIllustration = (title: string | null | undefined, category?: string | null | undefined) => {
   const t = String(title || '').toLowerCase();
@@ -115,6 +116,7 @@ const getLessonIllustration = (title: string | null | undefined, category?: stri
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
+  const { searchQuery } = useSearch();
   const { user, profile, isPro, signOut, dbConnected, refreshDbConnection, syncData } = useAuth();
   const [isSyncing, setIsSyncing] = useState(false);
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
@@ -441,9 +443,9 @@ export const Dashboard: React.FC = () => {
                       <div className="py-12 flex justify-center items-center">
                         <Loader2 className="w-5 h-5 text-accent animate-spin" />
                       </div>
-                    ) : reminders.filter(r => !r.completed).length > 0 ? (
+                    ) : reminders.filter(r => !r.completed && (!searchQuery || r.title.toLowerCase().includes(searchQuery.toLowerCase()))).length > 0 ? (
                       reminders
-                        .filter(r => !r.completed)
+                        .filter(r => !r.completed && (!searchQuery || r.title.toLowerCase().includes(searchQuery.toLowerCase())))
                         .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
                         .slice(0, 5)
                         .map((reminder, i) => (

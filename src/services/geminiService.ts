@@ -2806,7 +2806,8 @@ export const generateProactiveGreeting = async (
     const response = await generateContentWithFallback(
       {
         model: modelToUse,
-        contents: `Analyze the following lesson content. If the concepts appear particularly complex, advanced, or dense, generate a friendly, proactive message offering to break down the complex parts step-by-step or provide simpler examples. If the content is straightforward, offer to help with any questions, summarize it, or quiz the student on the material. Keep the message brief (1-3 sentences), encouraging, and conversational. Respond in the same language as the lesson content, unless the user's preferred language (${userLanguage || "unknown"}) is different and you think it would help them understand better.
+        contents: `Analyze the following lesson content. If the concepts appear particularly complex, advanced, or dense, generate a friendly, proactive message offering to break down the complex parts step-by-step or provide simpler examples. If the content is straightforward, offer to help with any questions, summarize it, or quiz the student on the material. Keep the message brief (1-3 sentences), encouraging, and conversational.
+CRITICAL LANGUAGE RULE: You MUST respond in the EXACT same language as the lesson content below. For example, if the lesson is in Arabic, your message MUST be entirely in Arabic. Do not mix languages. Ignore the user's interface language (${userLanguage || "unknown"}) for this greeting, always match the lesson content's language.
 ${subject ? `SUBJECT: ${subject}` : ""}
 ${grade ? `STUDENT LEVEL: ${grade}` : ""}
 
@@ -2898,10 +2899,11 @@ export const chatWithTutor = async (
     const strictRagInstruction = strictRAG ? `\nSTRICT RAG MODE IS ENABLED: You MUST ONLY answer based on the provided LESSON CONTENT and ADDITIONAL RELEVANT CONTEXT. Do NOT generate content outside this context. Do NOT suggest ideas that are not mathematically or logically derivable strictly from the provided text.` : `SECONDARY RULE: If the user asks a question or requests information that is NOT covered in the provided contexts, answer carefully and briefly mention when you are bringing in outside knowledge to supplement the lesson.`;
     const systemInstruction = `You are an AI tutor helping a student understand a specific lesson.
 PRIMARY RULE: You should first try to answer questions, explain concepts, extend ideas, or generate practice questions using ONLY the provided LESSON CONTENT and ADDITIONAL RELEVANT CONTEXT.
+CRITICAL LANGUAGE RULE: Your response MUST be in the exact same language as the LESSON CONTENT. If the lesson content is in Arabic, your entire response MUST be in Arabic. DO NOT use English or mix languages. The ONLY exception is if the user's message explicitly and deliberately asks you to translate or explain in another language.
+FORMATTING & CONCISENESS RULE: Keep your explanations concise, clean, and directly to the point. Do not generate long walls of text. Use short paragraphs, bullet points, and bold text for emphasis to make it easy to read. Limit your response to 2-4 short paragraphs maximum unless the user explicitly asks for a detailed essay.
 ${strictRagInstruction}
 ${subject ? `SUBJECT: ${subject}` : ""}
 ${grade ? `STUDENT LEVEL: ${grade}` : ""}
-${userLanguage ? `\nThe user's preferred interface language is '${userLanguage}'. If they ask for explanations in another language, or if it helps them understand better, feel free to use their preferred language or any other language they request.` : ""}
 
 LESSON CONTENT:
 ${augmentedContext}`;
@@ -3656,13 +3658,56 @@ export const getQuickDefinition = async (
   if (!checkAIProvider()) return null;
   
   try {
-    const cacheKey = getCacheKey("getQuickDefinition", word, context);
+    const cacheKey = getCacheKey("getQuickDefinition_v2", word, context);
     const cachedResponse = await responseCache.get(cacheKey);
     if (cachedResponse) {
       console.log("Pipeline: Cache hit for getQuickDefinition");
       return safeJsonParse(cachedResponse);
     }
 
+    // 1. Attempt to use free Dictionary API first
+    try {
+      const detectLanguageFromContext = (ctx: string, w: string): "ar" | "fr" | "en" => {
+        if (/[\u0600-\u06FF]/.test(w) || /[\u0600-\u06FF]/.test(ctx)) return "ar";
+        
+        const lowerCtx = " " + ctx.toLowerCase() + " ";
+        const frWords = [" le ", " la ", " les ", " un ", " une ", " des ", " dans ", " sur ", " avec ", " est ", " et ", " au ", " aux ", " du ", " ou "];
+        const enWords = [" the ", " a ", " an ", " in ", " on ", " with ", " is ", " and ", " to ", " of ", " or "];
+        
+        let frScore = 0;
+        let enScore = 0;
+        
+        frWords.forEach(fw => { if (lowerCtx.includes(fw)) frScore++; });
+        enWords.forEach(ew => { if (lowerCtx.includes(ew)) enScore++; });
+        
+        return frScore > enScore ? "fr" : "en";
+      };
+
+      const lang = detectLanguageFromContext(context, word);
+      
+      const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/${lang}/${encodeURIComponent(word.trim().toLowerCase())}`);
+      if (res.ok) {
+        const data = await res.json();
+        const definition = data[0]?.meanings?.[0]?.definitions?.[0]?.definition;
+        if (definition) {
+          console.log(`Pipeline: Dictionary API success (${lang})`);
+          const result = {
+            definition: definition,
+            languages: {
+              en: lang === "en" ? word : "",
+              fr: lang === "fr" ? word : "",
+              ar: lang === "ar" ? word : "",
+            }
+          };
+          await responseCache.set(cacheKey, JSON.stringify(result));
+          return result;
+        }
+      }
+    } catch (dictError) {
+      console.warn("Dictionary API failed, falling back to AI:", dictError);
+    }
+
+    // 2. Fallback to AI generation
     const prompt = `You are a quick dictionary tool.
     The user has highlighted the text: "${word}".
     The surrounding lesson context is: "${context.slice(0, 500)}..."
@@ -3671,6 +3716,8 @@ export const getQuickDefinition = async (
     1. Briefly define the text/word in simple terms based on the context.
     2. Provide its translation/equivalent in English, French, and Arabic.
     
+    CRITICAL LANGUAGE RULE: The "definition" MUST be in the exact same language as the context. If the context is Arabic, the definition MUST be in Arabic.
+
     Output exactly in this JSON format:
     {
       "definition": "string",
@@ -3696,8 +3743,16 @@ export const getQuickDefinition = async (
 
     const parsed = safeJsonParse(response.text || "");
     if (parsed && parsed.definition) {
-      await responseCache.set(cacheKey, JSON.stringify(parsed));
-      return parsed;
+      const finalResult = {
+        definition: parsed.definition,
+        languages: {
+          en: parsed.languages?.en || "",
+          fr: parsed.languages?.fr || "",
+          ar: parsed.languages?.ar || "",
+        }
+      };
+      await responseCache.set(cacheKey, JSON.stringify(finalResult));
+      return finalResult;
     }
     return null;
   } catch (error) {
@@ -4336,7 +4391,7 @@ export const getDetailedWordExplanation = async (
   if (!checkAIProvider()) return null;
 
   try {
-    const cacheKey = getCacheKey("getDetailedWordExplanation", word, context);
+    const cacheKey = getCacheKey("getDetailedWordExplanation_v2", word, context);
     const cachedResponse = await responseCache.get(cacheKey);
     if (cachedResponse) {
       return safeJsonParse(cachedResponse);
@@ -4349,6 +4404,8 @@ export const getDetailedWordExplanation = async (
     Task:
     Provide a detailed, rich, multi-lingual pedagogical breakdown of this word.
     
+    CRITICAL LANGUAGE RULE: The "pedagogicalExplanation" MUST be written in the exact same language as the surrounding context. For example, if the context is in Arabic, the explanation MUST be in Arabic. Do not use English for the pedagogical explanation unless the context is in English.
+
     Return EXACTLY in this JSON format:
     {
       "word": "original word",
@@ -4360,7 +4417,7 @@ export const getDetailedWordExplanation = async (
         "fr": "French definition / equivalent",
         "ar": "Arabic definition / equivalent"
       },
-      "pedagogicalExplanation": "A student-friendly detailed explanation of what this word means in this specific educational context and curriculum.",
+      "pedagogicalExplanation": "A student-friendly detailed explanation of what this word means in this specific educational context and curriculum. (Must be in the language of the context!)",
       "examples": [
         {
           "sentence": "Example sentence using the word in context",
@@ -4384,8 +4441,16 @@ export const getDetailedWordExplanation = async (
 
     const parsed = safeJsonParse(response.text || "");
     if (parsed && parsed.definition) {
-      await responseCache.set(cacheKey, JSON.stringify(parsed));
-      return parsed as DetailedWordExplanation;
+      const finalResult = {
+        ...parsed,
+        languages: {
+          en: parsed.languages?.en || "",
+          fr: parsed.languages?.fr || "",
+          ar: parsed.languages?.ar || "",
+        }
+      };
+      await responseCache.set(cacheKey, JSON.stringify(finalResult));
+      return finalResult as DetailedWordExplanation;
     }
     return null;
   } catch (error) {

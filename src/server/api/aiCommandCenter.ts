@@ -3267,16 +3267,179 @@ export async function loadRagChunkHealth(supabase: SupabaseClient) {
 
 export async function repairRagTopicLinks(supabase: SupabaseClient) {
   const before = await loadRagChunkHealth(supabase);
-  const { data, error } = await supabase.rpc("repair_rag_chunk_topic_links");
-  if (error) {
-    throw error;
+
+  // 1. Fetch reference data
+  const [{ data: topicsData }, { data: subjectsData }, { data: lessonsData }] = await Promise.all([
+    supabase.from("topics").select("id, grade_id, subject_id, title"),
+    supabase.from("subjects").select("id, name"),
+    supabase.from("lessons").select("id, topic_id"),
+  ]);
+
+  const topics = topicsData || [];
+  const subjects = subjectsData || [];
+  const lessons = lessonsData || [];
+
+  const normalizeStr = (str: any) => {
+    if (!str) return "";
+    return String(str)
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu, " ")
+      .trim();
+  };
+
+  const isUUID = (str: any) =>
+    str && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(str));
+
+  const lessonToTopic = new Map(lessons.filter((l) => l.topic_id).map((l) => [l.id, l.topic_id]));
+  const topicsById = new Map(topics.map((t) => [t.id, t]));
+  const subjectsByName = new Map(subjects.map((s) => [normalizeStr(s.name), s.id]));
+
+  // 2. Fetch all unlinked chunks
+  const allChunks: any[] = [];
+  let page = 0;
+  const pageSize = 1000;
+  while (true) {
+    const { data } = await supabase
+      .from("rag_chunks")
+      .select("id, grade_id, lesson_id, title, metadata")
+      .is("topic_id", null)
+      .range(page * pageSize, (page + 1) * pageSize - 1);
+
+    if (!data || data.length === 0) break;
+    allChunks.push(...data);
+    page++;
   }
+
+  const methodCounts: Record<string, number> = {
+    lesson_id: 0,
+    metadata_topic_id: 0,
+    title_match: 0,
+    single_topic_for_grade_subject: 0,
+    unmatched: 0,
+  };
+
+  const updates: any[] = [];
+  const now = new Date().toISOString();
+
+  // 3. Process each chunk in JS to find matches
+  for (const chunk of allChunks) {
+    let matchedTopicId: string | null = null;
+    let matchedGradeId = chunk.grade_id;
+    let matchMethod: string | null = null;
+
+    // Method 1: lesson_id
+    if (chunk.lesson_id && lessonToTopic.has(chunk.lesson_id)) {
+      matchedTopicId = lessonToTopic.get(chunk.lesson_id);
+      const t = topicsById.get(matchedTopicId);
+      if (t) matchedGradeId = matchedGradeId || t.grade_id;
+      matchMethod = "lesson_id";
+    }
+
+    // Method 2: metadata_topic_id
+    if (!matchedTopicId) {
+      const metaTopicId =
+        chunk.metadata?.topic_id || chunk.metadata?.topic?.id || chunk.metadata?.source?.topic_id;
+      if (isUUID(metaTopicId) && topicsById.has(metaTopicId)) {
+        matchedTopicId = metaTopicId;
+        const t = topicsById.get(matchedTopicId);
+        if (t) matchedGradeId = matchedGradeId || t.grade_id;
+        matchMethod = "metadata_topic_id";
+      }
+    }
+
+    // Method 3: title_match
+    if (!matchedTopicId && matchedGradeId) {
+      const rawTitle =
+        chunk.title ||
+        chunk.metadata?.topic_title ||
+        chunk.metadata?.topic_name ||
+        chunk.metadata?.topic ||
+        chunk.metadata?.title ||
+        chunk.metadata?.topic?.title ||
+        chunk.metadata?.source?.topic_title ||
+        chunk.metadata?.source?.title;
+      const normalizedTitle = normalizeStr(rawTitle);
+
+      if (normalizedTitle) {
+        const gradeTopics = topics.filter((t) => t.grade_id === matchedGradeId && normalizeStr(t.title).length >= 6);
+        const matches = gradeTopics.filter((t) => {
+          const nt = normalizeStr(t.title);
+          return normalizedTitle === nt || normalizedTitle.includes(nt);
+        });
+
+        if (matches.length === 1) {
+          matchedTopicId = matches[0].id;
+          matchMethod = "title_match";
+        }
+      }
+    }
+
+    // Method 4: single_topic_for_grade_subject
+    if (!matchedTopicId && matchedGradeId) {
+      const rawSubj =
+        chunk.metadata?.subject ||
+        chunk.metadata?.subject_name ||
+        chunk.metadata?.subject?.name ||
+        chunk.metadata?.source?.subject ||
+        chunk.metadata?.source?.subject_name;
+      const normalizedSubj = normalizeStr(rawSubj);
+
+      if (normalizedSubj && subjectsByName.has(normalizedSubj)) {
+        const subjId = subjectsByName.get(normalizedSubj);
+        const matches = topics.filter((t) => t.grade_id === matchedGradeId && t.subject_id === subjId);
+        if (matches.length === 1) {
+          matchedTopicId = matches[0].id;
+          matchMethod = "single_topic_for_grade_subject";
+        }
+      }
+    }
+
+    // Prepare update operation
+    if (matchedTopicId && matchMethod) {
+      methodCounts[matchMethod]++;
+      updates.push({
+        id: chunk.id,
+        topic_id: matchedTopicId,
+        grade_id: matchedGradeId,
+        metadata: {
+          ...(chunk.metadata || {}),
+          topic_link_status: "linked",
+          topic_link_method: matchMethod,
+          topic_linked_at: now,
+        },
+        updated_at: now,
+      });
+    } else if (chunk.metadata?.topic_link_status !== "unmatched") {
+      methodCounts.unmatched++;
+      updates.push({
+        id: chunk.id,
+        metadata: {
+          ...(chunk.metadata || {}),
+          topic_link_status: "unmatched",
+          topic_link_reason: "no safe topic match",
+          topic_linked_at: now,
+        },
+        updated_at: now,
+      });
+    }
+  }
+
+  // 4. Perform batch updates (concurrent execution for speed)
+  const batchSize = 100;
+  for (let i = 0; i < updates.length; i += batchSize) {
+    const batch = updates.slice(i, i + batchSize);
+    await Promise.all(
+      batch.map(async (u) => {
+        const { id, ...payload } = u;
+        await supabase.from("rag_chunks").update(payload).eq("id", id);
+      })
+    );
+  }
+
   const after = await loadRagChunkHealth(supabase);
-  const methodCounts = ((data || []) as JsonRecord[]).reduce<Record<string, number>>((acc, row) => {
-    const method = String(row.method || "unknown");
-    acc[method] = Number(row.linked_count || 0);
-    return acc;
-  }, {});
+
   const { data: unmatchedSamples, error: sampleError } = await supabase
     .from("rag_chunks")
     .select("id, content, metadata, grade_id, embedding_status")
