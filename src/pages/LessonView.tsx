@@ -194,6 +194,8 @@ const PendingLessonView: React.FC<{ title: string; lessonId: string; onReady: ()
   );
 };
 
+const EMPTY_ARRAY: any[] = [];
+
 export const LessonView: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -201,7 +203,7 @@ export const LessonView: React.FC = () => {
   const { t, language } = useLanguage();
   const { isAdmin, isDemoAdmin } = useAuth();
   const lesson = useLiveQuery(() => (id ? db.lessons.get(id) : undefined), [id]);
-  const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
+  const dbSettings = useLiveQuery(() => db.settings.toArray()) || EMPTY_ARRAY;
   const settingsMap = useMemo(() => {
     if (!Array.isArray(dbSettings)) return {};
     return Object.fromEntries(dbSettings.map((setting) => [setting.key, setting.value]));

@@ -92,6 +92,8 @@ function EventIcon({ type }: { type: string }) {
 
 type EventEntry = { type: string; label: string; id?: string };
 
+const EMPTY_ARRAY: any[] = [];
+
 export const CalendarWidget: React.FC = () => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<Date>(new Date());
@@ -105,8 +107,8 @@ export const CalendarWidget: React.FC = () => {
 
   const isLoading = scheduleEventsVal === undefined || tasksVal === undefined;
 
-  const scheduleEvents = scheduleEventsVal ?? [];
-  const tasks = tasksVal ?? [];
+  const scheduleEvents = scheduleEventsVal ?? EMPTY_ARRAY;
+  const tasks = tasksVal ?? EMPTY_ARRAY;
 
   // Fetch current weather for Rabat, Morocco dynamically
   useEffect(() => {
@@ -179,7 +181,7 @@ export const CalendarWidget: React.FC = () => {
   }), [currentMonth]);
 
   const selectedStr = format(selectedDay, 'yyyy-MM-dd');
-  const selectedEvents = eventsByDate[selectedStr] ?? [];
+  const selectedEvents = eventsByDate[selectedStr] ?? EMPTY_ARRAY;
 
   const handleSave = async () => {
     if (!form.title.trim()) return;
@@ -299,7 +301,7 @@ export const CalendarWidget: React.FC = () => {
           const inMonth = isSameMonth(day, currentMonth);
           const todayBool = isSameDay(day, new Date());
           const isSelected = isSameDay(day, selectedDay);
-          const events = eventsByDate[dateStr] ?? [];
+          const events = eventsByDate[dateStr] ?? EMPTY_ARRAY;
           const dots = events.slice(0, 3);
 
           // Determine the primary type of event for this day to set background image

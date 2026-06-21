@@ -334,6 +334,8 @@ const fetchSubjectsForCurrentGrade = async (country: string, grade: string) => {
     .filter(Boolean);
 };
 
+const EMPTY_ARRAY: any[] = [];
+
 export const Modules: React.FC = () => {
   const { t } = useLanguage();
   const { isPro } = useAuth();
@@ -344,9 +346,9 @@ export const Modules: React.FC = () => {
   const aiUnavailableMsg = 'AI curriculum suggestions require an API key.';
 
   const dbModules = useLiveQuery(() => db.modules.toArray());
-  const allLessons = useLiveQuery(() => db.lessons.toArray()) || [];
+  const allLessons = useLiveQuery(() => db.lessons.toArray()) || EMPTY_ARRAY;
 
-  const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
+  const dbSettings = useLiveQuery(() => db.settings.toArray()) || EMPTY_ARRAY;
   const settingsMap = useMemo(() => Object.fromEntries(dbSettings.map(s => [s.key, s.value])), [dbSettings]);
 
   const country = settingsMap['selected_country'] || localStorage.getItem('selected_country') || '';
