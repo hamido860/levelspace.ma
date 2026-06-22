@@ -217,6 +217,11 @@ export async function handleAIEmbed(req: ApiRequest, res: ApiResponse) {
   }
 
   try {
+    const credentials = await resolveCredentialContext(req, body);
+    if (credentials.credentialMode === "platform" && !credentials.userId) {
+      return res.status(401).json({ error: "Authentication required for embeddings." });
+    }
+
     const result = await generateEmbedding({ text });
     return res.status(200).json(result);
   } catch (error) {
