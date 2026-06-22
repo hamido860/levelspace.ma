@@ -8,6 +8,9 @@ import { ChevronLeft, ChevronRight, Plus, X, Flag, Star, GraduationCap, BookOpen
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 
+// ⚡ Bolt: Stable fallback array to prevent cascading re-renders when useLiveQuery loads
+const EMPTY_ARRAY: any[] = [];
+
 type HolidayType = 'national' | 'religious' | 'school_break';
 
 interface Holiday {
@@ -105,8 +108,8 @@ export const CalendarWidget: React.FC = () => {
 
   const isLoading = scheduleEventsVal === undefined || tasksVal === undefined;
 
-  const scheduleEvents = scheduleEventsVal ?? [];
-  const tasks = tasksVal ?? [];
+  const scheduleEvents = scheduleEventsVal ?? EMPTY_ARRAY;
+  const tasks = tasksVal ?? EMPTY_ARRAY;
 
   // Fetch current weather for Rabat, Morocco dynamically
   useEffect(() => {
