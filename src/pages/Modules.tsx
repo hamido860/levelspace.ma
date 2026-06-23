@@ -664,7 +664,7 @@ export const Modules: React.FC = () => {
   return (
     <Layout fullWidth>
       <SEO title={t('curriculum_classrooms_title') || 'Syllabus & Academic Classrooms'} />
-      <div className="min-h-full w-full bg-background flex flex-col overflow-visible p-3 sm:p-4 md:h-full md:overflow-hidden">
+      <div className="min-h-full w-full bg-background flex flex-col overflow-visible px-3 pb-3 pt-px sm:px-4 sm:pb-4 sm:pt-px md:h-full md:overflow-hidden">
         {/* 3-Column Layout */}
         <div className="flex-1 min-h-0 w-full flex flex-col md:flex-row gap-3 overflow-visible md:overflow-hidden">
         
