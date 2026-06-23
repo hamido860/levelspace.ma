@@ -1611,14 +1611,14 @@ export const ClassroomView: React.FC = () => {
   return (
     <Layout fullWidth>
       <SEO title={module.name || "Classroom"} />
-      <div className="min-h-full w-full bg-background flex flex-col overflow-visible p-3 pb-24 pt-5 sm:p-4 sm:pb-24 md:h-full md:overflow-hidden md:pb-4 md:pt-6">
+      <div className="flex flex-col h-full overflow-hidden p-1 pb-[68px] md:pb-1 bg-background gap-1">
         
         {/* Symmetrical Layout Container */}
-        <div className="flex-1 min-h-0 w-full flex flex-col md:flex-row gap-3 overflow-visible md:overflow-hidden">
+        <div className="flex-1 min-h-0 w-full flex flex-col md:flex-row gap-1">
           
           {/* Column 2: Main Classroom Content (Middle Column, flex-grow) */}
-          <div className="flex-1 min-w-0 flex flex-col min-h-0 w-full overflow-visible bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 p-4 sm:p-6 md:overflow-hidden">
-            <div className="flex-1 overflow-visible pb-8 md:overflow-y-auto md:pb-16 no-scrollbar flex flex-col gap-6">
+          <div className="flex-1 min-w-0 flex flex-col min-h-0 bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 p-4 sm:p-6 overflow-hidden">
+            <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar flex flex-col gap-6">
               
               {/* Page Header */}
               <div className="border-b border-slate-100 dark:border-white/5 pb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between shrink-0">
@@ -2466,8 +2466,8 @@ export const ClassroomView: React.FC = () => {
           </div>
 
           {/* Column 3: Classroom Widgets Sidebar (Right Column, 260px width) */}
-          <div className="flex md:w-[234px] w-full shrink-0 md:h-full bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 overflow-visible md:overflow-hidden flex-col p-4 sm:p-5">
-            <div className="flex-1 overflow-visible md:overflow-y-auto no-scrollbar flex flex-col gap-6 md:pr-1">
+          <div className="flex md:w-[234px] w-full shrink-0 flex-col bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden p-4 sm:p-5">
+            <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar flex flex-col gap-6 pr-1">
               
               {/* Subject Telemetry Card - Collapsible */}
               <section className="bg-slate-900 text-white rounded-2xl p-5 relative overflow-hidden dark:bg-surface-low shrink-0">

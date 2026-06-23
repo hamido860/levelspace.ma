@@ -459,7 +459,7 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
       
 
       {/* Responsive Grid/Single Column Layout Container */}
-      <main className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-4 md:overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-1 md:overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
         
         {/* Main Content Column */}
         <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden">
@@ -938,7 +938,7 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
 
         </div>
       </div>
-    </main>
+    </div>
 
       {onUpdateBanner && (
         <BannerImagePicker

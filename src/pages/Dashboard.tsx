@@ -356,14 +356,14 @@ export const Dashboard: React.FC = () => {
   return (
     <Layout fullWidth>
       <SEO title="Dashboard" />
-      <div className="h-full w-full bg-background flex flex-col overflow-hidden p-4">
+      <div className="flex flex-col h-full overflow-hidden p-1 pb-[68px] md:pb-1 bg-background gap-1">
         
-        {/* Symmetrical Layout Container */}
-        <div className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-3 overflow-hidden">
+        {/* Two-Column Layout */}
+        <div className="flex-1 min-h-0 w-full flex flex-col lg:flex-row gap-1">
           
-          {/* Column 2: Main Dashboard Content (Middle Column, flex-grow) */}
-          <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 p-6">
-            <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6">
+          {/* Column 1: Main Dashboard Content */}
+          <div className="flex-1 min-w-0 flex flex-col min-h-0 bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 p-5 sm:p-6 overflow-hidden">
+            <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar flex flex-col gap-6">
               {/* Page Header */}
               <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/5 pb-5">
                 <h1 className="ls-page-title text-slate-950 dark:text-ink">
@@ -493,9 +493,9 @@ export const Dashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* Column 3: Dashboard Widgets Sidebar (Right Column, 260px width) */}
-          <div className="flex lg:w-[234px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-5">
-            <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6 pr-1">
+          {/* Column 2: Widget Sidebar */}
+          <div className="lg:w-[234px] w-full shrink-0 flex flex-col bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 p-4 overflow-hidden">
+            <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar flex flex-col gap-5">
               
               {/* Deep Focus Pomodoro - Premium Calmer Box */}
               <section className="bg-slate-900 text-white rounded-2xl p-5 relative dark:bg-surface-low">

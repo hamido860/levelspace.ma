@@ -664,13 +664,13 @@ export const Modules: React.FC = () => {
   return (
     <Layout fullWidth>
       <SEO title={t('curriculum_classrooms_title') || 'Syllabus & Academic Classrooms'} />
-      <div className="min-h-full w-full bg-background flex flex-col overflow-visible p-3 sm:p-4 md:h-full md:overflow-hidden">
+      <div className="flex flex-col h-full overflow-hidden p-1 pb-[68px] md:pb-1 bg-background gap-1">
         {/* 3-Column Layout */}
-        <div className="flex-1 min-h-0 w-full flex flex-col md:flex-row gap-3 overflow-visible md:overflow-hidden">
+        <div className="flex-1 min-h-0 w-full flex flex-col md:flex-row gap-1">
         
           {/* Column 2: Main Content */}
-          <div className="flex-1 min-w-0 flex flex-col min-h-0 w-full overflow-visible bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 p-4 sm:p-6 md:overflow-hidden">
-            <div className="flex-1 overflow-visible md:overflow-y-auto no-scrollbar flex flex-col gap-6">
+          <div className="flex-1 min-w-0 flex flex-col min-h-0 bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 p-4 sm:p-6 overflow-hidden">
+            <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar flex flex-col gap-6">
               {/* Page Header */}
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-white/5 pb-5">
                 <div className="flex items-center gap-3">
@@ -1057,8 +1057,8 @@ export const Modules: React.FC = () => {
           </div>
 
           {/* Column 3: Right Sidebar — Focus & Tools */}
-          <div className="flex md:w-[234px] w-full shrink-0 md:h-full bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 overflow-visible md:overflow-hidden flex-col p-4 sm:p-5">
-            <div className="flex-1 overflow-visible md:overflow-y-auto no-scrollbar flex flex-col gap-6 md:pr-1">
+          <div className="flex md:w-[234px] w-full shrink-0 flex-col bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden p-4 sm:p-5">
+            <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar flex flex-col gap-6 pr-1">
 
               {/* Deep Focus Pomodoro - Premium Calmer Box */}
               <section className="bg-slate-900 text-white rounded-2xl p-5 relative dark:bg-surface-low">

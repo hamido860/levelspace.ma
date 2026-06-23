@@ -919,7 +919,7 @@ export const LessonView: React.FC = () => {
         type="article"
       />
 
-      <div dir={contentDir} className="h-full w-full bg-background flex flex-col overflow-hidden p-4 relative">
+      <div dir={contentDir} className="flex flex-col h-full overflow-hidden p-1 pb-[68px] md:pb-1 bg-background gap-1 relative">
         {/* Floating Edit Button for Admins */}
         {(isAdmin || isDemoAdmin) && (
           <button

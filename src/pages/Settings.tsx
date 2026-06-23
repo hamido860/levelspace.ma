@@ -522,10 +522,10 @@ export const Settings: React.FC = () => {
   return (
     <Layout fullWidth>
       <SEO title="Settings" />
-      <div className="h-full w-full bg-background flex flex-col overflow-hidden p-4">
-        <div className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-4 overflow-hidden">
-          <main className="flex-grow flex flex-col min-h-0 w-full overflow-hidden rounded-xl border border-slate-200 bg-white p-5 shadow-lg dark:border-white/8 dark:bg-paper md:p-6">
-            <div className="flex-grow overflow-y-auto pr-1 no-scrollbar">
+      <div className="flex flex-col h-full overflow-hidden p-1 pb-[68px] md:pb-1 bg-background gap-1">
+        <div className="flex-1 min-h-0 w-full flex flex-col lg:flex-row gap-1">
+          <div className="flex-1 min-w-0 flex flex-col min-h-0 rounded-xl border border-slate-200 bg-white p-5 shadow-lg dark:border-white/8 dark:bg-paper md:p-6 overflow-hidden">
+            <div className="flex-1 min-h-0 overflow-y-auto pr-1 no-scrollbar">
         {/* Page Header */}
         <div className="border-b border-slate-100 dark:border-white/5 pb-5 mb-6">
           <h1 className="ls-page-title text-slate-950 dark:text-ink">
@@ -1607,7 +1607,7 @@ export const Settings: React.FC = () => {
         )}
 
             </div>
-          </main>
+          </div>
 
           <aside className="flex lg:w-[234px] w-full shrink-0 h-full overflow-hidden rounded-xl border border-slate-200 bg-white p-5 shadow-lg dark:border-white/8 dark:bg-paper flex-col">
             <div className="flex-grow space-y-5 overflow-y-auto pr-1 no-scrollbar">

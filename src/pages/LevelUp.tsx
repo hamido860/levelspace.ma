@@ -438,9 +438,9 @@ export const LevelUp: React.FC = () => {
   return (
     <Layout fullWidth>
       <SEO title="LevelUp - Support Hub" />
-      <div className="h-full w-full bg-background flex flex-col overflow-hidden p-4">
+      <div className="flex flex-col h-full overflow-hidden p-1 pb-[68px] md:pb-1 bg-background gap-1">
         {/* 3-Column Layout */}
-        <div className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-4 overflow-hidden">
+        <div className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-1 overflow-hidden">
 
           {/* Column 2: Main Content */}
           <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 p-6">
