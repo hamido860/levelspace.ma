@@ -865,7 +865,7 @@ export const Modules: React.FC = () => {
           </div>
         ) : (
           // ---- GRID MODE ----
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="classroom-card-grid grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           <AnimatePresence mode="popLayout">
             {isLoading ? (
               <div className="col-span-full py-32 flex flex-col items-center justify-center space-y-4 bg-white dark:bg-paper">

@@ -1929,7 +1929,7 @@ export const ClassroomView: React.FC = () => {
                         </div>
                       ) : (
                         // GRID MODE
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-6">
+                        <div className="lesson-card-grid grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pb-6">
                         {Array.isArray(lessons) && lessons.length > 0 ? (
                           visibleLessons.length > 0 ? visibleLessons.map((lesson, i) => {
                             const isClickable = isAdmin || isStudentVisibleLesson(lesson);

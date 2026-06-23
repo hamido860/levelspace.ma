@@ -1339,3 +1339,10 @@
   border-color: color-mix(in srgb, var(--ink) 18%, transparent) !important;
 }
 
+@media (min-width: 1024px) and (max-width: 1279px) {
+  main[data-sidebar-collapsed="true"] .classroom-card-grid,
+  main[data-sidebar-collapsed="true"] .lesson-card-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
