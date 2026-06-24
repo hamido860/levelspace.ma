@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "fn:secrets": "supabase secrets set GEMINI_API_KEY=$GEMINI_API_KEY SR_KEY=$SR_KEY NVIDIA_API_KEY=$NVIDIA_API_KEY --project-ref pimojkivimygenhygsto",
+    "fn:secrets": "supabase secrets set GEMINI_API_KEY=\"$GEMINI_API_KEY\" SR_KEY=\"$SR_KEY\" NVIDIA_API_KEY=\"$NVIDIA_API_KEY\" --project-ref pimojkivimygenhygsto",
     "fn:deploy": "supabase functions deploy generate-lessons --project-ref pimojkivimygenhygsto --no-verify-jwt",
     "fn:invoke": "supabase functions invoke generate-lessons --project-ref pimojkivimygenhygsto",
     "fn:logs": "supabase functions logs generate-lessons --project-ref pimojkivimygenhygsto",
