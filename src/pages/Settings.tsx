@@ -116,6 +116,8 @@ const PROVIDER_MODELS = {
   ]
 };
 
+const EMPTY_ARRAY: any[] = [];
+
 export const Settings: React.FC = () => {
   const navigate = useNavigate();
   const { t, language, setLanguage } = useLanguage();
@@ -123,7 +125,7 @@ export const Settings: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const isLocked = !!profile?.onboarding_completed && !isAdmin;
   
-  const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
+  const dbSettings = useLiveQuery(() => db.settings.toArray()) || EMPTY_ARRAY;
   const settingsMap = useMemo(() => {
     if (!Array.isArray(dbSettings)) return {};
     return Object.fromEntries(dbSettings.map(s => [s.key, s.value]));

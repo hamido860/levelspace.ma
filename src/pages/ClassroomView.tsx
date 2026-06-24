@@ -282,6 +282,8 @@ type ClassroomSupabaseLesson = {
   is_ai_generated?: boolean | null;
 };
 
+const EMPTY_ARRAY: any[] = [];
+
 export const ClassroomView: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -497,7 +499,7 @@ export const ClassroomView: React.FC = () => {
       setPinnedLessonIds([]);
     }
   }, [pinStorageKey, allLessons?.length]);
-  const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
+  const dbSettings = useLiveQuery(() => db.settings.toArray()) || EMPTY_ARRAY;
   const settingsMap = useMemo(() => Object.fromEntries(dbSettings.map(s => [s.key, s.value])), [dbSettings]);
 
   const defaultDuration = Number(settingsMap['default_session_duration'] || localStorage.getItem('default_session_duration') || 25);
