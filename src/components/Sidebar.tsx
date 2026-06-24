@@ -53,7 +53,7 @@ const SidebarNavItem: React.FC<{
     aria-label={item.label}
     onClick={onClick}
     title={isCollapsed ? item.label : undefined}
-    className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3 px-3'} py-2.5 rounded-lg font-medium text-sm transition-all duration-200 ease-in-out ${
+    className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3 px-3'} py-2.5 rounded-lg font-medium text-sm transition-all duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 ${
       isActive
         ? 'bg-accent text-white shadow-sm shadow-accent/20'
         : 'text-muted hover:bg-ink/5'
@@ -74,7 +74,7 @@ const MobileNavItem: React.FC<{
   <button
     aria-label={item.label}
     onClick={onClick}
-    className={`flex flex-col items-center justify-center gap-1 h-full px-3 min-w-[72px] shrink-0 transition-all duration-300 ${
+    className={`flex flex-col items-center justify-center gap-1 h-full px-3 min-w-[72px] shrink-0 transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 ${
       isActive ? 'text-accent' : 'text-muted'
     }`}
   >
@@ -121,7 +121,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
               onClick={() => setIsCollapsed(!isCollapsed)}
               aria-expanded={!isCollapsed}
               aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-              className="p-1.5 rounded-lg hover:bg-ink/5 text-muted hover:text-ink transition-all"
+              className="p-1.5 rounded-lg hover:bg-ink/5 text-muted hover:text-ink transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
             >
               {isCollapsed 
                 ? (language === 'ar' ? <ChevronLeft size={20} /> : <ChevronRight size={20} />) 
@@ -157,7 +157,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
             </p>
             <button
               onClick={() => navigate('/pricing')}
-              className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white dark:bg-emerald-600 dark:hover:bg-emerald-700 text-xs font-black uppercase tracking-widest rounded-xl shadow-md hover:shadow-lg transition-all duration-300 text-center cursor-pointer active:scale-[0.98]"
+              className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white dark:bg-emerald-600 dark:hover:bg-emerald-700 text-xs font-black uppercase tracking-widest rounded-xl shadow-md hover:shadow-lg transition-all duration-300 text-center cursor-pointer active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
             >
               Upgrade
             </button>
@@ -169,7 +169,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
             onClick={() => signOut()}
             aria-label={t("logout")}
             title={isCollapsed ? t('logout') : undefined}
-            className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3 px-3'} py-2.5 rounded-lg font-medium text-sm text-muted hover:bg-error/5 hover:text-error transition-all duration-200 ease-in-out mt-1`}
+            className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3 px-3'} py-2.5 rounded-lg font-medium text-sm text-muted hover:bg-error/5 hover:text-error transition-all duration-200 ease-in-out mt-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1`}
           >
             <LogOut size={20} />
             {!isCollapsed && <span>{t('logout')}</span>}
