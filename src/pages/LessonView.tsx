@@ -21,6 +21,9 @@ import { isDraftValidationStatus } from '../services/curriculumValidation';
 import { getQuizzesByLesson } from '../services/quizService';
 import { getExercisesByLesson } from '../services/exerciseService';
 
+// ⚡ Bolt: Stable fallback array to prevent cascading re-renders when useLiveQuery loads
+const EMPTY_ARRAY: any[] = [];
+
 type SupabaseLessonRecord = {
   id?: string;
   topic_id?: string | null;
@@ -201,7 +204,8 @@ export const LessonView: React.FC = () => {
   const { t, language } = useLanguage();
   const { isAdmin, isDemoAdmin } = useAuth();
   const lesson = useLiveQuery(() => (id ? db.lessons.get(id) : undefined), [id]);
-  const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
+  const dbSettingsVal = useLiveQuery(() => db.settings.toArray());
+  const dbSettings = dbSettingsVal || EMPTY_ARRAY;
   const settingsMap = useMemo(() => {
     if (!Array.isArray(dbSettings)) return {};
     return Object.fromEntries(dbSettings.map((setting) => [setting.key, setting.value]));
@@ -511,7 +515,7 @@ export const LessonView: React.FC = () => {
 
   // Fetch all reminders/tasks to capture completed classroom checkmarks
   const remindersVal = useLiveQuery(() => db.tasks.toArray());
-  const reminders = remindersVal || [];
+  const reminders = remindersVal || EMPTY_ARRAY;
 
   // Local state to log Pomodoro focus timer starts dynamically
   const [pomodoroLogs, setPomodoroLogs] = useState<Array<{

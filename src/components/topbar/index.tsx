@@ -6,6 +6,9 @@ import { ActionIcons } from './ActionIcons';
 import { useAuth } from '../../context/AuthContext';
 import { db } from '../../db/db';
 
+// ⚡ Bolt: Stable fallback array to prevent cascading re-renders when useLiveQuery loads
+const EMPTY_ARRAY: any[] = [];
+
 interface TopbarProps {
   isCollapsed?: boolean;
   gradeOverride?: string;
@@ -13,9 +16,9 @@ interface TopbarProps {
 
 export const Topbar: React.FC<TopbarProps> = ({ isCollapsed = false, gradeOverride }) => {
   const { profile, loading } = useAuth();
-  const dbSettings = useLiveQuery(() => db.settings.toArray(), []);
+  const dbSettings = useLiveQuery(() => db.settings.toArray(), EMPTY_ARRAY);
   const settingsMap = React.useMemo(
-    () => Object.fromEntries((dbSettings || []).map((setting) => [setting.key, setting.value])),
+    () => Object.fromEntries((dbSettings || EMPTY_ARRAY).map((setting) => [setting.key, setting.value])),
     [dbSettings],
   );
   const browserGrade = localStorage.getItem('selected_grade') || '';

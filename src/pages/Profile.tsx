@@ -24,13 +24,16 @@ import { AiKeysModal } from '../components/settings/AiKeysModal';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 
+// ⚡ Bolt: Stable fallback array to prevent cascading re-renders when useLiveQuery loads
+const EMPTY_ARRAY: any[] = [];
+
 export const Profile: React.FC = () => {
   const navigate = useNavigate();
   const { user, profile, loading } = useAuth();
   const { t } = useLanguage();
-  const dbSettings = useLiveQuery(() => db.settings.toArray(), []);
+  const dbSettings = useLiveQuery(() => db.settings.toArray(), EMPTY_ARRAY);
   const settings = React.useMemo(
-    () => Object.fromEntries((dbSettings || []).map((setting) => [setting.key, setting.value])),
+    () => Object.fromEntries((dbSettings || EMPTY_ARRAY).map((setting) => [setting.key, setting.value])),
     [dbSettings],
   );
   const [isAiKeysOpen, setIsAiKeysOpen] = React.useState(false);

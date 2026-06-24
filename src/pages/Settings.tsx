@@ -40,6 +40,9 @@ import { useAuth } from '../context/AuthContext';
 import { updateProfile } from '../db/supabase';
 import { AiKeysModal } from '../components/settings/AiKeysModal';
 
+// ⚡ Bolt: Stable fallback array to prevent cascading re-renders when useLiveQuery loads
+const EMPTY_ARRAY: any[] = [];
+
 const parseStoredArray = (value: unknown): string[] => {
   if (Array.isArray(value)) return value.filter((item): item is string => typeof item === 'string');
   if (typeof value !== 'string') return [];
@@ -123,7 +126,8 @@ export const Settings: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const isLocked = !!profile?.onboarding_completed && !isAdmin;
   
-  const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
+  const dbSettingsVal = useLiveQuery(() => db.settings.toArray());
+  const dbSettings = dbSettingsVal || EMPTY_ARRAY;
   const settingsMap = useMemo(() => {
     if (!Array.isArray(dbSettings)) return {};
     return Object.fromEntries(dbSettings.map(s => [s.key, s.value]));
