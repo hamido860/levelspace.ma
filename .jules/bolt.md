@@ -4,3 +4,6 @@
 ## 2026-05-22 - Dexie array derivations
 **Learning:** The same pattern from the 2024-05-09 entry (Dexie live queries returning raw arrays that get transformed into derived objects causing cascading re-renders) also affects array filtering and mapping operations like `.filter()` and `.map()`.
 **Action:** Wrap all complex array derivations off of `useLiveQuery` arrays in `useMemo`.
+## 2025-02-12 - Prevent Expensive Re-renders with useMemo
+**Learning:** In React components with frequent state updates (like Dashboard.tsx ticking a timer every second), inline array derivations (`.filter()`, `.sort()`) cause expensive O(n log n) recalculations and violate React's referential equality principles.
+**Action:** Always extract array derivations into `useMemo` hooks when dealing with frequently re-rendering components to prevent stuttering and CPU waste.
