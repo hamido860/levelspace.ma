@@ -65,7 +65,9 @@ export const TagsManager: React.FC<TagsManagerProps> = ({
             {!readonly && (
               <button 
                 onClick={(e) => { e.stopPropagation(); onRemoveTag(tag); }}
-                className="ml-0.5 rounded-full p-0.5 transition-colors hover:bg-error/10 hover:text-error"
+                className="ml-0.5 rounded-full p-0.5 transition-colors hover:bg-error/10 hover:text-error focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
+                aria-label={`Remove tag ${tag}`}
+                title={`Remove tag ${tag}`}
               >
                 <X className="h-3 w-3" />
               </button>
@@ -92,6 +94,7 @@ export const TagsManager: React.FC<TagsManagerProps> = ({
                 onKeyDown={handleKeyDown}
                 onBlur={handleAdd}
                 placeholder="Add tag..."
+                aria-label="New tag name"
                 className="w-24 bg-transparent text-[10px] font-medium text-ink outline-none placeholder:text-muted/50"
                 onClick={(e) => e.stopPropagation()}
               />
@@ -99,7 +102,7 @@ export const TagsManager: React.FC<TagsManagerProps> = ({
           ) : (
             <button
               onClick={(e) => { e.stopPropagation(); setIsAdding(true); }}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-1 dark:focus-visible:ring-white dark:focus-visible:ring-offset-slate-950"
               title="Add Tag"
             >
               <Plus className="h-4 w-4" />
