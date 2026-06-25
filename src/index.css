@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@500;600;700;800&family=DM+Sans:wght@300;400;500&family=Inter:wght@100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Noto+Sans+Arabic:wght@100..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=DM+Sans:wght@300;400;500&family=Inter:wght@100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Noto+Sans+Arabic:wght@100..900&family=Patrick+Hand&family=Syne:wght@500;600;700;800&display=swap');
 @import "katex/dist/katex.min.css";
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
@@ -9,6 +9,7 @@
   --font-display: "Syne", "Noto Sans Arabic", sans-serif;
   --font-serif: "Cormorant Garamond", "Noto Sans Arabic", serif;
   --font-mono: "JetBrains Mono", "Noto Sans Arabic", monospace;
+  --font-script: "Patrick Hand", "Noto Sans Arabic", cursive;
 
   --color-background: var(--background);
   --color-ink: var(--ink);
@@ -326,37 +327,187 @@
   @apply grid gap-8 lg:grid-cols-[minmax(0,1fr)_260px] lg:items-start;
 }
 
+.lesson-reader--student {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--accent) 4%, transparent), transparent 18rem),
+    var(--background);
+}
+
+.lesson-reader--student main {
+  @apply gap-0;
+}
+
+.lesson-reader--student .lesson-reader-frame {
+  height: calc(100dvh - 9.5rem);
+  min-height: 520px;
+  background: color-mix(in srgb, var(--paper) 96%, var(--surface-low));
+}
+
+.lesson-reader--student .lesson-reader-content-scroll {
+  padding-top: 1.25rem;
+}
+
+.lesson-reader-domain-strip {
+  max-width: min(58vw, 620px);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.lesson-reader-domain-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.lesson-reader-student-header {
+  padding: 1rem 0 1.25rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--ink) 9%, transparent);
+}
+
+.lesson-reader-student-header__meta {
+  margin-bottom: 0.55rem;
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.lesson-reader-student-header h1 {
+  margin: 0;
+  max-width: 26ch;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 1.65rem;
+  font-weight: 800;
+  line-height: 1.14;
+  letter-spacing: 0;
+}
+
+@media (min-width: 768px) {
+  .lesson-reader-student-header h1 {
+    font-size: 2.15rem;
+  }
+}
+
+.lesson-reader-student-header p {
+  margin: 0.75rem 0 0;
+  max-width: 64ch;
+  color: var(--ink-muted);
+  font-size: 0.95rem;
+  line-height: 1.65;
+}
+
+.lesson-reader-student-progress {
+  margin-top: 1.1rem;
+  height: 0.35rem;
+  max-width: 12rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 10%, transparent);
+}
+
+.lesson-reader-student-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 240ms ease;
+}
+
+.lesson-reader-content-scroll {
+  container-type: inline-size;
+}
+
+.lesson-reading-rail {
+  width: min(100%, 760px);
+  max-width: 72ch;
+  margin-inline: auto;
+}
+
+@container (max-width: 820px) {
+  .lesson-reading-rail {
+    width: 100%;
+    max-width: 100%;
+  }
+}
+
+.lesson-reader-side-panel {
+  display: none;
+}
+
+@media (min-width: 1536px) {
+  .lesson-reader-side-panel {
+    display: flex;
+    width: 260px;
+  }
+}
+
 .lesson-reader-main {
   @apply mx-auto flex w-full max-w-3xl flex-col gap-5;
 }
 
 .lesson-reader-block {
-  @apply py-1 sm:py-2;
+  @apply py-1.5 md:py-2.5 px-0;
 }
 
 .lesson-reader-block__header {
-  @apply mb-4 flex items-center gap-3 sm:mb-5 sm:gap-4;
+  @apply mb-3 grid items-center gap-2 pb-2 border-b border-slate-100/70 dark:border-white/5;
+}
+
+.lesson-reader-block__header--quiet {
+  @apply mb-0 border-0 pb-0;
+}
+
+.lesson-reader-block__header--collapsible {
+  @apply border-b-0 pb-0;
+}
+
+.lesson-reader-block__static-header,
+.lesson-reader-block__toggle {
+  @apply flex w-full items-center gap-2 text-left;
+}
+
+.lesson-reader-block__toggle {
+  @apply rounded-xl px-2 py-2 transition-colors hover:bg-surface-low focus:outline-none focus:ring-2 focus:ring-accent/30;
+}
+
+.lesson-reader-block__static-header > .min-w-0,
+.lesson-reader-block__toggle > .min-w-0 {
+  @apply flex min-h-8 flex-col justify-center;
 }
 
 .lesson-reader-block__icon {
-  @apply flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-surface-mid text-ink-secondary sm:h-10 sm:w-10;
+  @apply flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-surface-mid text-ink-secondary;
 }
 
 .lesson-reader-eyebrow {
-  @apply text-xs font-medium text-ink-muted ;
+  font-family: var(--font-mono) !important;
+  @apply hidden;
 }
 
 .lesson-reader-block__title {
-  @apply m-0 text-xl font-extrabold leading-tight text-ink sm:text-2xl;
+  font-family: var(--font-sans) !important;
+  @apply m-0 text-lg font-extrabold leading-tight text-ink sm:text-xl;
   overflow-wrap: anywhere;
 }
 
 .lesson-reader-block__status {
-  @apply hidden items-center rounded-full bg-surface-mid px-2.5 py-1 text-[11px] font-semibold text-ink-secondary md:inline-flex  ;
+  @apply hidden;
 }
 
 .lesson-reader-block__status--viewed {
   @apply bg-success-soft text-success;
+}
+
+.lesson-reader-block__chevron {
+  @apply shrink-0 text-ink-muted transition-transform;
+}
+
+.lesson-reader-block__chevron--open {
+  transform: rotate(180deg);
+}
+
+.lesson-reader-block__preview {
+  @apply mt-1 px-2 text-sm leading-6 text-ink-muted;
 }
 
 .lesson-reader-read-state {
@@ -368,14 +519,21 @@
 }
 
 .lesson-reader-markdown {
+  font-family: var(--font-sans) !important;
   @apply prose prose-sm text-ink prose-headings:text-ink prose-strong:text-ink;
-  max-width: 72ch;
-  font-size: 1.02rem;
-  line-height: 1.78;
+  max-width: none;
+  margin-inline: 0;
+  font-size: 1rem;
+  line-height: 1.82;
   color: var(--ink-secondary);
   overflow-wrap: anywhere;
   user-select: text;
   -webkit-user-select: text;
+}
+
+.markdown-lesson-content {
+  max-width: none;
+  margin-inline: 0;
 }
 
 .lesson-reader-markdown > *:first-child {
@@ -387,9 +545,9 @@
 }
 
 .lesson-reader-markdown p {
-  margin-top: 0.75rem;
-  margin-bottom: 0.75rem;
-  line-height: 1.85;
+  margin-top: 0.7rem;
+  margin-bottom: 0.7rem;
+  line-height: 1.84;
   white-space: pre-line;
 }
 
@@ -398,10 +556,10 @@
 .lesson-reader-markdown h3,
 .lesson-reader-markdown h4 {
   color: var(--ink);
-  font-family: var(--font-display);
+  font-family: var(--font-serif);
   font-weight: 800;
-  margin-top: 1.45rem;
-  margin-bottom: 0.75rem;
+  margin-top: 1.8rem;
+  margin-bottom: 0.85rem;
   line-height: 1.25;
   letter-spacing: 0;
 }
@@ -414,12 +572,16 @@
 
 .lesson-reader-markdown h2 {
   font-size: 1.32rem;
+  margin-top: 2rem;
+  margin-bottom: 0.9rem;
   padding-inline-start: 0.85rem;
   border-inline-start: 4px solid var(--accent);
 }
 
 .lesson-reader-markdown h3 {
   font-size: 1.14rem;
+  margin-top: 1.55rem;
+  margin-bottom: 0.7rem;
 }
 
 .lesson-reader-markdown h4 {
@@ -429,15 +591,15 @@
 
 .lesson-reader-markdown ul,
 .lesson-reader-markdown ol {
-  margin-top: 0.75rem;
-  margin-bottom: 0.75rem;
+  margin-top: 0.9rem;
+  margin-bottom: 0.95rem;
   padding-inline-start: 1.45rem;
 }
 
 .lesson-reader-markdown li {
-  margin-top: 0.35rem;
-  margin-bottom: 0.35rem;
-  line-height: 1.75;
+  margin-top: 0.45rem;
+  margin-bottom: 0.45rem;
+  line-height: 1.82;
   padding-inline-start: 0.1rem;
 }
 
@@ -594,7 +756,7 @@
 
 .lesson-reader-list {
   @apply mt-3 space-y-3 pl-5;
-  max-width: 68ch;
+  max-width: none;
 }
 
 .lesson-reader-list li {
@@ -609,7 +771,69 @@
 .lesson-reader-check,
 .lesson-hint {
   @apply rounded-2xl bg-surface-low p-4;
-  max-width: 68ch;
+  max-width: none;
+}
+
+.lesson-reader-example {
+  font-family: var(--font-sans) !important;
+  font-size: 1rem;
+}
+
+.lesson-reader-example__step,
+.lesson-hint,
+.lesson-handnote {
+  font-family: var(--font-script) !important;
+  font-size: 1.06rem;
+}
+
+:is(.lesson-reader-example__step, .lesson-hint, .lesson-handnote):lang(ar),
+:is(.lesson-reader-example__step, .lesson-hint, .lesson-handnote)[dir="rtl"],
+[lang="ar"] :is(.lesson-reader-example__step, .lesson-hint, .lesson-handnote) {
+  font-family: "Noto Sans Arabic", "DM Sans", "Inter", sans-serif !important;
+}
+
+:is(.lesson-reader-example__step, .lesson-hint, .lesson-handnote) :is(code, pre, table) {
+  font-family: var(--font-mono) !important;
+}
+
+:is(.lesson-reader-example__step, .lesson-hint, .lesson-handnote) :is(.katex, .katex-display) {
+  font-family: KaTeX_Main, "Times New Roman", serif !important;
+}
+
+.lesson-grammar-flow {
+  @apply my-3 space-y-2 rounded-xl border border-accent/15 bg-surface-low/80 px-3.5 py-3 text-ink shadow-sm;
+  font-family: var(--font-sans) !important;
+}
+
+.lesson-grammar-flow__action {
+  @apply inline-flex rounded-full bg-paper/70 px-2.5 py-1 text-xs font-extrabold text-accent ring-1 ring-accent/15 dark:bg-paper/10;
+  font-family: var(--font-mono) !important;
+}
+
+.lesson-grammar-flow__line {
+  @apply flex flex-wrap items-center gap-x-2.5 gap-y-2 text-lg leading-snug md:text-xl;
+  word-spacing: 0.08em;
+}
+
+.lesson-grammar-flow__part {
+  @apply inline-flex items-center gap-2 rounded-lg bg-paper/80 px-3 py-1.5 text-ink ring-1 ring-ink/5 dark:bg-paper/10;
+  font-family: var(--font-sans) !important;
+  font-size: 1.2em;
+}
+
+.lesson-grammar-flow__part--verb {
+  @apply text-ink-secondary;
+}
+
+.lesson-grammar-flow__arrow {
+  @apply text-xl font-black text-accent md:text-2xl;
+  font-family: var(--font-mono) !important;
+}
+
+.lesson-grammar-flow__tag {
+  @apply rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-accent;
+  font-family: var(--font-mono) !important;
+  word-spacing: 0;
 }
 
 .lesson-reader-check {
@@ -621,11 +845,17 @@
 }
 
 .lesson-reader-question {
-  @apply text-base font-semibold text-ink;
+  @apply rounded-2xl border border-white/8 bg-paper/70 px-4 py-3 text-base font-semibold text-ink shadow-sm dark:bg-surface-low/70;
 }
 
 .lesson-reader-question .lesson-reader-markdown {
   color: var(--ink);
+  margin: 0 !important;
+  max-width: none !important;
+}
+
+.lesson-reader-question .lesson-reader-markdown p {
+  margin-bottom: 0 !important;
 }
 
 .lesson-reader-example__step {
@@ -633,27 +863,42 @@
 }
 
 .lesson-reader-options {
-  @apply mt-4 grid gap-2;
+  @apply mt-3 grid gap-2;
 }
 
 .lesson-reader-option {
-  @apply flex w-full items-start justify-between gap-3 rounded-2xl border border-surface-mid bg-paper px-4 py-3 text-left text-sm font-semibold text-ink transition-colors hover:border-ink/15 hover:bg-surface-low disabled:cursor-default;
+  @apply flex w-full items-center gap-3 rounded-xl border border-surface-mid/80 bg-paper/70 px-3.5 py-3 text-left text-sm font-semibold text-ink transition-all hover:border-accent/45 hover:bg-accent/5 active:scale-[0.995] disabled:cursor-default disabled:hover:scale-100;
+}
+
+.lesson-reader-option__badge {
+  @apply flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-surface-low text-[11px] font-black text-ink-muted ring-1 ring-inset ring-ink/5;
+  font-family: var(--font-mono) !important;
 }
 
 .lesson-reader-option__text {
-  @apply min-w-0 flex-1;
+  @apply min-w-0 flex-1 leading-snug;
 }
 
 .lesson-reader-option--correct {
-  @apply border-success bg-success-soft text-success;
+  @apply border-success/55 bg-success-soft text-success font-bold;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--success) 35%, transparent);
+}
+
+.lesson-reader-option--correct .lesson-reader-option__badge {
+  @apply bg-success text-white ring-success;
 }
 
 .lesson-reader-option--wrong {
-  @apply border-error bg-error-soft text-error;
+  @apply border-error/70 bg-error-soft text-error font-bold;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--error) 35%, transparent);
+}
+
+.lesson-reader-option--wrong .lesson-reader-option__badge {
+  @apply bg-error text-white ring-error;
 }
 
 .lesson-feedback {
-  @apply mt-4 rounded-2xl p-4 text-sm;
+  @apply mt-3 rounded-2xl border p-4 text-sm shadow-sm;
 }
 
 .lesson-feedback__title {
@@ -661,11 +906,21 @@
 }
 
 .lesson-feedback--good {
-  @apply bg-success-soft text-success;
+  @apply bg-success-soft/80 text-success border-success/20;
 }
 
 .lesson-feedback--review {
-  @apply bg-warning-soft text-warning;
+  @apply bg-warning-soft/70 text-warning border-warning/20;
+}
+
+.lesson-feedback .lesson-reader-markdown {
+  max-width: none !important;
+  margin: 0 !important;
+}
+
+.lesson-feedback .lesson-reader-markdown p {
+  margin-bottom: 0 !important;
+  line-height: 1.6 !important;
 }
 
 .lesson-reader-actions {
@@ -687,7 +942,7 @@
 
 .lesson-answer-panel {
   @apply rounded-2xl border border-success/20 bg-success-soft/60 p-4;
-  max-width: 68ch;
+  max-width: none;
 }
 
 .lesson-answer-panel__title {

@@ -33,6 +33,7 @@ import { LessonToolsMenu } from './LessonToolsMenu';
 import type { DisplayedLessonBlock, LessonDomainStat } from './useDisplayedLessonBlocks';
 
 type LessonReaderProps = {
+  isAdminMode?: boolean;
   title: string;
   subtitle?: string;
   grade?: string;
@@ -101,6 +102,17 @@ const cleanLessonTitle = (value: string) =>
     .replace(/[_-]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+
+const getStudentLessonTitle = (value: string) => {
+  const cleaned = cleanLessonTitle(value)
+    .replace(/\s*[-–—]\s*(cours|lesson|activity|activité)\b.*$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (cleaned.length <= 92) return cleaned;
+  const breakPoint = cleaned.lastIndexOf(' ', 89);
+  return `${cleaned.slice(0, breakPoint > 52 ? breakPoint : 89).trim()}...`;
+};
 
 const getLessonIllustration = (title: string | null | undefined, subject?: string | null | undefined) => {
   const t = String(title || '').toLowerCase();
@@ -206,6 +218,7 @@ const getPurposeLabel = (purpose: string, label: string) => {
 };
 
 export const LessonReader: React.FC<LessonReaderProps> = ({
+  isAdminMode = false,
   title,
   subtitle,
   grade,
@@ -254,13 +267,16 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
 }) => {
   const { t, language } = useLanguage();
   const contentScrollRef = React.useRef<HTMLDivElement | null>(null);
+  const studentLessonTitle = getStudentLessonTitle(title);
+  const visibleDomainStats = useMemo(
+    () => domainStats.filter((domain) => domain.count > 0),
+    [domainStats]
+  );
   
   const otherLessons = useMemo(() => {
     return (allLessonsInModule || []).filter((l: any) => l.title !== title);
   }, [allLessonsInModule, title]);
 
-  const hasSidebar = otherLessons.length > 0;
-  
   // Pinned lessons state persisting to localStorage — scoped per module
   const moduleIdForPins = useMemo(() => {
     const first = (allLessonsInModule || [])[0];
@@ -584,7 +600,7 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
   };
 
   return (
-    <div className="w-full min-h-full lg:h-full flex flex-col overflow-hidden bg-slate-50/50 dark:bg-background">
+    <div className={`lesson-reader lesson-reader--${isAdminMode ? 'admin' : 'student'} w-full min-h-full lg:h-full flex flex-col overflow-hidden bg-slate-50/50 dark:bg-background`}>
       
 
       {/* Responsive Grid/Single Column Layout Container */}
@@ -594,7 +610,7 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-visible lg:overflow-hidden">
         
         {/* Redesigned Card Container */}
-        <div className="w-full min-w-0 h-[calc(100dvh-9.5rem)] min-h-[520px] lg:h-full lg:min-h-0 bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex flex-col">
+        <div className="lesson-reader-frame w-full min-w-0 h-[calc(100dvh-9.5rem)] min-h-[520px] lg:h-full lg:min-h-0 bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex flex-col">
           
           {/* Compact Progress, Filters & Tools Ribbon */}
           <div className="bg-slate-50 border-b border-slate-100 dark:bg-surface-low dark:border-white/5 flex flex-col items-stretch justify-between px-3 py-2 shrink-0 gap-2 sm:flex-row sm:items-center sm:px-5">
@@ -632,8 +648,8 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
               )}
               
               {/* Domain filtering */}
-              {showDomainFilters && allBlocks.length > 0 && (
-                <div className="flex gap-2 items-center select-none shrink-0 border-l border-slate-200 dark:border-white/10 pl-3">
+              {showDomainFilters && allBlocks.length > 0 && (isAdminMode || visibleDomainStats.length > 1) && (
+                <div className="lesson-reader-domain-strip flex gap-2 items-center select-none shrink-0 border-l border-slate-200 dark:border-white/10 pl-3">
                   <button
                     type="button"
                     onClick={() => onDomainChange('all')}
@@ -645,7 +661,7 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
                   >
                     All {allBlocks.length}
                   </button>
-                  {domainStats.map((domain) => (
+                  {visibleDomainStats.map((domain) => (
                     <button
                       key={domain.code}
                       type="button"
@@ -708,7 +724,19 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
             </div>
 
             {/* Main Content Area */}
-            <div ref={contentScrollRef} data-smart-select-scope="true" className="flex-1 basis-0 min-h-0 overflow-y-auto no-scrollbar flex flex-col justify-start space-y-4 pt-3 pb-20 min-w-0 px-4 sm:px-2 overscroll-contain">
+            <div ref={contentScrollRef} data-smart-select-scope="true" className="lesson-reader-content-scroll flex-1 basis-0 min-h-0 overflow-y-auto no-scrollbar flex flex-col justify-start space-y-4 pt-3 pb-20 min-w-0 px-4 sm:px-2 overscroll-contain">
+              <header className="lesson-reading-rail lesson-reader-student-header">
+                <div className="lesson-reader-student-header__meta">
+                  {[subject, grade].filter(Boolean).join(' · ') || 'Lesson'}
+                </div>
+                <h1>{studentLessonTitle}</h1>
+                {subtitle && (
+                  <p>{subtitle}</p>
+                )}
+                <div className="lesson-reader-student-progress" aria-label={`Progress ${progressPercent}%`}>
+                  <span style={{ width: `${progressPercent}%` }} />
+                </div>
+              </header>
               
               {/* Speech Boundary Karaoke visualizer panel */}
               {isSpeaking && speakingState && speakingState.activeSentence && (
@@ -735,14 +763,14 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
               )}
 
               {/* Display blocks — Slide animation via AnimatePresence */}
-              <div className="mx-auto w-full max-w-[760px] px-0 sm:px-2">
+              <div className="w-full">
                 {displayedBlocks.length > 0 ? (() => {
                   return (
                     <div className="flex flex-col divide-y divide-slate-100 dark:divide-white/5">
                       {displayedBlocks.map((block) => (
                         <div
                           key={block.id}
-                          className="py-5 first:pt-2 last:pb-2 text-slate-700 leading-relaxed dark:text-ink-secondary select-text"
+                          className="lesson-reading-rail py-5 first:pt-2 last:pb-2 text-slate-700 leading-relaxed dark:text-ink-secondary select-text"
                         >
                           <LessonBlock
                             item={block}
@@ -764,7 +792,7 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
                         </div>
                       ))}
 
-                      <div className="flex items-center justify-between pt-5">
+                      <div className="lesson-reading-rail flex items-center justify-between pt-5">
                         <span className="text-[10px] text-slate-400 dark:text-ink-muted italic">Résumé de la leçon completed</span>
                         {hasTests ? (
                           <button
@@ -871,7 +899,7 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
                     </AnimatePresence>
                   );
                 })() : (
-                  <div className="text-center py-12 text-slate-400 dark:text-ink-muted bg-slate-50/50 dark:bg-surface-low rounded-2xl border border-solid border-slate-200/60 dark:border-white/5">
+                  <div className="lesson-reading-rail text-center py-12 text-slate-400 dark:text-ink-muted bg-slate-50/50 dark:bg-surface-low rounded-2xl border border-solid border-slate-200/60 dark:border-white/5">
                     No sections found in this lesson view.
                   </div>
                 )}
@@ -898,7 +926,8 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
       </div>
 
       {/* Column 3: Dynamic Widgets & Lesson Previews Sidebar (260px width) */}
-      <div className="hidden lg:flex lg:w-[260px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-4">
+      {isAdminMode && (
+      <div className="lesson-reader-side-panel shrink-0 h-full bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-4">
         <div className="flex-grow overflow-y-auto no-scrollbar pr-1 flex flex-col gap-6">
           
           {/* Focus Timer */}
@@ -1085,6 +1114,7 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
 
         </div>
       </div>
+      )}
     </main>
 
     </div>

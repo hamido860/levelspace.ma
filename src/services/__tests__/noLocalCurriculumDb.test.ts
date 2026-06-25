@@ -1,8 +1,7 @@
-import test from 'node:test';
-import assert from 'node:assert';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { expect, it } from 'vitest';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const srcRoot = resolve(__dirname, '../..');
@@ -23,10 +22,10 @@ const listSourceFiles = (directory: string): string[] => {
   });
 };
 
-test('source does not import the removed local Moroccan curriculum DB', () => {
+it('source does not import the removed local Moroccan curriculum DB', () => {
   const offenders = listSourceFiles(srcRoot)
     .filter((path) => !path.endsWith('noLocalCurriculumDb.test.ts'))
     .filter((path) => readFileSync(path, 'utf8').includes(forbiddenImport));
 
-  assert.deepStrictEqual(offenders, []);
+  expect(offenders).toEqual([]);
 });

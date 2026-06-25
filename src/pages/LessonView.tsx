@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import { useNavigate, useParams, useLocation, useSearchParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { Layout } from '../components/Layout';
@@ -207,8 +207,12 @@ export const LessonView: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { t, language } = useLanguage();
   const { isAdmin, loading: authLoading, profile } = useAuth();
+  const userRole = String(profile?.role || '').toLowerCase();
+  const canUseAdminMode = userRole === 'admin' || userRole === 'teacher';
+  const isAdminMode = canUseAdminMode && searchParams.get('mode') === 'admin';
   const lesson = useLiveQuery(() => (id ? db.lessons.get(id) : undefined), [id]);
   const dbSettings = useLiveQuery(() => db.settings.toArray());
   const settingsMap = useMemo(() => {
@@ -937,7 +941,7 @@ export const LessonView: React.FC = () => {
     );
   }
 
-  if (!isAdmin && !isStudentVisibleLesson(effectiveLesson)) {
+  if (!isAdminMode && !isStudentVisibleLesson(effectiveLesson)) {
     return (
       <Layout fullWidth>
         <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 px-6 text-center">
@@ -969,13 +973,17 @@ export const LessonView: React.FC = () => {
         type="article"
       />
 
-      <div dir={contentDir} className="min-h-full w-full bg-background flex flex-col overflow-y-auto p-4 md:h-full md:overflow-hidden">
+      <div
+        dir={contentDir}
+        className="min-h-full w-full bg-background flex flex-col overflow-y-auto p-4 md:h-full md:overflow-hidden"
+      >
         <LessonReader
+          isAdminMode={isAdminMode}
           title={effectiveLesson.title}
           subtitle={effectiveLesson.subtitle || `${displayedBlocks.length} sections`}
           grade={effectiveLesson.grade}
           subject={effectiveLesson.subject}
-          draftWarning={isDraftValidationStatus(effectiveLesson.validation_status, !!effectiveLesson.is_ai_generated)}
+          draftWarning={isAdminMode && isDraftValidationStatus(effectiveLesson.validation_status, !!effectiveLesson.is_ai_generated)}
           displayedBlocks={displayedBlocks}
           allBlocks={allBlocks}
           domainStats={domainStats}

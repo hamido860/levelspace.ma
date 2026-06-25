@@ -2,12 +2,13 @@ import React from 'react';
 import { CheckCircle2, Dumbbell, FileText, FlaskConical, HelpCircle, Lightbulb, ListChecks, PenTool, Target, XCircle } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import type { DisplayedLessonBlock, PedagogicalPurpose } from './useDisplayedLessonBlocks';
 
 const markdownPlugins = {
-  remarkPlugins: [remarkMath],
+  remarkPlugins: [remarkGfm, remarkMath],
   rehypePlugins: [[rehypeKatex, { strict: false }]] as any,
 };
 
@@ -110,6 +111,22 @@ const accentFrenchVerbRecap = (markdown: string) =>
     .replace(/\b(aller\s*->\s*)alle\b/gi, '$1allé')
     .replace(/\b(manger\s*->\s*)mange\b/gi, '$1mangé');
 
+const stripOrphanTableSeparators = (markdown: string) => {
+  const lines = markdown.split('\n');
+  const separatorPattern = /^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$/;
+  const tableLikePattern = /^\s*\|.*\|\s*$/;
+
+  return lines
+    .filter((line, index) => {
+      if (!separatorPattern.test(line)) return true;
+
+      const previousLine = lines[index - 1] || '';
+      const nextLine = lines[index + 1] || '';
+      return tableLikePattern.test(previousLine) && tableLikePattern.test(nextLine);
+    })
+    .join('\n');
+};
+
 const formatRecapTable = (markdown: string) => {
   if (!/Tableau\s+r[eé]cap/i.test(markdown)) return markdown;
 
@@ -137,9 +154,11 @@ const formatRecapTable = (markdown: string) => {
 };
 
 const normalizeLessonMarkdown = (value: string, titleContext: string) => {
-  const normalized = accentFrenchVerbRecap(formatRecapTable(value))
+  const normalized = stripOrphanTableSeparators(
+    accentFrenchVerbRecap(formatRecapTable(value))
     .replace(/\\r\\n|\\n|\\r/g, '\n')
     .replace(/\r\n?/g, '\n')
+  )
     .replace(/\t/g, '  ')
     .replace(new RegExp(`\\b(${lessonLabelPattern})\\s*[-\u2013\u2014]\\s+`, 'gi'), '$1: ')
     .replace(/^\s*[\u2022\u25cf\u25aa\u25e6]\s+/gm, '- ')
@@ -191,7 +210,6 @@ const SolutionPanel: React.FC<{ title?: string; content?: string }> = ({ title =
 
 export const LessonBlock: React.FC<LessonBlockProps> = ({
   item,
-  isViewed,
   reading,
   quizAnswered,
   quizCorrect,
@@ -213,8 +231,12 @@ export const LessonBlock: React.FC<LessonBlockProps> = ({
   const displayTitle = cleanDisplayTitle(item.title);
   const shouldShowTitle = Boolean(displayTitle) && !isFileNameTitle(item.title);
   const contentHeading = getFirstMarkdownHeading(contentText);
+  const usefulContentHeading = contentHeading && normalizeTitle(contentHeading) !== normalizeTitle(String(block.title || block.label || ''))
+    ? contentHeading
+    : '';
   const isGenericExplanationLabel = item.label.toLowerCase() === 'explanation';
-  const headingLabel = shouldShowTitle ? displayTitle : contentHeading || (isGenericExplanationLabel ? '' : item.label);
+  const generatedTaskTitle = item.purpose === 'quiz' || item.purpose === 'practice' || item.purpose === 'exam';
+  const headingLabel = generatedTaskTitle ? item.title : shouldShowTitle ? displayTitle : usefulContentHeading || (isGenericExplanationLabel ? '' : item.label);
   const quiz = block.quiz || (block.type === 'quiz' && block.question ? {
     question: block.question,
     options: block.options,
@@ -232,19 +254,23 @@ export const LessonBlock: React.FC<LessonBlockProps> = ({
     solution: block.solution,
     source: block.source,
   } : null);
+  const headerContent = (
+    <>
+      <div className="lesson-reader-block__icon">
+        <Icon size={18} />
+      </div>
+      <div className="min-w-0 flex-1">
+        {headingLabel && <h2 className="lesson-reader-block__title">{headingLabel}</h2>}
+      </div>
+    </>
+  );
 
   return (
     <article id={item.id} className="lesson-reader-block scroll-mt-28">
-      <header className="lesson-reader-block__header">
-        <div className="lesson-reader-block__icon">
-          <Icon size={18} />
+      <header className={`lesson-reader-block__header ${!headingLabel ? 'lesson-reader-block__header--quiet' : ''}`}>
+        <div className="lesson-reader-block__static-header">
+          {headerContent}
         </div>
-        <div className="min-w-0 flex-1">
-          {headingLabel && <h2 className="lesson-reader-block__title">{headingLabel}</h2>}
-        </div>
-        <span className={`lesson-reader-block__status ${isViewed ? 'lesson-reader-block__status--viewed' : ''}`}>
-          {isViewed ? 'Viewed' : 'New'}
-        </span>
       </header>
 
       {reading && (
@@ -253,124 +279,127 @@ export const LessonBlock: React.FC<LessonBlockProps> = ({
         </div>
       )}
 
-      {contentText && !quiz && !exercise && !exam && <MarkdownText titleContext={headingLabel || item.title}>{contentText}</MarkdownText>}
+      <div id={`${item.id}-content`}>
+          {contentText && !quiz && !exercise && !exam && <MarkdownText titleContext={headingLabel || item.title}>{contentText}</MarkdownText>}
 
-      {Array.isArray(block.points) && block.points.length > 0 && (
-        <ul className="lesson-reader-list">
-          {block.points.map((point: string, index: number) => (
-            <li key={index}><MarkdownText>{point}</MarkdownText></li>
-          ))}
-        </ul>
-      )}
+          {Array.isArray(block.points) && block.points.length > 0 && (
+            <ul className="lesson-reader-list">
+              {block.points.map((point: string, index: number) => (
+                <li key={index}><MarkdownText>{point}</MarkdownText></li>
+              ))}
+            </ul>
+          )}
 
-      {Array.isArray(block.rules) && block.rules.length > 0 && (
-        <ul className="lesson-reader-list">
-          {block.rules.map((rule: string, index: number) => (
-            <li key={index}><MarkdownText>{rule}</MarkdownText></li>
-          ))}
-        </ul>
-      )}
+          {Array.isArray(block.rules) && block.rules.length > 0 && (
+            <ul className="lesson-reader-list">
+              {block.rules.map((rule: string, index: number) => (
+                <li key={index}><MarkdownText>{rule}</MarkdownText></li>
+              ))}
+            </ul>
+          )}
 
-      {Array.isArray(block.examples) && block.examples.length > 0 && (
-        <div className="lesson-reader-stack">
-          {block.examples.map((example: any, index: number) => (
-            <div key={index} className="lesson-reader-example">
-              {example.question && <MarkdownText>{example.question}</MarkdownText>}
-              {Array.isArray(example.steps) && example.steps.map((step: string, stepIndex: number) => (
-                <div key={stepIndex} className="lesson-reader-example__step">
-                  <MarkdownText>{step}</MarkdownText>
+          {Array.isArray(block.examples) && block.examples.length > 0 && (
+            <div className="lesson-reader-stack">
+              {block.examples.map((example: any, index: number) => (
+                <div key={index} className="lesson-reader-example">
+                  {example.question && <MarkdownText>{example.question}</MarkdownText>}
+                  {Array.isArray(example.steps) && example.steps.map((step: string, stepIndex: number) => (
+                    <div key={stepIndex} className="lesson-reader-example__step">
+                      <MarkdownText>{step}</MarkdownText>
+                    </div>
+                  ))}
+                  {example.answer && <SolutionPanel title="Answer" content={example.answer} />}
                 </div>
               ))}
-              {example.answer && <SolutionPanel title="Answer" content={example.answer} />}
             </div>
-          ))}
-        </div>
-      )}
+          )}
 
-      {quiz && Array.isArray(quiz.options) && (
-        <div className="lesson-reader-check">
-          <div className="lesson-reader-question">
-            <MarkdownText>{quiz.question}</MarkdownText>
-          </div>
-          <div className="lesson-reader-options">
-            {quiz.options.map((option: string, optionIndex: number) => {
-              const answered = quizAnswered[sourceIndex];
-              const selected = quizSelectedOption[sourceIndex] === option;
-              const correct = option === quiz.correctAnswer;
-              return (
-                <button
-                  key={optionIndex}
-                  type="button"
-                  disabled={answered}
-                  onClick={() => onQuizAnswer(sourceIndex, option, quiz.correctAnswer)}
-                  className={`lesson-reader-option ${answered && correct ? 'lesson-reader-option--correct' : ''} ${answered && selected && !correct ? 'lesson-reader-option--wrong' : ''}`}
-                >
-                  <span className="lesson-reader-option__text"><MarkdownText compact>{option}</MarkdownText></span>
-                  {answered && correct && <CheckCircle2 size={18} />}
-                  {answered && selected && !correct && <XCircle size={18} />}
+          {quiz && Array.isArray(quiz.options) && (
+            <div className="lesson-reader-check">
+              <div className="lesson-reader-question">
+                <MarkdownText>{quiz.question}</MarkdownText>
+              </div>
+              <div className="lesson-reader-options">
+                {quiz.options.map((option: string, optionIndex: number) => {
+                  const answered = quizAnswered[sourceIndex];
+                  const selected = quizSelectedOption[sourceIndex] === option;
+                  const correct = option === quiz.correctAnswer;
+                  return (
+                    <button
+                      key={optionIndex}
+                      type="button"
+                      disabled={answered}
+                      onClick={() => onQuizAnswer(sourceIndex, option, quiz.correctAnswer)}
+                      className={`lesson-reader-option ${answered && correct ? 'lesson-reader-option--correct' : ''} ${answered && selected && !correct ? 'lesson-reader-option--wrong' : ''}`}
+                    >
+                      <span className="lesson-reader-option__badge">{String.fromCharCode(65 + optionIndex)}</span>
+                      <span className="lesson-reader-option__text"><MarkdownText compact>{option}</MarkdownText></span>
+                      {answered && correct && <CheckCircle2 size={18} />}
+                      {answered && selected && !correct && <XCircle size={18} />}
+                    </button>
+                  );
+                })}
+              </div>
+              <AnimatePresence>
+                {quizAnswered[sourceIndex] && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    className={`lesson-feedback ${quizCorrect[sourceIndex] ? 'lesson-feedback--good' : 'lesson-feedback--review'}`}
+                  >
+                    <p className="lesson-feedback__title">{quizCorrect[sourceIndex] ? 'Correct.' : 'Review this idea.'}</p>
+                    {quiz.explanation && <MarkdownText>{quiz.explanation}</MarkdownText>}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
+
+          {exercise && (
+            <div className="lesson-reader-check">
+              <div className="lesson-reader-question">
+                <MarkdownText>{exercise.question || exercise.prompt}</MarkdownText>
+              </div>
+              <div className="lesson-reader-actions">
+                {exercise.hint && (
+                  <button type="button" onClick={() => onShowExerciseHint(sourceIndex)} className="lesson-reader-secondary">
+                    {exerciseHintShown[sourceIndex] ? 'Hint shown' : 'Show hint'}
+                  </button>
+                )}
+                <button type="button" onClick={() => onExerciseSubmit(sourceIndex, exercise.solution || '')} className="lesson-reader-primary">
+                  {exerciseResult[sourceIndex] ? 'Hide solution' : 'Show solution'}
                 </button>
-              );
-            })}
-          </div>
-          <AnimatePresence>
-            {quizAnswered[sourceIndex] && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                className={`lesson-feedback ${quizCorrect[sourceIndex] ? 'lesson-feedback--good' : 'lesson-feedback--review'}`}
-              >
-                <p className="lesson-feedback__title">{quizCorrect[sourceIndex] ? 'Correct.' : 'Review this idea.'}</p>
-                {quiz.explanation && <MarkdownText>{quiz.explanation}</MarkdownText>}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      )}
-
-      {exercise && (
-        <div className="lesson-reader-check">
-          <div className="lesson-reader-question">
-            <MarkdownText>{exercise.question || exercise.prompt}</MarkdownText>
-          </div>
-          <div className="lesson-reader-actions">
-            {exercise.hint && (
-              <button type="button" onClick={() => onShowExerciseHint(sourceIndex)} className="lesson-reader-secondary">
-                {exerciseHintShown[sourceIndex] ? 'Hint shown' : 'Show hint'}
-              </button>
-            )}
-            <button type="button" onClick={() => onExerciseSubmit(sourceIndex, exercise.solution || '')} className="lesson-reader-primary">
-              {exerciseResult[sourceIndex] ? 'Hide solution' : 'Show solution'}
-            </button>
-          </div>
-          {exerciseHintShown[sourceIndex] && exercise.hint && (
-            <div className="lesson-hint"><MarkdownText>{exercise.hint}</MarkdownText></div>
+              </div>
+              {exerciseHintShown[sourceIndex] && exercise.hint && (
+                <div className="lesson-hint"><MarkdownText>{exercise.hint}</MarkdownText></div>
+              )}
+              {exerciseResult[sourceIndex] && <SolutionPanel content={exercise.solution} />}
+            </div>
           )}
-          {exerciseResult[sourceIndex] && <SolutionPanel content={exercise.solution} />}
-        </div>
-      )}
 
-      {exam && (
-        <div className="lesson-reader-check lesson-reader-check--exam">
-          {exam.source && <p className="lesson-reader-eyebrow">{exam.source}</p>}
-          <div className="lesson-reader-question">
-            <MarkdownText>{exam.question}</MarkdownText>
-          </div>
-          <div className="lesson-reader-actions">
-            {exam.hint && (
-              <button type="button" onClick={() => onShowExamHint(sourceIndex)} className="lesson-reader-secondary">
-                {examHintShown[sourceIndex] ? 'Hint shown' : 'Show hint'}
-              </button>
-            )}
-            <button type="button" onClick={() => onExamSubmit(sourceIndex, exam.solution || '')} className="lesson-reader-primary">
-              {examResult[sourceIndex] ? 'Hide solution' : 'Show solution'}
-            </button>
-          </div>
-          {examHintShown[sourceIndex] && exam.hint && (
-            <div className="lesson-hint"><MarkdownText>{exam.hint}</MarkdownText></div>
+          {exam && (
+            <div className="lesson-reader-check lesson-reader-check--exam">
+              {exam.source && <p className="lesson-reader-eyebrow">{exam.source}</p>}
+              <div className="lesson-reader-question">
+                <MarkdownText>{exam.question}</MarkdownText>
+              </div>
+              <div className="lesson-reader-actions">
+                {exam.hint && (
+                  <button type="button" onClick={() => onShowExamHint(sourceIndex)} className="lesson-reader-secondary">
+                    {examHintShown[sourceIndex] ? 'Hint shown' : 'Show hint'}
+                  </button>
+                )}
+                <button type="button" onClick={() => onExamSubmit(sourceIndex, exam.solution || '')} className="lesson-reader-primary">
+                  {examResult[sourceIndex] ? 'Hide solution' : 'Show solution'}
+                </button>
+              </div>
+              {examHintShown[sourceIndex] && exam.hint && (
+                <div className="lesson-hint"><MarkdownText>{exam.hint}</MarkdownText></div>
+              )}
+              {examResult[sourceIndex] && <SolutionPanel content={exam.solution} />}
+            </div>
           )}
-          {examResult[sourceIndex] && <SolutionPanel content={exam.solution} />}
-        </div>
-      )}
+      </div>
     </article>
   );
 };
