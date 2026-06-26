@@ -605,10 +605,12 @@ export const Modules: React.FC = () => {
     await db.modules.bulkPut(updates);
   };
 
-  const filteredModules = modules.filter(m => 
-    m.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    m.code.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredModules = useMemo(() => {
+    return modules.filter(m =>
+      m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      m.code.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [modules, searchQuery]);
 
   // Layout mode: grid or carousel
   const [layoutMode, setLayoutMode] = useState<'grid' | 'carousel'>('grid');
@@ -659,7 +661,7 @@ export const Modules: React.FC = () => {
   }, [isTimerRunning]);
   const formatTime = (s: number) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
-  const selectedModules = modules.filter(m => m.selected);
+  const selectedModules = useMemo(() => modules.filter(m => m.selected), [modules]);
 
   return (
     <Layout fullWidth>
