@@ -209,6 +209,13 @@ export const Dashboard: React.FC = () => {
   const dbSettings = dbSettingsVal || [];
   const settingsMap = useMemo(() => Object.fromEntries(dbSettings.map(s => [s.key, s.value])), [dbSettings]);
 
+  const activeReminders = useMemo(() => {
+    return reminders
+      .filter(r => !r.completed && (!searchQuery || r.title.toLowerCase().includes(searchQuery.toLowerCase())))
+      .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
+      .slice(0, 5);
+  }, [reminders, searchQuery]);
+
   const selectedGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || '';
   const selectedCountry = settingsMap['selected_country'] || localStorage.getItem('selected_country') || '';
   const currentSession = settingsMap['current_session'] || localStorage.getItem('current_session') || 'Fall 2024';
@@ -443,12 +450,8 @@ export const Dashboard: React.FC = () => {
                       <div className="py-12 flex justify-center items-center">
                         <Loader2 className="w-5 h-5 text-accent animate-spin" />
                       </div>
-                    ) : reminders.filter(r => !r.completed && (!searchQuery || r.title.toLowerCase().includes(searchQuery.toLowerCase()))).length > 0 ? (
-                      reminders
-                        .filter(r => !r.completed && (!searchQuery || r.title.toLowerCase().includes(searchQuery.toLowerCase())))
-                        .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
-                        .slice(0, 5)
-                        .map((reminder, i) => (
+                    ) : activeReminders.length > 0 ? (
+                      activeReminders.map((reminder, i) => (
                           <motion.div 
                             key={reminder.id}
                             initial={{ opacity: 0, y: 10 }}
