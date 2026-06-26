@@ -49,14 +49,20 @@ export const TimelineTool: React.FC<TimelineToolProps> = ({ state, onChange, les
         <div className="flex items-center gap-2 bg-paper border border-ink/5 rounded-lg p-1">
           <button 
             onClick={() => setZoomLevel(prev => Math.max(0.5, prev - 0.1))}
-            className="p-1.5 hover:bg-surface-low rounded text-muted hover:text-ink transition-colors"
+            aria-label="Zoom out"
+            title="Zoom out"
+            className="p-1.5 hover:bg-surface-low rounded text-muted hover:text-ink transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
           >
             <ZoomOut size={14} />
           </button>
-          <span className="text-[9px] font-bold text-muted w-8 text-center">{Math.round(zoomLevel * 100)}%</span>
+          <div aria-live="polite">
+            <span className="text-[9px] font-bold text-muted w-8 text-center inline-block" aria-label={`Zoom level ${Math.round(zoomLevel * 100)} percent`}>{Math.round(zoomLevel * 100)}%</span>
+          </div>
           <button 
             onClick={() => setZoomLevel(prev => Math.min(2, prev + 0.1))}
-            className="p-1.5 hover:bg-surface-low rounded text-muted hover:text-ink transition-colors"
+            aria-label="Zoom in"
+            title="Zoom in"
+            className="p-1.5 hover:bg-surface-low rounded text-muted hover:text-ink transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
           >
             <ZoomIn size={14} />
           </button>
