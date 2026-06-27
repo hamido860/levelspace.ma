@@ -65,7 +65,9 @@ export const TagsManager: React.FC<TagsManagerProps> = ({
             {!readonly && (
               <button 
                 onClick={(e) => { e.stopPropagation(); onRemoveTag(tag); }}
-                className="ml-0.5 rounded-full p-0.5 transition-colors hover:bg-error/10 hover:text-error"
+                className="ml-0.5 rounded-full p-0.5 transition-colors hover:bg-error/10 hover:text-error focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
+                aria-label={`Remove tag ${tag}`}
+                title={`Remove tag ${tag}`}
               >
                 <X className="h-3 w-3" />
               </button>
