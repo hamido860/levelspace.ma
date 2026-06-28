@@ -169,7 +169,11 @@ export const ImageFetcher: React.FC<ImageFetcherProps> = ({ state, onChange, les
             className="fixed inset-0 z-[10000] flex items-center justify-center p-8 bg-ink/90 "
             onClick={() => setSelectedImage(null)}
           >
-            <button className="absolute top-8 right-8 text-paper hover:text-accent transition-colors">
+            <button
+              className="absolute top-8 right-8 text-paper hover:text-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 rounded-sm"
+              aria-label="Close image preview"
+              title="Close"
+            >
               <X size={32} />
             </button>
             <div className="flex flex-col items-center max-w-4xl max-h-full" onClick={(e) => e.stopPropagation()}>
