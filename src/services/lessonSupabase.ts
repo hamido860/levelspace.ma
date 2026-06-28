@@ -29,6 +29,8 @@ export const getLessonSelectColumns = ({
   const columns = [
     "id",
     "topic_id",
+    "instruction_option_id",
+    "lesson_tracks(track_id)",
     "lesson_title",
     "content",
     "blocks",

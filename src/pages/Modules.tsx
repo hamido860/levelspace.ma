@@ -44,6 +44,7 @@ import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { AnnouncementBanner } from '../components/AnnouncementBanner';
 import { getCardGradient, randomBanner, randomCardGradient, CARD_GRADIENTS } from '../utils/cardColors';
+import { getAcademicIdentity, matchesAcademicDimension } from '../services/academicIdentity';
 
 const relativeTime = (ts: number) => {
   const diff = Date.now() - ts;
@@ -160,7 +161,7 @@ const getLessonIllustration = (title: string | null | undefined, category?: stri
 };
 
 
-const MODULES_SCOPE_VERSION = 'v2';
+const MODULES_SCOPE_VERSION = 'v3';
 
 const MOROCCAN_SCOPE_SUBJECTS: Record<string, string[]> = {
   'tronc commun::tronc commun scientifique': [
@@ -229,6 +230,36 @@ const buildFallbackTrustedModules = (subjectNames: string[]) =>
     selected: false,
     createdAt: Date.now(),
   }));
+
+const rowMatchesGradeCandidates = (rowGrade: string | null | undefined, gradeCandidates: string[]) => {
+  const normalizedRowGrade = normalizeCurriculumValue(String(rowGrade || ''));
+  if (!normalizedRowGrade) return false;
+  return gradeCandidates.some((candidate) => normalizeCurriculumValue(candidate) === normalizedRowGrade);
+};
+
+const buildModulesFromCurriculumCards = (rows: any[], grade: string): any[] => {
+  const gradeCandidates = getGradeCandidates(grade);
+  const bySubject = new Map<string, string>();
+
+  for (const row of rows || []) {
+    if (!rowMatchesGradeCandidates(row?.grade_name, gradeCandidates)) continue;
+    const subjectName = String(row?.subject_name || '').trim();
+    if (!subjectName) continue;
+    const key = normalizeCurriculumValue(subjectName);
+    if (!bySubject.has(key)) bySubject.set(key, subjectName);
+  }
+
+  return Array.from(bySubject.entries()).map(([key, subjectName]) => ({
+    id: `curriculum-${key.replace(/\s+/g, '-')}`,
+    name: subjectName,
+    code: subjectName,
+    description: 'Supabase curriculum subject',
+    category: 'General',
+    progress: 0,
+    selected: false,
+    createdAt: Date.now(),
+  }));
+};
 
 const getNestedSingle = <T,>(value: T | T[] | null | undefined): T | null => {
   if (Array.isArray(value)) return value[0] || null;
@@ -312,15 +343,36 @@ const findScopedGrade = (grades: SupabaseGradeRow[], country: string, grade: str
   }) || null;
 };
 
-const fetchSubjectsForCurrentGrade = async (country: string, grade: string) => {
+const fetchSubjectsForCurrentGrade = async (
+  country: string,
+  grade: string,
+  selectedGradeId: string,
+  trackId: string,
+  isBac: boolean,
+) => {
   const { data: grades, error: gradeError } = await supabase
     .from('grades')
     .select('id, name, grade_order, cycles(name, curricula(country))');
 
   if (gradeError) throw gradeError;
 
-  const matchedGrade = findScopedGrade((grades || []) as SupabaseGradeRow[], country, grade);
+  const matchedGrade = (grades || []).find((row) => row.id === selectedGradeId) ||
+    findScopedGrade((grades || []) as SupabaseGradeRow[], country, grade);
   if (!matchedGrade) return null;
+
+  if (isBac && trackId) {
+    const { data: trackSubjects, error: trackSubjectError } = await supabase
+      .from('track_subjects')
+      .select('subjects(*)')
+      .eq('track_id', trackId);
+
+    if (trackSubjectError) throw trackSubjectError;
+    if ((trackSubjects || []).length > 0) {
+      return trackSubjects
+        .map((row: any) => getNestedSingle(row.subjects))
+        .filter(Boolean);
+    }
+  }
 
   const { data: gradeSubjects, error: gradeSubjectError } = await supabase
     .from('grade_subjects')
@@ -338,6 +390,7 @@ export const Modules: React.FC = () => {
   const { t } = useLanguage();
   const { isPro } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [curriculumTopicCountByModuleId, setCurriculumTopicCountByModuleId] = useState<Record<string, number>>({});
   const { searchQuery } = useSearch();
   const navigate = useNavigate();
   const aiAvailable = checkAIProvider();
@@ -352,14 +405,18 @@ export const Modules: React.FC = () => {
   const country = settingsMap['selected_country'] || localStorage.getItem('selected_country') || '';
   const grade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || '';
   const selectedBacTrackId = settingsMap['selected_bac_track'] || localStorage.getItem('selected_bac_track') || '';
-  const selectedBacIntOptionId = settingsMap['selected_bac_int_option'] || localStorage.getItem('selected_bac_int_option') || '';
+  const selectedBacIntOptionId = settingsMap['selected_bac_int_option'] || localStorage.getItem('selected_bac_int_option') || settingsMap['selected_option'] || localStorage.getItem('selected_option') || '';
+  const academicIdentity = getAcademicIdentity({
+    settings: settingsMap,
+    country,
+    gradeName: grade,
+    trackId: selectedBacTrackId,
+    instructionOptionId: selectedBacIntOptionId,
+  });
   const classroomScopeKey = [
     'modules',
     MODULES_SCOPE_VERSION,
-    normalizeCurriculumValue(country),
-    normalizeCurriculumValue(grade),
-    normalizeCurriculumValue(String(selectedBacTrackId || '')),
-    normalizeCurriculumValue(String(selectedBacIntOptionId || '')),
+    academicIdentity.scopeKey,
   ].join(':');
   const storedClassroomScopeKey = settingsMap['modules_scope_key'] || localStorage.getItem('modules_scope_key') || '';
 
@@ -373,6 +430,8 @@ export const Modules: React.FC = () => {
   const lessonCountByModuleId = useMemo(
     () => allLessons.reduce<Record<string, number>>((acc, l) => {
       if (l.status === 'suggested') return acc;
+      if (!matchesAcademicDimension(l.track_id, academicIdentity.trackId)) return acc;
+      if (!matchesAcademicDimension(l.instruction_option_id, academicIdentity.instructionOptionId)) return acc;
 
       const lessonGrade = String(l.grade || '').trim().toLocaleLowerCase();
       if (lessonGrade && !normalizedGradeCandidates.has(lessonGrade)) {
@@ -391,12 +450,14 @@ export const Modules: React.FC = () => {
       acc[l.moduleId] = (acc[l.moduleId] || 0) + 1;
       return acc;
     }, {}),
-    [allLessons, normalizedCurrentCountry, normalizedGradeCandidates],
+    [academicIdentity.instructionOptionId, academicIdentity.trackId, allLessons, normalizedCurrentCountry, normalizedGradeCandidates],
   );
 
   const completedLessonCountByModuleId = useMemo(
     () => allLessons.reduce<Record<string, number>>((acc, l) => {
       if (l.status !== 'done') return acc;
+      if (!matchesAcademicDimension(l.track_id, academicIdentity.trackId)) return acc;
+      if (!matchesAcademicDimension(l.instruction_option_id, academicIdentity.instructionOptionId)) return acc;
 
       const lessonGrade = String(l.grade || '').trim().toLocaleLowerCase();
       if (lessonGrade && !normalizedGradeCandidates.has(lessonGrade)) return acc;
@@ -413,12 +474,14 @@ export const Modules: React.FC = () => {
       acc[l.moduleId] = (acc[l.moduleId] || 0) + 1;
       return acc;
     }, {}),
-    [allLessons, normalizedCurrentCountry, normalizedGradeCandidates],
+    [academicIdentity.instructionOptionId, academicIdentity.trackId, allLessons, normalizedCurrentCountry, normalizedGradeCandidates],
   );
 
   const lastActivityByModuleId = useMemo(
     () => allLessons.reduce<Record<string, number>>((acc, l) => {
       if (l.status === 'suggested') return acc;
+      if (!matchesAcademicDimension(l.track_id, academicIdentity.trackId)) return acc;
+      if (!matchesAcademicDimension(l.instruction_option_id, academicIdentity.instructionOptionId)) return acc;
 
       const lessonGrade = String(l.grade || '').trim().toLocaleLowerCase();
       if (lessonGrade && !normalizedGradeCandidates.has(lessonGrade)) {
@@ -437,7 +500,7 @@ export const Modules: React.FC = () => {
       if (!acc[l.moduleId] || l.createdAt > acc[l.moduleId]) acc[l.moduleId] = l.createdAt;
       return acc;
     }, {}),
-    [allLessons, normalizedCurrentCountry, normalizedGradeCandidates],
+    [academicIdentity.instructionOptionId, academicIdentity.trackId, allLessons, normalizedCurrentCountry, normalizedGradeCandidates],
   );
 
   const [bacTrackName, setBacTrackName] = useState<string>('');
@@ -450,14 +513,77 @@ export const Modules: React.FC = () => {
       ...m,
       icon: getIconForCategory(m.category)
     })), [dbModules, trustedSubjectSet]);
+  const visibleLessonCountByModuleId = useMemo(() => {
+    const counts: Record<string, number> = { ...curriculumTopicCountByModuleId };
+    for (const [moduleId, count] of Object.entries(lessonCountByModuleId)) {
+      counts[moduleId] = Math.max(counts[moduleId] || 0, count);
+    }
+    return counts;
+  }, [curriculumTopicCountByModuleId, lessonCountByModuleId]);
   const selectedCount = useMemo(() => modules.filter(m => m.selected).length, [modules]);
+
+  useEffect(() => {
+    if (modules.length === 0) {
+      setCurriculumTopicCountByModuleId({});
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      const gradeNames = getGradeCandidates(grade);
+      let query = supabase
+        .from('v_curriculum_topic_lesson_cards')
+        .select('topic_id, grade_name, subject_name, instruction_option_id')
+        .limit(5000);
+
+      const optionId = String(selectedBacIntOptionId || '').trim();
+      if (optionId) {
+        query = query.or(`instruction_option_id.eq.${optionId},instruction_option_id.is.null`);
+      }
+
+      const { data, error } = await query;
+      if (cancelled) return;
+      if (error) {
+        console.warn('[Modules] Failed to count curriculum lesson titles:', error);
+        setCurriculumTopicCountByModuleId({});
+        return;
+      }
+
+      const moduleMatchers = modules.map((module) => ({
+        id: module.id,
+        candidates: new Set(
+          getSubjectCandidates(module.name, module.category)
+            .concat(module.name, module.code)
+            .map((value) => normalizeCurriculumValue(String(value || ''))),
+        ),
+      }));
+      const counts: Record<string, number> = {};
+      const seen = new Set<string>();
+      for (const card of data || []) {
+        if (!rowMatchesGradeCandidates((card as any).grade_name, gradeNames)) continue;
+        const subjectKey = normalizeCurriculumValue(String((card as any).subject_name || ''));
+        const topicId = String((card as any).topic_id || '');
+        const matched = moduleMatchers.find((matcher) => matcher.candidates.has(subjectKey));
+        if (!matched || !topicId) continue;
+        const seenKey = `${matched.id}:${topicId}`;
+        if (seen.has(seenKey)) continue;
+        seen.add(seenKey);
+        counts[matched.id] = (counts[matched.id] || 0) + 1;
+      }
+      setCurriculumTopicCountByModuleId(counts);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [grade, modules, selectedBacIntOptionId]);
 
   useEffect(() => {
     const fetchBacDetails = async () => {
       if (selectedBacTrackId) {
         const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(selectedBacTrackId);
         if (isUUID) {
-          const { data } = await supabase.from('bac_tracks').select('name').eq('id', selectedBacTrackId).single();
+          const { data } = await supabase.from('tracks').select('name').eq('id', selectedBacTrackId).single();
           if (data) setBacTrackName(data.name);
         } else {
           setBacTrackName(selectedBacTrackId);
@@ -469,7 +595,7 @@ export const Modules: React.FC = () => {
       if (selectedBacIntOptionId) {
         const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(selectedBacIntOptionId);
         if (isUUID) {
-          const { data } = await supabase.from('bac_international_options').select('name').eq('id', selectedBacIntOptionId).single();
+          const { data } = await supabase.from('instruction_options').select('name').eq('id', selectedBacIntOptionId).single();
           if (data) setBacIntOptionName(data.name);
         } else {
           setBacIntOptionName(selectedBacIntOptionId);
@@ -493,7 +619,13 @@ export const Modules: React.FC = () => {
   const fetchCurriculum = async (includeAiSuggestions = false, bypassAiCache = false) => {
     setIsLoading(true);
     try {
-      const scopedSubjectRows = await fetchSubjectsForCurrentGrade(country, grade);
+      const scopedSubjectRows = await fetchSubjectsForCurrentGrade(
+        country,
+        grade,
+        academicIdentity.gradeId,
+        academicIdentity.trackId,
+        academicIdentity.isBac,
+      );
       let subjectRows = scopedSubjectRows;
 
       if (subjectRows === null) {
@@ -505,10 +637,26 @@ export const Modules: React.FC = () => {
       const supabaseModules = mapSubjectsToModules((subjectRows || []) as any[]);
       let modulesToStore = supabaseModules;
 
+      if (modulesToStore.length === 0) {
+        const { data: curriculumCards, error: curriculumCardsError } = await supabase
+          .from('v_curriculum_topic_lesson_cards')
+          .select('grade_name, subject_name')
+          .limit(5000);
+
+        if (!curriculumCardsError) {
+          modulesToStore = buildModulesFromCurriculumCards(curriculumCards || [], grade);
+        } else {
+          console.warn('[Modules] Curriculum-card subject fallback failed:', curriculumCardsError);
+        }
+      }
+
       if (trustedSubjectSet.size > 0) {
         const scopedSupabaseModules = supabaseModules.filter((module) => moduleMatchesTrustedSubjects(module, trustedSubjectSet));
+        const scopedCurriculumModules = modulesToStore.filter((module) => moduleMatchesTrustedSubjects(module, trustedSubjectSet));
         modulesToStore = scopedSupabaseModules.length > 0
           ? scopedSupabaseModules
+          : scopedCurriculumModules.length > 0
+          ? scopedCurriculumModules
           : buildFallbackTrustedModules(trustedSubjectNames);
       }
 
@@ -757,7 +905,7 @@ export const Modules: React.FC = () => {
                       {[
                         { label: 'Total Subjects', value: modules.length, icon: <LayoutGrid size={16} /> },
                         { label: 'Active Classrooms', value: selectedModules.length, icon: <Zap size={16} /> },
-                        { label: 'With Lessons', value: Object.keys(lessonCountByModuleId).length, icon: <BookOpen size={16} /> },
+                        { label: 'With Lessons', value: Object.keys(visibleLessonCountByModuleId).filter((moduleId) => visibleLessonCountByModuleId[moduleId] > 0).length, icon: <BookOpen size={16} /> },
                       ].map((s, i) => (
                         <div key={i} className="bg-slate-50/50 dark:bg-surface-low/30 p-4 rounded-2xl border border-slate-100 dark:border-white/5 flex items-center justify-between shadow-sm hover:border-slate-200 dark:hover:border-white/10 transition-all cursor-default">
                           <div className="flex items-center gap-3">
@@ -827,7 +975,7 @@ export const Modules: React.FC = () => {
                             >
                               <div className="flex items-center gap-2 text-xs">
                                 <BookOpen className="w-4 h-4 text-slate-400" />
-                                <span className="font-bold text-slate-800 dark:text-ink">{lessonCountByModuleId[module.id] ?? 0} Lessons</span>
+                                <span className="font-bold text-slate-800 dark:text-ink">{visibleLessonCountByModuleId[module.id] ?? 0} Lessons</span>
                               </div>
                               <div className="space-y-1 pb-1">
                                 <div className="flex justify-between text-[11px] font-bold">
@@ -874,7 +1022,7 @@ export const Modules: React.FC = () => {
               </div>
             ) : filteredModules.length > 0 ? (
               filteredModules.map((module, i) => {
-                const lessonCount = lessonCountByModuleId[module.id] ?? 0;
+                const lessonCount = visibleLessonCountByModuleId[module.id] ?? 0;
                 const completedLessonCount = completedLessonCountByModuleId[module.id] ?? 0;
                 const progress = lessonCount > 0 ? Math.round((completedLessonCount / lessonCount) * 100) : 0;
                 const subjectLabel = getReadableSubjectLabel(module.name, module.code);
@@ -1160,7 +1308,7 @@ export const Modules: React.FC = () => {
               <section className="space-y-3">
                 <p className="text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-wider">Progress</p>
                 {modules.slice(0, 4).map(m => {
-                  const lessonCount = lessonCountByModuleId[m.id] ?? 0;
+                  const lessonCount = visibleLessonCountByModuleId[m.id] ?? 0;
                   const completedLessonCount = completedLessonCountByModuleId[m.id] ?? 0;
                   const progress = lessonCount > 0 ? Math.round((completedLessonCount / lessonCount) * 100) : 0;
 
