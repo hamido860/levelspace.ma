@@ -370,14 +370,16 @@ export const Modules: React.FC = () => {
   );
   const normalizedCurrentCountry = String(country || '').trim().toLocaleLowerCase();
 
-  const lessonCountByModuleId = useMemo(
-    () => allLessons.reduce<Record<string, number>>((acc, l) => {
-      if (l.status === 'suggested') return acc;
+  const { lessonCountByModuleId, completedLessonCountByModuleId, lastActivityByModuleId } = useMemo(() => {
+    const counts: Record<string, number> = {};
+    const completedCounts: Record<string, number> = {};
+    const activities: Record<string, number> = {};
+
+    allLessons.forEach((l) => {
+      if (l.status === 'suggested') return;
 
       const lessonGrade = String(l.grade || '').trim().toLocaleLowerCase();
-      if (lessonGrade && !normalizedGradeCandidates.has(lessonGrade)) {
-        return acc;
-      }
+      if (lessonGrade && !normalizedGradeCandidates.has(lessonGrade)) return;
 
       const lessonCountry = String(l.country || '').trim().toLocaleLowerCase();
       if (normalizedCurrentCountry && lessonCountry) {
@@ -385,60 +387,24 @@ export const Modules: React.FC = () => {
           (normalizedCurrentCountry === 'morocco' || normalizedCurrentCountry === 'maroc')
             ? (lessonCountry === 'morocco' || lessonCountry === 'maroc')
             : lessonCountry === normalizedCurrentCountry;
-        if (!isMatch) return acc;
+        if (!isMatch) return;
       }
 
-      acc[l.moduleId] = (acc[l.moduleId] || 0) + 1;
-      return acc;
-    }, {}),
-    [allLessons, normalizedCurrentCountry, normalizedGradeCandidates],
-  );
-
-  const completedLessonCountByModuleId = useMemo(
-    () => allLessons.reduce<Record<string, number>>((acc, l) => {
-      if (l.status !== 'done') return acc;
-
-      const lessonGrade = String(l.grade || '').trim().toLocaleLowerCase();
-      if (lessonGrade && !normalizedGradeCandidates.has(lessonGrade)) return acc;
-
-      const lessonCountry = String(l.country || '').trim().toLocaleLowerCase();
-      if (normalizedCurrentCountry && lessonCountry) {
-        const isMatch =
-          (normalizedCurrentCountry === 'morocco' || normalizedCurrentCountry === 'maroc')
-            ? (lessonCountry === 'morocco' || lessonCountry === 'maroc')
-            : lessonCountry === normalizedCurrentCountry;
-        if (!isMatch) return acc;
+      counts[l.moduleId] = (counts[l.moduleId] || 0) + 1;
+      if (l.status === 'done') {
+        completedCounts[l.moduleId] = (completedCounts[l.moduleId] || 0) + 1;
       }
-
-      acc[l.moduleId] = (acc[l.moduleId] || 0) + 1;
-      return acc;
-    }, {}),
-    [allLessons, normalizedCurrentCountry, normalizedGradeCandidates],
-  );
-
-  const lastActivityByModuleId = useMemo(
-    () => allLessons.reduce<Record<string, number>>((acc, l) => {
-      if (l.status === 'suggested') return acc;
-
-      const lessonGrade = String(l.grade || '').trim().toLocaleLowerCase();
-      if (lessonGrade && !normalizedGradeCandidates.has(lessonGrade)) {
-        return acc;
+      if (!activities[l.moduleId] || l.createdAt > activities[l.moduleId]) {
+        activities[l.moduleId] = l.createdAt;
       }
+    });
 
-      const lessonCountry = String(l.country || '').trim().toLocaleLowerCase();
-      if (normalizedCurrentCountry && lessonCountry) {
-        const isMatch =
-          (normalizedCurrentCountry === 'morocco' || normalizedCurrentCountry === 'maroc')
-            ? (lessonCountry === 'morocco' || lessonCountry === 'maroc')
-            : lessonCountry === normalizedCurrentCountry;
-        if (!isMatch) return acc;
-      }
-
-      if (!acc[l.moduleId] || l.createdAt > acc[l.moduleId]) acc[l.moduleId] = l.createdAt;
-      return acc;
-    }, {}),
-    [allLessons, normalizedCurrentCountry, normalizedGradeCandidates],
-  );
+    return {
+      lessonCountByModuleId: counts,
+      completedLessonCountByModuleId: completedCounts,
+      lastActivityByModuleId: activities
+    };
+  }, [allLessons, normalizedCurrentCountry, normalizedGradeCandidates]);
 
   const [bacTrackName, setBacTrackName] = useState<string>('');
   const [bacIntOptionName, setBacIntOptionName] = useState<string>('');
