@@ -166,21 +166,18 @@ export const Dashboard: React.FC = () => {
   const allModules = allModulesVal || [];
   const allLessons = allLessonsVal || [];
 
-  const lessonCountByModuleId = useMemo(
-    () => allLessons.reduce<Record<string, number>>((acc, l) => {
-      acc[l.moduleId] = (acc[l.moduleId] || 0) + 1;
-      return acc;
-    }, {}),
-    [allLessons],
-  );
-
-  const lastActivityByModuleId = useMemo(
-    () => allLessons.reduce<Record<string, number>>((acc, l) => {
-      if (!acc[l.moduleId] || l.createdAt > acc[l.moduleId]) acc[l.moduleId] = l.createdAt;
-      return acc;
-    }, {}),
-    [allLessons],
-  );
+  const { lessonCountByModuleId, lastActivityByModuleId } = useMemo(() => {
+    return allLessons.reduce(
+      (acc, l) => {
+        acc.lessonCountByModuleId[l.moduleId] = (acc.lessonCountByModuleId[l.moduleId] || 0) + 1;
+        if (!acc.lastActivityByModuleId[l.moduleId] || l.createdAt > acc.lastActivityByModuleId[l.moduleId]) {
+          acc.lastActivityByModuleId[l.moduleId] = l.createdAt;
+        }
+        return acc;
+      },
+      { lessonCountByModuleId: {} as Record<string, number>, lastActivityByModuleId: {} as Record<string, number> }
+    );
+  }, [allLessons]);
 
   const relativeTime = (ts: number) => {
     const diff = Date.now() - ts;
