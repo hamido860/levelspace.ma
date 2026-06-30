@@ -33,14 +33,15 @@ export const TextInput: React.FC<TextInputProps> = ({ state, onChange }) => {
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center bg-paper border border-ink/5 rounded-lg p-1">
-            <button className="p-1.5 hover:bg-surface-low rounded text-muted hover:text-ink transition-colors"><Bold size={14} /></button>
-            <button className="p-1.5 hover:bg-surface-low rounded text-muted hover:text-ink transition-colors"><Italic size={14} /></button>
-            <button className="p-1.5 hover:bg-surface-low rounded text-muted hover:text-ink transition-colors"><List size={14} /></button>
+            <button aria-label="Bold" className="p-1.5 hover:bg-surface-low rounded text-muted hover:text-ink transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"><Bold size={14} /></button>
+            <button aria-label="Italic" className="p-1.5 hover:bg-surface-low rounded text-muted hover:text-ink transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"><Italic size={14} /></button>
+            <button aria-label="List" className="p-1.5 hover:bg-surface-low rounded text-muted hover:text-ink transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"><List size={14} /></button>
           </div>
           <button
             onClick={handleClear}
-            className="p-2 bg-paper border border-ink/5 rounded-lg text-muted hover:text-error transition-colors"
+            className="p-2 bg-paper border border-ink/5 rounded-lg text-muted hover:text-error transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-error focus-visible:ring-offset-1"
             title="Clear"
+            aria-label="Clear"
           >
             <Trash2 size={16} />
           </button>

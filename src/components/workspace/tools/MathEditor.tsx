@@ -100,15 +100,17 @@ export const MathEditorToolbar: React.FC<{
       {canAskAi && <div className="w-px h-4 bg-ink/10 mx-1"></div>}
       <button
         onClick={onCopy}
-        className="p-2 bg-paper border border-ink/5 rounded-lg text-muted hover:text-accent transition-colors"
+        className="p-2 bg-paper border border-ink/5 rounded-lg text-muted hover:text-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
         title="Copy LaTeX"
+        aria-label="Copy LaTeX"
       >
         {copied ? <Check size={16} /> : <Copy size={16} />}
       </button>
       <button
         onClick={onClear}
-        className="p-2 bg-paper border border-ink/5 rounded-lg text-muted hover:text-error transition-colors"
+        className="p-2 bg-paper border border-ink/5 rounded-lg text-muted hover:text-error transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-error focus-visible:ring-offset-1"
         title="Clear"
+        aria-label="Clear"
       >
         <Trash2 size={16} />
       </button>
