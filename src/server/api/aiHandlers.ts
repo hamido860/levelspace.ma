@@ -139,6 +139,9 @@ export async function handleAIGenerate(req: ApiRequest, res: ApiResponse) {
 
   try {
     const credentials = await resolveCredentialContext(req, body);
+    if (credentials.credentialMode === 'platform' && !credentials.userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
     const result = await generateAIResponse({
       prompt,
       provider: body.provider,
@@ -185,6 +188,9 @@ Return a concise student-friendly answer.`;
 
   try {
     const credentials = await resolveCredentialContext(req, body);
+    if (credentials.credentialMode === 'platform' && !credentials.userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
     const result = await generateContextualExplanation({
       prompt,
       provider: body.provider,
@@ -215,6 +221,9 @@ export async function handleAILessonBlocks(req: ApiRequest, res: ApiResponse) {
 
   try {
     const credentials = await resolveCredentialContext(req, body);
+    if (credentials.credentialMode === 'platform' && !credentials.userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
     const result = await generateLessonBlocks({
       prompt,
       provider: body.provider,
