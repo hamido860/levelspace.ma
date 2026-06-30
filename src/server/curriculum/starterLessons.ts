@@ -22,6 +22,10 @@ export interface StarterLessonSeedSummary {
 type TopicRow = {
   id: string;
   title: string | null;
+  grade_id?: string | null;
+  subject_id?: string | null;
+  instruction_option_id?: string | null;
+  topic_tracks?: Array<{ track_id?: string | null }> | { track_id?: string | null } | null;
   grades?: NestedRow<{
     name?: string | null;
     cycles?: NestedRow<{ name?: string | null }>;
@@ -43,6 +47,7 @@ const OPTIONAL_LESSON_INSERT_COLUMNS = [
   "topic_id",
   "blocks",
   "subtitle",
+  "instruction_option_id",
 ] as const;
 
 const first = <T>(value: NestedRow<T>): T | null =>
@@ -96,8 +101,8 @@ const insertStarterLessonBatch = async (supabase: SupabaseLike, rows: any[]) => 
   const strippedColumns = new Set<string>();
 
   for (let attempt = 0; attempt <= OPTIONAL_LESSON_INSERT_COLUMNS.length; attempt += 1) {
-    const { error } = await supabase.from("lessons").insert(remainingRows);
-    if (!error) return;
+    const { data, error } = await supabase.from("lessons").insert(remainingRows).select("id, topic_id");
+    if (!error) return data || [];
 
     const missingColumn = getMissingColumnName(error);
     if (!missingColumn || strippedColumns.has(missingColumn)) {
@@ -115,7 +120,7 @@ const fetchTopicRows = async (supabase: SupabaseLike, topicIds: string[]) => {
   let richTopicQuery = applyTopicFilter(
     supabase
       .from("topics")
-      .select("id, title, grades(name, cycles(name)), subjects(name)")
+      .select("id, title, grade_id, subject_id, instruction_option_id, grades(name, cycles(name)), subjects(name), topic_tracks(track_id)")
       .order("title", { ascending: true }),
   );
 
@@ -223,6 +228,7 @@ export async function seedStarterLessonsFromTopics(
       lesson_title: topicTitle,
       content: buildStarterContent(topicTitle, grade, subject),
       topic_id: topic.id,
+      instruction_option_id: topic.instruction_option_id || null,
       is_ai_generated: false,
       tags: ["starter", "needs_review"],
       teaching_contract: {
@@ -240,7 +246,26 @@ export async function seedStarterLessonsFromTopics(
   if (options.commit && rowsToInsert.length > 0) {
     for (let start = 0; start < rowsToInsert.length; start += 100) {
       const batch = rowsToInsert.slice(start, start + 100);
-      await insertStarterLessonBatch(supabase, batch);
+      const insertedLessons = await insertStarterLessonBatch(supabase, batch);
+      const topicById = new Map(topicRows.map((topic) => [topic.id, topic]));
+      const lessonTrackRows = (insertedLessons || []).flatMap((lesson: any) => {
+        const topic = topicById.get(String(lesson.topic_id || ''));
+        const rawLinks = Array.isArray(topic?.topic_tracks)
+          ? topic?.topic_tracks
+          : topic?.topic_tracks
+          ? [topic.topic_tracks]
+          : [];
+        return rawLinks
+          .map((link: any) => String(link?.track_id || '').trim())
+          .filter(Boolean)
+          .map((trackId: string) => ({ lesson_id: lesson.id, track_id: trackId }));
+      });
+      if (lessonTrackRows.length > 0) {
+        const { error } = await supabase
+          .from('lesson_tracks')
+          .upsert(lessonTrackRows, { onConflict: 'lesson_id,track_id', ignoreDuplicates: true });
+        if (error) throw error;
+      }
     }
   }
 

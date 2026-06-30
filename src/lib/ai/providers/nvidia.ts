@@ -1,3 +1,5 @@
+import { getPlatformAiKey } from "../../envDiagnostics";
+
 export type NvidiaGenerateOptions = {
   prompt: string;
   apiKey?: string;
@@ -15,7 +17,7 @@ const NVIDIA_FALLBACK_MODELS = [
   "google/gemma-3-27b-it",
 ];
 
-const getNvidiaApiKey = () => process.env.NVIDIA_API_KEY || "";
+const getNvidiaApiKey = () => getPlatformAiKey("nvidia");
 
 async function tryNvidiaRequest(
   apiKey: string,

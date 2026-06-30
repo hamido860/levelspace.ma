@@ -28,7 +28,7 @@ export const ToggleButton: React.FC<ToggleButtonProps> = ({
         setIsExpanded(!isExpanded);
         setHasNewUpdate(false);
       }}
-      className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-2xl shadow-md transition-all border ${
+      className={`w-full pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-2xl shadow-md transition-all border ${
         activeTasks.length > 0
           ? 'bg-accent text-paper border-accent shadow-accent/20'
           : 'bg-paper text-ink border-surface-mid shadow-ink/5'
@@ -63,7 +63,7 @@ export const ToggleButton: React.FC<ToggleButtonProps> = ({
         </div>
       </div>
 
-      <div className="ml-2 opacity-50">
+      <div className="ml-auto opacity-50">
         {isExpanded ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
       </div>
     </motion.button>

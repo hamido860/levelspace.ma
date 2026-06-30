@@ -26,6 +26,9 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
 import { Layout } from '../components/Layout';
+import { WorkspaceColumns } from '../components/WorkspaceColumns';
+import { WorkspaceMainPanel } from '../components/WorkspaceMainPanel';
+import { WorkspacePage } from '../components/WorkspacePage';
 import { Modal } from '../components/Modal';
 import { TagsManager } from '../components/TagsManager';
 import { SEO } from '../components/SEO';
@@ -42,7 +45,6 @@ import { OnboardingModal } from '../components/OnboardingModal';
 import { CalendarWidget } from '../components/CalendarWidget';
 import { PlanSessionModal } from '../components/PlanSessionModal';
 import { SupportZoneModal } from '../components/SupportZoneModal';
-import { useSearch } from '../context/SearchContext';
 
 const getLessonIllustration = (title: string | null | undefined, category?: string | null | undefined) => {
   const t = String(title || '').toLowerCase();
@@ -116,7 +118,6 @@ const getLessonIllustration = (title: string | null | undefined, category?: stri
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
-  const { searchQuery } = useSearch();
   const { user, profile, isPro, signOut, dbConnected, refreshDbConnection, syncData } = useAuth();
   const [isSyncing, setIsSyncing] = useState(false);
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
@@ -356,14 +357,13 @@ export const Dashboard: React.FC = () => {
   return (
     <Layout fullWidth>
       <SEO title="Dashboard" />
-      <div className="flex flex-col h-full overflow-hidden p-1 pb-[68px] md:pb-1 bg-background gap-1">
+      <WorkspacePage desktopAt="lg">
         
-        {/* Two-Column Layout */}
-        <div className="flex-1 min-h-0 w-full flex flex-col lg:flex-row gap-1">
+        {/* Symmetrical Layout Container */}
+        <WorkspaceColumns rowAt="lg">
           
-          {/* Column 1: Main Dashboard Content */}
-          <div className="flex-1 min-w-0 flex flex-col min-h-0 bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 p-5 sm:p-6 overflow-hidden">
-            <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar flex flex-col gap-6">
+          {/* Column 2: Main Dashboard Content (Middle Column, flex-grow) */}
+          <WorkspaceMainPanel>
               {/* Page Header */}
               <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/5 pb-5">
                 <h1 className="ls-page-title text-slate-950 dark:text-ink">
@@ -443,9 +443,9 @@ export const Dashboard: React.FC = () => {
                       <div className="py-12 flex justify-center items-center">
                         <Loader2 className="w-5 h-5 text-accent animate-spin" />
                       </div>
-                    ) : reminders.filter(r => !r.completed && (!searchQuery || r.title.toLowerCase().includes(searchQuery.toLowerCase()))).length > 0 ? (
+                    ) : reminders.filter(r => !r.completed).length > 0 ? (
                       reminders
-                        .filter(r => !r.completed && (!searchQuery || r.title.toLowerCase().includes(searchQuery.toLowerCase())))
+                        .filter(r => !r.completed)
                         .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
                         .slice(0, 5)
                         .map((reminder, i) => (
@@ -490,12 +490,11 @@ export const Dashboard: React.FC = () => {
                 </div>
 
               </div>
-            </div>
-          </div>
+          </WorkspaceMainPanel>
 
-          {/* Column 2: Widget Sidebar */}
-          <div className="lg:w-[234px] w-full shrink-0 flex flex-col bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 p-4 overflow-hidden">
-            <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar flex flex-col gap-5">
+          {/* Column 3: Dashboard Widgets Sidebar (Right Column, 260px width) */}
+          <div className="flex lg:w-[234px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-5">
+            <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6 pr-1">
               
               {/* Deep Focus Pomodoro - Premium Calmer Box */}
               <section className="bg-slate-900 text-white rounded-2xl p-5 relative dark:bg-surface-low">
@@ -612,7 +611,7 @@ export const Dashboard: React.FC = () => {
 
             </div>
           </div>
-        </div>
+        </WorkspaceColumns>
       
         {/* Floating Action Button */}
         <motion.button
@@ -624,7 +623,7 @@ export const Dashboard: React.FC = () => {
           <Plus className="w-4 h-4" />
           New classroom
         </motion.button>
-      </div>
+      </WorkspacePage>
 
       {/* Audit Modal */}
       <Modal

@@ -1,10 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import { useNavigate, useParams, useLocation, useSearchParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { AlertCircle, Loader2, Edit } from 'lucide-react';
+import { AlertCircle, Loader2 } from 'lucide-react';
 import { Layout } from '../components/Layout';
 import { Modal } from '../components/Modal';
-import { AdminLessonEditorModal } from '../components/admin/AdminLessonEditorModal';
 import { SEO } from '../components/SEO';
 import { EduWorkspace } from '../components/workspace/EduWorkspace';
 import { db } from '../db/db';
@@ -150,6 +149,16 @@ const isFrenchLesson = (values: Array<string | null | undefined>) =>
     return normalized === 'francais' || normalized === 'langue francaise' || normalized.includes('francais');
   });
 
+const isRealGradeValue = (value: string) => {
+  const normalized = normalizeSearchText(value);
+  return Boolean(
+    normalized &&
+    normalized !== 'set grade' &&
+    normalized !== 'not set' &&
+    normalized !== 'loading',
+  );
+};
+
 const getExpectedAnswer = (block: any) =>
   String(
     block?.exercise?.answer ||
@@ -198,15 +207,34 @@ export const LessonView: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { t, language } = useLanguage();
-  const { isAdmin, isDemoAdmin } = useAuth();
+  const { isAdmin, loading: authLoading, profile } = useAuth();
+  const userRole = String(profile?.role || '').toLowerCase();
+  const canUseAdminMode = isAdmin || userRole === 'admin' || userRole === 'teacher';
+  // Admin and teacher accounts open the editor by default. Keep an explicit
+  // student mode so privileged users can still preview the learner experience.
+  const isAdminMode = canUseAdminMode && searchParams.get('mode') !== 'student';
   const lesson = useLiveQuery(() => (id ? db.lessons.get(id) : undefined), [id]);
-  const dbSettings = useLiveQuery(() => db.settings.toArray()) || [];
+  const dbSettings = useLiveQuery(() => db.settings.toArray());
   const settingsMap = useMemo(() => {
     if (!Array.isArray(dbSettings)) return {};
     return Object.fromEntries(dbSettings.map((setting) => [setting.key, setting.value]));
   }, [dbSettings]);
   const selectedInstructionOptionId = String(settingsMap.selected_bac_int_option || localStorage.getItem('selected_bac_int_option') || '');
+  const browserGrade = localStorage.getItem('selected_grade') || '';
+  const hasPersistedAcademicGrade = Boolean(profile?.selected_grade || settingsMap.selected_grade);
+  const selectedAcademicGradeId = String(profile?.selected_grade_id || settingsMap.selected_grade_id || localStorage.getItem('selected_grade_id') || '').trim();
+  const selectedAcademicGrade = String(
+    profile?.selected_grade ||
+    settingsMap.selected_grade ||
+    (browserGrade === 'Grade 12' && !hasPersistedAcademicGrade ? '' : browserGrade) ||
+    '',
+  ).trim();
+  const hasAcademicGrade = Boolean(selectedAcademicGradeId || isRealGradeValue(selectedAcademicGrade));
+  // A cached/profile grade is already sufficient to open a lesson. Do not keep
+  // the reader behind auth or Dexie hydration when that value is available.
+  const isAcademicSettingsLoading = !hasAcademicGrade && (authLoading || dbSettings === undefined);
   const navigationState = (location.state || {}) as LessonNavigationState;
 
   const startAtTest = navigationState.startAtTest || false;
@@ -220,8 +248,10 @@ export const LessonView: React.FC = () => {
   const [activeDomain, setActiveDomain] = useState('all');
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [noteContent, setNoteContent] = useState('');
+  const [editingBlockIndex, setEditingBlockIndex] = useState<number | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editContent, setEditContent] = useState('');
   const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
   const [readingBlockIndex, setReadingBlockIndex] = useState<number | null>(null);
   const [quizAnswered, setQuizAnswered] = useState<Record<number, boolean>>({});
   const [quizCorrect, setQuizCorrect] = useState<Record<number, boolean>>({});
@@ -246,11 +276,11 @@ export const LessonView: React.FC = () => {
     setSupabaseExercises([]);
     setCurriculumContext(null);
     setCurriculumOrderedLessons([]);
-    setIsEditing(false);
   }, [id]);
 
   useEffect(() => {
     if (!id) return;
+    if (isAcademicSettingsLoading || !hasAcademicGrade) return;
     let isCancelled = false;
 
     const fetchLesson = async () => {
@@ -326,7 +356,7 @@ export const LessonView: React.FC = () => {
     return () => {
       isCancelled = true;
     };
-  }, [id]);
+  }, [hasAcademicGrade, id, isAcademicSettingsLoading]);
 
   const effectiveLesson = useMemo(() => {
     if (supabaseLesson) {
@@ -525,7 +555,7 @@ export const LessonView: React.FC = () => {
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
 
   const defaultDuration = Number(settingsMap['default_session_duration'] || localStorage.getItem('default_session_duration') || 25);
-  const currentGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || '';
+  const currentGrade = selectedAcademicGrade;
 
   useEffect(() => {
     if (defaultDuration) {
@@ -655,33 +685,7 @@ export const LessonView: React.FC = () => {
   const readerSourceBlocks = useMemo(() => {
     let baseBlocks = [...storedBlocks];
     if (baseBlocks.length === 0 && effectiveLesson?.content?.trim()) {
-      const content = effectiveLesson.content;
-      // Split the markdown content into sections grouped by headings (##)
-      const parts = content.split(/(?=^##\s)/m).filter((p: string) => p.trim());
-      
-      if (parts.length > 0 && parts.some((p: string) => p.startsWith('## ') || p.startsWith('# '))) {
-        baseBlocks = parts.map((part: string) => {
-          const lines = part.split('\n');
-          let title = effectiveLesson.title;
-          let body = part;
-
-          if (part.startsWith('## ')) {
-            title = lines[0].replace(/^##\s+/, '').trim();
-            body = lines.slice(1).join('\n').trim();
-          } else if (part.startsWith('# ')) {
-            title = lines[0].replace(/^#\s+/, '').trim();
-            body = lines.slice(1).join('\n').trim();
-          }
-
-          return { 
-            type: 'explanation', 
-            title: title || effectiveLesson.title, 
-            content: body || part 
-          };
-        });
-      } else {
-        baseBlocks = [{ type: 'content', title: effectiveLesson.title, content: effectiveLesson.content }];
-      }
+      baseBlocks = [{ type: 'content', title: effectiveLesson.title, content: effectiveLesson.content }];
     }
 
     // 1. Gather all quizzes from Supabase separate table and embedded column/local record
@@ -830,6 +834,11 @@ export const LessonView: React.FC = () => {
   };
 
   const handleExerciseSubmit = (sourceIndex: number, solution: string) => {
+    if (exerciseResult[sourceIndex]) {
+      setExerciseResult((current) => ({ ...current, [sourceIndex]: null }));
+      return;
+    }
+
     const expected = getExpectedAnswer(readerSourceBlocks[sourceIndex]);
     if (!expected) {
       setExerciseResult((current) => ({ ...current, [sourceIndex]: 'shown' }));
@@ -846,6 +855,13 @@ export const LessonView: React.FC = () => {
     }));
   };
 
+  const handleExamSubmit = (sourceIndex: number) => {
+    setExamResult((current) => ({
+      ...current,
+      [sourceIndex]: current[sourceIndex] ? null : 'shown',
+    }));
+  };
+
   const handleAddNote = async () => {
     if (!noteContent.trim()) return;
     await db.notes.add({
@@ -858,6 +874,31 @@ export const LessonView: React.FC = () => {
     setShowNoteModal(false);
   };
 
+  const startEditing = (sourceIndex: number, block: any) => {
+    setEditingBlockIndex(sourceIndex);
+    setEditTitle(String(block?.title || block?.label || ''));
+    setEditContent(String(block?.content || ''));
+  };
+
+  const saveEdit = async () => {
+    if (!effectiveLesson?.id || editingBlockIndex === null) return;
+
+    const currentBlocks = Array.isArray(effectiveLesson.blocks) ? effectiveLesson.blocks : [];
+    const currentBlock = currentBlocks[editingBlockIndex];
+    if (!currentBlock) return;
+
+    const newBlocks = [...currentBlocks];
+    newBlocks[editingBlockIndex] = {
+      ...currentBlock,
+      title: editTitle.trim(),
+      content: editContent,
+    };
+
+    await db.lessons.update(effectiveLesson.id, { blocks: newBlocks });
+    setSupabaseLesson((current) => current ? { ...current, blocks: newBlocks } : current);
+    setEditingBlockIndex(null);
+  };
+
   const handleUpdateBanner = async (url: string) => {
     if (effectiveLesson?.id) {
       await db.lessons.update(effectiveLesson.id, { bannerImage: url });
@@ -865,7 +906,54 @@ export const LessonView: React.FC = () => {
     setSupabaseLesson(prev => prev ? { ...prev, bannerImage: url } : null);
   };
 
-  if (isLoading || lessonsInModule === undefined) {
+  if (isAcademicSettingsLoading) {
+    return (
+      <Layout fullWidth>
+        <div className="flex min-h-[50vh] items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-accent" />
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!hasAcademicGrade) {
+    return (
+      <Layout fullWidth>
+        <SEO title="Set grade" />
+        <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-background px-5 py-10">
+          <div className="w-full max-w-md rounded-2xl border border-ink/10 bg-paper p-6 text-center shadow-lg">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-accent/10 text-accent">
+              <AlertCircle className="h-6 w-6" />
+            </div>
+            <h1 className="text-xl font-bold text-ink">Set your grade first</h1>
+            <p className="mt-2 text-sm leading-relaxed text-muted">
+              Choose your academic grade before opening lessons so Levelspace loads the right curriculum.
+            </p>
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => navigate('/settings')}
+                className="flex-1 rounded-xl bg-accent px-4 py-3 text-sm font-bold text-paper transition-colors hover:bg-accent-hover"
+              >
+                Open Settings
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/dashboard')}
+                className="flex-1 rounded-xl border border-ink/10 px-4 py-3 text-sm font-bold text-ink transition-colors hover:bg-ink/5"
+              >
+                Back
+              </button>
+            </div>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // Render an available local lesson while Supabase and module navigation finish
+  // in the background. Those secondary reads must not hold the reader hostage.
+  if (!effectiveLesson && (isLoading || lessonsInModule === undefined)) {
     return (
       <Layout fullWidth>
         <div className="flex min-h-[50vh] items-center justify-center">
@@ -887,7 +975,7 @@ export const LessonView: React.FC = () => {
     );
   }
 
-  if (!isAdmin && !isStudentVisibleLesson(effectiveLesson)) {
+  if (!isAdminMode && !isStudentVisibleLesson(effectiveLesson)) {
     return (
       <Layout fullWidth>
         <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 px-6 text-center">
@@ -919,26 +1007,17 @@ export const LessonView: React.FC = () => {
         type="article"
       />
 
-      <div dir={contentDir} className="flex flex-col h-full overflow-hidden p-1 pb-[68px] md:pb-1 bg-background gap-1 relative">
-        {/* Floating Edit Button for Admins */}
-        {(isAdmin || isDemoAdmin) && (
-          <button
-            type="button"
-            onClick={() => setIsEditing(true)}
-            className="fixed bottom-6 right-6 z-[999] flex items-center gap-2 rounded-full bg-accent px-5 py-3 text-xs font-bold uppercase tracking-wider text-white shadow-xl shadow-accent/20 transition-all hover:scale-105 hover:bg-accent/90 active:scale-95 cursor-pointer"
-            title="Edit & Validate Lesson"
-          >
-            <Edit size={14} className="stroke-[2.5]" />
-            <span>Edit Lesson</span>
-          </button>
-        )}
-
+      <div
+        dir={contentDir}
+        className="min-h-full w-full bg-background flex flex-col overflow-y-auto p-4 md:h-full md:overflow-hidden"
+      >
         <LessonReader
+          isAdminMode={isAdminMode}
           title={effectiveLesson.title}
           subtitle={effectiveLesson.subtitle || `${displayedBlocks.length} sections`}
           grade={effectiveLesson.grade}
           subject={effectiveLesson.subject}
-          draftWarning={isDraftValidationStatus(effectiveLesson.validation_status, !!effectiveLesson.is_ai_generated)}
+          draftWarning={isAdminMode && isDraftValidationStatus(effectiveLesson.validation_status, !!effectiveLesson.is_ai_generated)}
           displayedBlocks={displayedBlocks}
           allBlocks={allBlocks}
           domainStats={domainStats}
@@ -957,10 +1036,11 @@ export const LessonView: React.FC = () => {
           onAddNote={() => setShowNoteModal(true)}
           onReadBlock={toggleReadAloud}
           onOpenWorkspace={() => setIsWorkspaceOpen(true)}
+          onAdminEdit={isAdminMode ? startEditing : undefined}
           onQuizAnswer={handleQuizAnswer}
           onExerciseSubmit={handleExerciseSubmit}
           onShowExerciseHint={(sourceIndex) => setExerciseHintShown((current) => ({ ...current, [sourceIndex]: true }))}
-          onExamSubmit={(sourceIndex) => setExamResult((current) => ({ ...current, [sourceIndex]: 'shown' }))}
+          onExamSubmit={handleExamSubmit}
           onShowExamHint={(sourceIndex) => setExamHintShown((current) => ({ ...current, [sourceIndex]: true }))}
           blockRefs={blockRefs}
           prevLesson={prevLesson}
@@ -1002,6 +1082,50 @@ export const LessonView: React.FC = () => {
           </div>
         </Modal>
 
+        <Modal
+          isOpen={editingBlockIndex !== null}
+          onClose={() => setEditingBlockIndex(null)}
+          title="Edit lesson block"
+        >
+          <div className="space-y-4">
+            <label className="block space-y-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted">Block title</span>
+              <input
+                type="text"
+                value={editTitle}
+                onChange={(event) => setEditTitle(event.target.value)}
+                className="w-full rounded-xl border border-ink/10 bg-surface-low p-3 text-sm text-ink outline-none focus:border-accent/40"
+              />
+            </label>
+            <label className="block space-y-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted">Content (Markdown)</span>
+              <textarea
+                value={editContent}
+                onChange={(event) => setEditContent(event.target.value)}
+                rows={10}
+                className="w-full resize-y rounded-xl border border-ink/10 bg-surface-low p-3 font-mono text-sm text-ink outline-none focus:border-accent/40"
+              />
+            </label>
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setEditingBlockIndex(null)}
+                className="rounded-xl px-4 py-2 text-xs font-bold text-muted hover:text-ink"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={saveEdit}
+                disabled={!editTitle.trim()}
+                className="rounded-xl bg-accent px-5 py-2 text-xs font-bold text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
+              >
+                Save changes
+              </button>
+            </div>
+          </div>
+        </Modal>
+
         <EduWorkspace
           isOpen={isWorkspaceOpen}
           onClose={() => setIsWorkspaceOpen(false)}
@@ -1026,25 +1150,6 @@ export const LessonView: React.FC = () => {
           isOpen={isSupportModalOpen}
           onClose={() => setIsSupportModalOpen(false)}
           grade={currentGrade || "Grade 9"}
-        />
-
-        <AdminLessonEditorModal
-          isOpen={isEditing}
-          onClose={() => setIsEditing(false)}
-          lesson={effectiveLesson}
-          onSave={(updated) => {
-            setSupabaseLesson(prev => {
-              if (!prev) return null;
-              return {
-                ...prev,
-                lesson_title: updated.title || updated.lesson_title || prev.lesson_title,
-                content: updated.content ?? prev.content,
-                blocks: updated.blocks,
-                validation_status: 'teacher_reviewed',
-                status: 'done'
-              };
-            });
-          }}
         />
       </div>
     </Layout>

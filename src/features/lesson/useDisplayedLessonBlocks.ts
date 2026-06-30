@@ -40,10 +40,10 @@ const FRENCH_DOMAIN_KEYWORDS: Record<string, string[]> = {
 };
 
 const PURPOSE_LABELS: Record<PedagogicalPurpose, string> = {
-  objective: 'Objective',
-  definition: 'Definition',
-  key_idea: 'Key idea',
-  explanation: 'Explanation',
+  objective: 'Contenu',
+  definition: 'Contenu',
+  key_idea: 'Contenu',
+  explanation: 'Contenu',
   example: 'Example',
   practice: 'Practice',
   quiz: 'Quick check',
@@ -147,8 +147,19 @@ const getPedagogicalPurpose = (block: any): PedagogicalPurpose => {
   return 'explanation';
 };
 
-const getBlockTitle = (block: any, sourceIndex: number, purpose: PedagogicalPurpose) =>
-  block?.title || block?.label || `${PURPOSE_LABELS[purpose]} ${sourceIndex + 1}`;
+const isContentPurpose = (purpose: PedagogicalPurpose) =>
+  purpose === 'definition' || purpose === 'explanation' || purpose === 'key_idea' || purpose === 'objective';
+
+const getBlockTitle = (block: any, sourceIndex: number, purpose: PedagogicalPurpose, sequence = 0, titleCount = 1) => {
+  if (isContentPurpose(purpose)) {
+    if (titleCount > 1) return '';
+    return block?.title || block?.label || '';
+  }
+  if (purpose === 'quiz') return `Quiz ${sequence}`;
+  if (purpose === 'practice') return `Practice ${sequence}`;
+  if (purpose === 'exam') return `Test my knowledge ${sequence}`;
+  return block?.title || block?.label || `${PURPOSE_LABELS[purpose]} ${sourceIndex + 1}`;
+};
 
 const getBlockPreview = (block: any) => {
   if (block?.question) return truncateText(stripMarkdown(String(block.question)));
@@ -175,15 +186,29 @@ export const useDisplayedLessonBlocks = ({
   isFrenchLesson: boolean;
 }) =>
   useMemo(() => {
-    const allBlocks: DisplayedLessonBlock[] = (blocks || []).map((block, sourceIndex) => {
-      const purpose = getPedagogicalPurpose(block);
+    const sequenceByPurpose: Partial<Record<PedagogicalPurpose, number>> = {};
+    const preparedBlocks = (blocks || []).map((block, sourceIndex) => ({
+      block,
+      sourceIndex,
+      purpose: getPedagogicalPurpose(block),
+    }));
+    const titleCounts = new Map<string, number>();
+    for (const item of preparedBlocks) {
+      if (!isContentPurpose(item.purpose)) continue;
+      const titleKey = normalizeSearchText(String(item.block?.title || item.block?.label || ''));
+      if (!titleKey) continue;
+      titleCounts.set(titleKey, (titleCounts.get(titleKey) || 0) + 1);
+    }
+    const allBlocks: DisplayedLessonBlock[] = preparedBlocks.map(({ block, sourceIndex, purpose }) => {
+      sequenceByPurpose[purpose] = (sequenceByPurpose[purpose] || 0) + 1;
+      const titleKey = normalizeSearchText(String(block?.title || block?.label || ''));
       return {
         id: `block-${sourceIndex}`,
         sourceIndex,
         block,
         purpose,
         label: PURPOSE_LABELS[purpose],
-        title: getBlockTitle(block, sourceIndex, purpose),
+        title: getBlockTitle(block, sourceIndex, purpose, sequenceByPurpose[purpose], titleCounts.get(titleKey) || 1),
         preview: getBlockPreview(block),
         domain: getBlockDomain(block, isFrenchLesson),
       };

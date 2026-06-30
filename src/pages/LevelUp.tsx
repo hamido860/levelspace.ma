@@ -35,6 +35,9 @@ import {
   Lightbulb
 } from 'lucide-react';
 import { Layout } from '../components/Layout';
+import { WorkspaceColumns } from '../components/WorkspaceColumns';
+import { WorkspaceMainPanel } from '../components/WorkspaceMainPanel';
+import { WorkspacePage } from '../components/WorkspacePage';
 import { SEO } from '../components/SEO';
 import { AIAssistant } from '../components/AIAssistant';
 import { useLanguage } from '../context/LanguageContext';
@@ -44,7 +47,6 @@ import { TabbedHeader, TabItem } from '../components/TabbedHeader';
 import { toast } from 'sonner';
 import Markdown from 'react-markdown';
 import remarkMath from 'remark-math';
-import remarkGfm from 'remark-gfm';
 import rehypeKatex from 'rehype-katex';
 import {
   fetchQuranSurahs,
@@ -438,13 +440,12 @@ export const LevelUp: React.FC = () => {
   return (
     <Layout fullWidth>
       <SEO title="LevelUp - Support Hub" />
-      <div className="flex flex-col h-full overflow-hidden p-1 pb-[68px] md:pb-1 bg-background gap-1">
+      <WorkspacePage desktopAt="lg">
         {/* 3-Column Layout */}
-        <div className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-1 overflow-hidden">
+        <WorkspaceColumns rowAt="lg">
 
           {/* Column 2: Main Content */}
-          <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 p-6">
-            <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6">
+          <WorkspaceMainPanel>
 
         {/* Compact Shared Flat Tab Header */}
         <TabbedHeader
@@ -595,7 +596,7 @@ export const LevelUp: React.FC = () => {
 
             </div>
 
-          </div>
+              </div>
         )}
 
         {/* ─── TAB 2: RESOURCE VAULT (FREE EBOOKS & OUTSOURCES) ─── */}
@@ -1035,8 +1036,7 @@ export const LevelUp: React.FC = () => {
           </div>
         )}
 
-            </div>
-          </div>
+          </WorkspaceMainPanel>
 
           {/* Column 3: Right Sidebar */}
           <div className="hidden lg:flex lg:w-[260px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-5">
@@ -1154,76 +1154,77 @@ export const LevelUp: React.FC = () => {
             </div>
           </div>
 
-        </div>
-      </div>
+        </WorkspaceColumns>
+      </WorkspacePage>
 
       {/* ─── DYNAMIC COGNITIVE AI EXPLAINER PANEL (POPUP OR CARD OVERLAY) ─── */}
       <AnimatePresence>
         {explainerOpen && selectedGap && (
-          <div className="fixed inset-0 z-50 flex items-center justify-end bg-slate-950/20 backdrop-blur-sm animate-fadeIn">
+          <div className="fixed inset-0 z-50 flex items-stretch justify-end bg-slate-950/40 backdrop-blur-sm animate-fadeIn">
             <motion.div
               initial={{ x: '100%' }}
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="w-full max-w-xl h-full bg-paper border-l border-ink/10 shadow-2xl flex flex-col justify-between overflow-hidden relative"
+              transition={{ type: 'spring', damping: 30, stiffness: 240 }}
+              className="h-full w-full max-w-[720px] overflow-hidden border-l border-white/10 bg-[#171c23] text-slate-100 shadow-2xl"
             >
               {/* Top Banner */}
-              <div className="p-6 bg-slate-950 text-white flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-accent">
-                    <Brain className="w-5 h-5 shrink-0 animate-pulse" />
+              <div className="flex shrink-0 items-center justify-between bg-[#000417] px-8 py-8 text-white">
+                <div className="flex min-w-0 items-center gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-500/10 text-blue-400 ring-1 ring-blue-500/20">
+                    <Brain className="h-6 w-6 shrink-0" />
                   </div>
-                  <div className="text-left">
-                    <h3 className="text-sm font-bold truncate max-w-[280px]">{selectedGap.concept}</h3>
-                    <p className="text-[10px] text-white/50 tracking-wider uppercase font-mono mt-0.5">{selectedGap.subject} • AI SUPPORT ACTIVE</p>
+                  <div className="min-w-0 text-left">
+                    <h3 className="truncate text-xl font-bold tracking-tight text-white">{selectedGap.concept}</h3>
+                    <p className="mt-1 font-mono text-xs uppercase tracking-[0.24em] text-white/45">{selectedGap.subject} • AI SUPPORT ACTIVE</p>
                   </div>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setExplainerOpen(false)}
-                  className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-all text-white/60 hover:text-white"
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/5 text-white/55 transition-all hover:bg-white/10 hover:text-white"
                 >
-                  <X size={16} />
+                  <X size={24} />
                 </button>
               </div>
 
               {/* Explainer Body */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin scroll-smooth no-scrollbar">
+              <div className="h-[calc(100%-7rem)] overflow-y-auto px-8 py-8 custom-scrollbar">
                 
                 {aiResponding ? (
-                  <div className="flex flex-col items-center justify-center h-48 space-y-3 text-slate-400">
-                    <Loader2 className="w-6 h-6 animate-spin text-accent" />
+                  <div className="flex h-64 flex-col items-center justify-center space-y-3 text-slate-400">
+                    <Loader2 className="h-7 w-7 animate-spin text-blue-400" />
                     <span className="text-xs font-mono">Synthesizing pedagogical guide parameters...</span>
                   </div>
                 ) : (
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="space-y-6 text-left"
+                    className="space-y-8 text-left"
                   >
                     {/* Visual warning of the gap */}
                     {!selectedGap.solved && (
-                      <div className="p-4 bg-amber-500/5 border border-amber-500/10 rounded-2xl flex gap-3 text-xs leading-relaxed">
-                        <AlertTriangle className="w-4.5 h-4.5 text-amber-500 shrink-0 mt-0.5" />
-                        <p className="text-amber-800 dark:text-amber-400 font-medium">
+                      <div className="flex gap-5 rounded-[1.35rem] border border-amber-500/20 bg-amber-500/[0.08] px-6 py-5 text-base leading-relaxed">
+                        <AlertTriangle className="mt-1 h-5 w-5 shrink-0 text-amber-400" />
+                        <p className="font-semibold text-amber-300">
                           Concept flagged during recent {selectedGap.failedIn}. Study the AI tutorial review below, then answer the verification question to bridge the gap.
                         </p>
                       </div>
                     )}
 
                     {selectedGap.solved && (
-                      <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex gap-3 text-xs leading-relaxed">
-                        <CheckCircle2 className="w-4.5 h-4.5 text-emerald-500 shrink-0 mt-0.5" />
-                        <p className="text-emerald-800 dark:text-emerald-400 font-bold">
+                      <div className="flex gap-5 rounded-[1.35rem] border border-emerald-500/20 bg-emerald-500/10 px-6 py-5 text-base leading-relaxed">
+                        <CheckCircle2 className="mt-1 h-5 w-5 shrink-0 text-emerald-400" />
+                        <p className="font-semibold text-emerald-300">
                           Gap Bridged! You have verified your mastery over this concept. Click review to refresh anytime.
                         </p>
                       </div>
                     )}
 
                     {/* Tutorial content */}
-                    <div className="prose prose-slate dark:prose-invert max-w-none text-sm text-slate-800 dark:text-ink-secondary leading-relaxed font-sans space-y-4">
+                    <div className="prose prose-invert max-w-none text-[1.05rem] leading-8 text-slate-200 prose-p:leading-8 prose-li:leading-8 prose-strong:text-white prose-ol:pl-6 prose-li:marker:text-slate-500 prose-code:text-blue-200">
                       <Markdown 
-                        remarkPlugins={[remarkMath, remarkGfm]} 
+                        remarkPlugins={[remarkMath]} 
                         rehypePlugins={[rehypeKatex]}
                       >
                         {selectedGap.explanationSnippet}
@@ -1231,33 +1232,33 @@ export const LevelUp: React.FC = () => {
                     </div>
 
                     {/* Verification Quiz Block */}
-                    <div className="border-t border-ink/5 pt-5 space-y-4">
+                    <div className="space-y-5 border-t border-white/10 pt-6">
                       <div className="flex items-center gap-2">
-                        <Award size={16} className="text-accent" />
-                        <span className="text-[10px] font-black uppercase text-ink-muted tracking-wider">Bridge-the-Gap Verification Task</span>
+                        <Award size={18} className="text-blue-400" />
+                        <span className="text-sm font-black uppercase tracking-wider text-slate-400">Bridge-the-Gap Verification Task</span>
                       </div>
 
-                      <div className="p-5 bg-background/40 border border-ink/5 rounded-2xl space-y-4">
-                        <p className="text-xs font-bold text-ink leading-relaxed">
+                      <div className="space-y-4 rounded-[1.35rem] border border-white/10 bg-[#111820] p-6">
+                        <p className="text-base font-bold leading-relaxed text-white">
                           {selectedGap.solutionQuestion}
                         </p>
 
-                        <div className="space-y-2">
+                        <div className="space-y-3">
                           {selectedGap.solutionOptions.map((opt, oIdx) => {
                             const isSelected = selectedOptionIndex === oIdx;
                             const isCorrectAnswer = oIdx === selectedGap.correctOptionIndex;
 
-                            let optStyle = 'border-ink/5 bg-paper/50 hover:bg-paper';
+                            let optStyle = 'border-white/10 bg-white/[0.03] text-slate-200 hover:bg-white/[0.06]';
                             if (isSelected) {
-                              optStyle = 'border-accent bg-accent/5 ring-1 ring-accent';
+                              optStyle = 'border-blue-400 bg-blue-500/10 text-white ring-1 ring-blue-400';
                             }
                             if (isQuizChecked) {
                               if (isCorrectAnswer) {
-                                optStyle = 'border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-bold';
+                                optStyle = 'border-emerald-400 bg-emerald-500/10 text-emerald-300 font-bold';
                               } else if (isSelected && !isCorrectAnswer) {
-                                optStyle = 'border-red-500 bg-red-500/10 text-red-700 dark:text-red-400';
+                                optStyle = 'border-red-400 bg-red-500/10 text-red-300';
                               } else {
-                                optStyle = 'border-ink/5 opacity-50 bg-paper/20';
+                                optStyle = 'border-white/10 bg-white/[0.02] text-slate-500';
                               }
                             }
 
@@ -1267,7 +1268,7 @@ export const LevelUp: React.FC = () => {
                                 type="button"
                                 onClick={() => handleOptionSelect(oIdx)}
                                 disabled={isQuizChecked}
-                                className={`w-full text-left p-3.5 rounded-xl border text-xs leading-tight transition-all duration-300 cursor-pointer ${optStyle}`}
+                                className={`w-full rounded-xl border p-4 text-left text-sm leading-snug transition-all duration-300 cursor-pointer disabled:cursor-default ${optStyle}`}
                               >
                                 {opt}
                               </button>
@@ -1280,13 +1281,13 @@ export const LevelUp: React.FC = () => {
                             type="button"
                             onClick={checkBridgeSuccess}
                             disabled={selectedOptionIndex === null}
-                            className="w-full py-3 bg-slate-950 hover:bg-accent text-white rounded-xl text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                            className="w-full rounded-xl bg-blue-600 py-4 text-sm font-bold text-white transition-all hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             Submit Answer & Clear Gap
                           </button>
                         ) : (
-                          <div className={`p-4.5 rounded-xl border text-center text-xs font-bold leading-normal ${
-                            isAnswerCorrect ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-700 dark:text-emerald-400' : 'bg-red-500/10 border-red-500/20 text-red-700 dark:text-red-400'
+                          <div className={`rounded-xl border p-4 text-center text-sm font-bold leading-normal ${
+                            isAnswerCorrect ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-300' : 'border-red-500/25 bg-red-500/10 text-red-300'
                           }`}>
                             {isAnswerCorrect 
                               ? "Excellent! Verification success. The knowledge gap has been fully reconciled." 
@@ -1336,7 +1337,7 @@ export const LevelUp: React.FC = () => {
 
               <div className="flex-grow overflow-y-auto no-scrollbar prose prose-slate dark:prose-invert max-w-none text-left p-2">
                 <Markdown 
-                  remarkPlugins={[remarkMath, remarkGfm]} 
+                  remarkPlugins={[remarkMath]} 
                   rehypePlugins={[rehypeKatex]}
                 >
                   {selectedResource.content || '# Content Not Loaded'}

@@ -1,3 +1,5 @@
+import { getPlatformAiKey } from "../../envDiagnostics";
+
 export type OpenRouterGenerateOptions = {
   prompt: string;
   apiKey?: string;
@@ -10,7 +12,7 @@ export type OpenRouterGenerateOptions = {
 
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
 
-const getOpenRouterApiKey = () => process.env.OPENROUTER_API_KEY || "";
+const getOpenRouterApiKey = () => getPlatformAiKey("openrouter");
 
 export async function generateWithOpenRouter(options: OpenRouterGenerateOptions) {
   const apiKey = options.apiKey || getOpenRouterApiKey();

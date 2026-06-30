@@ -48,6 +48,8 @@ export interface Lesson {
   country?: string;
   subject?: string;
   topic_id?: string;
+  track_id?: string;
+  instruction_option_id?: string;
   sourceLessonId?: string;
   teaching_contract?: unknown;
   validation_status?: string;

@@ -1,3 +1,5 @@
+import { getPlatformAiKey } from "../../envDiagnostics";
+
 export type GeminiGenerateOptions = {
   prompt: string;
   apiKey?: string;
@@ -10,17 +12,12 @@ export type GeminiGenerateOptions = {
 
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 
-const getGeminiApiKey = () =>
-  process.env.GEMINI_API_KEY ||
-  process.env.GEMINI_KEY_0 ||
-  process.env.AI_API_KEY ||
-  process.env.VITE_AI_API_KEY ||
-  "";
+const getGeminiApiKey = () => getPlatformAiKey("gemini");
 
 export async function generateWithGemini(options: GeminiGenerateOptions) {
   const apiKey = options.apiKey || getGeminiApiKey();
   if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
-    throw new Error("Gemini provider is not configured. Set GEMINI_API_KEY or AI_API_KEY in environment variables.");
+    throw new Error("Gemini provider is not configured. Set GEMINI_API_KEY in environment variables.");
   }
 
   const model = options.model || process.env.GEMINI_MODEL || "gemini-2.5-flash";
@@ -70,7 +67,7 @@ export async function generateWithGemini(options: GeminiGenerateOptions) {
 export async function embedWithGemini(text: string) {
   const apiKey = getGeminiApiKey();
   if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
-    throw new Error("Gemini provider is not configured. Set GEMINI_API_KEY or AI_API_KEY in environment variables.");
+    throw new Error("Gemini provider is not configured. Set GEMINI_API_KEY in environment variables.");
   }
 
   const model = process.env.GEMINI_EMBEDDING_MODEL || "gemini-embedding-2-preview";

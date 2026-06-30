@@ -39,6 +39,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { updateProfile } from '../db/supabase';
 import { AiKeysModal } from '../components/settings/AiKeysModal';
+import { getAcademicIdentity, isMoroccanBacIdentity } from '../services/academicIdentity';
 
 const parseStoredArray = (value: unknown): string[] => {
   if (Array.isArray(value)) return value.filter((item): item is string => typeof item === 'string');
@@ -110,9 +111,7 @@ const PROVIDER_MODELS = {
     { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet', desc: 'Supreme general intelligence & code synthesis', speed: '720ms', cost: 'High' }
   ],
   nvidia: [
-    { id: 'meta/llama-3.3-70b-instruct', name: 'Llama 3.3 70B', desc: 'Default NIM model for complex reasoning', speed: '280ms', cost: 'Medium' },
-    { id: 'meta/llama-3.1-405b-instruct', name: 'Llama 3.1 405B', desc: 'Massive model for highest quality outputs', speed: '550ms', cost: 'High' },
-    { id: 'google/gemma-2-27b-it', name: 'Gemma 2 27B', desc: 'Fast, efficient Google model', speed: '200ms', cost: 'Low' }
+    { id: 'google/gemma-3-27b-it', name: 'Gemma 3 27B', desc: 'Moroccan lesson generation default NIM model', speed: '280ms', cost: 'Server Credits' }
   ]
 };
 
@@ -143,45 +142,6 @@ export const Settings: React.FC = () => {
 
   const [dbBacTracks, setDbBacTracks] = useState<any[]>([]);
   const [dbBacIntOptions, setDbBacIntOptions] = useState<any[]>([]);
-
-  const dynamicSections = useMemo(() => {
-    const sectionsMap = new Map();
-    dbBacTracks.forEach(t => {
-      const sectionId = t.section_id || t.metadata?.bac_section_id || t.metadata?.section_id;
-      if (sectionId) {
-        sectionsMap.set(sectionId, {
-          id: sectionId,
-          name: t.metadata?.bac_section_name || t.metadata?.bac_section_code || 'Other',
-          code: t.metadata?.bac_section_code || 'OTHER'
-        });
-      }
-    });
-    return Array.from(sectionsMap.values());
-  }, [dbBacTracks]);
-
-  const hasTracks = useMemo(() => {
-    if (!selectedGradeId) return false;
-    const hasGradeIdMapping = dbBacTracks.some((t) => t.grade_id !== null);
-    if (hasGradeIdMapping) {
-      return dbBacTracks.some((t) => t.grade_id === selectedGradeId);
-    }
-    return selectedGrade.includes('Bac') && !selectedGrade.includes('Tronc Commun');
-  }, [selectedGradeId, selectedGrade, dbBacTracks]);
-
-  const displayTracks = useMemo(() => {
-    let list = dbBacTracks;
-    const hasGradeIdMapping = dbBacTracks.some((t) => t.grade_id !== null);
-    if (hasGradeIdMapping && selectedGradeId) {
-      list = dbBacTracks.filter((t) => t.grade_id === selectedGradeId);
-    }
-    if (bacSection) {
-      list = list.filter((track) => {
-        const secId = track.section_id || track.metadata?.bac_section_id || track.metadata?.section_id;
-        return secId === bacSection;
-      });
-    }
-    return list;
-  }, [selectedGradeId, dbBacTracks, bacSection]);
 
   const [currentSession, setCurrentSession] = useState<string>('Fall 2024');
   const [defaultDuration, setDefaultDuration] = useState<number>(60);
@@ -234,7 +194,7 @@ export const Settings: React.FC = () => {
     const duration = getStoredValue('default_session_duration');
     const section = getStoredValue('selected_bac_section');
     const track = getStoredValue('selected_bac_track');
-    const option = getStoredValue('selected_bac_int_option');
+    const option = getStoredValue('selected_bac_int_option') || getStoredValue('selected_option');
     const storedAiProvider = getStoredValue('ai_provider');
     const storedAiModel = getStoredValue('ai_model');
     const storedAiFallbackEnabled = getStoredValue('ai_fallback_enabled');
@@ -333,11 +293,11 @@ export const Settings: React.FC = () => {
         if (Object.keys(gradesMap).length > 0) setDbGrades(gradesMap);
         if (Object.keys(gradeOptionsMap).length > 0) setDbGradeOptions(gradeOptionsMap);
 
-        // Fetch tracks and instruction options
-        const { data: tracksData } = await supabase.from('tracks').select('id, name, grade_id, track_order, metadata');
+        // Canonical academic identity data. Legacy bac_* tables are not used by the frontend.
+        const { data: tracksData } = await supabase.from('tracks').select('*').order('track_order');
         if (tracksData) setDbBacTracks(tracksData);
         
-        const { data: intOptionsData } = await supabase.from('instruction_options').select('id, name, option_code, language_code');
+        const { data: intOptionsData } = await supabase.from('instruction_options').select('*').order('name');
         if (intOptionsData) setDbBacIntOptions(intOptionsData);
       } catch (err) {
         console.error("Failed to fetch metadata", err);
@@ -374,30 +334,29 @@ export const Settings: React.FC = () => {
   );
 
   const currentCountryName = availableCountries.find(c => c.code === selectedCountry)?.name || selectedCountry;
-  const selectedSectionName = dynamicSections.find((section: any) => section.id === bacSection)?.name || '';
   const selectedTrackName = dbBacTracks.find((track) => track.id === bacTrack)?.name || '';
   const selectedInstructionOption = dbBacIntOptions.find((option) => option.id === bacIntOption);
   const selectedOptionName = selectedInstructionOption?.name || '';
-  const selectedOptionCode = selectedInstructionOption?.option_code || selectedInstructionOption?.name || '';
+  const lockedIdentity = getAcademicIdentity({
+    settings: settingsMap,
+    profile,
+    gradeId: profile?.grade_id || profile?.selected_grade_id || settingsMap.selected_grade_id || selectedGradeId,
+    gradeName: profile?.selected_grade || settingsMap.selected_grade || selectedGrade,
+  });
   const lockedAcademicValues = useMemo(() => ({
-    selected_country: String(settingsMap.selected_country || 'Morocco'),
-    selected_grade_id: String(profile?.selected_grade_id || settingsMap.selected_grade_id || selectedGradeId || ''),
-    selected_grade: String(profile?.selected_grade || settingsMap.selected_grade || selectedGrade),
+    selected_country: lockedIdentity.country,
+    selected_grade_id: lockedIdentity.gradeId,
+    selected_grade: lockedIdentity.gradeName,
     selected_bac_section: String(settingsMap.selected_bac_section || ''),
-    selected_bac_track: String(profile?.selected_bac_track || settingsMap.selected_bac_track || ''),
-    selected_bac_int_option: String(settingsMap.selected_bac_int_option || ''),
+    selected_bac_track: lockedIdentity.trackId,
+    selected_bac_int_option: lockedIdentity.instructionOptionId,
   }), [
-    profile?.selected_bac_track,
-    profile?.selected_grade,
-    profile?.selected_grade_id,
-    selectedGradeId,
-    selectedGrade,
-    settingsMap.selected_bac_int_option,
+    lockedIdentity.country,
+    lockedIdentity.gradeId,
+    lockedIdentity.gradeName,
+    lockedIdentity.instructionOptionId,
+    lockedIdentity.trackId,
     settingsMap.selected_bac_section,
-    settingsMap.selected_grade_id,
-    settingsMap.selected_bac_track,
-    settingsMap.selected_country,
-    settingsMap.selected_grade,
   ]);
   const lockedAcademicSyncKey = useRef('');
 
@@ -419,6 +378,7 @@ export const Settings: React.FC = () => {
     lockedAcademicSyncKey.current = nextSyncKey;
 
     setSelectedCountry(lockedAcademicValues.selected_country);
+    setSelectedGradeId(lockedAcademicValues.selected_grade_id);
     setSelectedGrade(lockedAcademicValues.selected_grade);
     setBacSection(lockedAcademicValues.selected_bac_section);
     setBacTrack(lockedAcademicValues.selected_bac_track);
@@ -427,11 +387,15 @@ export const Settings: React.FC = () => {
     for (const key of ACADEMIC_SETTING_KEYS) {
       localStorage.setItem(key, lockedAcademicValues[key]);
     }
+    localStorage.setItem('selected_option', lockedAcademicValues.selected_bac_int_option);
 
-    db.settings.bulkPut(ACADEMIC_SETTING_KEYS.map((key) => ({
-      key,
-      value: lockedAcademicValues[key],
-    }))).catch((err) => {
+    db.settings.bulkPut([
+      ...ACADEMIC_SETTING_KEYS.map((key) => ({
+        key,
+        value: lockedAcademicValues[key],
+      })),
+      { key: 'selected_option', value: lockedAcademicValues.selected_bac_int_option },
+    ]).catch((err) => {
       console.error('Failed to restore locked academic settings:', err);
     });
   }, [isAdmin, isLocked, lockedAcademicValues]);
@@ -441,7 +405,7 @@ export const Settings: React.FC = () => {
       ? lockedAcademicValues.selected_grade_id
       : selectedGradeId || await resolveSelectedGradeId(selectedGrade);
 
-    const academicValues = isLocked && !isAdmin
+    const rawAcademicValues = isLocked && !isAdmin
       ? lockedAcademicValues
       : {
         selected_country: selectedCountry,
@@ -451,6 +415,18 @@ export const Settings: React.FC = () => {
         selected_bac_track: bacTrack,
         selected_bac_int_option: bacIntOption,
       };
+    const identity = getAcademicIdentity({
+      country: rawAcademicValues.selected_country,
+      gradeId: rawAcademicValues.selected_grade_id,
+      gradeName: rawAcademicValues.selected_grade,
+      trackId: rawAcademicValues.selected_bac_track,
+      instructionOptionId: rawAcademicValues.selected_bac_int_option,
+    });
+    const academicValues = {
+      ...rawAcademicValues,
+      selected_bac_track: identity.trackId,
+      selected_bac_int_option: identity.instructionOptionId,
+    };
 
     localStorage.setItem('selected_country', academicValues.selected_country);
     localStorage.setItem('selected_grade_id', academicValues.selected_grade_id);
@@ -460,6 +436,7 @@ export const Settings: React.FC = () => {
     localStorage.setItem('selected_bac_section', academicValues.selected_bac_section);
     localStorage.setItem('selected_bac_track', academicValues.selected_bac_track);
     localStorage.setItem('selected_bac_int_option', academicValues.selected_bac_int_option);
+    localStorage.setItem('selected_option', academicValues.selected_bac_int_option);
     localStorage.setItem('ai_provider', aiProvider);
     localStorage.setItem('ai_model', aiModel);
     localStorage.setItem('ai_fallback_enabled', String(aiFallbackEnabled));
@@ -479,6 +456,7 @@ export const Settings: React.FC = () => {
       { key: 'selected_bac_section', value: academicValues.selected_bac_section },
       { key: 'selected_bac_track', value: academicValues.selected_bac_track },
       { key: 'selected_bac_int_option', value: academicValues.selected_bac_int_option },
+      { key: 'selected_option', value: academicValues.selected_bac_int_option },
       { key: 'ai_provider', value: aiProvider },
       { key: 'ai_model', value: aiModel },
       { key: 'ai_fallback_enabled', value: aiFallbackEnabled },
@@ -497,8 +475,7 @@ export const Settings: React.FC = () => {
           instruction_option_id: academicValues.selected_bac_int_option || null,
           track_id: academicValues.selected_bac_track || null,
           selected_grade: academicValues.selected_grade,
-          selected_grade_id: academicValues.selected_grade_id || null,
-          selected_option: selectedOptionCode || null,
+          selected_option: academicValues.selected_bac_int_option || null,
           selected_bac_track: academicValues.selected_bac_track || null,
           onboarding_completed: true,
         });
@@ -522,10 +499,10 @@ export const Settings: React.FC = () => {
   return (
     <Layout fullWidth>
       <SEO title="Settings" />
-      <div className="flex flex-col h-full overflow-hidden p-1 pb-[68px] md:pb-1 bg-background gap-1">
-        <div className="flex-1 min-h-0 w-full flex flex-col lg:flex-row gap-1">
-          <div className="flex-1 min-w-0 flex flex-col min-h-0 rounded-xl border border-slate-200 bg-white p-5 shadow-lg dark:border-white/8 dark:bg-paper md:p-6 overflow-hidden">
-            <div className="flex-1 min-h-0 overflow-y-auto pr-1 no-scrollbar">
+      <div className="min-h-full w-full bg-background flex flex-col overflow-y-auto p-4 pb-24 lg:h-full lg:overflow-hidden lg:pb-4">
+        <div className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-4 overflow-visible lg:overflow-hidden">
+          <main className="flex-grow flex flex-col min-h-0 w-full overflow-visible rounded-xl border border-slate-200 bg-white p-5 shadow-lg dark:border-white/8 dark:bg-paper md:p-6 lg:overflow-hidden">
+            <div className="flex-grow overflow-visible pr-0 lg:overflow-y-auto lg:pr-1 lg:no-scrollbar">
         {/* Page Header */}
         <div className="border-b border-slate-100 dark:border-white/5 pb-5 mb-6">
           <h1 className="ls-page-title text-slate-950 dark:text-ink">
@@ -593,7 +570,7 @@ export const Settings: React.FC = () => {
                 </div>
                 <div className="min-w-0 space-y-1 rounded-xl border border-ink/5 bg-surface-low p-4">
                   <span className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('track')}</span>
-                  <p className="truncate text-sm font-semibold text-ink">{selectedTrackName || selectedSectionName || t('not_set')}</p>
+                  <p className="truncate text-sm font-semibold text-ink">{selectedTrackName || t('not_set')}</p>
                   {selectedOptionName && <p className="text-[11px] text-muted">{selectedOptionName}</p>}
                 </div>
               </div>
@@ -736,74 +713,37 @@ export const Settings: React.FC = () => {
                     </div>
                   </div>
 
-                  {selectedCountry === 'Morocco' && hasTracks && (
+                  {isMoroccanBacIdentity(selectedCountry, selectedGrade) && (
                     <div className="space-y-4">
-                      {dynamicSections.length > 0 && (
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('section')}</label>
-                          <div className="grid grid-cols-1 gap-2 max-h-[180px] overflow-y-auto pr-2 custom-scrollbar">
-                            {dynamicSections.map((section: any) => (
-                              <button
-                                key={section.id}
-                                onClick={() => {
-                                  setBacSection(section.id);
-                                  setBacTrack('');
-                                  setBacIntOption('');
-                                }}
-                                className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
-                                  bacSection === section.id
-                                    ? 'bg-accent border-accent text-paper shadow-sm shadow-accent/20'
-                                    : 'bg-background border-ink/5 text-ink hover:border-accent/30'
-                                }`}
-                              >
-                                <span className="text-xs font-medium text-left pr-2">{section.name}</span>
-                                {bacSection === section.id && <CheckCircle2 className="w-3.5 h-3.5 text-paper shrink-0" />}
-                              </button>
-                            ))}
-                          </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('track')}</label>
+                        <div className="grid grid-cols-1 gap-2 max-h-[180px] overflow-y-auto pr-2 custom-scrollbar">
+                          {dbBacTracks
+                            .filter((track) => !track.grade_id || track.grade_id === selectedGradeId)
+                            .map((track) => (
+                            <button
+                              key={track.id}
+                              onClick={() => {
+                                setBacTrack(track.id);
+                                setBacIntOption('');
+                              }}
+                              className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
+                                bacTrack === track.id
+                                  ? 'bg-accent border-accent text-paper shadow-sm shadow-accent/20'
+                                  : 'bg-background border-ink/5 text-ink hover:border-accent/30'
+                              }`}
+                            >
+                              <span className="text-xs font-medium text-left pr-2">{track.name}</span>
+                              {bacTrack === track.id && <CheckCircle2 className="w-3.5 h-3.5 text-paper shrink-0" />}
+                            </button>
+                          ))}
                         </div>
-                      )}
-
-                      {(bacSection || dynamicSections.length === 0) && (
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('track')}</label>
-                          <div className="grid grid-cols-1 gap-2 max-h-[180px] overflow-y-auto pr-2 custom-scrollbar">
-                            {displayTracks.map((track) => (
-                              <button
-                                key={track.id}
-                                onClick={() => {
-                                  setBacTrack(track.id);
-                                  setBacIntOption('');
-                                }}
-                                className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
-                                  bacTrack === track.id
-                                    ? 'bg-accent border-accent text-paper shadow-sm shadow-accent/20'
-                                    : 'bg-background border-ink/5 text-ink hover:border-accent/30'
-                                }`}
-                              >
-                                <span className="text-xs font-medium text-left pr-2">{track.name}</span>
-                                {bacTrack === track.id && <CheckCircle2 className="w-3.5 h-3.5 text-paper shrink-0" />}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                      </div>
 
                       {bacTrack && dbBacIntOptions.length > 0 && (
                         <div className="space-y-2">
                           <label className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('international_option')}</label>
                           <div className="grid grid-cols-1 gap-2 max-h-[180px] overflow-y-auto pr-2 custom-scrollbar">
-                            <button
-                              onClick={() => setBacIntOption('')}
-                              className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
-                                  bacIntOption === ''
-                                    ? 'bg-accent border-accent text-paper shadow-sm shadow-accent/20'
-                                    : 'bg-background border-ink/5 text-ink hover:border-accent/30'
-                              }`}
-                            >
-                              <span className="text-xs font-medium text-left pr-2">{t('none')}</span>
-                              {bacIntOption === '' && <CheckCircle2 className="w-3.5 h-3.5 text-paper shrink-0" />}
-                            </button>
                             {dbBacIntOptions.map((option) => (
                               <button
                                 key={option.id}
@@ -972,7 +912,7 @@ export const Settings: React.FC = () => {
                           type="button"
                           onClick={() => {
                             setAiProvider(provider);
-                            const defaults = { gemini: 'gemini-2.5-flash', nvidia: 'meta/llama-3.3-70b-instruct', openrouter: 'openai/gpt-4o-mini', openai: 'gpt-4o-mini' } as const;
+                            const defaults = { gemini: 'gemini-2.5-flash', nvidia: 'google/gemma-3-27b-it', openrouter: 'openai/gpt-4o-mini', openai: 'gpt-4o-mini' } as const;
                             setAiModel(aiStatus?.models?.[provider] || defaults[provider]);
                           }}
                           className={`p-3 rounded-2xl border text-left transition-all duration-300 flex flex-col justify-between h-20 cursor-pointer ${providerStyles[provider]}`}
@@ -1607,10 +1547,10 @@ export const Settings: React.FC = () => {
         )}
 
             </div>
-          </div>
+          </main>
 
-          <aside className="flex lg:w-[234px] w-full shrink-0 h-full overflow-hidden rounded-xl border border-slate-200 bg-white p-5 shadow-lg dark:border-white/8 dark:bg-paper flex-col">
-            <div className="flex-grow space-y-5 overflow-y-auto pr-1 no-scrollbar">
+          <aside className="flex lg:w-[234px] w-full shrink-0 lg:h-full overflow-visible rounded-xl border border-slate-200 bg-white p-5 shadow-lg dark:border-white/8 dark:bg-paper flex-col lg:overflow-hidden">
+            <div className="flex-grow space-y-5 overflow-visible pr-0 lg:overflow-y-auto lg:pr-1 lg:no-scrollbar">
               <section className="rounded-2xl bg-slate-950 p-5 text-white">
                 <p className="mb-2 text-[10px] font-bold uppercase tracking-normal text-slate-400">{t('session')}</p>
                 <p className="text-2xl font-bold leading-tight">{currentSession}</p>

@@ -2,10 +2,20 @@ import { embedWithGemini, generateWithGemini } from "./providers/gemini";
 import { generateWithNvidia } from "./providers/nvidia";
 import { generateWithOpenAI } from "./providers/openai";
 import { generateWithOpenRouter } from "./providers/openrouter";
-import { getDecryptedUserAiKey, normalizeUserAiProvider } from "../../server/aiKeys";
+import { getDecryptedUserAiKey, getDevAdminOwnerRef, normalizeUserAiProvider } from "../../server/aiKeys";
 import { getServerSupabase } from "../../server/api/aiCommandCenter";
+import {
+  getDevAdminAiKey,
+  getEnvDiagnostics,
+  getPlatformAiKey,
+  isDevAdminAiKeyModeEnabled,
+  isProductionLike,
+  normalizeAiProvider,
+  readBooleanEnv,
+  type SupportedAiProvider,
+} from "../envDiagnostics";
 
-export type AIProviderName = "gemini" | "nvidia" | "openrouter" | "openai";
+export type AIProviderName = SupportedAiProvider;
 export type AICredentialMode = "byok" | "platform";
 
 export type GenerateAIResponseInput = {
@@ -31,89 +41,55 @@ export type GenerateAIResponseResult = {
 
 const MISSING_PROVIDER_MESSAGE = "No AI provider configured";
 
-const normalizeProvider = (value: unknown): AIProviderName | null => {
-  const provider = String(value || "").toLowerCase();
-  if (provider === "gemini" || provider === "nvidia" || provider === "openrouter" || provider === "openai") return provider;
-  return null;
-};
-
-const isTruthy = (value: unknown) => ["1", "true", "yes", "on"].includes(String(value || "").toLowerCase());
-const isProductionLike = () => process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
-
-// DEV ONLY - remove after auth is implemented
-export const isDevAdminAiKeyModeEnabled = () => {
-  const explicitlyEnabled = isTruthy(process.env.ENABLE_DEV_ADMIN_AI_KEYS) || isTruthy(process.env.NEXT_PUBLIC_ENABLE_DEV_ADMIN_AI_KEYS);
-  return explicitlyEnabled && !isProductionLike();
-};
-
-const getDevAdminKey = (provider: AIProviderName) => {
-  if (!isDevAdminAiKeyModeEnabled()) return "";
-  if (provider === "gemini") return process.env.DEV_ADMIN_GEMINI_API_KEY || "";
-  if (provider === "nvidia") return process.env.DEV_ADMIN_NVIDIA_API_KEY || process.env.NVIDIA_API_KEY || "";
-  if (provider === "openrouter") return process.env.DEV_ADMIN_OPENROUTER_API_KEY || "";
-  return "";
-};
-
 export const getDevAdminAiStatus = () => {
   const enabled = isDevAdminAiKeyModeEnabled();
   const providers = {
-    gemini: Boolean(enabled && process.env.DEV_ADMIN_GEMINI_API_KEY),
-    nvidia: Boolean(enabled && (process.env.DEV_ADMIN_NVIDIA_API_KEY || process.env.NVIDIA_API_KEY)),
-    openrouter: Boolean(enabled && process.env.DEV_ADMIN_OPENROUTER_API_KEY),
-    openai: false,
+    gemini: Boolean(enabled && getDevAdminAiKey("gemini")),
+    nvidia: Boolean(enabled && getDevAdminAiKey("nvidia")),
+    openrouter: Boolean(enabled && getDevAdminAiKey("openrouter")),
+    openai: Boolean(enabled && getDevAdminAiKey("openai")),
   };
 
   return {
     enabled,
     providers,
-    defaultProvider: normalizeProvider(process.env.DEV_ADMIN_AI_PROVIDER) || null,
+    defaultProvider: normalizeAiProvider(process.env.DEV_ADMIN_AI_PROVIDER) || null,
   };
 };
 
 const isMissingProviderError = (error: unknown) =>
   error instanceof Error && /no ai provider configured|not configured|API_KEY|environment variables/i.test(error.message);
 
-const cleanKey = (value: string | undefined) => String(value || "").trim().replace(/^["']|["']$/g, "");
-
-const isPlausibleProviderKey = (provider: AIProviderName, key: string) => {
-  if (!key) return false;
-  if (provider === "gemini") return key.startsWith("AIza");
-  if (provider === "openrouter") return key.startsWith("sk-or-");
-  if (provider === "openai") return key.startsWith("sk-") && !key.startsWith("sk-or-");
-  if (provider === "nvidia") return key.startsWith("nvapi-");
-  return false;
-};
-
-const getPlatformKey = (provider: AIProviderName) => {
-  const firstPlausible = (...values: Array<string | undefined>) =>
-    values.map(cleanKey).find((key) => isPlausibleProviderKey(provider, key)) || "";
-
-  if (provider === "gemini") {
-    return firstPlausible(process.env.GEMINI_API_KEY, process.env.GEMINI_KEY_0, process.env.AI_API_KEY, process.env.VITE_AI_API_KEY);
-  }
-  if (provider === "openrouter") return firstPlausible(process.env.OPENROUTER_API_KEY);
-  if (provider === "openai") return firstPlausible(process.env.OPENAI_API_KEY);
-  if (provider === "nvidia") return firstPlausible(process.env.NVIDIA_API_KEY);
-  return "";
-};
-
 const isPlatformEnabled = () => process.env.AI_PLATFORM_CREDITS_ENABLED !== "false";
 
+const tryGetSavedAiKey = async (ownerRef: string, provider: AIProviderName) => {
+  const savedProvider = normalizeUserAiProvider(provider);
+  if (!savedProvider) return null;
+
+  try {
+    return await getDecryptedUserAiKey(getServerSupabase(), ownerRef, savedProvider);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[AI Provider] Saved ${provider} key unavailable:`, message);
+    return null;
+  }
+};
+
 export const getPlatformAiProviderStatus = () => ({
-  gemini: Boolean(getPlatformKey("gemini")),
-  nvidia: Boolean(getPlatformKey("nvidia")),
-  openrouter: Boolean(getPlatformKey("openrouter")),
-  openai: Boolean(getPlatformKey("openai")),
+  gemini: Boolean(getPlatformAiKey("gemini")),
+  nvidia: Boolean(getPlatformAiKey("nvidia")),
+  openrouter: Boolean(getPlatformAiKey("openrouter")),
+  openai: Boolean(getPlatformAiKey("openai")),
 });
 
-const providerOrder: AIProviderName[] = ["gemini", "nvidia", "openrouter", "openai"];
+const providerOrder: AIProviderName[] = ["gemini", "openrouter", "openai", "nvidia"];
 
 export const getConfiguredAIProvider = (): AIProviderName => {
   const devAdmin = getDevAdminAiStatus();
-  const devAdminProvider = devAdmin.enabled ? normalizeProvider(process.env.DEV_ADMIN_AI_PROVIDER) : null;
+  const devAdminProvider = devAdmin.enabled ? normalizeAiProvider(process.env.DEV_ADMIN_AI_PROVIDER) : null;
   if (devAdminProvider && devAdmin.providers[devAdminProvider]) return devAdminProvider;
 
-  const envProvider = normalizeProvider(process.env.AI_PROVIDER);
+  const envProvider = normalizeAiProvider(process.env.AI_PROVIDER);
   const platformStatus = getPlatformAiProviderStatus();
   if (envProvider && platformStatus[envProvider]) return envProvider;
 
@@ -121,22 +97,27 @@ export const getConfiguredAIProvider = (): AIProviderName => {
 };
 
 const getFallbackProvider = (primary: AIProviderName) => {
-  const configuredFallback = normalizeProvider(process.env.AI_FALLBACK_PROVIDER);
-  const platformStatus = getPlatformAiProviderStatus();
-  const devAdmin = getDevAdminAiStatus();
-  if (configuredFallback && configuredFallback !== primary && (platformStatus[configuredFallback] || devAdmin.providers[configuredFallback])) {
+  const configuredFallback = normalizeAiProvider(process.env.AI_FALLBACK_PROVIDER);
+  if (configuredFallback && configuredFallback !== primary) {
     return configuredFallback;
   }
 
-  return providerOrder.find((provider) => provider !== primary && (platformStatus[provider] || devAdmin.providers[provider])) || primary;
+  return primary;
 };
 
 const resolveApiKey = async (provider: AIProviderName, input: GenerateAIResponseInput) => {
   const savedProvider = normalizeUserAiProvider(provider);
   const ownerRef = input.ownerRef || (input.userId ? `user:${input.userId}` : null);
-  if (savedProvider && ownerRef) {
-    const apiKey = await getDecryptedUserAiKey(getServerSupabase(), ownerRef, savedProvider);
+  if (savedProvider && input.userId && ownerRef) {
+    const apiKey = await tryGetSavedAiKey(ownerRef, provider);
     if (apiKey) return apiKey;
+  }
+
+  // TODO(auth): remove dev/admin key exception after authenticated per-user key ownership is implemented.
+  // TODO(security): review key storage before production.
+  if (isDevAdminAiKeyModeEnabled()) {
+    const savedDevAdminKey = await tryGetSavedAiKey(getDevAdminOwnerRef(), provider);
+    if (savedDevAdminKey) return savedDevAdminKey;
   }
 
   if (input.credentialMode === "byok") {
@@ -144,19 +125,21 @@ const resolveApiKey = async (provider: AIProviderName, input: GenerateAIResponse
     if (!isProductionLike() && input.requestApiKey) return input.requestApiKey;
 
     if (savedProvider) {
-      throw new Error(`No API key saved for this provider. Add it once in AI Keys settings.`);
+      throw new Error(`No API key configured for this provider.`);
     }
   }
 
-  // DEV ONLY - remove after auth is implemented
-  const devAdminKey = getDevAdminKey(provider);
+  const devAdminKey = isDevAdminAiKeyModeEnabled() ? getDevAdminAiKey(provider) : "";
   if (devAdminKey) return devAdminKey;
 
   if (!isPlatformEnabled()) {
-    throw new Error(`No AI provider configured for ${provider}.`);
+    throw new Error(`No API key configured for this provider.`);
   }
 
-  return getPlatformKey(provider);
+  const platformKey = getPlatformAiKey(provider);
+  if (platformKey) return platformKey;
+
+  throw new Error(`No API key configured for this provider.`);
 };
 
 const callProvider = async (provider: AIProviderName, input: GenerateAIResponseInput) => {
@@ -178,10 +161,15 @@ const callProvider = async (provider: AIProviderName, input: GenerateAIResponseI
 };
 
 export async function generateAIResponse(input: GenerateAIResponseInput): Promise<GenerateAIResponseResult> {
-  const primary = input.provider || getConfiguredAIProvider();
+  const primary = normalizeAiProvider(input.provider) || getConfiguredAIProvider();
   const fallback = getFallbackProvider(primary);
-  const fallbackEnabled = input.fallbackEnabled ?? process.env.AI_FALLBACK_ENABLED !== "false";
+  const fallbackEnabled = input.fallbackEnabled ?? readBooleanEnv(process.env.AI_FALLBACK_ENABLED, false);
   const errors: string[] = [];
+
+  const diagnostics = getEnvDiagnostics();
+  if (diagnostics.fallbackEnabled && diagnostics.warnings.some((warning) => warning.includes("AI_FALLBACK_ENABLED=true"))) {
+    console.warn("[AI Provider]", diagnostics.warnings.find((warning) => warning.includes("AI_FALLBACK_ENABLED=true")));
+  }
 
   try {
     return await callProvider(primary, input);

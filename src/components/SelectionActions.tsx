@@ -4,6 +4,7 @@ import { Bot, Loader2, Languages, MessageCircle, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { getQuickDefinition } from '../services/geminiService';
 import { ExplanationModal } from './ExplanationModal';
+import { useLanguage } from '../context/LanguageContext';
 
 type QuickDefResult = {
   definition: string;
@@ -12,7 +13,51 @@ type QuickDefResult = {
 
 type SelectionState = 'idle' | 'loading' | 'result';
 
+const ARABIC_TEXT_PATTERN = /[\u0600-\u06FF]/;
+
+const IGNORE_SELECTION_SELECTOR = [
+  '#selection-actions',
+  '[data-selection-actions-ignore="true"]',
+  '[role="dialog"]',
+  '.explanation-modal-content',
+  'button',
+  'a',
+  'input',
+  'textarea',
+  'select',
+  '[role="button"]',
+  '[contenteditable="true"]',
+].join(',');
+
+const ALLOWED_SELECTION_SELECTOR = [
+  '[data-smart-select-scope="true"]',
+  '.lesson-reader-markdown',
+  '.lesson-reader-block',
+  '.lesson-copy',
+  '.lesson-content',
+  '.markdown-body',
+  '.prose',
+].join(',');
+
+const getElementFromNode = (node: Node | null) => {
+  if (!node) return null;
+  return node.nodeType === Node.ELEMENT_NODE ? node as Element : node.parentElement;
+};
+
+const isInsideIgnoredUi = (target: EventTarget | Node | null) =>
+  target instanceof Element && Boolean(target.closest(IGNORE_SELECTION_SELECTOR));
+
+const isAllowedSelectionSurface = (range: Range, target: EventTarget | null) => {
+  const targetElement = target instanceof Element ? target : null;
+  const ancestorElement = getElementFromNode(range.commonAncestorContainer);
+  return Boolean(
+    targetElement?.closest(ALLOWED_SELECTION_SELECTOR) ||
+    ancestorElement?.closest(ALLOWED_SELECTION_SELECTOR)
+  );
+};
+
 export const SelectionActions = () => {
+  const { language } = useLanguage();
   const [selection, setSelection] = useState<{
     text: string;
     context: string;
@@ -23,14 +68,20 @@ export const SelectionActions = () => {
   const [result, setResult] = useState<QuickDefResult | null>(null);
   const [isExplanationModalOpen, setIsExplanationModalOpen] = useState(false);
 
+  const resetSelection = (clearBrowserSelection = false) => {
+    setSelection(null);
+    setState('idle');
+    setResult(null);
+    window.dispatchEvent(new CustomEvent('inline-selection-assistant:close'));
+    if (clearBrowserSelection) window.getSelection()?.removeAllRanges();
+  };
+
   useEffect(() => {
     const handleSelectionChange = () => {
       const activeSelection = window.getSelection();
       if (!activeSelection || !activeSelection.toString().trim()) {
         if (!isExplanationModalOpen) {
-          setSelection(null);
-          setState('idle');
-          setResult(null);
+          resetSelection();
         }
       }
     };
@@ -42,23 +93,33 @@ export const SelectionActions = () => {
           const text = activeSelection.toString().trim();
           
           if (text.length > 100) {
-            setSelection(null);
+            resetSelection();
             return;
           }
 
+          if (activeSelection.rangeCount === 0 || isInsideIgnoredUi(e.target)) return;
+
           const range = activeSelection.getRangeAt(0);
           const rect = range.getBoundingClientRect();
-          
-          if (e.target instanceof Element && e.target.closest('#selection-actions')) return;
-          if (e.target instanceof Element && e.target.closest('.explanation-modal-content')) return;
+
+          if (!rect.width && !rect.height) {
+            resetSelection();
+            return;
+          }
+
+          if (!isAllowedSelectionSurface(range, e.target)) {
+            resetSelection();
+            return;
+          }
 
           // Extract surrounding text for context
-          const container = range.startContainer.parentElement;
-          const context = container ? container.innerText.slice(0, 800) : text;
+          const container = getElementFromNode(range.startContainer);
+          const context = container ? (container.textContent || '').slice(0, 800) : text;
 
           const newSelection = { text, context, rect };
           setSelection(newSelection);
           setResult(null);
+          window.dispatchEvent(new CustomEvent('inline-selection-assistant:open', { detail: { text } }));
 
           const wordCount = text.split(/\s+/).filter(Boolean).length;
           if (wordCount <= 4) {
@@ -81,7 +142,7 @@ export const SelectionActions = () => {
         } else {
           if (e.target instanceof Element && !e.target.closest('#selection-actions')) {
             if (!isExplanationModalOpen) {
-              setSelection(null);
+              resetSelection();
             }
           }
         }
@@ -89,21 +150,28 @@ export const SelectionActions = () => {
     };
 
     const handleMouseDown = (e: MouseEvent) => {
-      if (e.target instanceof Element && e.target.closest('#selection-actions')) return;
-      if (e.target instanceof Element && e.target.closest('.explanation-modal-content')) return;
+      if (isInsideIgnoredUi(e.target)) return;
       if (!isExplanationModalOpen) {
-        setSelection(null);
+        resetSelection();
       }
+    };
+
+    const handleExternalAssistantOpen = () => {
+      if (!isExplanationModalOpen) resetSelection();
     };
 
     document.addEventListener('mouseup', handleMouseUp);
     document.addEventListener('mousedown', handleMouseDown);
     document.addEventListener('selectionchange', handleSelectionChange);
+    window.addEventListener('open-ai-assistant' as any, handleExternalAssistantOpen);
+    window.addEventListener('smart-selection-assistant:open' as any, handleExternalAssistantOpen);
 
     return () => {
       document.removeEventListener('mouseup', handleMouseUp);
       document.removeEventListener('mousedown', handleMouseDown);
       document.removeEventListener('selectionchange', handleSelectionChange);
+      window.removeEventListener('open-ai-assistant' as any, handleExternalAssistantOpen);
+      window.removeEventListener('smart-selection-assistant:open' as any, handleExternalAssistantOpen);
     };
   }, [isExplanationModalOpen]);
 
@@ -121,13 +189,30 @@ export const SelectionActions = () => {
 
   const handleAskAI = () => {
     if (selection) {
+      const context = `${selection.text} ${selection.context}`.toLowerCase();
+      const shouldUseArabic = language === 'ar' || ARABIC_TEXT_PATTERN.test(context);
+      const shouldUseFrench =
+        !shouldUseArabic &&
+        (
+          language === 'fr' ||
+          /\b(le|la|les|un|une|des|verbe|phrase|sujet|cours|texte)\b/.test(context) ||
+          /[àâçéèêëîïôùûüÿœ]/i.test(context)
+        );
+      const initialInput = shouldUseArabic
+        ? `ساعدني على فهم الجزء الصعب في "${selection.text}".`
+        : shouldUseFrench
+        ? `Aide-moi a comprendre ce qui est difficile dans "${selection.text}".`
+        : `Help me understand what is difficult about "${selection.text}".`;
       window.dispatchEvent(
         new CustomEvent('open-ai-assistant', {
-          detail: { initialInput: `Can you explain the highlighted concept "${selection.text}" in this context: "${selection.context}"?` }
+          detail: {
+            initialInput,
+            direction: shouldUseArabic ? 'rtl' : 'ltr',
+            languageHint: shouldUseArabic ? 'ar' : shouldUseFrench ? 'fr' : 'en'
+          }
         })
       );
-      setSelection(null);
-      window.getSelection()?.removeAllRanges();
+      resetSelection(true);
     }
   };
 
@@ -231,10 +316,7 @@ export const SelectionActions = () => {
         isOpen={isExplanationModalOpen}
         onClose={() => {
           setIsExplanationModalOpen(false);
-          setSelection(null);
-          setState('idle');
-          setResult(null);
-          window.getSelection()?.removeAllRanges();
+          resetSelection(true);
         }}
         word={selection?.text || ''}
         context={selection?.context || ''}

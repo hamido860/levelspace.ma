@@ -3,6 +3,7 @@ import type { VercelRequest } from "@vercel/node";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { User } from "@supabase/supabase-js";
 import { AiCommandCenterHttpError, requireAuthenticatedUser } from "./api/aiCommandCenter";
+import { isDevAdminAiKeyModeEnabled } from "../lib/envDiagnostics";
 
 export const USER_AI_KEY_PROVIDERS = ["gemini", "openrouter", "openai", "nvidia"] as const;
 export type UserAiKeyProvider = (typeof USER_AI_KEY_PROVIDERS)[number];
@@ -44,6 +45,8 @@ const getBearerToken = (req: VercelRequest) => {
   if (!header || typeof header !== "string") return null;
   return header.match(/^Bearer\s+(.+)$/i)?.[1] || null;
 };
+
+export const getDevAdminOwnerRef = () => process.env.DEV_ADMIN_OWNER_REF || "dev-admin";
 
 export function normalizeUserAiProvider(value: unknown): UserAiKeyProvider | null {
   const provider = String(value || "").toLowerCase();
@@ -132,13 +135,16 @@ export async function resolveAiKeyOwner(req: VercelRequest, options: { requireAu
     throw new AiCommandCenterHttpError(401, AUTH_REQUIRED_ERROR);
   }
 
-  // DEV ONLY - remove after auth is implemented
-  // DEV ONLY - remove after auth is implemented
-  // DEV ONLY - remove after auth is implemented
+  // TODO(auth): remove dev/admin key exception after authenticated per-user key ownership is implemented.
+  // TODO(security): review key storage before production.
+  if (!isDevAdminAiKeyModeEnabled()) {
+    throw new AiCommandCenterHttpError(401, "Dev/admin key mode is disabled.");
+  }
+
   return {
     user: null,
     userId: null,
-    ownerRef: process.env.DEV_ADMIN_OWNER_REF || "dev-admin",
+    ownerRef: getDevAdminOwnerRef(),
     authenticated: false,
     devFallback: true,
   };

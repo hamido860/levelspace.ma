@@ -43,11 +43,14 @@ const createDemoAdminProfile = () => ({
 });
 
 const syncAcademicSettingsFromProfile = async (profile: any) => {
+  const instructionOptionId = profile?.instruction_option_id || profile?.selected_option;
   const academicSettings = [
     ['selected_grade_id', profile?.selected_grade_id || profile?.grade_id],
     ['selected_grade', profile?.selected_grade],
     ['selected_bac_track', profile?.selected_bac_track || profile?.track_id],
-    ['selected_option', profile?.selected_option || profile?.instruction_option_id],
+    ['selected_bac_int_option', instructionOptionId],
+    // Compatibility for older app versions. New reads use selected_bac_int_option.
+    ['selected_option', instructionOptionId],
   ].filter(([, value]) => typeof value === 'string' && value.trim());
 
   if (academicSettings.length === 0) return;

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Brain, Target, Compass, CheckCircle, AlertCircle, Loader2, ChevronRight, Sparkles, RefreshCw } from 'lucide-react';
+import { X, Brain, Compass, CheckCircle, AlertCircle, Loader2, ChevronRight, Sparkles, RefreshCw } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
   generateAssessmentQuestion,
@@ -277,92 +278,88 @@ export const SupportZoneModal: React.FC<SupportZoneModalProps> = ({
     setIsGenerating(false);
   };
 
-  if (!isOpen) return null;
-
   const progressPct = (Math.max(1, questionCount) / MAX_QUESTIONS) * 100;
   const abilityPct = Math.round(ability);
 
-  return (
+  if (!isOpen) return null;
+
+  return createPortal(
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+      <div className="fixed inset-0 z-[9999] flex items-stretch justify-end">
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="absolute inset-0 bg-ink/60 backdrop-blur-sm"
           onClick={onClose}
+          className="absolute inset-0 bg-ink/35 backdrop-blur-[1px]"
         />
 
         <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="relative w-full max-w-4xl max-h-[90vh] bg-paper rounded-xl shadow-2xl overflow-hidden flex flex-col"
+          initial={{ opacity: 0, x: '100%' }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: '100%' }}
+          transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+          data-selection-actions-ignore="true"
+          role="dialog"
+          aria-modal="true"
+          className="relative flex h-full w-full max-w-[720px] flex-col overflow-hidden border-l border-white/10 bg-[#171c23] text-slate-100 shadow-2xl"
         >
-          {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-ink/5 bg-white/50 dark:bg-paper shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent">
-                <Compass size={20} />
+          <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/10 bg-[#000417] px-4 py-3.5 text-white">
+            <div className="flex min-w-0 flex-1 items-center gap-3 text-left">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-400 ring-1 ring-blue-500/20">
+                <Compass size={16} />
               </div>
-              <div>
-                <h2 className="text-lg font-bold text-ink">Support Zone / MyLevel</h2>
-                <p className="text-xs text-muted font-medium">
+              <div className="min-w-0">
+                <h2 className="truncate text-sm font-bold tracking-tight text-white">Support Zone / MyLevel</h2>
+                <p className="mt-0.5 text-[10px] font-semibold text-white/45">
                   {phase === 'subject-select' ? 'Choose your subject' : `${selectedSubject} • ${effectiveGrade}`}
                 </p>
               </div>
             </div>
+
             <button
+              type="button"
               onClick={onClose}
-              className="w-9 h-9 rounded-full hover:bg-ink/5 flex items-center justify-center text-muted transition-colors"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/5 text-white/55 transition-all hover:bg-white/10 hover:text-white"
+              aria-label="Close modal"
             >
-              <X size={18} />
+              <X size={17} />
             </button>
           </div>
 
-          {/* Body */}
-          <div className="flex-1 overflow-y-auto p-6 md:p-10">
-
+          <div className="min-h-0 flex-1 overflow-y-auto bg-[#171c23] px-4 py-4 text-slate-100 custom-scrollbar">
             {/* ── SUBJECT SELECT ── */}
             {phase === 'subject-select' && (
-              <div className="max-w-2xl mx-auto space-y-8">
-                <div className="text-center space-y-3">
-                  <div className="w-20 h-20 mx-auto bg-accent/10 rounded-xl flex items-center justify-center text-accent mb-4">
-                    <Target size={40} />
-                  </div>
-                  <h1 className="text-3xl font-bold text-ink">Find your real level.</h1>
-                  <p className="text-muted text-base leading-relaxed max-w-md mx-auto">
-                    An adaptive 20-question check that locates your strengths and gaps, then builds your personal roadmap.
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-sm font-bold text-muted uppercase tracking-wider mb-4">Select a subject</p>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              <div className="mx-auto max-w-[608px] space-y-3">
+                <div className="space-y-2">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Select a subject</p>
+                  <div className="grid grid-cols-3 gap-2">
                     {SUPPORTED_SUBJECTS.map(sub => (
                       <button
                         key={sub}
                         onClick={() => handleSelectSubject(sub)}
-                        className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all font-medium text-sm ${
+                        className={`flex aspect-square flex-col items-center justify-center gap-1.5 rounded-lg border p-2 text-center transition-all ${
                           selectedSubject === sub
-                            ? 'border-accent bg-accent/10 text-accent'
-                            : 'border-ink/8 hover:border-accent/40 text-ink hover:bg-ink/3'
+                            ? 'border-accent bg-accent/10 text-accent shadow-sm shadow-accent/10'
+                            : 'border-white/8 bg-white/[0.02] text-slate-200 hover:border-accent/40 hover:bg-white/[0.04]'
                         }`}
                       >
-                        <span className="text-2xl">{SUBJECT_ICONS[sub] || '📚'}</span>
-                        {sub}
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white/5 text-base">
+                          {SUBJECT_ICONS[sub] || '📚'}
+                        </span>
+                        <span className="block max-w-full truncate text-[10px] font-bold">{sub}</span>
                       </button>
                     ))}
                   </div>
                 </div>
 
-                <div className="flex justify-center pt-2">
+                <div>
                   <button
                     onClick={handleStartRating}
-                    className="px-10 py-4 bg-accent text-white rounded-2xl font-bold text-base hover:bg-accent/90 transition-all hover:scale-105 active:scale-95 shadow-lg shadow-accent/20 flex items-center gap-2"
+                    className="flex h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-4 text-[11px] font-bold text-white shadow-lg shadow-accent/20 transition-all hover:bg-accent/90 active:scale-[0.99]"
                   >
                     Start MyLevel Check
-                    <ChevronRight size={18} />
+                    <ChevronRight size={13} />
                   </button>
                 </div>
               </div>
@@ -370,25 +367,25 @@ export const SupportZoneModal: React.FC<SupportZoneModalProps> = ({
 
             {/* ── SELF RATING ── */}
             {phase === 'self-rating' && (
-              <div className="max-w-2xl mx-auto space-y-6">
-                <div className="text-center space-y-2 mb-8">
-                  <h2 className="text-2xl font-bold text-ink">How do you rate yourself in {selectedSubject}?</h2>
-                  <p className="text-muted text-sm">Be honest — this sets your starting difficulty level.</p>
+              <div className="mx-auto max-w-[340px] space-y-4">
+                <div className="space-y-1.5">
+                  <h2 className="text-base font-bold leading-snug text-white">Rate yourself in {selectedSubject}</h2>
+                  <p className="text-xs leading-5 text-slate-500">This sets your starting difficulty.</p>
                 </div>
 
-                <div className="grid gap-3">
+                <div className="grid gap-2">
                   {RATING_OPTIONS.map(opt => (
                     <button
                       key={opt.id}
                       onClick={() => handleSelectRating(opt.id)}
-                      className={`flex items-center gap-5 p-5 rounded-2xl border-2 border-ink/8 text-left transition-all group ${opt.color}`}
+                      className={`flex min-h-[74px] items-center gap-3 rounded-xl border border-white/8 bg-white/[0.02] p-3 text-left transition-all hover:border-accent/40 hover:bg-white/[0.04]`}
                     >
-                      <div className={`w-10 h-10 rounded-xl ${opt.badge} text-white flex items-center justify-center font-black text-lg shrink-0`}>
+                      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${opt.badge} text-sm font-black text-white`}>
                         {opt.id}
                       </div>
-                      <div>
-                        <h3 className="font-bold text-ink text-base">{opt.label}</h3>
-                        <p className="text-sm text-muted">{opt.desc}</p>
+                      <div className="min-w-0">
+                        <h3 className="text-sm font-bold leading-snug text-white">{opt.label}</h3>
+                        <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-slate-500">{opt.desc}</p>
                       </div>
                     </button>
                   ))}
@@ -398,13 +395,13 @@ export const SupportZoneModal: React.FC<SupportZoneModalProps> = ({
 
             {/* ── ASSESSMENT ── */}
             {phase === 'assessment' && (
-              <div className="max-w-3xl mx-auto">
+              <div className="mx-auto max-w-[608px] space-y-4">
                 {/* Progress bar */}
-                <div className="flex items-center gap-4 mb-8">
-                  <span className="text-xs font-bold text-muted uppercase tracking-wider shrink-0">
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider shrink-0">
                     {isGenerating && questionCount === 0 ? 'Q 1' : `Q ${questionCount}`} / {MAX_QUESTIONS}
                   </span>
-                  <div className="h-1.5 flex-1 bg-ink/8 rounded-full overflow-hidden">
+                  <div className="h-1.5 flex-1 bg-white/8 rounded-full overflow-hidden">
                     <motion.div
                       className="h-full bg-accent rounded-full"
                       animate={{ width: `${progressPct}%` }}
@@ -412,8 +409,8 @@ export const SupportZoneModal: React.FC<SupportZoneModalProps> = ({
                     />
                   </div>
                   {/* Live ability meter */}
-                  <div className="flex items-center gap-2 text-xs font-bold text-muted shrink-0">
-                    <div className="w-16 h-1.5 bg-ink/8 rounded-full overflow-hidden">
+                  <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 shrink-0">
+                    <div className="w-12 h-1.5 bg-white/8 rounded-full overflow-hidden">
                       <motion.div
                         className="h-full bg-emerald-500 rounded-full"
                         animate={{ width: `${abilityPct}%` }}
@@ -425,7 +422,7 @@ export const SupportZoneModal: React.FC<SupportZoneModalProps> = ({
                 </div>
 
                 {isGenerating ? (
-                  <div className="py-24 flex flex-col items-center justify-center space-y-4 text-muted">
+                  <div className="py-16 flex flex-col items-center justify-center space-y-4 text-slate-500">
                     <div className="relative">
                       <Brain size={40} className="text-accent animate-pulse" />
                       <Loader2 size={16} className="text-accent animate-spin absolute -top-1 -right-1" />
@@ -433,10 +430,10 @@ export const SupportZoneModal: React.FC<SupportZoneModalProps> = ({
                     <p className="font-medium text-sm animate-pulse">Adapting difficulty and generating next question…</p>
                   </div>
                 ) : questionError ? (
-                  <div className="py-24 flex flex-col items-center justify-center space-y-5 text-muted text-center">
+                  <div className="py-16 flex flex-col items-center justify-center space-y-5 text-slate-500 text-center">
                     <AlertCircle size={40} className="text-amber-500" />
                     <div className="space-y-2">
-                      <h3 className="font-bold text-ink">Could not load question</h3>
+                      <h3 className="font-bold text-white">Could not load question</h3>
                       <p className="text-sm">The AI service is temporarily unavailable.</p>
                     </div>
                     <button
@@ -447,7 +444,7 @@ export const SupportZoneModal: React.FC<SupportZoneModalProps> = ({
                     </button>
                   </div>
                 ) : currentQuestion ? (
-                  <div className="space-y-6">
+                  <div className="space-y-4">
                     {/* Question badge */}
                     <div className="flex items-center gap-2">
                       <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-md ${
@@ -463,8 +460,8 @@ export const SupportZoneModal: React.FC<SupportZoneModalProps> = ({
                     </div>
 
                     {/* Question text */}
-                    <div className="p-7 bg-ink/2 dark:bg-white/3 rounded-2xl border border-ink/5">
-                      <p className="text-xl font-medium text-ink leading-relaxed">
+                    <div className="rounded-xl border border-white/8 bg-white/[0.03] p-4">
+                      <p className="text-sm font-semibold leading-7 text-white">
                         {currentQuestion.questionText}
                       </p>
                     </div>
@@ -477,7 +474,7 @@ export const SupportZoneModal: React.FC<SupportZoneModalProps> = ({
                             key={i}
                             onClick={() => !feedback && setUserAnswer(opt)}
                             disabled={!!feedback}
-                            className={`p-5 text-left rounded-2xl border-2 transition-all font-medium ${
+                            className={`rounded-xl border p-3 text-left text-sm font-medium transition-all ${
                               userAnswer === opt
                                 ? feedback
                                   ? feedback.isCorrect
@@ -499,7 +496,7 @@ export const SupportZoneModal: React.FC<SupportZoneModalProps> = ({
                         onChange={e => setUserAnswer(e.target.value)}
                         disabled={!!feedback}
                         placeholder="Type your answer here…"
-                        className="w-full p-5 rounded-2xl border-2 border-ink/10 bg-transparent text-ink placeholder:text-muted/40 focus:border-accent focus:outline-none resize-none h-28 transition-colors"
+                        className="h-28 w-full resize-none rounded-xl border border-white/10 bg-white/[0.02] p-4 text-sm text-white placeholder:text-slate-600 transition-colors focus:border-accent focus:outline-none"
                       />
                     )}
 
@@ -509,7 +506,7 @@ export const SupportZoneModal: React.FC<SupportZoneModalProps> = ({
                         <button
                           onClick={handleSubmitAnswer}
                           disabled={!userAnswer.trim() || isEvaluating}
-                          className="px-8 py-3.5 bg-ink text-white rounded-2xl font-bold hover:bg-ink/90 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 transition-all"
+                          className="flex h-10 min-w-[150px] items-center justify-center gap-2 rounded-xl bg-accent px-5 text-xs font-bold text-white transition-all hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           {isEvaluating ? <Loader2 className="animate-spin" size={18} /> : 'Submit Answer'}
                         </button>
@@ -523,7 +520,7 @@ export const SupportZoneModal: React.FC<SupportZoneModalProps> = ({
                           initial={{ opacity: 0, y: 8 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0 }}
-                          className={`p-5 rounded-2xl flex gap-4 ${
+                          className={`p-4 rounded-xl flex gap-3 text-sm ${
                             feedback.isCorrect
                               ? 'bg-emerald-50 text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200'
                               : 'bg-rose-50 text-rose-900 dark:bg-rose-950/40 dark:text-rose-200'
@@ -676,6 +673,7 @@ export const SupportZoneModal: React.FC<SupportZoneModalProps> = ({
           </div>
         </motion.div>
       </div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };

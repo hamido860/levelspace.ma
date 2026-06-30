@@ -30,7 +30,7 @@ export const ExplanationModal: React.FC<ExplanationModalProps> = ({
   word,
   context
 }) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<DetailedWordExplanation | null>(null);
   const [activeLangTab, setActiveLangTab] = useState<'en' | 'fr' | 'ar'>('en');
@@ -64,11 +64,17 @@ export const ExplanationModal: React.FC<ExplanationModalProps> = ({
   };
 
   const handleAskAITutor = () => {
+    const contextText = `${word} ${context} ${data?.definition || ''}`.toLowerCase();
+    const shouldUseFrench =
+      language === 'fr' ||
+      /\b(le|la|les|un|une|des|verbe|phrase|sujet|cours|texte)\b/.test(contextText) ||
+      /[àâçéèêëîïôùûüÿœ]/i.test(contextText);
+    const initialInput = shouldUseFrench
+      ? `Aide-moi a trouver ce qui est difficile dans le mot "${word}".`
+      : `Help me find what is difficult about the word "${word}".`;
     window.dispatchEvent(
       new CustomEvent('open-ai-assistant', {
-        detail: { 
-          initialInput: `I want to discuss the word "${word}" from the lesson. Its definition is "${data?.definition || ''}". Can you help me understand how to use it in other contexts?` 
-        }
+        detail: { initialInput }
       })
     );
     onClose();

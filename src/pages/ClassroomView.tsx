@@ -35,15 +35,28 @@ import {
 import { HorizontalSlider } from '../components/HorizontalSlider';
 import { LayoutGrid, Rows3, Shuffle } from 'lucide-react';
 import { getCardGradient, randomBanner, randomCardGradient } from '../utils/cardColors';
-import { useSearch } from '../context/SearchContext';
+import { getAcademicIdentity, matchesAcademicDimension } from '../services/academicIdentity';
+
 
 const normalizeLessonTitle = (title: string | null | undefined) =>
   String(title || '').trim().toLocaleLowerCase();
 
 const applyInstructionOptionTopicFilter = (query: any, optionId: string) => {
   const normalizedOptionId = String(optionId || '').trim();
-  if (!normalizedOptionId) return query.is('instruction_option_id', null);
+  if (!normalizedOptionId) return query;
   return query.or(`instruction_option_id.eq.${normalizedOptionId},instruction_option_id.is.null`);
+};
+
+const hasSelectedTrack = (links: unknown, selectedTrackId: string) => {
+  if (!selectedTrackId) return true;
+  const rows = Array.isArray(links) ? links : links ? [links] : [];
+  return rows.length === 0 || rows.some((row: any) => String(row?.track_id || '') === selectedTrackId);
+};
+
+const rowMatchesGradeCandidates = (rowGrade: string | null | undefined, gradeCandidates: string[]) => {
+  const normalizedRowGrade = normalizeCurriculumValue(String(rowGrade || ''));
+  if (!normalizedRowGrade) return false;
+  return gradeCandidates.some((candidate) => normalizeCurriculumValue(candidate) === normalizedRowGrade);
 };
 
 const getLessonIllustration = (title: string | null | undefined, subject?: string | null | undefined) => {
@@ -137,6 +150,9 @@ type SupabaseLessonRow = {
   grade?: string | null;
   country?: string | null;
   subject?: string | null;
+  instruction_option_id?: string | null;
+  track_id?: string | null;
+  lesson_tracks?: Array<{ track_id?: string | null }> | { track_id?: string | null } | null;
   validation_status?: string | null;
   source_confidence?: number | null;
   source_name?: string | null;
@@ -157,6 +173,7 @@ type SupabaseTopicRow = {
   domain_name?: string | null;
   domain_order?: number | null;
   outlines: SupabaseTopicOutlineRow[];
+  topic_tracks?: Array<{ track_id?: string | null }> | { track_id?: string | null } | null;
 };
 
 type SupabaseTopicOutlineRow = {
@@ -165,6 +182,23 @@ type SupabaseTopicOutlineRow = {
   title: string;
   description: string;
   outline_order: number;
+};
+
+type CurriculumCardRow = {
+  topic_id?: string | null;
+  id?: string | null;
+  lesson_title?: string | null;
+  topic_title?: string | null;
+  title?: string | null;
+  topic_name?: string | null;
+  grade_name?: string | null;
+  subject_name?: string | null;
+  instruction_option_id?: string | null;
+  track_id?: string | null;
+  topic_tracks?: Array<{ track_id?: string | null }> | { track_id?: string | null } | null;
+  domain_code?: string | null;
+  domain_name?: string | null;
+  domain_order?: number | null;
 };
 
 type ClassroomDomain = {
@@ -287,7 +321,6 @@ export const ClassroomView: React.FC = () => {
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
   const { t } = useLanguage();
-  const { searchQuery } = useSearch();
   const label = (key: string, fallback: string) => {
     const translated = t(key);
     return translated && translated !== key ? translated : fallback;
@@ -542,7 +575,15 @@ export const ClassroomView: React.FC = () => {
   const currentGrade = settingsMap['selected_grade'] || localStorage.getItem('selected_grade') || '';
   const currentCountry = settingsMap['selected_country'] || localStorage.getItem('selected_country') || '';
   const selectedBacTrack = settingsMap['selected_bac_track'] || localStorage.getItem('selected_bac_track') || '';
-  const selectedInstructionOptionId = String(settingsMap['selected_bac_int_option'] || localStorage.getItem('selected_bac_int_option') || '');
+  const selectedInstructionOptionId = String(settingsMap['selected_bac_int_option'] || localStorage.getItem('selected_bac_int_option') || settingsMap['selected_option'] || localStorage.getItem('selected_option') || '');
+  const academicIdentity = getAcademicIdentity({
+    settings: settingsMap,
+    country: currentCountry,
+    gradeName: currentGrade,
+    trackId: selectedBacTrack,
+    instructionOptionId: selectedInstructionOptionId,
+    subjectId: module?.id,
+  });
   useEffect(() => {
     if (!module) {
       setNavigationCurriculumIds({});
@@ -576,6 +617,8 @@ export const ClassroomView: React.FC = () => {
     () =>
       (allLessons || []).filter((lesson) => {
         if (lesson.status === 'suggested') return false;
+        if (!matchesAcademicDimension(lesson.track_id, academicIdentity.trackId)) return false;
+        if (!matchesAcademicDimension(lesson.instruction_option_id, academicIdentity.instructionOptionId)) return false;
 
         const lessonGrade = String(lesson.grade || '').trim().toLocaleLowerCase();
         if (lessonGrade && !normalizedGradeCandidates.has(lessonGrade)) {
@@ -593,7 +636,7 @@ export const ClassroomView: React.FC = () => {
 
         return true;
       }),
-    [allLessons, normalizedCurrentCountry, normalizedGradeCandidates],
+    [academicIdentity.instructionOptionId, academicIdentity.trackId, allLessons, normalizedCurrentCountry, normalizedGradeCandidates],
   );
   const studentVisibleLessons = useMemo(
     () => filterStudentVisibleLessons(filteredScopeLessons),
@@ -713,58 +756,37 @@ export const ClassroomView: React.FC = () => {
   }, [frenchDomainByCode, hasLessons, lessons, topicDomainById, topicFallbackDomains]);
   const showDomainTabs = lessonDomainStats.length > 0 || topicFallbackDomains.length > 0;
   const visibleLessons = useMemo(() => {
-    let filtered = lessons;
-    if (showDomainTabs && activeDomainKey !== 'all') {
-      filtered = filtered.filter((lesson) => {
-        const domain =
-          (lesson.topic_id ? topicDomainById.get(lesson.topic_id) : undefined) ||
-          (() => {
-            const code = inferFrenchDomainCodeFromTitle(lesson.title);
-            const frenchDomain = code ? frenchDomainByCode.get(code) : undefined;
-            return frenchDomain
-              ? { key: frenchDomain.code, code: frenchDomain.code, name: frenchDomain.name, order: frenchDomain.order }
-              : undefined;
-          })();
+    if (!showDomainTabs || activeDomainKey === 'all') return lessons;
 
-        return domain?.key === activeDomainKey;
-      });
-    }
+    return lessons.filter((lesson) => {
+      const domain =
+        (lesson.topic_id ? topicDomainById.get(lesson.topic_id) : undefined) ||
+        (() => {
+          const code = inferFrenchDomainCodeFromTitle(lesson.title);
+          const frenchDomain = code ? frenchDomainByCode.get(code) : undefined;
+          return frenchDomain
+            ? { key: frenchDomain.code, code: frenchDomain.code, name: frenchDomain.name, order: frenchDomain.order }
+            : undefined;
+        })();
 
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      filtered = filtered.filter(lesson => 
-        (lesson.title && lesson.title.toLowerCase().includes(q)) || 
-        (lesson.subtitle && lesson.subtitle.toLowerCase().includes(q))
-      );
-    }
-
-    return filtered;
-  }, [activeDomainKey, frenchDomainByCode, lessons, showDomainTabs, topicDomainById, searchQuery]);
+      return domain?.key === activeDomainKey;
+    });
+  }, [activeDomainKey, frenchDomainByCode, lessons, showDomainTabs, topicDomainById]);
   const visibleTopicFallbackRows = useMemo(() => {
-    let filtered = topicFallbackRows;
-    if (showDomainTabs && activeDomainKey !== 'all') {
-      filtered = filtered.filter((topic) => {
-        const key = topic.domain_id || topic.domain_code || topic.domain_name;
-        return key === activeDomainKey;
-      });
-    }
+    if (!showDomainTabs || activeDomainKey === 'all') return topicFallbackRows;
 
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      filtered = filtered.filter(topic => 
-        (topic.title && topic.title.toLowerCase().includes(q))
-      );
-    }
-
-    return filtered;
-  }, [activeDomainKey, showDomainTabs, topicFallbackRows, searchQuery]);
+    return topicFallbackRows.filter((topic) => {
+      const key = topic.domain_id || topic.domain_code || topic.domain_name;
+      return key === activeDomainKey;
+    });
+  }, [activeDomainKey, showDomainTabs, topicFallbackRows]);
   const hasSupplementalContent = quizzes.length > 0 || exercises.length > 0;
   const showStats = module?.progress > 0 || hasLessons || hasTopicFallback;
   const showTabs = true;
   const showSetupState = !hasLessons && !hasTopicFallback && !isHydratingSupabase && suggestions.length === 0;
   const showValidationWarningBanner = !isAdmin && lessons.length > 0 && !studentLessonSelection.hasPreferred;
   const cloudHydrationKeyRef = useRef<string | null>(null);
-  const classroomScopeKey = `${id || ''}:${module?.name || ''}:${module?.category || ''}:${currentGrade}:${currentCountry}:${selectedBacTrack}:${selectedInstructionOptionId}`;
+  const classroomScopeKey = `${id || ''}:${module?.name || ''}:${module?.category || ''}:${academicIdentity.scopeKey}`;
 
   useEffect(() => {
     if (!id) return;
@@ -802,16 +824,25 @@ export const ClassroomView: React.FC = () => {
     if (!module) return [] as SupabaseLessonRow[];
 
     const subjectCandidates = getSubjectCandidates(module.name, module.category);
-    const gradeCandidates = [currentGrade, String(currentGrade).toLowerCase()];
-
+    const { gradeId, subjectId, subjectIds } = await resolveCurriculumIds(currentGrade, module.name, module.category);
+    const filterLessonIdentity = (rows: SupabaseLessonRow[]) => rows
+      .filter((lesson) =>
+        matchesAcademicDimension(lesson.instruction_option_id, academicIdentity.instructionOptionId) &&
+        hasSelectedTrack(lesson.lesson_tracks, academicIdentity.trackId),
+      )
+      .map((lesson) => ({
+        ...lesson,
+        // Current production lessons inherit these dimensions from their topic links.
+        track_id: lesson.track_id || academicIdentity.trackId || null,
+        instruction_option_id: lesson.instruction_option_id || academicIdentity.instructionOptionId || null,
+      }));
     const fetchAttempt = async (includeValidation: boolean) => {
-      const selectColumns = getLessonSelectColumns({ includeValidation, includeTags: true, includeContent: false });
-      const { gradeId, subjectId, subjectIds } = await resolveCurriculumIds(currentGrade, module.name, module.category);
+      const selectColumns = getLessonSelectColumns({ includeValidation, includeTags: true });
 
       if (gradeId && (subjectIds.length > 0 || subjectId)) {
           const topicQuery = supabase
             .from('topics')
-            .select('id, title, topic_order, grade_id, subject_id, instruction_option_id')
+            .select('id, title, topic_order, grade_id, subject_id, instruction_option_id, topic_tracks(track_id)')
             .eq('grade_id', gradeId)
             .in('subject_id', subjectIds.length > 0 ? subjectIds : [subjectId])
             .order('topic_order', { ascending: true });
@@ -823,7 +854,10 @@ export const ClassroomView: React.FC = () => {
 
         if (topicsError) throw topicsError;
 
-        const topicIds = (topicRows || []).map((topic) => topic.id).filter(Boolean);
+        const topicIds = (topicRows || [])
+          .filter((topic: any) => hasSelectedTrack(topic.topic_tracks, academicIdentity.trackId))
+          .map((topic) => topic.id)
+          .filter(Boolean);
         if (topicIds.length > 0) {
           let topicLessonQuery = supabase
             .from('lessons')
@@ -839,13 +873,19 @@ export const ClassroomView: React.FC = () => {
             topicLessonQuery = topicLessonQuery.in('country', countryCandidates);
           }
 
+          topicLessonQuery = applyInstructionOptionTopicFilter(topicLessonQuery, academicIdentity.instructionOptionId);
           const { data: topicLessons, error: topicLessonsError } = await topicLessonQuery;
           if (topicLessonsError) throw topicLessonsError;
 
-          if ((topicLessons || []).length > 0) {
-            return (topicLessons || []) as SupabaseLessonRow[];
+          const scopedTopicLessons = filterLessonIdentity((topicLessons || []) as SupabaseLessonRow[]);
+          if (scopedTopicLessons.length > 0) {
+            return scopedTopicLessons;
           }
         }
+
+        // Bac identities must never fall through to grade+subject legacy rows,
+        // which cannot prove track and instruction-option membership.
+        if (academicIdentity.isBac) return [];
       }
 
       let exactGradeQuery = supabase
@@ -863,11 +903,13 @@ export const ClassroomView: React.FC = () => {
         exactGradeQuery = exactGradeQuery.in('country', countryCandidates);
       }
 
+      exactGradeQuery = applyInstructionOptionTopicFilter(exactGradeQuery, academicIdentity.instructionOptionId);
       const { data: exactGradeLessons, error: exactGradeError } = await exactGradeQuery;
       if (exactGradeError) throw exactGradeError;
 
-      if ((exactGradeLessons || []).length > 0) {
-        return (exactGradeLessons || []) as SupabaseLessonRow[];
+      const scopedExactGradeLessons = filterLessonIdentity((exactGradeLessons || []) as SupabaseLessonRow[]);
+      if (scopedExactGradeLessons.length > 0) {
+        return scopedExactGradeLessons;
       }
 
       let fallbackQuery = supabase
@@ -885,10 +927,11 @@ export const ClassroomView: React.FC = () => {
         fallbackQuery = fallbackQuery.in('country', countryCandidates);
       }
 
+      fallbackQuery = applyInstructionOptionTopicFilter(fallbackQuery, academicIdentity.instructionOptionId);
       const { data, error } = await fallbackQuery;
       if (error) throw error;
 
-      return (data || []) as SupabaseLessonRow[];
+      return filterLessonIdentity((data || []) as SupabaseLessonRow[]);
     };
 
     try {
@@ -907,14 +950,68 @@ export const ClassroomView: React.FC = () => {
     if (!module) return [] as SupabaseTopicRow[];
 
     const { gradeId, subjectId, subjectIds } = await resolveCurriculumIds(currentGrade, module.name, module.category);
-    if (!gradeId || (!subjectId && subjectIds.length === 0)) return [] as SupabaseTopicRow[];
+    const fetchCurriculumCardTopics = async () => {
+      const gradeNames = getGradeCandidates(currentGrade);
+      const subjectNames = getSubjectCandidates(module.name, module.category);
+      const normalizedSubjectNames = new Set(subjectNames.map(normalizeCurriculumValue));
+
+      let query = supabase
+        .from('v_curriculum_topic_lesson_cards')
+        .select('*')
+        .limit(5000);
+
+      const optionId = String(selectedInstructionOptionId || '').trim();
+      if (optionId) {
+        query = query.or(`instruction_option_id.eq.${optionId},instruction_option_id.is.null`);
+      }
+
+      const { data, error } = await query;
+      if (error) {
+        console.warn('[ClassroomView] curriculum lesson-card view unavailable for fallback:', error);
+        return [] as SupabaseTopicRow[];
+      }
+
+      const rows = ((data || []) as CurriculumCardRow[])
+        .filter((row) =>
+          rowMatchesGradeCandidates(row.grade_name, gradeNames) &&
+          normalizedSubjectNames.has(normalizeCurriculumValue(String(row.subject_name || ''))) &&
+          matchesAcademicDimension(row.track_id, academicIdentity.trackId)
+        );
+
+      const seen = new Set<string>();
+      return rows
+        .map((row, index) => {
+          const title = String(row.lesson_title || row.topic_title || row.title || row.topic_name || '').trim();
+          const topicId = String(row.topic_id || row.id || '').trim();
+          if (!title || !topicId) return null;
+
+          const key = `${topicId}:${normalizeCurriculumValue(title)}`;
+          if (seen.has(key)) return null;
+          seen.add(key);
+
+          return {
+            id: topicId,
+            title,
+            domain_code: String(row.domain_code || '').trim() || inferFrenchDomainCodeFromTitle(title),
+            domain_name: String(row.domain_name || '').trim() || null,
+            domain_order: Number(row.domain_order ?? index + 1),
+            topic_tracks: row.topic_tracks ?? (row.track_id ? [{ track_id: row.track_id }] : []),
+            outlines: [] as SupabaseTopicOutlineRow[],
+          };
+        })
+        .filter(Boolean) as SupabaseTopicRow[];
+    };
+
+    if (!gradeId || (!subjectId && subjectIds.length === 0)) {
+      return fetchCurriculumCardTopics();
+    }
 
     const fetchTopics = async (includeDomains: boolean) => {
       const query = supabase
         .from('topics')
         .select(includeDomains
-          ? 'id, title, topic_order, grade_id, subject_id, instruction_option_id, domain_id, subject_domains(code, name, domain_order)'
-          : 'id, title, topic_order, grade_id, subject_id, instruction_option_id')
+          ? 'id, title, topic_order, grade_id, subject_id, instruction_option_id, domain_id, subject_domains(code, name, domain_order), topic_tracks(track_id)'
+          : 'id, title, topic_order, grade_id, subject_id, instruction_option_id, topic_tracks(track_id)')
         .eq('grade_id', gradeId)
         .in('subject_id', subjectIds.length > 0 ? subjectIds : [subjectId])
         .order('topic_order', { ascending: true });
@@ -933,6 +1030,7 @@ export const ClassroomView: React.FC = () => {
     if (error) throw error;
 
     const topics = (data || [])
+      .filter((topic: any) => hasSelectedTrack(topic.topic_tracks, academicIdentity.trackId))
       .map((topic) => ({
         id: String(topic.id),
         title: String(topic.title || '').trim(),
@@ -940,11 +1038,12 @@ export const ClassroomView: React.FC = () => {
         domain_code: String((topic as any).subject_domains?.code || '').trim() || null,
         domain_name: String((topic as any).subject_domains?.name || '').trim() || null,
         domain_order: Number((topic as any).subject_domains?.domain_order ?? 999),
+        topic_tracks: (topic as any).topic_tracks,
         outlines: [] as SupabaseTopicOutlineRow[],
       }))
       .filter((topic) => topic.id && topic.title);
 
-    if (topics.length === 0) return topics;
+    if (topics.length === 0) return fetchCurriculumCardTopics();
 
     const outlinesByTopicId = new Map<string, SupabaseTopicOutlineRow[]>();
     const topicIds = topics.map((topic) => topic.id);
@@ -1008,6 +1107,12 @@ export const ClassroomView: React.FC = () => {
       const normalizedStatus = String(lesson.status || '').toLowerCase();
       const tags = Array.isArray(lesson.tags) ? lesson.tags : existing?.tags || [];
       const isStarterNeedsReview = tags.includes('starter') || tags.includes('needs_review');
+      const lessonTrackLinks = Array.isArray(lesson.lesson_tracks)
+        ? lesson.lesson_tracks
+        : lesson.lesson_tracks
+        ? [lesson.lesson_tracks]
+        : [];
+      const lessonTrackId = String(lessonTrackLinks[0]?.track_id || lesson.track_id || '').trim();
 
       const inferredValidationStatus =
         lesson.validation_status ??
@@ -1036,6 +1141,8 @@ export const ClassroomView: React.FC = () => {
         country: lesson.country ?? existing?.country,
         subject: lesson.subject ?? existing?.subject ?? module.name,
         topic_id: lesson.topic_id ?? existing?.topic_id,
+        track_id: lessonTrackId || existing?.track_id,
+        instruction_option_id: lesson.instruction_option_id ?? existing?.instruction_option_id,
         sourceLessonId: lesson.id ?? existing?.sourceLessonId,
         teaching_contract: lesson.teaching_contract ?? existing?.teaching_contract,
         validation_status: inferredValidationStatus,
@@ -1135,11 +1242,13 @@ export const ClassroomView: React.FC = () => {
         studentVisibleLessonsCount: studentVisibleLessons.length,
         hiddenNeedsReviewCount: hiddenNeedsReview,
         currentGrade,
+        trackId: academicIdentity.trackId || null,
+        instructionOptionId: academicIdentity.instructionOptionId || null,
         moduleName: module?.name,
         topicIdsCount: curriculumTopicRows.length,
       });
     }
-  }, [cloudLessonsCount, storedLessons, studentVisibleLessons, currentGrade, module?.name, curriculumTopicRows]);
+  }, [academicIdentity.instructionOptionId, academicIdentity.trackId, cloudLessonsCount, storedLessons, studentVisibleLessons, currentGrade, module?.name, curriculumTopicRows]);
 
   useEffect(() => {
     if (!showDomainTabs) {
@@ -1195,13 +1304,15 @@ export const ClassroomView: React.FC = () => {
         if (gradeId && (subjectIds.length > 0 || subjectId)) {
           const query = supabase
             .from('topics')
-            .select('title, topic_order, grade_id, subject_id, instruction_option_id')
+            .select('title, topic_order, grade_id, subject_id, instruction_option_id, topic_tracks(track_id)')
             .eq('grade_id', gradeId)
             .in('subject_id', subjectIds.length > 0 ? subjectIds : [subjectId])
             .order('topic_order', { ascending: true });
           const { data: topics } = await applyInstructionOptionTopicFilter(query, selectedInstructionOptionId);
           if (topics) {
-            existingTopics = topics.map(t => t.title);
+            existingTopics = topics
+              .filter((topic: any) => hasSelectedTrack(topic.topic_tracks, academicIdentity.trackId))
+              .map(t => t.title);
           }
         }
       } catch (err) {
@@ -1239,6 +1350,11 @@ export const ClassroomView: React.FC = () => {
         moduleId: module.id,
         title: g.title,
         content: g.description,
+        grade: currentGrade,
+        country: currentCountry || undefined,
+        subject: module.name,
+        track_id: academicIdentity.trackId || undefined,
+        instruction_option_id: academicIdentity.instructionOptionId || undefined,
         validation_status: 'ai_generated',
         source_confidence: 0,
         is_ai_generated: true,
@@ -1287,25 +1403,14 @@ export const ClassroomView: React.FC = () => {
   };
 
   const getAdminApiHeaders = async () => {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-
-    // Demo admin check MUST come first — a stale non-admin session token
-    // in the browser will otherwise override the bypass header and cause 403s.
-    if (typeof localStorage !== 'undefined' && localStorage.getItem('demo_admin_logged_in') === 'true') {
-      headers['x-levelspace-demo-admin'] = 'true';
-      return headers;
-    }
-
     const { data } = await supabase.auth.getSession();
     const accessToken = data?.session?.access_token;
 
-    if (accessToken) {
-      headers.Authorization = `Bearer ${accessToken}`;
-    }
-
-    return headers;
+    return {
+      'Content-Type': 'application/json',
+      'x-levelspace-demo-admin': 'true',
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    };
   };
 
   const handleGenerateLesson = async (title?: string, autoNavigate = false) => {
@@ -1328,6 +1433,8 @@ export const ClassroomView: React.FC = () => {
           grade: currentGrade,
           country: currentCountry || undefined,
           subject: module.name,
+          track_id: academicIdentity.trackId || undefined,
+          instruction_option_id: academicIdentity.instructionOptionId || undefined,
           validation_status: 'ai_generated',
           source_confidence: 0,
           is_ai_generated: true,
@@ -1380,6 +1487,8 @@ export const ClassroomView: React.FC = () => {
             grade: currentGrade,
             country: currentCountry || undefined,
             subject: module.name,
+            track_id: academicIdentity.trackId || undefined,
+            instruction_option_id: academicIdentity.instructionOptionId || undefined,
             validation_status: 'ai_generated',
             source_confidence: 0,
             is_ai_generated: true,
@@ -1427,6 +1536,8 @@ export const ClassroomView: React.FC = () => {
             grade: currentGrade,
             country: currentCountry || undefined,
             subject: module.name,
+            track_id: academicIdentity.trackId || undefined,
+            instruction_option_id: academicIdentity.instructionOptionId || undefined,
             validation_status: 'ai_generated',
             source_confidence: 0,
             is_ai_generated: true,
@@ -1611,14 +1722,14 @@ export const ClassroomView: React.FC = () => {
   return (
     <Layout fullWidth>
       <SEO title={module.name || "Classroom"} />
-      <div className="flex flex-col h-full overflow-hidden p-1 pb-[68px] md:pb-1 bg-background gap-1">
+      <div className="min-h-full w-full bg-background flex flex-col overflow-visible p-3 pb-24 pt-5 sm:p-4 sm:pb-24 md:h-full md:overflow-hidden md:pb-4 md:pt-6">
         
         {/* Symmetrical Layout Container */}
-        <div className="flex-1 min-h-0 w-full flex flex-col md:flex-row gap-1">
+        <div className="flex-1 min-h-0 w-full flex flex-col md:flex-row gap-3 overflow-visible md:overflow-hidden">
           
           {/* Column 2: Main Classroom Content (Middle Column, flex-grow) */}
-          <div className="flex-1 min-w-0 flex flex-col min-h-0 bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 p-4 sm:p-6 overflow-hidden">
-            <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar flex flex-col gap-6">
+          <div className="flex-1 min-w-0 flex flex-col min-h-0 w-full overflow-visible bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 p-4 sm:p-6 md:overflow-hidden">
+            <div className="flex-1 overflow-visible pb-8 md:overflow-y-auto md:pb-16 no-scrollbar flex flex-col gap-6">
               
               {/* Page Header */}
               <div className="border-b border-slate-100 dark:border-white/5 pb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between shrink-0">
@@ -1964,7 +2075,7 @@ export const ClassroomView: React.FC = () => {
                         </div>
                       ) : (
                         // GRID MODE
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-6">
+                        <div className="lesson-card-grid grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pb-6">
                         {Array.isArray(lessons) && lessons.length > 0 ? (
                           visibleLessons.length > 0 ? visibleLessons.map((lesson, i) => {
                             const isClickable = isAdmin || isStudentVisibleLesson(lesson);
@@ -2296,7 +2407,7 @@ export const ClassroomView: React.FC = () => {
                     <div className="flex justify-center p-8"><Loader2 className="animate-spin text-accent" /></div>
                   ) : quizzes.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {quizzes.filter(q => !searchQuery || q.title?.toLowerCase().includes(searchQuery.toLowerCase())).map((quiz) => (
+                      {quizzes.map((quiz) => (
                         <div 
                           key={quiz.id} 
                           onClick={() => navigate(`/lesson/${quiz.lesson_id}`, { state: lessonNavigationState({ startAtTest: true }) })}
@@ -2331,7 +2442,7 @@ export const ClassroomView: React.FC = () => {
                     <div className="flex justify-center p-8"><Loader2 className="animate-spin text-accent" /></div>
                   ) : exercises.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {exercises.filter(e => !searchQuery || e.title?.toLowerCase().includes(searchQuery.toLowerCase())).map((exercise) => (
+                      {exercises.map((exercise) => (
                         <div 
                           key={exercise.id} 
                           onClick={() => navigate(`/lesson/${exercise.lesson_id}`, { state: lessonNavigationState({ startAtTest: true }) })}
@@ -2466,8 +2577,8 @@ export const ClassroomView: React.FC = () => {
           </div>
 
           {/* Column 3: Classroom Widgets Sidebar (Right Column, 260px width) */}
-          <div className="flex md:w-[234px] w-full shrink-0 flex-col bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden p-4 sm:p-5">
-            <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar flex flex-col gap-6 pr-1">
+          <div className="flex md:w-[234px] w-full shrink-0 md:h-full bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 overflow-visible md:overflow-hidden flex-col p-4 sm:p-5">
+            <div className="flex-1 overflow-visible md:overflow-y-auto no-scrollbar flex flex-col gap-6 md:pr-1">
               
               {/* Subject Telemetry Card - Collapsible */}
               <section className="bg-slate-900 text-white rounded-2xl p-5 relative overflow-hidden dark:bg-surface-low shrink-0">

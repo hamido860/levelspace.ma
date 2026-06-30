@@ -59,7 +59,14 @@ const deriveCycleFromGrade = (grade: string) => {
 
 async function resolveTopicContext(
   supabaseAdmin: any,
-  lessonContext: { grade: string; subject: string; topic: string; lessonTitle?: string | null }
+  lessonContext: {
+    grade: string;
+    subject: string;
+    topic: string;
+    lessonTitle?: string | null;
+    trackId?: string | null;
+    instructionOptionId?: string | null;
+  }
 ) {
   const gradeName = normalizeValue(lessonContext.grade);
   const subjectName = normalizeValue(lessonContext.subject);
@@ -86,18 +93,30 @@ async function resolveTopicContext(
     return null;
   }
 
-  const { data: existingTopics, error: topicLookupError } = await supabaseAdmin
+  let existingTopicQuery = supabaseAdmin
     .from("topics")
-    .select("id, title")
+    .select("id, title, instruction_option_id, topic_tracks(track_id)")
     .eq("grade_id", gradeId)
     .eq("subject_id", subjectId)
     .ilike("title", topicTitle)
-    .limit(1);
+    .limit(20);
+  existingTopicQuery = lessonContext.instructionOptionId
+    ? existingTopicQuery.eq("instruction_option_id", lessonContext.instructionOptionId)
+    : existingTopicQuery.is("instruction_option_id", null);
+  const { data: existingTopics, error: topicLookupError } = await existingTopicQuery;
 
   if (topicLookupError) throw topicLookupError;
 
-  const existingTopicRows = (existingTopics || []) as Array<{ id: string }>;
-  const existingTopicId = existingTopicRows[0]?.id;
+  const existingTopicRows = (existingTopics || []) as Array<{
+    id: string;
+    topic_tracks?: Array<{ track_id?: string | null }> | null;
+  }>;
+  const existingTopicId = existingTopicRows.find((row) => {
+    const links = row.topic_tracks || [];
+    return lessonContext.trackId
+      ? links.some((link) => link.track_id === lessonContext.trackId)
+      : links.length === 0;
+  })?.id;
   if (existingTopicId) {
     return { topicId: existingTopicId, gradeId, subjectId, topicTitle };
   }
@@ -107,6 +126,7 @@ async function resolveTopicContext(
     .insert({
       grade_id: gradeId,
       subject_id: subjectId,
+      instruction_option_id: lessonContext.instructionOptionId ?? null,
       title: topicTitle,
     })
     .select("id")
@@ -117,6 +137,16 @@ async function resolveTopicContext(
   const createdTopicId = (createdTopic as { id?: string } | null)?.id;
   if (!createdTopicId) {
     return null;
+  }
+
+  if (lessonContext.trackId) {
+    const { error: topicTrackError } = await supabaseAdmin
+      .from("topic_tracks")
+      .upsert({ topic_id: createdTopicId, track_id: lessonContext.trackId }, {
+        onConflict: "topic_id,track_id",
+        ignoreDuplicates: true,
+      });
+    if (topicTrackError) throw topicTrackError;
   }
 
   return { topicId: createdTopicId, gradeId, subjectId, topicTitle };
@@ -1078,11 +1108,15 @@ Deno.serve(async (req) => {
   let activeMcpRunId: string | null = null;
   let observability: LessonGenerationObservability | null = null;
   let activeModel: string | null = null;
+  let activeTrackId: string | null = null;
+  let activeInstructionOptionId: string | null = null;
 
   try {
     startedAt = Date.now();
     const body = await req.json();
     const { topic, country, grade, subject, moduleName, userId, referenceUrls, existingContext } = body;
+    activeTrackId = normalizeValue(body.trackId || body.track_id) || null;
+    activeInstructionOptionId = normalizeValue(body.instructionOptionId || body.instruction_option_id) || null;
     queueJobId = getRequestQueueJobId(body);
     activeTopicId = getRequestTopicId(body);
 
@@ -1118,6 +1152,21 @@ Deno.serve(async (req) => {
 
     const claimedJob = await claimQueueJob(supabaseAdmin, queueJobId);
     if (claimedJob?.topic_id && !activeTopicId) activeTopicId = claimedJob.topic_id;
+    if (claimedJob?.track_id && !activeTrackId) activeTrackId = claimedJob.track_id;
+    if (activeTopicId) {
+      const { data: topicIdentity, error: topicIdentityError } = await supabaseAdmin
+        .from("topics")
+        .select("instruction_option_id, topic_tracks(track_id)")
+        .eq("id", activeTopicId)
+        .maybeSingle();
+      if (topicIdentityError) throw topicIdentityError;
+      if (!activeInstructionOptionId && topicIdentity?.instruction_option_id) {
+        activeInstructionOptionId = topicIdentity.instruction_option_id;
+      }
+      if (!activeTrackId && Array.isArray(topicIdentity?.topic_tracks)) {
+        activeTrackId = topicIdentity.topic_tracks[0]?.track_id ?? null;
+      }
+    }
     if (claimedJob?.id) {
       await writeAiTaskLog(supabaseAdmin, observability, "job_claimed", "Lesson generation queue job claimed.", {
         topic_id: activeTopicId,
@@ -1161,6 +1210,8 @@ Deno.serve(async (req) => {
       grade,
       subject,
       topic,
+      trackId: activeTrackId,
+      instructionOptionId: activeInstructionOptionId,
     });
     activeTopicId = topicContext?.topicId ?? activeTopicId;
     const topicData = await fetchTopicData(supabaseAdmin, activeTopicId);
@@ -1201,6 +1252,14 @@ Deno.serve(async (req) => {
       );
     }
     const materialRequirements = await fetchMaterialRequirements(supabaseAdmin, activeTopicId);
+    const [{ data: activeTrack }, { data: activeInstructionOption }] = await Promise.all([
+      activeTrackId
+        ? supabaseAdmin.from("tracks").select("name, code").eq("id", activeTrackId).maybeSingle()
+        : Promise.resolve({ data: null }),
+      activeInstructionOptionId
+        ? supabaseAdmin.from("instruction_options").select("name, option_code").eq("id", activeInstructionOptionId).maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]);
     const [mcpProfile, trustedSources] = await Promise.all([
       fetchMcpProfile(supabaseAdmin),
       fetchTrustedSources(supabaseAdmin),
@@ -1215,6 +1274,9 @@ Deno.serve(async (req) => {
       materialPack,
     });
     const sourceContext = [
+      activeTrack || activeInstructionOption
+        ? `Exact academic identity:\n- Track: ${activeTrack?.name || "shared"} (${activeTrack?.code || activeTrackId || "none"})\n- Instruction option: ${activeInstructionOption?.name || "shared"} (${activeInstructionOption?.option_code || activeInstructionOptionId || "none"})`
+        : "",
       existingContext ? `Existing lessons for context:\n${existingContext}` : "",
       buildSourceContext(topicData),
       materialPack.length > 0 ? `Required materials:\n${materialPack.map((item) => `- ${item.material_type}: ${item.title || "untitled"} | required=${item.required} | purpose=${item.purpose || ""} | search=${item.search_query || ""}`).join("\n")}` : "No explicit topic_material_requirements were found.",
@@ -1315,6 +1377,12 @@ Deno.serve(async (req) => {
     const sourceName = fallbackUsed || !hasRagChunks ? "topic_outlines" : "rag_chunks";
     const mcpQualityReport = {
       pipeline_type: "admin_heavy",
+      academic_identity: {
+        grade_id: topicContext?.gradeId ?? null,
+        subject_id: topicContext?.subjectId ?? null,
+        track_id: activeTrackId,
+        instruction_option_id: activeInstructionOptionId,
+      },
       checks: mcpQualityChecks,
       fallback_used: fallbackUsed,
       source_name: sourceName,
@@ -1329,6 +1397,7 @@ Deno.serve(async (req) => {
         grade,
         subject,
         topic_id: topicContext?.topicId ?? null,
+        instruction_option_id: activeInstructionOptionId,
         lesson_title: lesson.lesson_title,
         content: normalizedContent,
         status: "draft",
@@ -1383,6 +1452,15 @@ Deno.serve(async (req) => {
     }
 
     const lessonId = inserted.id;
+    if (activeTrackId) {
+      const { error: lessonTrackError } = await supabaseAdmin
+        .from("lesson_tracks")
+        .upsert({ lesson_id: lessonId, track_id: activeTrackId }, {
+          onConflict: "lesson_id,track_id",
+          ignoreDuplicates: true,
+        });
+      if (lessonTrackError) throw lessonTrackError;
+    }
     await writeAiTaskLog(supabaseAdmin, observability, "lesson_inserted", "Lesson row inserted or updated.", {
       topic_id: activeTopicId,
       lesson_id: lessonId,
@@ -1391,6 +1469,10 @@ Deno.serve(async (req) => {
       fallback_used: fallbackUsed,
       source_name: sourceName,
       model: activeModel,
+      grade_id: topicContext?.gradeId ?? null,
+      subject_id: topicContext?.subjectId ?? null,
+      track_id: activeTrackId,
+      instruction_option_id: activeInstructionOptionId,
     });
 
     await writeAiTaskLog(supabaseAdmin, observability, "lesson_blocks_saved_in_lessons_jsonb", "Lesson blocks saved in lessons JSONB.", {
