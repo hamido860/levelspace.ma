@@ -1,12 +1,12 @@
 import { Type } from "@google/genai";
 import { jsonrepair } from "jsonrepair";
+import { moroccanAcademicDb } from "../data/moroccan_academic_db";
 import { toast } from "sonner";
 import { db } from "../db/db";
 import { supabase } from "../db/supabase";
 import { searchContextForGeneration } from "./ragService";
 import { transformersService } from "./transformersService";
 import { mcpClient } from "./mcpClient";
-import { detectLanguage, LANG_LABELS, resolveExpectedLanguage, type LangCode } from "../mcp/languagePolicy";
 
 export const getCustomApiKey = () => "";
 
@@ -80,8 +80,8 @@ export const setNvidiaApiKey = (key: string) => {
   }
 };
 
-export const NVIDIA_MODEL = "google/gemma-3-27b-it";
-export const NVIDIA_WORKER_MODEL = "google/gemma-3-27b-it"; // Gemma 3 27B — primary bulk lesson worker
+export const NVIDIA_MODEL = "meta/llama-3.3-70b-instruct";
+export const NVIDIA_WORKER_MODEL = "meta/llama-3.3-70b-instruct"; // Llama 3.3 70B — primary bulk lesson worker
 
 export async function callNvidiaAPI(params: {
   prompt: string;
@@ -184,6 +184,24 @@ export const modelQuotaTracker = {
   allGeminiExhausted(): boolean {
     return GEMINI_FALLBACKS.every((m) => this.isExhausted(m));
   },
+};
+
+export const resolveModelForProvider = (): string | undefined => {
+  const provider = getAiProvider();
+  
+  if (!provider) {
+    return undefined; // Let the backend use its default provider and model
+  }
+  
+  if (provider === "nvidia") {
+    return NVIDIA_MODEL;
+  }
+  
+  if (provider === "gemini") {
+    return modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]) || "gemini-2.5-flash";
+  }
+  
+  return undefined;
 };
 
 const extractResponseText = (response: any): string =>
@@ -379,88 +397,16 @@ const SIMPLE_THANKS = new Set([
   "حسنا",
 ]);
 
-const SUPPORTED_CHAT_LANGS = new Set<LangCode>(["ar", "fr", "en", "de", "es", "ja"]);
-
-function resolveAssistantLanguage(input: {
-  country?: string;
-  subject?: string;
-  lessonContent?: string;
-  userLanguage?: string;
-}): { code: LangCode; label: string; source: string } {
-  const policyLanguage = input.country && input.subject
-    ? resolveExpectedLanguage(input.country, input.subject)
-    : null;
-  if (policyLanguage) {
-    return { code: policyLanguage, label: LANG_LABELS[policyLanguage] || policyLanguage, source: "curriculum policy" };
-  }
-
-  const detected = input.lessonContent ? detectLanguage(input.lessonContent) : null;
-  if (detected?.dominant && detected.dominant !== "unknown") {
-    return { code: detected.dominant, label: LANG_LABELS[detected.dominant] || detected.dominant, source: "lesson content" };
-  }
-
-  const requested = input.userLanguage as LangCode | undefined;
-  if (requested && SUPPORTED_CHAT_LANGS.has(requested)) {
-    return { code: requested, label: LANG_LABELS[requested] || requested, source: "interface preference" };
-  }
-
-  return { code: "en", label: LANG_LABELS.en, source: "default" };
-}
-
-function localizedSimpleResponse(kind: "greeting" | "thanks", language: LangCode): string {
-  const messages: Record<LangCode, Record<"greeting" | "thanks", string>> = {
-    ar: {
-      greeting: "مرحبا! كيف يمكنني مساعدتك في هذا الدرس اليوم؟",
-      thanks: "على الرحب والسعة! أخبرني إذا كان لديك أي سؤال آخر.",
-    },
-    fr: {
-      greeting: "Bonjour ! Comment puis-je t'aider avec ce cours aujourd'hui ?",
-      thanks: "Avec plaisir ! Dis-moi si tu as une autre question.",
-    },
-    en: {
-      greeting: "Hello! How can I help you with your lesson today?",
-      thanks: "You're welcome! Let me know if you have any other questions.",
-    },
-    de: {
-      greeting: "Hallo! Wie kann ich dir heute bei dieser Lektion helfen?",
-      thanks: "Gern geschehen! Sag mir Bescheid, wenn du noch Fragen hast.",
-    },
-    es: {
-      greeting: "Hola! Como puedo ayudarte con esta leccion hoy?",
-      thanks: "De nada! Dime si tienes otra pregunta.",
-    },
-    ja: {
-      greeting: "こんにちは。このレッスンについて、今日はどう手伝いましょうか。",
-      thanks: "どういたしまして。他にも質問があれば教えてください。",
-    },
-  };
-
-  return messages[language]?.[kind] || messages.en[kind];
-}
-
-function fallbackTutorMessage(language: LangCode): string {
-  const messages: Record<LangCode, string> = {
-    ar: "كيف يمكنني مساعدتك في هذا الدرس؟ يمكنني الإجابة عن الأسئلة أو شرح المفاهيم أو اختبار فهمك.",
-    fr: "Comment puis-je t'aider avec ce cours ? Je peux répondre à tes questions, expliquer des notions ou tester ta compréhension.",
-    en: "How can I help you with this lesson? I can answer questions, explain concepts, or test your knowledge.",
-    de: "Wie kann ich dir bei dieser Lektion helfen? Ich kann Fragen beantworten, Konzepte erklaeren oder dein Verstaendnis testen.",
-    es: "Como puedo ayudarte con esta leccion? Puedo responder preguntas, explicar conceptos o poner a prueba tu comprension.",
-    ja: "このレッスンについて、どう手伝いましょうか。質問への回答、概念の説明、理解度チェックができます。",
-  };
-
-  return messages[language] || messages.en;
-}
-
-export function handleSimpleTask(message: string, language: LangCode = "en"): string | null {
+export function handleSimpleTask(message: string): string | null {
   const cleanMsg = message
     .trim()
     .toLowerCase()
     .replace(/[^\w\sأ-ي]/g, "");
   if (SIMPLE_GREETINGS.has(cleanMsg)) {
-    return localizedSimpleResponse("greeting", language);
+    return "Hello! How can I help you with your lesson today?";
   }
   if (SIMPLE_THANKS.has(cleanMsg)) {
-    return localizedSimpleResponse("thanks", language);
+    return "You're welcome! Let me know if you have any other questions.";
   }
   return null;
 }
@@ -753,7 +699,16 @@ export async function generateAIContent(
   try {
     const config = params.config || {};
     const preferredProvider = params.provider || getAiProvider() || undefined;
-    const preferredModel = params.model || getAiModel() || undefined;
+    let preferredModel = params.model || getAiModel() || undefined;
+    
+    // Auto-migrate EOL Gemma 3 models to Llama 3.3 for NVIDIA provider
+    if (preferredModel === "google/gemma-3-27b-it" || preferredModel === "google/gemma-2-27b-it") {
+       if (preferredProvider === "nvidia" || !preferredProvider) {
+           preferredModel = "meta/llama-3.3-70b-instruct";
+           localStorage.setItem("ai_model", preferredModel); // update cache for future
+       }
+    }
+
     const fallbackEnabled = localStorage.getItem("ai_fallback_enabled");
     const { data: sessionData } = await supabase.auth.getSession();
     const accessToken = sessionData.session?.access_token;
@@ -934,6 +889,7 @@ export interface LessonSuggestion {
 
 export interface LessonTemplate {
   id?: string;
+  topic_id?: string;
   country: string;
   grade: string;
   subject: string;
@@ -945,6 +901,10 @@ export interface LessonTemplate {
   exam: any;
   similarity?: number;
   blocks?: AILessonBlock[];
+  tags?: string[];
+  teaching_contract?: any;
+  subtitle?: string;
+  cycle?: string;
 }
 
 // ─── Orchestration: Pro plans, Gemma 4 executes ──────────────────────────────
@@ -1174,7 +1134,7 @@ export const getLessonPrompt = (
     1. Be precise, academic, and engaging.
     2. Use Markdown for formatting within the "content" fields.
     3. Provide 2-3 exercises, 2-3 quizzes, and 1 exam-style question.
-    4. Write a complete teaching lesson with enough depth for classroom use. Target 12,000-16,000 characters total, while keeping the JSON valid.
+    4. Keep the total content length under 8000 characters to ensure complete JSON generation.
     5. ILLUSTRATIONS: You MUST include 1-2 relevant illustrations in the lesson content using Markdown image syntax. Use the format: ![Alt text](https://picsum.photos/seed/{keyword}/800/400) where {keyword} is a single, highly relevant English word (e.g., physics, biology, history, geography).
     6. MATH FORMATTING: Use clean LaTeX formatting for all math equations (e.g., $x^2$ for inline, $$x^2$$ for block). Do NOT output raw text like "lim x->x0".
     7. PEDAGOGY & STRUCTURE: The lesson content MUST follow a strict pedagogical structure:
@@ -1280,7 +1240,7 @@ Return ONLY the refined Markdown content. Do not include any conversational fill
   try {
     const response = await generateContentWithFallback(
       {
-        model: "gemini-3.1-pro-preview",
+        model: resolveModelForProvider(),
         contents: prompt,
       },
       "refineLessonContent"
@@ -1319,7 +1279,7 @@ export const generateFullLesson = async (
 
     const config: any = {
       responseMimeType: "application/json",
-      maxOutputTokens: 8192,
+      maxOutputTokens: 5000,
       responseSchema: {
         type: Type.OBJECT,
         properties: {
@@ -1478,6 +1438,33 @@ export const generateFullLesson = async (
         retries - 1, referenceUrls, existingContext, isAdmin, _correctionPrompt,
       );
     }
+    throw error;
+  }
+};
+
+export const extractChunkMetadata = async (chunkContent: string): Promise<{ topic: string; subject: string; moduleName: string } | null> => {
+  if (!chunkContent || !checkAIProvider()) return null;
+  try {
+    const prompt = `Analyze the following educational content and extract the most appropriate Topic/Title, Subject (e.g. Math, Physics, History), and Module Name (a broader category or chapter name, e.g. "Module 1: Mechanics"). Respond ONLY in JSON matching this schema: {"topic": "string", "subject": "string", "moduleName": "string"}.
+
+Content:
+${chunkContent.substring(0, 1500)}`;
+
+    const response = await generateContentWithFallback({
+      model: modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]),
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        maxOutputTokens: 300,
+      }
+    }, "extractChunkMetadata");
+
+    if (response && response.text) {
+      return safeJsonParse(response.text) as { topic: string; subject: string; moduleName: string };
+    }
+    return null;
+  } catch (err) {
+    console.error("Failed to extract chunk metadata:", err);
     return null;
   }
 };
@@ -1505,7 +1492,7 @@ export const generateCurriculum = async (
 
     let extraContext = "";
     if (country === "MA" || country === "Morocco") {
-      extraContext = `\n\nUse the connected Supabase curriculum data as the source of truth for Moroccan academic structure.\n
+      extraContext = `\n\nUse the following Moroccan academic structure as a reference for the curriculum:\n${JSON.stringify(moroccanAcademicDb, null, 2)}\n
       CRITICAL HIERARCHY RULES FOR MOROCCO:
       1. Primary Education (1ère - 6ème année primaire) is for children aged 6-12. Subjects are basic.
       2. Lower Secondary (Collège) is for ages 12-15.
@@ -1612,7 +1599,6 @@ export const generateSeedLesson = async (
     // 1. Check Cache
     const cacheKey = getCacheKey(
       "generateSeedLesson",
-      "v3-depth",
       moduleName,
       grade,
       country,
@@ -1631,13 +1617,12 @@ export const generateSeedLesson = async (
         ? `\nUse this existing curriculum as chaining context to stay consistent:\n<CONTEXT>\n${existingContext}\n</CONTEXT>`
         : "";
 
-    const basePrompt = `Generate a complete classroom seed lesson for "${moduleName}" for a student in ${country} at the ${grade} level.
-The lesson must be substantial enough for a real study session and structured into blocks: definition, rules, worked examples, a multiple-choice quiz, a practice exercise, and a national exam style question.
+    const basePrompt = `Generate a concise introductory seed lesson for the classroom "${moduleName}" for a student in ${country} at the ${grade} level.
+The lesson must be engaging and structured into blocks: definition, rules, worked examples, a multiple-choice quiz, a practice exercise, and a national exam style question.
 ${ragInstruction}
 
 CONSTRAINTS:
-- Target 8,000-12,000 characters total while keeping the JSON valid.
-- Include enough explanation, examples, and step-by-step reasoning that the lesson does not feel like a summary.
+- Keep total content under 3000 characters.
 - Use Markdown inside "content" and "question" fields.
 - No walls of text: use bullet points, bold key terms, short paragraphs.
 - Write entirely in the official language of instruction for "${moduleName}" in ${country} for ${grade} (e.g. Arabic for Philosophy/History in Morocco, French for Sciences/Math).
@@ -1659,7 +1644,7 @@ Return ONLY valid JSON (no markdown fences) matching this exact structure:
     // ── Primary: NVIDIA (free tier, no Gemini quota consumed) ─────────────────
     if (getNvidiaApiKey()) {
       try {
-        const nvidiaText = await callNvidiaAPI({ prompt: basePrompt, isJson: true, maxTokens: 7000 });
+        const nvidiaText = await callNvidiaAPI({ prompt: basePrompt, isJson: true, maxTokens: 4096 });
         if (nvidiaText) {
           const parsed = safeJsonParse(nvidiaText) as AILesson;
           if (parsed?.title && Array.isArray(parsed.blocks)) {
@@ -1676,15 +1661,15 @@ Return ONLY valid JSON (no markdown fences) matching this exact structure:
     const response = await generateContentWithFallback(
       {
         model: modelQuotaTracker.getBestModel("gemini-2.5-flash", ["gemini-2.5-flash-lite"]),
-        contents: `Generate a complete classroom seed lesson for "${moduleName}" for a student in ${country} at the ${grade} level.
-      The lesson should be substantial enough for a real study session and structured into specific blocks: definition, rules, worked examples, a multiple-choice quiz, a practice exercise, and a national exam style question.
+        contents: `Generate a concise introductory seed lesson for the classroom "${moduleName}" for a student in ${country} at the ${grade} level.
+      The lesson should be engaging and structured into specific blocks: definition, rules, worked examples, a multiple-choice quiz, a practice exercise, and a national exam style question.
       ${ragInstruction}
       
       CRITICAL CONSTRAINTS:
-      1. Target 8,000-12,000 characters total while keeping the JSON valid.
+      1. Keep the total content length under 3000 characters to ensure complete JSON generation.
       2. Be precise and academic.
       3. Use Markdown for formatting within the "content" and "question" fields.
-      4. Ensure each block has real teaching depth: explanations, examples, common mistakes, and step-by-step reasoning where useful.
+      4. Ensure each block is concise. For example, the "content" should be no more than 800 characters.
       5. FORMATTING & READABILITY: You MUST avoid "walls of text". 
          - **Never** write a dense wall of text. Break concepts into bullet points.
          - **Definitions** must be clear and concise.
@@ -1854,7 +1839,7 @@ export const generateAnotherExample = async (
 
     const response = await generateContentWithFallback(
       {
-        model: "gemini-3.1-pro-preview",
+        model: resolveModelForProvider(),
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -2796,10 +2781,8 @@ export const generateProactiveGreeting = async (
   userLanguage?: string,
   subject?: string,
   grade?: string,
-  country?: string,
 ): Promise<string> => {
   try {
-    const assistantLanguage = resolveAssistantLanguage({ country, subject, lessonContent, userLanguage });
     // 1. Check Cache
     const cacheKey = getCacheKey(
       "generateProactiveGreeting",
@@ -2807,9 +2790,6 @@ export const generateProactiveGreeting = async (
       userLanguage,
       subject,
       grade,
-      country,
-      assistantLanguage.code,
-      "socratic-diagnostic-ui-v1",
     );
     const cachedResponse = await responseCache.get(cacheKey);
     if (cachedResponse) {
@@ -2827,11 +2807,9 @@ export const generateProactiveGreeting = async (
       {
         model: modelToUse,
         contents: `Analyze the following lesson content. If the concepts appear particularly complex, advanced, or dense, generate a friendly, proactive message offering to break down the complex parts step-by-step or provide simpler examples. If the content is straightforward, offer to help with any questions, summarize it, or quiz the student on the material. Keep the message brief (1-3 sentences), encouraging, and conversational.
-
-MANDATORY LANGUAGE: Respond entirely in ${assistantLanguage.label}. This language was selected from ${assistantLanguage.source}. Do not default to English unless the mandatory language is English.
+CRITICAL LANGUAGE RULE: You MUST respond in the EXACT same language as the lesson content below. For example, if the lesson is in Arabic, your message MUST be entirely in Arabic. Do not mix languages. Ignore the user's interface language (${userLanguage || "unknown"}) for this greeting, always match the lesson content's language.
 ${subject ? `SUBJECT: ${subject}` : ""}
 ${grade ? `STUDENT LEVEL: ${grade}` : ""}
-${country ? `COUNTRY: ${country}` : ""}
 
 LESSON CONTENT:
 ${lessonContent.substring(0, 4000)}`,
@@ -2843,7 +2821,7 @@ ${lessonContent.substring(0, 4000)}`,
 
     const responseText =
       response.text ||
-      fallbackTutorMessage(assistantLanguage.code);
+      "How can I help you with this lesson? I can answer questions, explain concepts, or test your knowledge.";
 
     // Save to cache
     await responseCache.set(cacheKey, responseText);
@@ -2851,8 +2829,7 @@ ${lessonContent.substring(0, 4000)}`,
     return responseText;
   } catch (error) {
     handleApiError(error, "generateProactiveGreeting");
-    const assistantLanguage = resolveAssistantLanguage({ country, subject, lessonContent, userLanguage });
-    return fallbackTutorMessage(assistantLanguage.code);
+    return "How can I help you with this lesson? I can answer questions, explain concepts, or test your knowledge.";
   }
 };
 
@@ -2870,10 +2847,8 @@ export const chatWithTutor = async (
   strictRAG?: boolean,
   subject?: string,
   grade?: string,
-  country?: string,
 ): Promise<string> => {
   try {
-    const assistantLanguage = resolveAssistantLanguage({ country, subject, lessonContent: lessonContext, userLanguage });
     // 1. Check Cache
     const cacheKey = getCacheKey(
       "chatWithTutor",
@@ -2885,9 +2860,6 @@ export const chatWithTutor = async (
       strictRAG,
       subject,
       grade,
-      country,
-      assistantLanguage.code,
-      "socratic-diagnostic-v1",
     );
     const cachedResponse = await responseCache.get(cacheKey);
     if (cachedResponse) {
@@ -2896,7 +2868,7 @@ export const chatWithTutor = async (
     }
 
     // 2. Check Simple Task
-    const simpleResponse = handleSimpleTask(message, assistantLanguage.code);
+    const simpleResponse = handleSimpleTask(message);
     if (simpleResponse) {
       console.log("Pipeline: Simple task matched");
       return simpleResponse;
@@ -2924,78 +2896,14 @@ export const chatWithTutor = async (
       }
     }
 
-    const strictRagInstruction = strictRAG ? `\nSTRICT LESSON-CONTEXT MODE: You MUST ONLY answer based on the provided LESSON CONTENT and ADDITIONAL LESSON CONTEXT. Do NOT generate content outside this context. Do NOT suggest ideas that are not mathematically or logically derivable strictly from the provided text.` : `SECONDARY RULE: If the student asks about something not covered in the provided contexts, answer carefully and briefly say that the lesson text does not show that part clearly.`;
-    const socraticDiagnosticInstruction = `You are the Levelspace Socratic Diagnostic Adaptive Tutor.
-Your job is not to lecture.
-Your job is to find the student's exact blockage and guide one step at a time.
-
-For each turn, choose exactly one action:
-1. diagnose
-2. explain one small point
-3. give one example
-4. ask one mini-check
-5. repair a misconception
-6. start one quiz question
-
-Never do more than one major action in the same turn.
-
-If the student asks for help finding what is difficult, trigger diagnostic_mode.
-If the student says words are difficult, trigger vocabulary_diagnostic_mode.
-If the student asks for an example and the section is known, give an example immediately.
-If the student answers incorrectly, give a hint before the final answer.
-If the student repeats the same request, continue from state instead of restarting.
-
-Avoid:
-- polite filler
-- "Bien sur" as a repeated opener
-- "Je suis la pour t'aider"
-- long introductions
-- broad generic questions
-- repeated greetings
-- full lectures
-- fake curriculum content
-- internal system details
-
-Keep student-facing answers short. Every explanation must end with one mini-check question.
-Never mention RAG, embeddings, chunks, Supabase, metadata, vector search, generation pipelines, source tables, confidence, tool calls, or admin validation.`;
-    const tutorUiInstruction = `OPTIONAL UI INSTRUCTION:
-When the conversation clearly enters a tutoring UI state, you may append ONE machine-readable block after the student-facing answer.
-Use this exact wrapper and valid JSON only:
-<tutor-ui>{"ui_mode":"diagnostic_mode","event":"ASK_HELP","studentText":"...","assistantText":"On va trouver le blocage exact. Choisis ce qui bloque le plus.","card":"diagnostic_selector"}</tutor-ui>
-
-Allowed ui_mode values:
-- diagnostic_mode: student asks for help finding what is difficult.
-- vocabulary_diagnostic_mode: student says words are difficult.
-- sentence_diagnostic_mode: student says a sentence is difficult.
-- example_mode: student asks for an example and the section is known.
-- explanation_mode: student asks for a small explanation.
-- quiz_mode: student asks for a quiz. Include exactly one question.
-- repair_mode: student answer is wrong, partial, or blocked.
-- summary_mode: student asks for a summary.
-- reading_mode: use only when there is a clear reason to return to normal reading.
-
-For quiz_mode, use this shape:
-<tutor-ui>{"ui_mode":"quiz_mode","event":"START_QUIZ","studentText":"...","assistantText":"Essaie cette question.","card":"quiz_card","question":{"question_text":"...","question_type":"mcq_single","options":["...","...","...","..."],"correct_answer":"...","hint":"...","explanation":"...","difficulty":1,"skill_code":"...","misconception_tag":"..."}}</tutor-ui>
-
-Rules:
-- Never show or explain the UI JSON to the student.
-- Do not include a UI instruction unless a clear tutoring state transition is useful.
-- Ask only one quiz question at a time.
-- Do not ask "Quel exemple veux-tu ?" if the lesson concept is known.
-- Do not ask broad open questions when diagnostic_mode or a diagnostic card is appropriate.
-- Keep all visible text in ${assistantLanguage.label}.`;
-    const systemInstruction = `You are a calm Levelspace tutor helping a student understand a specific lesson.
-PRIMARY RULE: First help the student locate the exact difficulty, then adapt the explanation. Use ONLY the provided LESSON CONTENT and ADDITIONAL LESSON CONTEXT.
-${socraticDiagnosticInstruction}
-${tutorUiInstruction}
+    const strictRagInstruction = strictRAG ? `\nSTRICT RAG MODE IS ENABLED: You MUST ONLY answer based on the provided LESSON CONTENT and ADDITIONAL RELEVANT CONTEXT. Do NOT generate content outside this context. Do NOT suggest ideas that are not mathematically or logically derivable strictly from the provided text.` : `SECONDARY RULE: If the user asks a question or requests information that is NOT covered in the provided contexts, answer carefully and briefly mention when you are bringing in outside knowledge to supplement the lesson.`;
+    const systemInstruction = `You are an AI tutor helping a student understand a specific lesson.
+PRIMARY RULE: You should first try to answer questions, explain concepts, extend ideas, or generate practice questions using ONLY the provided LESSON CONTENT and ADDITIONAL RELEVANT CONTEXT.
+CRITICAL LANGUAGE RULE: Your response MUST be in the exact same language as the LESSON CONTENT. If the lesson content is in Arabic, your entire response MUST be in Arabic. DO NOT use English or mix languages. The ONLY exception is if the user's message explicitly and deliberately asks you to translate or explain in another language.
+FORMATTING & CONCISENESS RULE: Keep your explanations concise, clean, and directly to the point. Do not generate long walls of text. Use short paragraphs, bullet points, and bold text for emphasis to make it easy to read. Limit your response to 2-4 short paragraphs maximum unless the user explicitly asks for a detailed essay.
 ${strictRagInstruction}
 ${subject ? `SUBJECT: ${subject}` : ""}
 ${grade ? `STUDENT LEVEL: ${grade}` : ""}
-${country ? `COUNTRY: ${country}` : ""}
-
-MANDATORY LANGUAGE: Answer entirely in ${assistantLanguage.label}. This language was selected from ${assistantLanguage.source}. Do not default to English unless the mandatory language is English.
-If the student explicitly asks to translate or explain in another language, honor that request, but otherwise keep the answer in ${assistantLanguage.label}.
-${userLanguage ? `The user's interface language is '${userLanguage}', but lesson/curriculum language takes priority for tutoring answers.` : ""}
 
 LESSON CONTENT:
 ${augmentedContext}`;
@@ -3013,7 +2921,7 @@ ${augmentedContext}`;
     }, "chatWithTutor");
 
     const responseText =
-      response.text || fallbackTutorMessage(assistantLanguage.code);
+      response.text || "I'm sorry, I couldn't generate a response.";
 
     // Save to cache
     await responseCache.set(cacheKey, responseText);
@@ -3328,7 +3236,7 @@ export const askAdminAI = async (
 
     const response = await generateContentWithFallback(
       {
-        model: "gemini-3.1-pro-preview",
+        model: resolveModelForProvider(),
         contents: prompt,
         config: {
           maxOutputTokens: 4096,
@@ -3341,6 +3249,48 @@ export const askAdminAI = async (
     return response.text?.trim() || "I couldn't generate a response.";
   } catch (error) {
     console.error("Error asking Admin AI:", error);
+    throw error;
+  }
+};
+
+export const rewriteLessonContent = async (
+  instruction: string,
+  currentContent: string,
+  title: string
+): Promise<string> => {
+  try {
+    const prompt = `You are an expert educator and content editor. Your task is to rewrite, improve, or update the educational lesson content based on the user's instructions.
+
+CRITICAL RULES:
+1. RAG Sourcing: If "Current Lesson Content" is provided, treat it as your absolute factual foundation and do not hallucinate external facts. However, if the content is empty or the instructions ask to "generate from scratch", you MAY use your extensive educational knowledge to generate a comprehensive lesson.
+2. Language & Culture: Output language MUST perfectly match the user's request or existing content. If Arabic, use Modern Standard Arabic (Fus'ha) tailored and simplified for Moroccan students (avoid overly complex classical vocabulary unless it is an Arabic Literature lesson).
+3. Subject Adaptation: If this is a Math/Science (STEM) lesson, focus on step-by-step logic, tables, formulas, and practical examples. If it is Literature/Language, focus on text analysis, quotes, grammar rules, and storytelling.
+4. Formatting: Actively use rich GitHub Flavored Markdown (bullet points, numbered lists, tables, bold text, blockquotes). Do NOT output a giant wall of plain text.
+
+Current Lesson Title: ${title}
+
+Current Lesson Content (Markdown):
+${currentContent}
+
+User Instructions:
+"${instruction}"
+
+Please return ONLY the updated/rewritten lesson content in standard Markdown. Do not include any introductory remarks, metadata, explanations, or wrapping markdown code block indicators (like \`\`\`markdown) unless specifically requested. Output the pure revised markdown content itself.`;
+
+    const response = await generateContentWithFallback(
+      {
+        model: resolveModelForProvider(),
+        contents: prompt,
+        config: {
+          maxOutputTokens: 4096,
+        },
+      },
+      "rewriteLessonContent",
+    );
+
+    return response.text?.trim() || "I couldn't generate a response.";
+  } catch (error) {
+    console.error("Error in rewriteLessonContent:", error);
     throw error;
   }
 };
@@ -3409,7 +3359,7 @@ export const auditClassroomContent = async (
 
     const response = await generateContentWithFallback(
       {
-        model: "gemini-3.1-pro-preview",
+        model: resolveModelForProvider(),
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -3466,7 +3416,7 @@ export async function smartExtractFromResource(
     
     const response = await generateContentWithFallback(
       {
-        model: "gemini-3.1-pro-preview",
+        model: resolveModelForProvider(),
         contents: [
           {
             role: "user",
@@ -3518,7 +3468,7 @@ export async function evaluateExtractionWeakness(
 
     const response = await generateContentWithFallback(
       {
-        model: "gemini-3.1-pro-preview",
+        model: resolveModelForProvider(),
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -3623,7 +3573,7 @@ export async function findSimilarResources(
 
     const response = await generateContentWithFallback(
       {
-        model: "gemini-3.1-pro-preview",
+        model: resolveModelForProvider(),
         contents: prompt,
         config: {
           tools: [{ googleSearch: {} }]
@@ -3708,13 +3658,56 @@ export const getQuickDefinition = async (
   if (!checkAIProvider()) return null;
   
   try {
-    const cacheKey = getCacheKey("getQuickDefinition", word, context);
+    const cacheKey = getCacheKey("getQuickDefinition_v2", word, context);
     const cachedResponse = await responseCache.get(cacheKey);
     if (cachedResponse) {
       console.log("Pipeline: Cache hit for getQuickDefinition");
       return safeJsonParse(cachedResponse);
     }
 
+    // 1. Attempt to use free Dictionary API first
+    try {
+      const detectLanguageFromContext = (ctx: string, w: string): "ar" | "fr" | "en" => {
+        if (/[\u0600-\u06FF]/.test(w) || /[\u0600-\u06FF]/.test(ctx)) return "ar";
+        
+        const lowerCtx = " " + ctx.toLowerCase() + " ";
+        const frWords = [" le ", " la ", " les ", " un ", " une ", " des ", " dans ", " sur ", " avec ", " est ", " et ", " au ", " aux ", " du ", " ou "];
+        const enWords = [" the ", " a ", " an ", " in ", " on ", " with ", " is ", " and ", " to ", " of ", " or "];
+        
+        let frScore = 0;
+        let enScore = 0;
+        
+        frWords.forEach(fw => { if (lowerCtx.includes(fw)) frScore++; });
+        enWords.forEach(ew => { if (lowerCtx.includes(ew)) enScore++; });
+        
+        return frScore > enScore ? "fr" : "en";
+      };
+
+      const lang = detectLanguageFromContext(context, word);
+      
+      const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/${lang}/${encodeURIComponent(word.trim().toLowerCase())}`);
+      if (res.ok) {
+        const data = await res.json();
+        const definition = data[0]?.meanings?.[0]?.definitions?.[0]?.definition;
+        if (definition) {
+          console.log(`Pipeline: Dictionary API success (${lang})`);
+          const result = {
+            definition: definition,
+            languages: {
+              en: lang === "en" ? word : "",
+              fr: lang === "fr" ? word : "",
+              ar: lang === "ar" ? word : "",
+            }
+          };
+          await responseCache.set(cacheKey, JSON.stringify(result));
+          return result;
+        }
+      }
+    } catch (dictError) {
+      console.warn("Dictionary API failed, falling back to AI:", dictError);
+    }
+
+    // 2. Fallback to AI generation
     const prompt = `You are a quick dictionary tool.
     The user has highlighted the text: "${word}".
     The surrounding lesson context is: "${context.slice(0, 500)}..."
@@ -3723,6 +3716,8 @@ export const getQuickDefinition = async (
     1. Briefly define the text/word in simple terms based on the context.
     2. Provide its translation/equivalent in English, French, and Arabic.
     
+    CRITICAL LANGUAGE RULE: The "definition" MUST be in the exact same language as the context. If the context is Arabic, the definition MUST be in Arabic.
+
     Output exactly in this JSON format:
     {
       "definition": "string",
@@ -3748,8 +3743,16 @@ export const getQuickDefinition = async (
 
     const parsed = safeJsonParse(response.text || "");
     if (parsed && parsed.definition) {
-      await responseCache.set(cacheKey, JSON.stringify(parsed));
-      return parsed;
+      const finalResult = {
+        definition: parsed.definition,
+        languages: {
+          en: parsed.languages?.en || "",
+          fr: parsed.languages?.fr || "",
+          ar: parsed.languages?.ar || "",
+        }
+      };
+      await responseCache.set(cacheKey, JSON.stringify(finalResult));
+      return finalResult;
     }
     return null;
   } catch (error) {
@@ -4388,7 +4391,7 @@ export const getDetailedWordExplanation = async (
   if (!checkAIProvider()) return null;
 
   try {
-    const cacheKey = getCacheKey("getDetailedWordExplanation", word, context);
+    const cacheKey = getCacheKey("getDetailedWordExplanation_v2", word, context);
     const cachedResponse = await responseCache.get(cacheKey);
     if (cachedResponse) {
       return safeJsonParse(cachedResponse);
@@ -4401,6 +4404,8 @@ export const getDetailedWordExplanation = async (
     Task:
     Provide a detailed, rich, multi-lingual pedagogical breakdown of this word.
     
+    CRITICAL LANGUAGE RULE: The "pedagogicalExplanation" MUST be written in the exact same language as the surrounding context. For example, if the context is in Arabic, the explanation MUST be in Arabic. Do not use English for the pedagogical explanation unless the context is in English.
+
     Return EXACTLY in this JSON format:
     {
       "word": "original word",
@@ -4412,7 +4417,7 @@ export const getDetailedWordExplanation = async (
         "fr": "French definition / equivalent",
         "ar": "Arabic definition / equivalent"
       },
-      "pedagogicalExplanation": "A student-friendly detailed explanation of what this word means in this specific educational context and curriculum.",
+      "pedagogicalExplanation": "A student-friendly detailed explanation of what this word means in this specific educational context and curriculum. (Must be in the language of the context!)",
       "examples": [
         {
           "sentence": "Example sentence using the word in context",
@@ -4436,8 +4441,16 @@ export const getDetailedWordExplanation = async (
 
     const parsed = safeJsonParse(response.text || "");
     if (parsed && parsed.definition) {
-      await responseCache.set(cacheKey, JSON.stringify(parsed));
-      return parsed as DetailedWordExplanation;
+      const finalResult = {
+        ...parsed,
+        languages: {
+          en: parsed.languages?.en || "",
+          fr: parsed.languages?.fr || "",
+          ar: parsed.languages?.ar || "",
+        }
+      };
+      await responseCache.set(cacheKey, JSON.stringify(finalResult));
+      return finalResult as DetailedWordExplanation;
     }
     return null;
   } catch (error) {

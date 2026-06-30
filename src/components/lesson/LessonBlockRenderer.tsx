@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import Markdown from 'react-markdown';
 import remarkMath from 'remark-math';
+import remarkGfm from 'remark-gfm';
 import rehypeKatex from 'rehype-katex';
 import {
   LEARNING_BLOCK_EMOJIS,
@@ -82,7 +83,7 @@ const getBlockEmoji = (block: StructuredLearningBlock) =>
   block.emoji === LEARNING_BLOCK_EMOJIS[block.type] ? block.emoji : LEARNING_BLOCK_EMOJIS[block.type];
 
 const markdownPlugins = {
-  remarkPlugins: [remarkMath],
+  remarkPlugins: [remarkMath, remarkGfm],
   rehypePlugins: [[rehypeKatex, { strict: false }]] as any,
 };
 

@@ -14,10 +14,9 @@ const CONFIRMED_ADMIN_TABLES = [
   "lesson_gen_queue",
   "rag_chunks",
   "app_settings",
-  "bac_sections",
-  "bac_tracks",
-  "bac_exams",
-  "bac_track_subjects",
+  "tracks",
+  "track_subjects",
+  "instruction_options",
   "grade_subjects",
   "ai_issues",
   "ai_tasks",
@@ -223,18 +222,23 @@ const ensureConfigured = async () => {
   return await checkSupabaseConnection();
 };
 
-const getAdminApiHeaders = async () => {
+export const getAdminApiHeaders = async () => {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
+
+  // Demo admin check MUST come first — a stale non-admin session token
+  // in the browser will otherwise override the bypass header and cause 403s.
+  if (typeof localStorage !== "undefined" && localStorage.getItem("demo_admin_logged_in") === "true") {
+    headers["x-levelspace-demo-admin"] = "true";
+    return headers;
+  }
 
   const { data } = await supabase.auth.getSession();
   const accessToken = data?.session?.access_token;
 
   if (accessToken) {
     headers.Authorization = `Bearer ${accessToken}`;
-  } else if (typeof localStorage !== "undefined" && localStorage.getItem("demo_admin_logged_in") === "true") {
-    headers["x-levelspace-demo-admin"] = "true";
   }
 
   return headers;

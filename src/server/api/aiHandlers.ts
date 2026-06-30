@@ -118,7 +118,7 @@ export async function handleAIStatus(req: ApiRequest, res: ApiResponse) {
     diagnostics: statusDiagnostics,
     models: {
       gemini: process.env.GEMINI_MODEL || "gemini-2.5-flash",
-      nvidia: process.env.NVIDIA_MODEL || "google/gemma-3-27b-it",
+      nvidia: process.env.NVIDIA_MODEL || "meta/llama-3.3-70b-instruct",
       openrouter: process.env.OPENROUTER_MODEL || "openai/gpt-4o-mini",
       openai: process.env.OPENAI_MODEL || "gpt-4o-mini",
     },

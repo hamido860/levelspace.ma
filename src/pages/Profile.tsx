@@ -68,7 +68,7 @@ export const Profile: React.FC = () => {
         const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(selectedBacTrackId);
 
         if (isUUID) {
-          const { data } = await supabase.from('bac_tracks').select('name').eq('id', selectedBacTrackId).single();
+          const { data } = await supabase.from('tracks').select('name').eq('id', selectedBacTrackId).single();
           if (data) {
             setBacTrackName(data.name);
           }
@@ -91,9 +91,9 @@ export const Profile: React.FC = () => {
   return (
     <Layout fullWidth>
       <SEO title="Profile" />
-      <div className="h-full w-full bg-background flex flex-col overflow-hidden p-4">
+      <div className="flex flex-col h-full overflow-hidden p-1 pb-[68px] md:pb-1 bg-background gap-1">
         {/* 3-Column Layout */}
-        <div className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-3 overflow-hidden">
+        <div className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-1 overflow-hidden">
 
           {/* Column 2: Main Content */}
           <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden rounded-xl border border-slate-200 bg-white p-6 shadow-lg dark:border-white/8 dark:bg-paper">

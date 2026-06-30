@@ -103,11 +103,17 @@ export function keyPreview(rawKey: string) {
 }
 
 export function toSafeMetadata(row: Partial<AiProviderKeyRow>): UserAiKeyMetadata {
+  let status = row.last_test_status || null;
+  if (status === "valid") {
+    status = "passed";
+  } else if (status === "invalid") {
+    status = "failed";
+  }
   return {
     provider: row.provider as UserAiKeyProvider,
     key_preview: row.key_preview || null,
     is_active: row.is_active !== false,
-    last_test_status: row.last_test_status || null,
+    last_test_status: status,
     last_tested_at: row.last_tested_at || null,
     updated_at: row.updated_at || null,
   };
@@ -224,10 +230,11 @@ export async function updateUserAiKeyTestStatus(
   provider: UserAiKeyProvider,
   status: "passed" | "failed",
 ) {
+  const dbStatus = status === "passed" ? "valid" : "invalid";
   const { error } = await supabase
     .from("ai_provider_keys")
     .update({
-      last_test_status: status,
+      last_test_status: dbStatus,
       last_tested_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })

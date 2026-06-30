@@ -79,7 +79,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setSession(null);
     setUser(demoUser);
     setProfile(demoProfile);
-    await db.settings.put({ key: `profile_${DEMO_ADMIN_USER_ID}`, value: demoProfile });
+    try {
+      await db.settings.put({ key: `profile_${DEMO_ADMIN_USER_ID}`, value: demoProfile });
+    } catch (e) {
+      console.warn('Failed to cache admin profile locally (storage quota exceeded?):', e);
+    }
   };
 
   const refreshDbConnection = async () => {
@@ -96,8 +100,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     // Pull cloud → local first (restores lessons on new devices / fresh sessions),
     // then push local → cloud so any offline changes are not lost.
-    await syncService.pullAll(user.id);
-    return await syncService.syncAll(user.id);
+    try {
+      await syncService.pullAll(user.id);
+      return await syncService.syncAll(user.id);
+    } catch (error: any) {
+      console.error('Data sync failed (possible QuotaExceededError):', error);
+      return { errors: [error.message || 'Data sync failed due to local storage constraints.'] };
+    }
   };
 
   useEffect(() => {
@@ -114,16 +123,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(currentSession.user);
 
         // Try to load from cache first
-        const cachedProfile = await db.settings.get(`profile_${currentSession.user.id}`);
-        if (cachedProfile) {
-          setProfile(cachedProfile.value);
-          await syncAcademicSettingsFromProfile(cachedProfile.value);
+        try {
+          const cachedProfile = await db.settings.get(`profile_${currentSession.user.id}`);
+          if (cachedProfile) {
+            setProfile(cachedProfile.value);
+            await syncAcademicSettingsFromProfile(cachedProfile.value);
+          }
+        } catch (e) {
+          console.warn('Failed to read profile from local cache:', e);
         }
 
         const userProfile = await getProfile(currentSession.user.id);
         if (userProfile) {
           setProfile(userProfile);
-          await db.settings.put({ key: `profile_${currentSession.user.id}`, value: userProfile });
+          try {
+            await db.settings.put({ key: `profile_${currentSession.user.id}`, value: userProfile });
+          } catch (e) {
+            console.warn('Failed to cache profile locally (storage quota exceeded?):', e);
+          }
           await syncAcademicSettingsFromProfile(userProfile);
         }
       } else if (localStorage.getItem(DEMO_ADMIN_STORAGE_KEY) === 'true') {
@@ -178,7 +195,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const isPro = profile?.plan === 'pro';
-  const isAdmin = profile?.role === 'admin';
+  const isAdmin = profile?.role?.toLowerCase() === 'admin';
 
   useEffect(() => {
     const initSettings = async () => {

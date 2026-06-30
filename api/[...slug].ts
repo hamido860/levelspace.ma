@@ -946,6 +946,52 @@ async function handleRagTopicRepair(req: VercelRequest, res: VercelResponse) {
   }
 }
 
+async function handleAdminLessonUpdate(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  try {
+    await requireAdminUser(req);
+    const body = getBody(req);
+    const lessonId = typeof body.lesson_id === "string" ? body.lesson_id.trim() : "";
+    if (!lessonId) {
+      return res.status(400).json({ error: "lesson_id is required." });
+    }
+
+    const allowedFields = [
+      "lesson_title", "content", "blocks", "validation_status",
+      "status", "review_notes", "reviewed_by", "reviewed_at",
+    ];
+    const updates: Record<string, any> = {};
+    for (const field of allowedFields) {
+      if (body[field] !== undefined) {
+        updates[field] = body[field];
+      }
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: "No valid fields to update." });
+    }
+
+    const supabase = getServerSupabase();
+    const { error } = await supabase
+      .from("lessons")
+      .update(updates)
+      .eq("id", lessonId);
+
+    if (error) {
+      console.error("[admin/lessons/update] Supabase error:", error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    return res.status(200).json({ success: true });
+  } catch (e: any) {
+    const status = e.statusCode || 500;
+    return res.status(status).json({ error: e.message || "Lesson update failed." });
+  }
+}
+
 async function handleSeedStarterLessons(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -1161,6 +1207,7 @@ const rootRoutes: Record<string, RouteHandler> = {
   "admin/topics/repair": handleTopicsRepair,
   "admin/rag/health": handleRagHealth,
   "admin/rag/repair-topic-links": handleRagTopicRepair,
+  "admin/lessons/update": handleAdminLessonUpdate,
   "admin/lessons/seed-starter": handleSeedStarterLessons,
 };
 

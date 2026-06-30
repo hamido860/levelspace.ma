@@ -1399,7 +1399,7 @@ export async function loadAiRecoveryJobDiagnostics(
   let existingLessonBlocksCount: number | null = 0;
   let lessonBlocksStatus: "available" | "missing_table" = "available";
 
-  let lessonRows: Array<{ id: string }> = [];
+  let lessonRows: Array<{ id: string; blocks?: any[] | null }> = [];
   if (queueJob.topic_id) {
     const { count, error: lessonsCountError } = await supabase
       .from("lessons")
@@ -1413,33 +1413,22 @@ export async function loadAiRecoveryJobDiagnostics(
 
     const { data: lessonsForBlocks, error: lessonsForBlocksError } = await supabase
       .from("lessons")
-      .select("id")
+      .select("id, blocks")
       .eq("topic_id", queueJob.topic_id);
 
     if (lessonsForBlocksError) {
       throw lessonsForBlocksError;
     }
 
-    lessonRows = (lessonsForBlocks || []) as Array<{ id: string }>;
+    lessonRows = (lessonsForBlocks || []) as Array<{ id: string; blocks?: any[] | null }>;
   }
 
-  const lessonIds = lessonRows.map((lesson) => lesson.id);
-  if (lessonIds.length > 0) {
-    const { count, error: blocksError } = await supabase
-      .from("lesson_blocks")
-      .select("*", { count: "exact", head: true })
-      .in("lesson_id", lessonIds);
-
-    if (blocksError) {
-      if (isMissingTableError(blocksError)) {
-        existingLessonBlocksCount = null;
-        lessonBlocksStatus = "missing_table";
-      } else {
-        throw blocksError;
-      }
-    } else {
-      existingLessonBlocksCount = count ?? 0;
-    }
+  if (lessonRows.length > 0) {
+    existingLessonBlocksCount = lessonRows.reduce((acc, row) => {
+      const blocksCount = Array.isArray(row.blocks) ? row.blocks.length : 0;
+      return acc + blocksCount;
+    }, 0);
+    lessonBlocksStatus = "available";
   }
 
   const outlines =
@@ -1475,10 +1464,9 @@ export async function loadAiRecoveryRecoveredLessons(
   if (!["needs_review", "approved", "rejected"].includes(status)) {
     throw new AiCommandCenterHttpError(400, "Unsupported recovered lesson status filter.");
   }
-
   const { data: lessons, error } = await supabase
     .from("lessons")
-    .select("id, lesson_title, title, subtitle, grade, subject, topic_id, teaching_contract, created_at, updated_at")
+    .select("id, lesson_title, title, subtitle, grade, subject, topic_id, blocks, teaching_contract, created_at, updated_at")
     .eq("teaching_contract->>status", status)
     .order("created_at", { ascending: false });
 
@@ -1499,24 +1487,10 @@ export async function loadAiRecoveryRecoveredLessons(
   const topicContext = await fetchTopicContext(supabase, topicIds);
   const blocksByLessonId = new Map<string, number>();
 
-  if (lessonIds.length > 0) {
-    const { data: blocks, error: blocksError } = await supabase
-      .from("lesson_blocks")
-      .select("lesson_id")
-      .in("lesson_id", lessonIds);
-
-    if (blocksError) {
-      if (!isMissingTableError(blocksError)) {
-        throw blocksError;
-      }
-    } else {
-      ((blocks || []) as JsonRecord[]).forEach((block) => {
-        const lessonId = typeof block.lesson_id === "string" ? block.lesson_id : "";
-        if (!lessonId) return;
-        blocksByLessonId.set(lessonId, (blocksByLessonId.get(lessonId) || 0) + 1);
-      });
-    }
-  }
+  lessonRows.forEach((lesson) => {
+    const blocksCount = Array.isArray(lesson.blocks) ? lesson.blocks.length : 0;
+    blocksByLessonId.set(String(lesson.id), blocksCount);
+  });
 
   return lessonRows.map((lesson) =>
     buildRecoveredLessonSummary(
@@ -1550,19 +1524,8 @@ export async function loadAiRecoveryRecoveredLessonDetail(
   let blocks: JsonRecord[] = [];
   let blocksStatus: "available" | "missing_table" = "available";
 
-  const { data: lessonBlocks, error: blocksError } = await supabase
-    .from("lesson_blocks")
-    .select("*")
-    .eq("lesson_id", lessonId);
-
-  if (blocksError) {
-    if (isMissingTableError(blocksError)) {
-      blocksStatus = "missing_table";
-    } else {
-      throw blocksError;
-    }
-  } else {
-    blocks = sortLessonBlocks((lessonBlocks || []) as JsonRecord[]);
+  if (Array.isArray(lesson.blocks)) {
+    blocks = sortLessonBlocks((lesson.blocks || []) as JsonRecord[]);
   }
 
   const topicId = typeof lesson.topic_id === "string" ? lesson.topic_id : null;
@@ -1741,61 +1704,7 @@ export async function saveRecoveredLessonReviewEdits(
     throw lessonUpdateError;
   }
 
-  if (detail.blocks_status === "available") {
-    const existingBlocks = sortLessonBlocks(detail.blocks);
-    if (existingBlocks.length !== normalizedBlocks.length) {
-      throw new AiCommandCenterHttpError(
-        400,
-        "This review page only supports editing the existing block set. Add or remove blocks directly in SQL if the lesson shape must change.",
-      );
-    }
 
-    for (let index = 0; index < normalizedBlocks.length; index += 1) {
-      const existingBlock = existingBlocks[index];
-      const incomingBlock = normalizedBlocks[index];
-      const blockId = typeof existingBlock.id === "string" ? existingBlock.id : null;
-
-      if (!blockId) {
-        throw new AiCommandCenterHttpError(400, "A lesson block row is missing its id and cannot be safely updated.");
-      }
-
-      const nextBlockPayload: JsonRecord = {
-        lesson_id: lessonId,
-        updated_at: nowIso(),
-      };
-
-      if ("order_index" in existingBlock || "order_index" in incomingBlock) {
-        nextBlockPayload.order_index = index;
-      }
-      if ("order" in existingBlock || "order" in incomingBlock) {
-        nextBlockPayload.order = index;
-      }
-      if ("position" in existingBlock || "position" in incomingBlock) {
-        nextBlockPayload.position = index;
-      }
-      if ("block_order" in existingBlock || "block_order" in incomingBlock) {
-        nextBlockPayload.block_order = index;
-      }
-      if ("title" in existingBlock || "title" in incomingBlock) {
-        nextBlockPayload.title = typeof incomingBlock.title === "string" ? incomingBlock.title : "";
-      }
-      if ("type" in existingBlock || "type" in incomingBlock) {
-        nextBlockPayload.type = normalizeLessonBlockType(incomingBlock.type);
-      }
-      if ("content" in existingBlock || "content" in incomingBlock) {
-        nextBlockPayload.content = typeof incomingBlock.content === "string" ? incomingBlock.content : "";
-      }
-
-      const { error: blockUpdateError } = await supabase
-        .from("lesson_blocks")
-        .update(nextBlockPayload)
-        .eq("id", blockId);
-
-      if (blockUpdateError) {
-        throw blockUpdateError;
-      }
-    }
-  }
 
   const sourceTaskId = typeof detail.lesson.teaching_contract.source_task_id === "string"
     ? detail.lesson.teaching_contract.source_task_id
@@ -2591,7 +2500,7 @@ export async function loadAiRecoveryTaskDetail(
   if (topicId) {
     const { data: lessons, error: lessonsError } = await supabase
       .from("lessons")
-      .select("id, lesson_title, title, topic_id, slug, teaching_contract, created_at, updated_at")
+      .select("id, lesson_title, title, topic_id, slug, blocks, teaching_contract, created_at, updated_at")
       .eq("topic_id", topicId)
       .order("created_at", { ascending: false });
 
@@ -2600,25 +2509,14 @@ export async function loadAiRecoveryTaskDetail(
     }
 
     existingLessons = (lessons || []) as JsonRecord[];
-    const lessonIds = existingLessons.map((lesson) => lesson.id).filter(Boolean);
-
-    if (lessonIds.length > 0) {
-      const { data: blocks, error: blocksError } = await supabase
-        .from("lesson_blocks")
-        .select("*")
-        .in("lesson_id", lessonIds);
-
-      if (blocksError) {
-        if (isMissingTableError(blocksError)) {
-          lessonBlocksStatus = "missing_table";
-          lessonBlocks = [];
-        } else {
-          throw blocksError;
-        }
-      } else {
-        lessonBlocks = (blocks || []) as JsonRecord[];
-      }
-    }
+    lessonBlocks = existingLessons.flatMap((lesson) => {
+      const blocks = Array.isArray(lesson.blocks) ? (lesson.blocks as JsonRecord[]) : [];
+      return blocks.map(block => ({
+        ...block,
+        lesson_id: lesson.id
+      }));
+    });
+    lessonBlocksStatus = "available";
   }
 
   return {
@@ -3370,16 +3268,179 @@ export async function loadRagChunkHealth(supabase: SupabaseClient) {
 
 export async function repairRagTopicLinks(supabase: SupabaseClient) {
   const before = await loadRagChunkHealth(supabase);
-  const { data, error } = await supabase.rpc("repair_rag_chunk_topic_links");
-  if (error) {
-    throw error;
+
+  // 1. Fetch reference data
+  const [{ data: topicsData }, { data: subjectsData }, { data: lessonsData }] = await Promise.all([
+    supabase.from("topics").select("id, grade_id, subject_id, title"),
+    supabase.from("subjects").select("id, name"),
+    supabase.from("lessons").select("id, topic_id"),
+  ]);
+
+  const topics = topicsData || [];
+  const subjects = subjectsData || [];
+  const lessons = lessonsData || [];
+
+  const normalizeStr = (str: any) => {
+    if (!str) return "";
+    return String(str)
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu, " ")
+      .trim();
+  };
+
+  const isUUID = (str: any) =>
+    str && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(str));
+
+  const lessonToTopic = new Map(lessons.filter((l) => l.topic_id).map((l) => [l.id, l.topic_id]));
+  const topicsById = new Map(topics.map((t) => [t.id, t]));
+  const subjectsByName = new Map(subjects.map((s) => [normalizeStr(s.name), s.id]));
+
+  // 2. Fetch all unlinked chunks
+  const allChunks: any[] = [];
+  let page = 0;
+  const pageSize = 1000;
+  while (true) {
+    const { data } = await supabase
+      .from("rag_chunks")
+      .select("id, grade_id, lesson_id, title, metadata")
+      .is("topic_id", null)
+      .range(page * pageSize, (page + 1) * pageSize - 1);
+
+    if (!data || data.length === 0) break;
+    allChunks.push(...data);
+    page++;
   }
+
+  const methodCounts: Record<string, number> = {
+    lesson_id: 0,
+    metadata_topic_id: 0,
+    title_match: 0,
+    single_topic_for_grade_subject: 0,
+    unmatched: 0,
+  };
+
+  const updates: any[] = [];
+  const now = new Date().toISOString();
+
+  // 3. Process each chunk in JS to find matches
+  for (const chunk of allChunks) {
+    let matchedTopicId: string | null = null;
+    let matchedGradeId = chunk.grade_id;
+    let matchMethod: string | null = null;
+
+    // Method 1: lesson_id
+    if (chunk.lesson_id && lessonToTopic.has(chunk.lesson_id)) {
+      matchedTopicId = lessonToTopic.get(chunk.lesson_id);
+      const t = topicsById.get(matchedTopicId);
+      if (t) matchedGradeId = matchedGradeId || t.grade_id;
+      matchMethod = "lesson_id";
+    }
+
+    // Method 2: metadata_topic_id
+    if (!matchedTopicId) {
+      const metaTopicId =
+        chunk.metadata?.topic_id || chunk.metadata?.topic?.id || chunk.metadata?.source?.topic_id;
+      if (isUUID(metaTopicId) && topicsById.has(metaTopicId)) {
+        matchedTopicId = metaTopicId;
+        const t = topicsById.get(matchedTopicId);
+        if (t) matchedGradeId = matchedGradeId || t.grade_id;
+        matchMethod = "metadata_topic_id";
+      }
+    }
+
+    // Method 3: title_match
+    if (!matchedTopicId && matchedGradeId) {
+      const rawTitle =
+        chunk.title ||
+        chunk.metadata?.topic_title ||
+        chunk.metadata?.topic_name ||
+        chunk.metadata?.topic ||
+        chunk.metadata?.title ||
+        chunk.metadata?.topic?.title ||
+        chunk.metadata?.source?.topic_title ||
+        chunk.metadata?.source?.title;
+      const normalizedTitle = normalizeStr(rawTitle);
+
+      if (normalizedTitle) {
+        const gradeTopics = topics.filter((t) => t.grade_id === matchedGradeId && normalizeStr(t.title).length >= 6);
+        const matches = gradeTopics.filter((t) => {
+          const nt = normalizeStr(t.title);
+          return normalizedTitle === nt || normalizedTitle.includes(nt);
+        });
+
+        if (matches.length === 1) {
+          matchedTopicId = matches[0].id;
+          matchMethod = "title_match";
+        }
+      }
+    }
+
+    // Method 4: single_topic_for_grade_subject
+    if (!matchedTopicId && matchedGradeId) {
+      const rawSubj =
+        chunk.metadata?.subject ||
+        chunk.metadata?.subject_name ||
+        chunk.metadata?.subject?.name ||
+        chunk.metadata?.source?.subject ||
+        chunk.metadata?.source?.subject_name;
+      const normalizedSubj = normalizeStr(rawSubj);
+
+      if (normalizedSubj && subjectsByName.has(normalizedSubj)) {
+        const subjId = subjectsByName.get(normalizedSubj);
+        const matches = topics.filter((t) => t.grade_id === matchedGradeId && t.subject_id === subjId);
+        if (matches.length === 1) {
+          matchedTopicId = matches[0].id;
+          matchMethod = "single_topic_for_grade_subject";
+        }
+      }
+    }
+
+    // Prepare update operation
+    if (matchedTopicId && matchMethod) {
+      methodCounts[matchMethod]++;
+      updates.push({
+        id: chunk.id,
+        topic_id: matchedTopicId,
+        grade_id: matchedGradeId,
+        metadata: {
+          ...(chunk.metadata || {}),
+          topic_link_status: "linked",
+          topic_link_method: matchMethod,
+          topic_linked_at: now,
+        },
+        updated_at: now,
+      });
+    } else if (chunk.metadata?.topic_link_status !== "unmatched") {
+      methodCounts.unmatched++;
+      updates.push({
+        id: chunk.id,
+        metadata: {
+          ...(chunk.metadata || {}),
+          topic_link_status: "unmatched",
+          topic_link_reason: "no safe topic match",
+          topic_linked_at: now,
+        },
+        updated_at: now,
+      });
+    }
+  }
+
+  // 4. Perform batch updates (concurrent execution for speed)
+  const batchSize = 100;
+  for (let i = 0; i < updates.length; i += batchSize) {
+    const batch = updates.slice(i, i + batchSize);
+    await Promise.all(
+      batch.map(async (u) => {
+        const { id, ...payload } = u;
+        await supabase.from("rag_chunks").update(payload).eq("id", id);
+      })
+    );
+  }
+
   const after = await loadRagChunkHealth(supabase);
-  const methodCounts = ((data || []) as JsonRecord[]).reduce<Record<string, number>>((acc, row) => {
-    const method = String(row.method || "unknown");
-    acc[method] = Number(row.linked_count || 0);
-    return acc;
-  }, {});
+
   const { data: unmatchedSamples, error: sampleError } = await supabase
     .from("rag_chunks")
     .select("id, content, metadata, grade_id, embedding_status")

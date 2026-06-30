@@ -1143,7 +1143,6 @@ export const LessonView: React.FC = () => {
           lessonContent={readerSourceBlocks.map((block: any) => getBlockText(block)).join('\n')}
           subject={effectiveLesson.subject}
           grade={effectiveLesson.grade}
-          country={effectiveLesson.country}
           strictRAG={true}
         />
 

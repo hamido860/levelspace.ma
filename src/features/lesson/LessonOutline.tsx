@@ -19,11 +19,12 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
 import remarkMath from 'remark-math';
+import remarkGfm from 'remark-gfm';
 import rehypeKatex from 'rehype-katex';
 import type { DisplayedLessonBlock } from './useDisplayedLessonBlocks';
 
 const markdownPlugins = {
-  remarkPlugins: [remarkMath],
+  remarkPlugins: [remarkMath, remarkGfm],
   rehypePlugins: [[rehypeKatex, { strict: false }]] as any,
 };
 
