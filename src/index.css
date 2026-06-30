@@ -434,7 +434,7 @@
   display: none;
 }
 
-@media (min-width: 1536px) {
+@media (min-width: 1280px) {
   .lesson-reader-side-panel {
     display: flex;
     width: 260px;

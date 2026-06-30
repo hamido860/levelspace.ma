@@ -812,9 +812,9 @@ export const Modules: React.FC = () => {
   return (
     <Layout fullWidth>
       <SEO title={t('curriculum_classrooms_title') || 'Syllabus & Academic Classrooms'} />
-      <div className="min-h-full w-full bg-background flex flex-col overflow-visible px-3 pb-3 pt-px sm:px-4 sm:pb-4 sm:pt-px md:h-full md:overflow-hidden">
+      <div className="min-h-full w-full bg-background flex flex-col overflow-visible p-[4px] md:h-full md:overflow-hidden">
         {/* 3-Column Layout */}
-        <div className="flex-1 min-h-0 w-full flex flex-col md:flex-row gap-3 overflow-visible md:overflow-hidden">
+        <div className="flex-1 min-h-0 w-full flex flex-col md:flex-row gap-[4px] overflow-visible md:overflow-hidden">
         
           {/* Column 2: Main Content */}
           <div className="flex-1 min-w-0 flex flex-col min-h-0 w-full overflow-visible bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 p-4 sm:p-6 md:overflow-hidden">
@@ -1206,7 +1206,7 @@ export const Modules: React.FC = () => {
 
           {/* Column 3: Right Sidebar — Focus & Tools */}
           <div className="flex md:w-[234px] w-full shrink-0 md:h-full bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 overflow-visible md:overflow-hidden flex-col p-4 sm:p-5">
-            <div className="flex-1 overflow-visible md:overflow-y-auto no-scrollbar flex flex-col gap-6 md:pr-1">
+            <div className="flex-1 overflow-visible md:overflow-y-auto no-scrollbar flex flex-col gap-1 md:pr-1">
 
               {/* Deep Focus Pomodoro - Premium Calmer Box */}
               <section className="bg-slate-900 text-white rounded-2xl p-5 relative dark:bg-surface-low">
@@ -1251,9 +1251,9 @@ export const Modules: React.FC = () => {
 
               {/* Active Classrooms */}
               {selectedModules.length > 0 && (
-                <section className="space-y-3">
+                <section className="space-y-1">
                   <p className="text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-wider">Active Classrooms</p>
-                  <div className="space-y-2">
+                  <div className="space-y-1">
                     {selectedModules.slice(0, 5).map(m => (
                       <button
                         key={m.id}
@@ -1271,7 +1271,7 @@ export const Modules: React.FC = () => {
               )}
 
               {/* Study Tips - Borderless & Collapsible */}
-              <section className="space-y-3">
+              <section className="space-y-1">
                 <button 
                   type="button" 
                   onClick={() => toggleSidebarSection('studyTips')}
@@ -1287,7 +1287,7 @@ export const Modules: React.FC = () => {
                       initial={{ height: 0, opacity: 0 }}
                       animate={{ height: 'auto', opacity: 1 }}
                       exit={{ height: 0, opacity: 0 }}
-                      className="overflow-hidden space-y-3"
+                      className="overflow-hidden space-y-1"
                     >
                       {[
                         { tip: 'Pick 2–3 subjects per day for deep work', icon: <Target size={12} /> },
@@ -1305,7 +1305,7 @@ export const Modules: React.FC = () => {
               </section>
 
               {/* Progress Summary - Borderless & Collapsible */}
-              <section className="space-y-3">
+              <section className="space-y-1">
                 <p className="text-[9px] font-bold text-slate-400 dark:text-ink-muted uppercase tracking-wider">Progress</p>
                 {modules.slice(0, 4).map(m => {
                   const lessonCount = visibleLessonCountByModuleId[m.id] ?? 0;

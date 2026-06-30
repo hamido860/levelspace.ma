@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Globe,
@@ -9,6 +9,7 @@ import {
   WifiOff,
   User,
   ShieldCheck,
+  Check,
 } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -22,6 +23,8 @@ const LANGUAGE_META = {
   de: { short: 'DE', label: 'German' },
 } as const;
 
+const LANGUAGE_OPTIONS = ['en', 'fr', 'ar', 'es', 'de'] as const;
+
 export const ActionIcons: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -30,6 +33,8 @@ export const ActionIcons: React.FC = () => {
   const { isAdmin } = useAuth();
   
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [isLanguageMenuOpen, setIsLanguageMenuOpen] = useState(false);
+  const languageMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const handleOnline = () => setIsOffline(false);
@@ -44,11 +49,29 @@ export const ActionIcons: React.FC = () => {
     };
   }, []);
 
-  const langs = ['en', 'fr', 'ar', 'es', 'de'] as const;
   const currentLanguageMeta = LANGUAGE_META[language] || LANGUAGE_META.en;
-  const nextLang = langs[(langs.indexOf(language) + 1) % langs.length];
-  const nextLanguageMeta = LANGUAGE_META[nextLang] || LANGUAGE_META.en;
-  const languageTooltip = `Current language: ${currentLanguageMeta.label}. Click to switch to ${nextLanguageMeta.label}.`;
+
+  useEffect(() => {
+    const handlePointerDown = (event: MouseEvent) => {
+      if (languageMenuRef.current && !languageMenuRef.current.contains(event.target as Node)) {
+        setIsLanguageMenuOpen(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsLanguageMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, []);
 
   return (
     <div className="flex items-center gap-2 md:gap-3">
@@ -71,19 +94,64 @@ export const ActionIcons: React.FC = () => {
         >
           {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
         </button>
-        <button
-          onClick={() => {
-            setLanguage(nextLang as any);
-          }}
-          title={languageTooltip}
-          aria-label={languageTooltip}
-          className="text-muted hover:text-accent hover:bg-surface-mid transition-all px-2.5 py-2 rounded-full flex items-center gap-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
-        >
-          <Globe size={18} />
-          <span className="text-[10px] font-black uppercase tracking-normal">
-            {currentLanguageMeta.short}
-          </span>
-        </button>
+        <div className="relative" ref={languageMenuRef}>
+          <button
+            type="button"
+            onClick={() => setIsLanguageMenuOpen((open) => !open)}
+            title={`Language: ${currentLanguageMeta.label}`}
+            aria-label={`Language: ${currentLanguageMeta.label}`}
+            aria-expanded={isLanguageMenuOpen}
+            aria-haspopup="menu"
+            className="text-muted hover:text-accent hover:bg-surface-mid transition-all px-2.5 py-2 rounded-full flex items-center gap-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
+          >
+            <Globe size={18} />
+            <span className="text-[10px] font-black uppercase tracking-normal">
+              {currentLanguageMeta.short}
+            </span>
+          </button>
+
+          {isLanguageMenuOpen && (
+            <div
+              role="menu"
+              className="absolute right-0 top-[calc(100%+0.5rem)] z-50 min-w-[180px] overflow-hidden rounded-2xl border border-ink/10 bg-surface shadow-2xl shadow-black/10"
+            >
+              <div className="border-b border-ink/5 px-3 py-2">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-muted">Language</p>
+              </div>
+              <div className="p-1.5">
+                {LANGUAGE_OPTIONS.map((langOption) => {
+                  const meta = LANGUAGE_META[langOption];
+                  const selected = langOption === language;
+                  return (
+                    <button
+                      key={langOption}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={selected}
+                      onClick={() => {
+                        setLanguage(langOption);
+                        setIsLanguageMenuOpen(false);
+                      }}
+                      className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition-all ${
+                        selected
+                          ? 'bg-accent/10 text-accent'
+                          : 'text-ink-secondary hover:bg-surface-mid hover:text-ink'
+                      }`}
+                    >
+                      <span className="flex items-center gap-2.5">
+                        <span className="text-[10px] font-black uppercase tracking-[0.18em] text-muted">
+                          {meta.short}
+                        </span>
+                        <span className="text-sm font-semibold">{meta.label}</span>
+                      </span>
+                      {selected && <Check size={16} className="shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
         {isAdmin && (
           <button
             onClick={() => navigate('/admin')}
