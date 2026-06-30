@@ -26,6 +26,9 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
 import { Layout } from '../components/Layout';
+import { WorkspaceColumns } from '../components/WorkspaceColumns';
+import { WorkspaceMainPanel } from '../components/WorkspaceMainPanel';
+import { WorkspacePage } from '../components/WorkspacePage';
 import { Modal } from '../components/Modal';
 import { TagsManager } from '../components/TagsManager';
 import { SEO } from '../components/SEO';
@@ -354,14 +357,13 @@ export const Dashboard: React.FC = () => {
   return (
     <Layout fullWidth>
       <SEO title="Dashboard" />
-      <div className="h-full w-full bg-background flex flex-col overflow-hidden p-4">
+      <WorkspacePage desktopAt="lg">
         
         {/* Symmetrical Layout Container */}
-        <div className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-3 overflow-hidden">
+        <WorkspaceColumns rowAt="lg">
           
           {/* Column 2: Main Dashboard Content (Middle Column, flex-grow) */}
-          <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 p-6">
-            <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6">
+          <WorkspaceMainPanel>
               {/* Page Header */}
               <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/5 pb-5">
                 <h1 className="ls-page-title text-slate-950 dark:text-ink">
@@ -488,8 +490,7 @@ export const Dashboard: React.FC = () => {
                 </div>
 
               </div>
-            </div>
-          </div>
+          </WorkspaceMainPanel>
 
           {/* Column 3: Dashboard Widgets Sidebar (Right Column, 260px width) */}
           <div className="flex lg:w-[234px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-5">
@@ -610,7 +611,7 @@ export const Dashboard: React.FC = () => {
 
             </div>
           </div>
-        </div>
+        </WorkspaceColumns>
       
         {/* Floating Action Button */}
         <motion.button
@@ -622,7 +623,7 @@ export const Dashboard: React.FC = () => {
           <Plus className="w-4 h-4" />
           New classroom
         </motion.button>
-      </div>
+      </WorkspacePage>
 
       {/* Audit Modal */}
       <Modal

@@ -50,7 +50,7 @@ export const AICrewStatus: React.FC = () => {
         bottom: 'calc(var(--ls-page-gap, 4px) + 4px)',
         width: 'calc(var(--ls-sidebar-width, 220px) - 8px)',
       }}
-      className="fixed z-[100] flex flex-col items-stretch gap-[4px] pointer-events-none"
+      className="fixed z-[100] hidden md:flex flex-col items-stretch gap-[4px] pointer-events-none"
     >
       <AnimatePresence>
         {isExpanded && (

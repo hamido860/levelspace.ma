@@ -96,19 +96,20 @@ const getBlockReadText = (item: DisplayedLessonBlock) =>
     ...(Array.isArray(item.block?.rules) ? item.block.rules : []),
   ].filter(Boolean).join('\n');
 
-const cleanLessonTitle = (value: string) =>
-  value
+const cleanLessonTitle = (value?: string | null) =>
+  String(value || '')
     .replace(/\.(pdf|docx?|pptx?)$/i, '')
     .replace(/[_-]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 
-const getStudentLessonTitle = (value: string) => {
+const getStudentLessonTitle = (value?: string | null) => {
   const cleaned = cleanLessonTitle(value)
     .replace(/\s*[-–—]\s*(cours|lesson|activity|activité)\b.*$/i, '')
     .replace(/\s+/g, ' ')
     .trim();
 
+  if (!cleaned) return 'Lesson';
   if (cleaned.length <= 92) return cleaned;
   const breakPoint = cleaned.lastIndexOf(' ', 89);
   return `${cleaned.slice(0, breakPoint > 52 ? breakPoint : 89).trim()}...`;
@@ -681,6 +682,14 @@ export const LessonReader: React.FC<LessonReaderProps> = ({
 
             {/* Right: Tools (Speaker & AI) */}
             <div className="flex items-center gap-2 shrink-0 sm:border-l sm:border-slate-200 sm:dark:border-white/10 sm:pl-4">
+              <LessonToolsMenu
+                canAdminEdit={isAdminMode && Boolean(onAdminEdit)}
+                canOpenWorkspace={Boolean(onOpenWorkspace)}
+                onAddNote={onAddNote}
+                onReadCurrent={() => currentBlock && onReadBlock(currentBlock.sourceIndex, getBlockReadText(currentBlock))}
+                onOpenWorkspace={onOpenWorkspace}
+                onAdminEdit={() => currentBlock && onAdminEdit?.(currentBlock.sourceIndex, currentBlock.block)}
+              />
               {currentBlock && (
                 <>
                   <button

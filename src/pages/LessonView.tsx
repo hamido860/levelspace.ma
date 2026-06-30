@@ -211,8 +211,10 @@ export const LessonView: React.FC = () => {
   const { t, language } = useLanguage();
   const { isAdmin, loading: authLoading, profile } = useAuth();
   const userRole = String(profile?.role || '').toLowerCase();
-  const canUseAdminMode = userRole === 'admin' || userRole === 'teacher';
-  const isAdminMode = canUseAdminMode && searchParams.get('mode') === 'admin';
+  const canUseAdminMode = isAdmin || userRole === 'admin' || userRole === 'teacher';
+  // Admin and teacher accounts open the editor by default. Keep an explicit
+  // student mode so privileged users can still preview the learner experience.
+  const isAdminMode = canUseAdminMode && searchParams.get('mode') !== 'student';
   const lesson = useLiveQuery(() => (id ? db.lessons.get(id) : undefined), [id]);
   const dbSettings = useLiveQuery(() => db.settings.toArray());
   const settingsMap = useMemo(() => {
@@ -229,8 +231,10 @@ export const LessonView: React.FC = () => {
     (browserGrade === 'Grade 12' && !hasPersistedAcademicGrade ? '' : browserGrade) ||
     '',
   ).trim();
-  const isAcademicSettingsLoading = authLoading || dbSettings === undefined;
   const hasAcademicGrade = Boolean(selectedAcademicGradeId || isRealGradeValue(selectedAcademicGrade));
+  // A cached/profile grade is already sufficient to open a lesson. Do not keep
+  // the reader behind auth or Dexie hydration when that value is available.
+  const isAcademicSettingsLoading = !hasAcademicGrade && (authLoading || dbSettings === undefined);
   const navigationState = (location.state || {}) as LessonNavigationState;
 
   const startAtTest = navigationState.startAtTest || false;
@@ -244,6 +248,9 @@ export const LessonView: React.FC = () => {
   const [activeDomain, setActiveDomain] = useState('all');
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [noteContent, setNoteContent] = useState('');
+  const [editingBlockIndex, setEditingBlockIndex] = useState<number | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editContent, setEditContent] = useState('');
   const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
   const [readingBlockIndex, setReadingBlockIndex] = useState<number | null>(null);
   const [quizAnswered, setQuizAnswered] = useState<Record<number, boolean>>({});
@@ -867,6 +874,31 @@ export const LessonView: React.FC = () => {
     setShowNoteModal(false);
   };
 
+  const startEditing = (sourceIndex: number, block: any) => {
+    setEditingBlockIndex(sourceIndex);
+    setEditTitle(String(block?.title || block?.label || ''));
+    setEditContent(String(block?.content || ''));
+  };
+
+  const saveEdit = async () => {
+    if (!effectiveLesson?.id || editingBlockIndex === null) return;
+
+    const currentBlocks = Array.isArray(effectiveLesson.blocks) ? effectiveLesson.blocks : [];
+    const currentBlock = currentBlocks[editingBlockIndex];
+    if (!currentBlock) return;
+
+    const newBlocks = [...currentBlocks];
+    newBlocks[editingBlockIndex] = {
+      ...currentBlock,
+      title: editTitle.trim(),
+      content: editContent,
+    };
+
+    await db.lessons.update(effectiveLesson.id, { blocks: newBlocks });
+    setSupabaseLesson((current) => current ? { ...current, blocks: newBlocks } : current);
+    setEditingBlockIndex(null);
+  };
+
   const handleUpdateBanner = async (url: string) => {
     if (effectiveLesson?.id) {
       await db.lessons.update(effectiveLesson.id, { bannerImage: url });
@@ -919,7 +951,9 @@ export const LessonView: React.FC = () => {
     );
   }
 
-  if (isLoading || lessonsInModule === undefined) {
+  // Render an available local lesson while Supabase and module navigation finish
+  // in the background. Those secondary reads must not hold the reader hostage.
+  if (!effectiveLesson && (isLoading || lessonsInModule === undefined)) {
     return (
       <Layout fullWidth>
         <div className="flex min-h-[50vh] items-center justify-center">
@@ -1002,6 +1036,7 @@ export const LessonView: React.FC = () => {
           onAddNote={() => setShowNoteModal(true)}
           onReadBlock={toggleReadAloud}
           onOpenWorkspace={() => setIsWorkspaceOpen(true)}
+          onAdminEdit={isAdminMode ? startEditing : undefined}
           onQuizAnswer={handleQuizAnswer}
           onExerciseSubmit={handleExerciseSubmit}
           onShowExerciseHint={(sourceIndex) => setExerciseHintShown((current) => ({ ...current, [sourceIndex]: true }))}
@@ -1044,6 +1079,50 @@ export const LessonView: React.FC = () => {
             >
               Save note
             </button>
+          </div>
+        </Modal>
+
+        <Modal
+          isOpen={editingBlockIndex !== null}
+          onClose={() => setEditingBlockIndex(null)}
+          title="Edit lesson block"
+        >
+          <div className="space-y-4">
+            <label className="block space-y-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted">Block title</span>
+              <input
+                type="text"
+                value={editTitle}
+                onChange={(event) => setEditTitle(event.target.value)}
+                className="w-full rounded-xl border border-ink/10 bg-surface-low p-3 text-sm text-ink outline-none focus:border-accent/40"
+              />
+            </label>
+            <label className="block space-y-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted">Content (Markdown)</span>
+              <textarea
+                value={editContent}
+                onChange={(event) => setEditContent(event.target.value)}
+                rows={10}
+                className="w-full resize-y rounded-xl border border-ink/10 bg-surface-low p-3 font-mono text-sm text-ink outline-none focus:border-accent/40"
+              />
+            </label>
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setEditingBlockIndex(null)}
+                className="rounded-xl px-4 py-2 text-xs font-bold text-muted hover:text-ink"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={saveEdit}
+                disabled={!editTitle.trim()}
+                className="rounded-xl bg-accent px-5 py-2 text-xs font-bold text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
+              >
+                Save changes
+              </button>
+            </div>
           </div>
         </Modal>
 

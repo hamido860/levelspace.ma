@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Layout } from '../components/Layout';
+import { WorkspaceColumns } from '../components/WorkspaceColumns';
+import { WorkspacePage } from '../components/WorkspacePage';
 import { SEO } from '../components/SEO';
 import {
   Filter,
@@ -812,9 +814,9 @@ export const Modules: React.FC = () => {
   return (
     <Layout fullWidth>
       <SEO title={t('curriculum_classrooms_title') || 'Syllabus & Academic Classrooms'} />
-      <div className="min-h-full w-full bg-background flex flex-col overflow-visible p-[4px] md:h-full md:overflow-hidden">
+      <WorkspacePage>
         {/* 3-Column Layout */}
-        <div className="flex-1 min-h-0 w-full flex flex-col md:flex-row gap-[4px] overflow-visible md:overflow-hidden">
+        <WorkspaceColumns>
         
           {/* Column 2: Main Content */}
           <div className="flex-1 min-w-0 flex flex-col min-h-0 w-full overflow-visible bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 p-4 sm:p-6 md:overflow-hidden">
@@ -1333,8 +1335,8 @@ export const Modules: React.FC = () => {
             </div>
           </div>
 
-        </div>
-      </div>
+        </WorkspaceColumns>
+      </WorkspacePage>
     </Layout>
   );
 };

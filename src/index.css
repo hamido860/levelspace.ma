@@ -1601,3 +1601,14 @@
   }
 }
 
+/* The sidebar and its reserved content space must switch at the same breakpoint. */
+.layout-main-with-sidebar {
+  padding-inline-start: 0;
+}
+
+@media (min-width: 768px) {
+  .layout-main-with-sidebar {
+    padding-inline-start: calc(var(--ls-sidebar-width) + var(--ls-page-gap));
+  }
+}
+

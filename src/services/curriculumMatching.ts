@@ -40,8 +40,16 @@ const SUBJECT_EQUIVALENTS: Record<string, string[]> = {
   comptabilite: ["Comptabilité", "Accounting", "Finance", "Business"],
   french: ["Langue Française", "Français", "French Language"],
   francais: ["Langue Française", "Français", "French", "French Language"],
-  arabic: ["Langue Arabe", "Arabe", "Arabic Language"],
-  arabe: ["Langue Arabe", "Arabic", "Arabic Language"],
+  arabic: ["Langue Arabe", "Arabe", "Arabic Language", "اللغة العربية", "اللغه العربيه", "العربية"],
+  arabe: ["Langue Arabe", "Arabic", "Arabic Language", "اللغة العربية", "اللغه العربيه", "العربية"],
+  "arabic language": ["Arabic", "Langue Arabe", "Arabe", "اللغة العربية", "اللغه العربيه", "العربية"],
+  "اللغة العربية": ["Arabic", "Arabic Language", "Langue Arabe", "Arabe", "العربية"],
+  "اللغه العربيه": ["Arabic", "Arabic Language", "Langue Arabe", "Arabe", "العربية"],
+  "العربية": ["Arabic", "Arabic Language", "Langue Arabe", "Arabe", "اللغة العربية"],
+  "islamic education": ["Islamic Studies", "Education Islamique", "التربية الإسلامية", "التربيه الاسلاميه", "التربية الاسلامية"],
+  "education islamique": ["Islamic Education", "Islamic Studies", "التربية الإسلامية", "التربيه الاسلاميه", "التربية الاسلامية"],
+  "التربية الاسلامية": ["Islamic Education", "Islamic Studies", "Education Islamique", "التربية الإسلامية"],
+  "التربيه الاسلاميه": ["Islamic Education", "Islamic Studies", "Education Islamique", "التربية الإسلامية"],
   english: ["Anglais", "English Language"],
   anglais: ["English", "English Language"],
   philosophy: ["Philosophie"],
@@ -122,6 +130,10 @@ export const getSubjectCandidates = (name: string, category?: string | null) => 
   const inferredCandidates =
     normalizedName.includes("fran") || normalizedCategory.includes("fran")
       ? SUBJECT_EQUIVALENTS.francais || []
+      : normalizedName.includes("arab") || normalizedCategory.includes("arab") || normalizedName.includes("العربية") || normalizedCategory.includes("العربية")
+      ? SUBJECT_EQUIVALENTS.arabic || []
+      : normalizedName.includes("islam") || normalizedCategory.includes("islam") || normalizedName.includes("التربية الاسلامية") || normalizedCategory.includes("التربية الاسلامية")
+      ? SUBJECT_EQUIVALENTS["islamic education"] || []
       : [];
   const categoryCandidates = isGenericCurriculumCategory(category)
     ? []

@@ -35,6 +35,9 @@ import {
   Lightbulb
 } from 'lucide-react';
 import { Layout } from '../components/Layout';
+import { WorkspaceColumns } from '../components/WorkspaceColumns';
+import { WorkspaceMainPanel } from '../components/WorkspaceMainPanel';
+import { WorkspacePage } from '../components/WorkspacePage';
 import { SEO } from '../components/SEO';
 import { AIAssistant } from '../components/AIAssistant';
 import { useLanguage } from '../context/LanguageContext';
@@ -437,13 +440,12 @@ export const LevelUp: React.FC = () => {
   return (
     <Layout fullWidth>
       <SEO title="LevelUp - Support Hub" />
-      <div className="h-full w-full bg-background flex flex-col overflow-hidden p-4">
+      <WorkspacePage desktopAt="lg">
         {/* 3-Column Layout */}
-        <div className="flex-grow min-h-0 w-full flex flex-col lg:flex-row gap-4 overflow-hidden">
+        <WorkspaceColumns rowAt="lg">
 
           {/* Column 2: Main Content */}
-          <div className="flex-grow flex flex-col min-h-0 w-full overflow-hidden bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 p-6">
-            <div className="flex-grow overflow-y-auto no-scrollbar flex flex-col gap-6">
+          <WorkspaceMainPanel>
 
         {/* Compact Shared Flat Tab Header */}
         <TabbedHeader
@@ -594,7 +596,7 @@ export const LevelUp: React.FC = () => {
 
             </div>
 
-          </div>
+              </div>
         )}
 
         {/* ─── TAB 2: RESOURCE VAULT (FREE EBOOKS & OUTSOURCES) ─── */}
@@ -1034,8 +1036,7 @@ export const LevelUp: React.FC = () => {
           </div>
         )}
 
-            </div>
-          </div>
+          </WorkspaceMainPanel>
 
           {/* Column 3: Right Sidebar */}
           <div className="hidden lg:flex lg:w-[260px] w-full shrink-0 h-full bg-white dark:bg-paper rounded-xl shadow-lg border border-slate-200 dark:border-white/8 overflow-hidden flex-col p-5">
@@ -1153,8 +1154,8 @@ export const LevelUp: React.FC = () => {
             </div>
           </div>
 
-        </div>
-      </div>
+        </WorkspaceColumns>
+      </WorkspacePage>
 
       {/* ─── DYNAMIC COGNITIVE AI EXPLAINER PANEL (POPUP OR CARD OVERLAY) ─── */}
       <AnimatePresence>

@@ -36,17 +36,8 @@ export const Layout: React.FC<LayoutProps> = ({
       <main 
         data-sidebar-collapsed={isCollapsed ? 'true' : 'false'}
         className={`flex-grow ${fullWidth ? 'min-h-screen md:h-screen md:overflow-hidden' : 'min-h-screen'} flex flex-col w-full pb-20 md:pb-0 transition-all duration-300 ${
-          hideSidebar ? '' : 'pt-16'
+          hideSidebar ? '' : 'layout-main-with-sidebar pt-16'
         }`}
-        style={
-          hideSidebar
-            ? undefined
-            : {
-                // The page wrapper contributes its own 4px inset. One gap here
-                // keeps the visible sidebar-to-panel distance at exactly 4px.
-                paddingInlineStart: 'calc(var(--ls-sidebar-width) + var(--ls-page-gap))',
-              }
-        }
       >
         {!hideSidebar && <Topbar isCollapsed={isCollapsed} gradeOverride={topbarGradeOverride} />}
         <div className={`${fullWidth ? 'min-h-[calc(100vh-4rem)] w-full flex flex-col overflow-y-auto md:h-[calc(100vh-4rem)] md:min-h-0 md:overflow-hidden' : 'p-2 md:p-4 mx-auto space-y-6 overflow-x-hidden max-w-[1000px] w-full'}`}>
