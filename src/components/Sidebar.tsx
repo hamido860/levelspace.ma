@@ -114,8 +114,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
         style={{
           width: 'var(--ls-sidebar-width, 220px)',
           left: 'var(--ls-page-gap, 4px)',
-          top: 'calc(var(--ls-topbar-height, 64px) + (var(--ls-page-gap, 4px) * 2))',
-          height: 'calc(100vh - var(--ls-topbar-height, 64px) - (var(--ls-page-gap, 4px) * 3))',
+          top: 'calc(var(--ls-topbar-height, 72px) + (var(--ls-page-gap, 4px) * 2))',
+          height: 'calc(100vh - var(--ls-topbar-height, 72px) - (var(--ls-page-gap, 4px) * 3))',
         }}
         className="hidden md:flex fixed bg-white dark:bg-paper flex-col p-[4px] gap-[4px] z-40 border border-slate-200 dark:border-white/8 rounded-xl shadow-lg transition-all duration-300"
       >
