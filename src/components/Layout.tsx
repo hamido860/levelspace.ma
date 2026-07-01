@@ -22,7 +22,7 @@ export const Layout: React.FC<LayoutProps> = ({
         ['--ls-page-gap' as string]: '4px',
         // Tailwind's h-16/pt-16 resolve to 56px in this app because the root
         // font size is 87.5%. Keep the fixed rail on the same measured grid.
-        ['--ls-topbar-height' as string]: '56px',
+        ['--ls-topbar-height' as string]: '72px',
         ['--ls-sidebar-width' as string]: isCollapsed ? '60px' : '220px',
       } as React.CSSProperties);
 
@@ -36,11 +36,11 @@ export const Layout: React.FC<LayoutProps> = ({
       <main 
         data-sidebar-collapsed={isCollapsed ? 'true' : 'false'}
         className={`flex-grow ${fullWidth ? 'min-h-screen md:h-screen md:overflow-hidden' : 'min-h-screen'} flex flex-col w-full pb-20 md:pb-0 transition-all duration-300 ${
-          hideSidebar ? '' : 'layout-main-with-sidebar pt-16'
+          hideSidebar ? '' : 'layout-main-with-sidebar pt-[80px]'
         }`}
       >
         {!hideSidebar && <Topbar isCollapsed={isCollapsed} gradeOverride={topbarGradeOverride} />}
-        <div className={`${fullWidth ? 'min-h-[calc(100vh-4rem)] w-full flex flex-col overflow-y-auto md:h-[calc(100vh-4rem)] md:min-h-0 md:overflow-hidden' : 'p-2 md:p-4 mx-auto space-y-6 overflow-x-hidden max-w-[1000px] w-full'}`}>
+        <div className={`${fullWidth ? 'min-h-[calc(100vh-84px)] w-full flex flex-col overflow-y-auto md:h-[calc(100vh-84px)] md:min-h-0 md:overflow-hidden' : 'px-2 md:px-4 pt-0 pb-4 mx-auto space-y-6 overflow-x-hidden max-w-[1000px] w-full'}`}>
           {children}
         </div>
       </main>

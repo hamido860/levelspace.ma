@@ -29,11 +29,7 @@ export const Topbar: React.FC<TopbarProps> = ({ isCollapsed = false, gradeOverri
 
   return (
     <header
-      className={`h-16 border border-slate-200 dark:border-white/8 bg-white dark:bg-paper fixed z-30 px-3 flex items-center justify-between gap-4 transition-all duration-300 shadow-md ${
-        isCollapsed 
-          ? 'md:left-[72px]' 
-          : 'md:left-[242px]'
-      } left-1 right-1 top-1 rounded-xl`}
+      className={`h-[72px] border border-slate-200 dark:border-white/8 bg-white dark:bg-paper fixed z-30 px-3 flex items-center justify-between gap-4 transition-all duration-300 shadow-md md:left-[var(--ls-page-gap,4px)] md:top-[var(--ls-page-gap,4px)] md:right-[var(--ls-page-gap,4px)] left-1 right-1 top-1 rounded-xl`}
     >
       <UserProfile currentGrade={currentGrade} />
       <SearchBar />
