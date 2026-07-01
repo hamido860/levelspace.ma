@@ -16,8 +16,7 @@ export const SearchBar: React.FC = () => {
           placeholder={t('search')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          style={{ backgroundColor: 'var(--accent-soft)' }}
-          className="w-full h-7 ps-9 pe-3 bg-paper/50 border border-ink/5 rounded-full text-sm focus:ring-1 focus:ring-accent/20 outline-none transition-all hover:bg-paper"
+          className="w-full h-7 ps-9 pe-3 bg-surface-low border border-ink/5 rounded-full text-sm focus:ring-1 focus:ring-accent/20 outline-none transition-all hover:bg-surface-mid/50"
         />
       </div>
     </div>

@@ -566,7 +566,7 @@ export const Settings: React.FC = () => {
                 </div>
                 <div className="min-w-0 space-y-1 rounded-xl border border-ink/5 bg-surface-low p-4">
                   <span className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('grade')}</span>
-                  <p className="truncate text-sm font-semibold text-ink">{selectedGrade || t('not_set')}</p>
+                  <p className="truncate text-sm font-semibold text-success">{selectedGrade || t('not_set')}</p>
                 </div>
                 <div className="min-w-0 space-y-1 rounded-xl border border-ink/5 bg-surface-low p-4">
                   <span className="text-[10px] font-bold uppercase tracking-normal text-muted">{t('track')}</span>
@@ -654,26 +654,26 @@ export const Settings: React.FC = () => {
                             }}
                             className={`flex min-h-[70px] items-center justify-between gap-3 rounded-xl border p-3 text-left transition-all ${
                               selectedGradeId === grade.id
-                                ? 'bg-accent border-accent text-paper shadow-sm shadow-accent/20'
+                                ? 'border-2 border-success bg-success/5 text-success shadow-sm shadow-success/10'
                                 : 'bg-background border-ink/5 text-ink hover:border-accent/30'
                             }`}
                           >
                             <span className="flex min-w-0 items-center gap-3">
                               <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-bold ${
-                                selectedGradeId === grade.id ? 'bg-paper/15 text-paper' : 'bg-accent/8 text-accent'
+                                selectedGradeId === grade.id ? 'bg-success/15 text-success' : 'bg-accent/8 text-accent'
                               }`}>
                                 {typeof grade.grade_order === 'number' ? grade.grade_order : '-'}
                               </span>
                               <span className="min-w-0">
                                 <span className="block truncate text-sm font-semibold leading-tight">{grade.name}</span>
                                 <span className={`mt-1 block text-[10px] font-medium uppercase tracking-normal ${
-                                  selectedGradeId === grade.id ? 'text-paper/70' : 'text-muted'
+                                  selectedGradeId === grade.id ? 'text-success/70' : 'text-muted'
                                 }`}>
                                   {selectedGradeId === grade.id ? 'Selected stage' : 'Available stage'}
                                 </span>
                               </span>
                             </span>
-                            {selectedGradeId === grade.id && <CheckCircle2 className="w-3.5 h-3.5 text-paper shrink-0" />}
+                            {selectedGradeId === grade.id && <CheckCircle2 className="w-3.5 h-3.5 text-success shrink-0" />}
                           </button>
                         )) : currentGrades.map((grade, index) => (
                           <button
@@ -684,12 +684,12 @@ export const Settings: React.FC = () => {
                             }}
                             className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
                               selectedGrade === grade
-                                ? 'bg-accent border-accent text-paper shadow-sm shadow-accent/20'
+                                ? 'border-2 border-success bg-success/5 text-success shadow-sm shadow-success/10'
                                 : 'bg-background border-ink/5 text-ink hover:border-accent/30'
                             }`}
                           >
                             <span className="text-xs font-medium">{grade}</span>
-                            {selectedGrade === grade && <CheckCircle2 className="w-3.5 h-3.5 text-paper" />}
+                            {selectedGrade === grade && <CheckCircle2 className="w-3.5 h-3.5 text-success" />}
                           </button>
                         ))}
                       </div>
@@ -729,12 +729,12 @@ export const Settings: React.FC = () => {
                               }}
                               className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
                                 bacTrack === track.id
-                                  ? 'bg-accent border-accent text-paper shadow-sm shadow-accent/20'
+                                  ? 'border-2 border-success bg-success/5 text-success shadow-sm shadow-success/10'
                                   : 'bg-background border-ink/5 text-ink hover:border-accent/30'
                               }`}
                             >
                               <span className="text-xs font-medium text-left pr-2">{track.name}</span>
-                              {bacTrack === track.id && <CheckCircle2 className="w-3.5 h-3.5 text-paper shrink-0" />}
+                              {bacTrack === track.id && <CheckCircle2 className="w-3.5 h-3.5 text-success shrink-0" />}
                             </button>
                           ))}
                         </div>
@@ -750,12 +750,12 @@ export const Settings: React.FC = () => {
                                 onClick={() => setBacIntOption(option.id)}
                                 className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
                                   bacIntOption === option.id
-                                    ? 'bg-accent border-accent text-paper shadow-sm shadow-accent/20'
+                                    ? 'border-2 border-success bg-success/5 text-success shadow-sm shadow-success/10'
                                     : 'bg-background border-ink/5 text-ink hover:border-accent/30'
                                 }`}
                               >
                                 <span className="text-xs font-medium text-left pr-2">{option.name}</span>
-                                {bacIntOption === option.id && <CheckCircle2 className="w-3.5 h-3.5 text-paper shrink-0" />}
+                                {bacIntOption === option.id && <CheckCircle2 className="w-3.5 h-3.5 text-success shrink-0" />}
                               </button>
                             ))}
                           </div>
