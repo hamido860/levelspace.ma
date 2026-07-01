@@ -22,7 +22,7 @@ export const Layout: React.FC<LayoutProps> = ({
         ['--ls-page-gap' as string]: '4px',
         // Tailwind's h-16/pt-16 resolve to 56px in this app because the root
         // font size is 87.5%. Keep the fixed rail on the same measured grid.
-        ['--ls-topbar-height' as string]: '56px',
+        ['--ls-topbar-height' as string]: '64px',
         ['--ls-sidebar-width' as string]: isCollapsed ? '60px' : '220px',
       } as React.CSSProperties);
 

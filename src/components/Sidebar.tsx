@@ -112,7 +112,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, setIsColl
       {/* Desktop Sidebar */}
       <aside 
         style={{
-          width: 'var(--ls-sidebar-width, 234px)',
+          width: 'var(--ls-sidebar-width, 220px)',
           left: 'var(--ls-page-gap, 4px)',
           top: 'calc(var(--ls-topbar-height, 64px) + var(--ls-page-gap, 4px))',
           height: 'calc(100vh - var(--ls-topbar-height, 64px) - (var(--ls-page-gap, 4px) * 2))',
