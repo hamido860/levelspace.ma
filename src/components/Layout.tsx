@@ -40,7 +40,7 @@ export const Layout: React.FC<LayoutProps> = ({
         }`}
       >
         {!hideSidebar && <Topbar isCollapsed={isCollapsed} gradeOverride={topbarGradeOverride} />}
-        <div className={`${fullWidth ? 'min-h-[calc(100vh-4rem)] w-full flex flex-col overflow-y-auto md:h-[calc(100vh-4rem)] md:min-h-0 md:overflow-hidden' : 'p-2 md:p-4 mx-auto space-y-6 overflow-x-hidden max-w-[1000px] w-full'}`}>
+        <div className={`${fullWidth ? 'min-h-[calc(100vh-76px)] w-full flex flex-col overflow-y-auto md:h-[calc(100vh-76px)] md:min-h-0 md:overflow-hidden' : 'p-2 md:p-4 mx-auto space-y-6 overflow-x-hidden max-w-[1000px] w-full'}`}>
           {children}
         </div>
       </main>
